@@ -10,6 +10,7 @@ on:
     paths-ignore:
       - "**/*.md"
       - "docs/**"
+      - "screenshots/**"
   workflow_dispatch:
     inputs:
       build_name:
