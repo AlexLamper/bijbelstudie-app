@@ -7,15 +7,15 @@ already-shipping pipeline; the only differences are the working directory
 
 You need the following **one-time setup** before it works.
 
-Bundle identifier for this app: **`com.bijbelstudie.app`**
-(RunnerTests: `com.bijbelstudie.app.RunnerTests`)
+Bundle identifier for this app: **`com.bijbel-studie.app`**
+(RunnerTests: `com.bijbel-studie.app.RunnerTests`)
 
 ---
 
 ## Step 1 — Register the App ID and enable Sign in with Apple
 
 1. [Apple Developer portal](https://developer.apple.com) → **Identifiers** →
-   register App ID `com.bijbelstudie.app`.
+   register App ID `com.bijbel-studie.app`.
 2. Enable the **Sign In with Apple** capability on it.
 
 This is not optional. The workflow **hard-fails** if the provisioning profile
@@ -42,7 +42,7 @@ app's OAuth client can leak into this binary:
 | `GIDClientID` | `PUT_YOUR_GID_CLIENT_ID_HERE` | iOS client ID, e.g. `1234-abcd.apps.googleusercontent.com` |
 
 Get both from **Google Cloud Console → Credentials → OAuth client ID (iOS)**
-created for `com.bijbelstudie.app`.
+created for `com.bijbel-studie.app`.
 
 Android additionally needs a *web* client ID passed at build time:
 `--dart-define=GOOGLE_WEB_CLIENT_ID=...`. iOS does not — it reads `GIDClientID`
@@ -68,7 +68,7 @@ On a Mac signed into your Apple Developer account:
 2. Right-click → **Export** → `distribution.p12`, with a strong password.
 3. Base64 it: `base64 -i distribution.p12 | pbcopy`
 4. Developer portal → **Profiles** → new **App Store** distribution profile for
-   `com.bijbelstudie.app`. Regenerate it *after* Step 1, or the entitlement
+   `com.bijbel-studie.app`. Regenerate it *after* Step 1, or the entitlement
    check in the workflow fails by design.
 5. Download the `.mobileprovision` and base64 it:
    `base64 -i BijbelStudie_AppStore.mobileprovision | pbcopy`
@@ -97,7 +97,7 @@ GitHub repository → **Settings → Secrets and variables → Actions**.
 
 | Variable name | Value |
 |---|---|
-| `APPLE_SERVICE_ID` | `com.bijbelstudie.app.signin` |
+| `APPLE_SERVICE_ID` | `com.bijbel-studie.app.signin` |
 | `APPLE_REDIRECT_URI` | `https://www.bijbel-studie.com/api/v1/auth/apple/callback` |
 
 The build step fails fast with a named message if any of these is missing, so a
@@ -116,7 +116,7 @@ The app talks to `https://www.bijbel-studie.com/api/v1`. That surface needs:
 | Env var | Purpose |
 |---|---|
 | `MOBILE_JWT_SECRET` | signs mobile access tokens. **Must differ from `NEXTAUTH_SECRET`** — a leaked mobile secret must not forge website sessions |
-| `APPLE_CLIENT_IDS` | `com.bijbelstudie.app` (comma-separated if you add the Services ID) |
+| `APPLE_CLIENT_IDS` | `com.bijbel-studie.app` (comma-separated if you add the Services ID) |
 | `GOOGLE_MOBILE_CLIENT_IDS` | iOS + Android + web OAuth client IDs, comma-separated |
 | `REVENUECAT_WEBHOOK_AUTHORIZATION` | exact value set in the RevenueCat webhook config |
 | `REVENUECAT_REST_API_KEY` | `sk_...`, required by `/api/v1/sync-premium` |
