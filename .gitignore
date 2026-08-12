@@ -1,0 +1,39 @@
+# ─── Credentials. Never commit any of these. ─────────────────────────────────
+# The signing material for this app lives in GitHub Actions secrets and on your
+# Mac, never in the repository. See docs/ios-release-setup.md.
+*.p12
+*.mobileprovision
+*.p8
+*.jks
+*.keystore
+*.pem
+*.cer
+*.certSigningRequest
+key.properties
+**/android/key.properties
+**/android/app/*.jks
+**/android/app/upload_certificate.pem
+GoogleService-Info.plist
+google-services.json
+.env
+.env.*
+
+# ─── Build output ────────────────────────────────────────────────────────────
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/android/.gradle/
+**/android/local.properties
+
+# ─── IDE ─────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,294 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/config/app_config.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_widgets.dart';
+import '../../profile/data/profile_model.dart';
+import '../../profile/present/profile_provider.dart';
+import '../data/purchase_service.dart';
+import 'premium_controller.dart';
+
+enum _ProPlan { monthly, yearly }
+
+/// The paywall.
+///
+/// Guideline 3.1.1: StoreKit products only. There is deliberately no Stripe
+/// link, no "abonneer op onze website", and no external purchase URL anywhere
+/// in this file — on the EU storefront that is an automatic rejection. Users
+/// who already pay on the web keep Pro through `/api/v1/me` and are shown a
+/// status card instead of a purchase button.
+class PremiumScreen extends ConsumerStatefulWidget {
+  const PremiumScreen({super.key});
+
+  @override
+  ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
+}
+
+class _PremiumScreenState extends ConsumerState<PremiumScreen> {
+  _ProPlan _selectedPlan = _ProPlan.yearly;
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<PremiumState>(premiumControllerProvider, (previous, next) {
+      if (next.status == PurchaseStatus.success) {
+        ref.read(premiumControllerProvider.notifier).clearStatus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pro is geactiveerd. Bedankt!')),
+        );
+      }
+      if (next.status == PurchaseStatus.error && next.errorMessage != null) {
+        ref.read(premiumControllerProvider.notifier).clearStatus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.errorMessage!)),
+        );
+      }
+    });
+
+    final premiumState = ref.watch(premiumControllerProvider);
+    final profile = ref.watch(profileProvider).value;
+    final isLoading = premiumState.status == PurchaseStatus.loading;
+
+    final service = ref.read(purchaseServiceProvider);
+    final monthlyPackage = service.findMonthlyPackage(premiumState.packages);
+    final yearlyPackage = service.findYearlyPackage(premiumState.packages);
+    final monthlyPrice = monthlyPackage?.storeProduct.priceString ?? '—';
+    final yearlyPrice = yearlyPackage?.storeProduct.priceString ?? '—';
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text('BijbelStudie Pro')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        children: [
+          if (profile != null && profile.isPro)
+            _ActiveCard(profile: profile)
+          else ...[
+            const _Benefits(),
+            const SizedBox(height: 24),
+            _PlanTile(
+              title: 'Maandelijks',
+              subtitle: 'Elke maand opzegbaar',
+              price: monthlyPrice,
+              priceSuffix: 'per maand',
+              selected: _selectedPlan == _ProPlan.monthly,
+              onTap: () => setState(() => _selectedPlan = _ProPlan.monthly),
+            ),
+            const SizedBox(height: 12),
+            _PlanTile(
+              title: 'Jaarlijks',
+              subtitle: 'Eén keer per jaar betalen',
+              price: yearlyPrice,
+              priceSuffix: 'per jaar',
+              badge: 'Voordeligst',
+              selected: _selectedPlan == _ProPlan.yearly,
+              onTap: () => setState(() => _selectedPlan = _ProPlan.yearly),
+            ),
+            const SizedBox(height: 20),
+            SiteButton(
+              label: 'Pro nemen',
+              loading: isLoading,
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      final notifier = ref.read(premiumControllerProvider.notifier);
+                      if (_selectedPlan == _ProPlan.monthly) {
+                        notifier.purchaseMonthly();
+                      } else {
+                        notifier.purchaseYearly();
+                      }
+                    },
+            ),
+            const SizedBox(height: 10),
+            // App Store review requires a visible restore action.
+            SiteOutlineButton(
+              label: 'Aankopen herstellen',
+              onPressed: isLoading
+                  ? null
+                  : () => ref.read(premiumControllerProvider.notifier).restorePurchases(),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Het abonnement wordt automatisch verlengd tenzij je het minstens 24 uur voor '
+              'het einde van de periode opzegt. Beheren en opzeggen doe je in je '
+              'Apple ID-instellingen.',
+              style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => _open(AppConfig.termsOfUseUrl),
+                child: const Text('Voorwaarden'),
+              ),
+              TextButton(
+                onPressed: () => _open(AppConfig.privacyPolicyUrl),
+                child: const Text('Privacy'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _open(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class _ActiveCard extends StatelessWidget {
+  const _ActiveCard({required this.profile});
+
+  final ProfileModel profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SiteBadge.positive(profile.isProFromWeb ? 'Actief via web' : 'Actief'),
+          const SizedBox(height: 12),
+          Text('Je hebt Pro', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text(
+            profile.isProFromWeb
+                // No link, no instructions to go somewhere and pay: stating
+                // that access already applies here is what the multiplatform
+                // exception allows.
+                ? 'Je abonnement loopt buiten de App Store om en geldt ook in deze app.'
+                : 'Beheer of stop je abonnement in je Apple ID-instellingen.',
+            style: AppTheme.bodyMuted,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Benefits extends StatelessWidget {
+  const _Benefits();
+
+  static const _items = [
+    ('Offline lezen', 'Bewaar hele bijbelboeken op je toestel en lees zonder verbinding.'),
+    ('Alle commentaren', 'Matthew Henry en Dachsel bij elk hoofdstuk.'),
+    ('Grondtekst', 'Hebreeuws en Grieks met transliteratie en Strong-nummers.'),
+    ('Onbeperkt notities', 'Markeringen, notities en bladwijzers, gesynchroniseerd met de website.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Eyebrow('Pro'),
+        const SizedBox(height: 10),
+        Text('Verdiep je studie', style: AppTheme.displaySmall),
+        const SizedBox(height: 16),
+        RuleGrid(
+          children: [
+            for (var i = 0; i < _items.length; i++)
+              RuleListTile(
+                showRule: i < _items.length - 1,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.check, size: 16, color: AppTheme.positive),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_items[i].$1, style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 2),
+                          Text(
+                            _items[i].$2,
+                            style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PlanTile extends StatelessWidget {
+  const _PlanTile({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.priceSuffix,
+    required this.selected,
+    required this.onTap,
+    this.badge,
+  });
+
+  final String title;
+  final String subtitle;
+  final String price;
+  final String priceSuffix;
+  final bool selected;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$title, $price $priceSuffix',
+      child: AppCard(
+        onTap: onTap,
+        borderColor: selected ? AppTheme.teal : AppTheme.rule,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(title, style: Theme.of(context).textTheme.titleMedium),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        SiteBadge.lapis(badge!),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(price, style: Theme.of(context).textTheme.headlineMedium),
+                Text(priceSuffix, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Icon(
+              selected ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 20,
+              color: selected ? AppTheme.teal : AppTheme.inkMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
