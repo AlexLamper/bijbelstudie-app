@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The logo mark's own ground, from public/images/logo.svg. -->
+    <color name="ic_launcher_background">#262626</color>
     <!-- Matches the paper background on www.bijbel-studie.com -->
-    <color name="ic_launcher_background">#FAF9F6</color>
     <color name="paper">#FAF9F6</color>
 </resources>

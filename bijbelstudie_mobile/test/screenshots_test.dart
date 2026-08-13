@@ -31,6 +31,8 @@ import 'package:bijbelstudie_mobile/features/studies/data/study_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart';
 
+import 'screenshot_fixtures.dart';
+
 /// Renders the store screenshots.
 ///
 /// iOS cannot be built on this machine, so these come out of the widget tester
@@ -43,17 +45,51 @@ import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart
 ///   flutter test test/screenshots_test.dart
 ///
 /// Output: ../screenshots/6.5/
-const double kScale = 3.0;
-const Size kLogicalSize = Size(428, 926);
+/// One App Store Connect screenshot slot.
+///
+/// `logical * scale` is the pixel size Apple wants, so the capture is always
+/// 1:1 and nothing is ever resampled.
+class ShotDevice {
+  const ShotDevice({
+    required this.slug,
+    required this.logical,
+    required this.scale,
+    required this.pixels,
+  });
 
-const String kOutDir = '../screenshots/6.5';
+  final String slug;
+  final Size logical;
+  final double scale;
+  final Size pixels;
+
+  String get outDir => '../screenshots/$slug';
+}
+
+const List<ShotDevice> kDevices = [
+  // iPhone 14/15 Pro Max — the 6.5"/6.9" slot. Apple derives the smaller
+  // iPhone sizes from this one.
+  ShotDevice(
+    slug: '6.5',
+    logical: Size(428, 926),
+    scale: 3.0,
+    pixels: Size(1284, 2778),
+  ),
+  // iPad Pro 13" (M4) — the 13" slot, mandatory because the app ships as
+  // universal (TARGETED_DEVICE_FAMILY = "1,2").
+  ShotDevice(
+    slug: '13-ipad',
+    logical: Size(1032, 1376),
+    scale: 2.0,
+    pixels: Size(2064, 2752),
+  ),
+];
 
 final GlobalKey _captureKey = GlobalKey();
 
 /// The icon font ships with the framework, not with the app, so it is loaded
 /// from the Flutter cache. Without it every `Icon()` renders as an empty box.
 Future<void> loadMaterialIcons() async {
-  final root = Platform.environment['FLUTTER_ROOT'] ?? r'C:lutter';
+  final root = Platform.environment['FLUTTER_ROOT'] ?? 'C:/flutter';
   final file = File('$root/bin/cache/artifacts/material_fonts/materialicons-regular.otf');
   if (!file.existsSync()) {
     throw StateError('Material icon font not found at ${file.path}');
@@ -201,7 +237,9 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     await loadMaterialIcons();
     await loadAppFonts();
-    Directory(kOutDir).createSync(recursive: true);
+    for (final device in kDevices) {
+      Directory(device.outDir).createSync(recursive: true);
+    }
   });
 
   const versions = [
@@ -232,48 +270,16 @@ void main() {
     sourceId: 'statenvertaling',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Statenvertaling (1637) — publiek domein',
-    verses: [
-      Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
-      Verse(
-        number: 2,
-        text:
-            'De aarde nu was woest en ledig, en duisternis was op den afgrond; '
-            'en de Geest Gods zweefde op de wateren.',
-      ),
-      Verse(number: 3, text: 'En God zeide: Daar zij licht! en daar werd licht.'),
-      Verse(number: 4, text: 'En God zag het licht, dat het goed was; en God maakte '
-          'scheiding tussen het licht en tussen de duisternis.'),
-      Verse(number: 5, text: 'En God noemde het licht dag, en de duisternis noemde Hij '
-          'nacht. Toen was het avond geweest, en het was morgen geweest, de eerste dag.'),
-      Verse(number: 6, text: 'En God zeide: Daar zij een uitspansel in het midden der '
-          'wateren; en dat make scheiding tussen wateren en wateren!'),
-    ],
+    attribution: kGenesisAttribution,
+    verses: kGenesis1Verses,
   );
 
   const commentaryChapter = ChapterContent(
     sourceId: 'matthew_henry_nl',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Matthew Henry (1662–1714) — publiek domein',
-    verses: [
-      Verse(
-        number: 0,
-        text: 'De grondslag van alle Godsdienst ligt in God als Schepper. Het eerste '
-            'hoofdstuk van de Bijbel geeft geen bewijs voor Gods bestaan, maar zet Hem '
-            'zonder omhaal aan het begin van alles wat is.',
-      ),
-      Verse(
-        number: 1,
-        text: 'De eerste woorden stellen God voor als de Schepper. Hemel en aarde staan '
-            'hier voor het geheel van de schepping, zichtbaar en onzichtbaar.',
-      ),
-      Verse(
-        number: 3,
-        text: 'Het licht wordt geroepen, niet gemaakt uit iets anders. Gods woord is '
-            'genoeg; wat Hij spreekt, staat er.',
-      ),
-    ],
+    attribution: kCommentaryAttribution,
+    verses: kMatthewHenryGenesis1,
   );
 
   final proProfile = ProfileModel(
@@ -314,6 +320,30 @@ void main() {
       translation: 'statenvertaling',
       isHighlight: false,
       updatedAt: DateTime(2026, 8, 4),
+    ),
+    StudyNote(
+      id: 'n3',
+      book: 'Psalmen',
+      chapter: 23,
+      verse: 1,
+      verseText: 'De HEERE is mijn Herder, mij zal niets ontbreken.',
+      noteText: 'Herder is hier geen sfeerbeeld maar een bestuursvorm: de herder '
+          'bepaalt de route.',
+      translation: 'statenvertaling',
+      isHighlight: false,
+      updatedAt: DateTime(2026, 8, 6),
+    ),
+    StudyNote(
+      id: 'n4',
+      book: 'Genesis',
+      chapter: 1,
+      verse: 27,
+      verseText: 'En God schiep den mens naar Zijn beeld.',
+      noteText: 'Naar Zijn beeld — gezegd van iedereen, voordat er ook maar iets '
+          'gepresteerd is.',
+      translation: 'statenvertaling',
+      isHighlight: false,
+      updatedAt: DateTime(2026, 8, 7),
     ),
   ];
 
@@ -385,7 +415,7 @@ void main() {
     );
   }
 
-  Future<void> capture(WidgetTester tester, String fileName) async {
+  Future<void> capture(WidgetTester tester, ShotDevice device, String fileName) async {
     // Let any pending image/layout work finish before reading pixels.
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
@@ -393,30 +423,38 @@ void main() {
 
     late final ByteData? png;
     await tester.runAsync(() async {
-      final image = await boundary.toImage(pixelRatio: kScale);
+      final image = await boundary.toImage(pixelRatio: device.scale);
       png = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
     });
 
     final bytes = png!.buffer.asUint8List();
-    final file = File('$kOutDir/$fileName.png');
-    file.writeAsBytesSync(bytes);
+    File('${device.outDir}/$fileName.png').writeAsBytesSync(bytes);
 
     // Guard the one thing Apple rejects outright: wrong dimensions. Read them
     // straight out of the PNG's IHDR chunk — `decodeImageFromList` needs the
     // real event loop and deadlocks under the test binding.
     final header = ByteData.view(bytes.buffer);
-    expect(header.getUint32(16), 1284, reason: '$fileName has the wrong width');
-    expect(header.getUint32(20), 2778, reason: '$fileName has the wrong height');
+    expect(
+      header.getUint32(16),
+      device.pixels.width.round(),
+      reason: '${device.slug}/$fileName has the wrong width',
+    );
+    expect(
+      header.getUint32(20),
+      device.pixels.height.round(),
+      reason: '${device.slug}/$fileName has the wrong height',
+    );
   }
 
   Future<void> pump(
     WidgetTester tester,
+    ShotDevice device,
     Widget screen, {
     ProfileModel? profile,
   }) async {
-    tester.view.physicalSize = kLogicalSize * kScale;
-    tester.view.devicePixelRatio = kScale;
+    tester.view.physicalSize = device.logical * device.scale;
+    tester.view.devicePixelRatio = device.scale;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(host(screen, profile: profile ?? proProfile));
@@ -424,38 +462,22 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   }
 
-  testWidgets('01 dashboard', (tester) async {
-    await pump(tester, const DashboardScreen());
-    await capture(tester, '01-dashboard');
-  });
+  for (final device in kDevices) {
+    group(device.slug, () {
+      void shot(String fileName, Widget Function() screen, {bool free = false}) {
+        testWidgets(fileName, (tester) async {
+          await pump(tester, device, screen(), profile: free ? freeProfile : null);
+          await capture(tester, device, fileName);
+        });
+      }
 
-  testWidgets('02 reader', (tester) async {
-    await pump(tester, const ReadScreen());
-    await capture(tester, '02-lezen');
-  });
-
-  testWidgets('03 commentary', (tester) async {
-    await pump(tester, const CommentaryScreen());
-    await capture(tester, '03-commentaar');
-  });
-
-  testWidgets('04 studies', (tester) async {
-    await pump(tester, const StudiesScreen());
-    await capture(tester, '04-studies');
-  });
-
-  testWidgets('05 notes', (tester) async {
-    await pump(tester, const NotesScreen());
-    await capture(tester, '05-notities');
-  });
-
-  testWidgets('06 profile', (tester) async {
-    await pump(tester, const ProfileScreen());
-    await capture(tester, '06-profiel');
-  });
-
-  testWidgets('07 paywall', (tester) async {
-    await pump(tester, const PremiumScreen(), profile: freeProfile);
-    await capture(tester, '07-pro');
-  });
+      shot('01-dashboard', DashboardScreen.new);
+      shot('02-lezen', ReadScreen.new);
+      shot('03-commentaar', CommentaryScreen.new);
+      shot('04-studies', StudiesScreen.new);
+      shot('05-notities', NotesScreen.new);
+      shot('06-profiel', ProfileScreen.new);
+      shot('07-pro', PremiumScreen.new, free: true);
+    });
+  }
 }

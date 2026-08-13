@@ -142,8 +142,9 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/app_icon.png"
-  # --card from www.bijbel-studie.com
-  adaptive_icon_background: "#FFFFFF"
+  # The mark's own ground, from public/images/logo.svg on www.bijbel-studie.com.
+  # A white background here would hide the white cross entirely.
+  adaptive_icon_background: "#262626"
   adaptive_icon_foreground: "assets/images/app_icon.png"
   min_sdk_android: 21
   web:
