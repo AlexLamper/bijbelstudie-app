@@ -175,9 +175,11 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 - [ ] **Privacy nutrition labels:** email address, name, user content
       (notes/highlights), identifiers, purchases. Linked to identity: yes.
       Used for tracking: no.
-- [ ] **Reviewer account.** A real account with `subscribed: true` set by hand
-      in MongoDB, plus a few notes and highlights. Reviewers reject apps they
-      cannot get past an empty state in.
+- [x] **Reviewer account.** Done — `applereview@mail.com`, created by
+      `scripts/ensure-review-account.mjs` in the bijbelstudie repo. Re-run it
+      with `--write` if the credentials ever stop working. Note it grants Pro
+      through `subscribed`, not `storePremium`: the launch-time RevenueCat sync
+      overwrites the latter. See `docs/app-review-1.0.5-rejection.md`.
 - [ ] **App Review notes.** Paste this:
       > The Bible translations and commentaries in this app are public domain.
       > The original-language text is STEPBible (TAHOT/TAGNT), CC BY 4.0, and
