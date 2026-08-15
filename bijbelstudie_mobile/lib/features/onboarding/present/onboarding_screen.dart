@@ -35,40 +35,41 @@ const List<_OnboardingPageData> _pages = [
   _OnboardingPageData(
     index: '01',
     badge: 'Welkom',
-    title: 'Hoe goed ken jij de ',
-    accent: 'Bijbel?',
+    title: 'Lees de ',
+    accent: 'Bijbel',
     body:
-        'Ontdek het met tientallen quizzen. Test je kennis, daag jezelf uit '
-        'en leer elke dag iets nieuws over Gods Woord.',
+        'De Statenvertaling en de King James Version, hoofdstuk voor '
+        'hoofdstuk. Stel de letter in zoals jij prettig leest en pak de draad '
+        'op waar je gebleven was.',
     highlights: [
-      'Tientallen quizzen in elke categorie',
-      'Van makkelijk tot uitdagend',
+      'Statenvertaling en King James Version',
+      'Bewaar hoofdstukken om offline te lezen',
     ],
   ),
   _OnboardingPageData(
     index: '02',
-    badge: 'Groei',
-    title: 'Klim naar de top van de ',
-    accent: 'ranglijst',
+    badge: 'Verdieping',
+    title: 'Begrijp wat er ',
+    accent: 'staat',
     body:
-        'Verdien punten bij elke vraag, bouw een dagelijkse streak op en '
-        'concurreer met spelers uit het hele land.',
+        'Lees bij elk hoofdstuk het commentaar van Matthew Henry, of ga naar '
+        'de grondtekst met transliteratie en Strong-nummers.',
     highlights: [
-      'Dagelijkse streaks en prestaties',
-      'Vergelijk je score op de ranglijst',
+      'Commentaren bij elk hoofdstuk',
+      'Hebreeuws en Grieks met Strong-nummers',
     ],
   ),
   _OnboardingPageData(
     index: '03',
-    badge: 'Samen',
-    title: 'Speel samen met ',
-    accent: 'vrienden',
+    badge: 'Vasthouden',
+    title: 'Bewaar wat je ',
+    accent: 'ontdekt',
     body:
-        'Speciaal ontworpen voor groepen - van gezin tot jeugdvereniging. '
-        'Host een room en speel live tegelijk met tot 20 spelers.',
+        'Markeer verzen, schrijf je notities op en volg een leesplan. Alles '
+        'staat ook klaar op www.bijbel-studie.com.',
     highlights: [
-      'Live multiplayer met één kamercode',
-      'Iedereen krijgt dezelfde vragen en timer',
+      'Notities, markeringen en bladwijzers',
+      'Gesynchroniseerd met de website',
     ],
   ),
 ];
@@ -98,7 +99,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     final token = await ref.read(authStorageProvider).getToken();
     final hasSession = token != null && token.isNotEmpty;
-    if (mounted) context.go(hasSession ? '/home' : '/login');
+    if (mounted) context.go(hasSession ? '/dashboard' : '/login');
   }
 
   void _next() {

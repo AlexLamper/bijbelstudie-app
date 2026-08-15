@@ -37,7 +37,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // first-run intro for visitors who still have to create an account.
       // Mark it seen so signing out later also skips it.
       await ref.read(onboardingStorageProvider).markSeen();
-      if (mounted) context.go('/home');
+      if (mounted) context.go('/dashboard');
       return;
     }
 
@@ -59,7 +59,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           children: [
             BijbelStudieWordmark(fontSize: 34),
             SizedBox(height: 18),
-            Text('TEST JOUW KENNIS VAN DE BIJBEL', style: AppTheme.overline),
+            Text('LEES EN BESTUDEER DE BIJBEL', style: AppTheme.overline),
             SizedBox(height: 44),
             AppLoader(size: 20),
           ],
@@ -70,7 +70,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 }
 
 /// `<span class="font-display text-xl font-semibold tracking-[-0.02em]
-///   text-ink">Bijbel<span class="text-lapis">Quiz</span></span>`
+///   text-ink">Bijbel<span class="text-teal">Studie</span></span>`
 class BijbelStudieWordmark extends StatelessWidget {
   const BijbelStudieWordmark({super.key, this.fontSize = 20});
 
@@ -90,7 +90,7 @@ class BijbelStudieWordmark extends StatelessWidget {
         children: const [
           TextSpan(text: 'Bijbel'),
           TextSpan(
-            text: 'Quiz',
+            text: 'Studie',
             style: TextStyle(color: AppTheme.lapis),
           ),
         ],

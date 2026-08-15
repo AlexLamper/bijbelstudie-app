@@ -31,10 +31,21 @@ class AppConfig {
     'PRIVACY_POLICY_URL',
     defaultValue: 'https://www.bijbel-studie.com/privacy-policy',
   );
+  /// The subscription EULA, linked from the paywall. Apple's standard EULA is
+  /// used deliberately: it is the one Apple explicitly accepts and it already
+  /// carries the auto-renewal terms review checks for.
   static const String termsOfUseUrl = String.fromEnvironment(
     'TERMS_OF_USE_URL',
     defaultValue:
         'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+  );
+
+  /// The product's own Algemene Voorwaarden, linked from the account screens.
+  /// Separate from [termsOfUseUrl] so the paywall keeps the EULA while a Dutch
+  /// signup screen links Dutch terms.
+  static const String termsOfServiceUrl = String.fromEnvironment(
+    'TERMS_OF_SERVICE_URL',
+    defaultValue: 'https://www.bijbel-studie.com/terms-of-service',
   );
 
   /// Get the appropriate API base URL based on build mode

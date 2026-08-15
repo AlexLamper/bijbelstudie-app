@@ -40,7 +40,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.hasValue && next.value != null) {
-        context.go('/home');
+        context.go('/dashboard');
       } else if (next.hasError) {
         final msg = next.error.toString();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,8 +80,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             const Text('Account aanmaken', style: AppTheme.displayLarge),
             const SizedBox(height: 14),
             const Text(
-              'Maak een account aan om je voortgang op te slaan en mee te doen '
-              'op de ranglijst.',
+              'Maak een account aan om je leesvoortgang, notities en '
+              'markeringen op te slaan en te synchroniseren met de website.',
               style: AppTheme.bodyLead,
             ),
             const SizedBox(height: 36),

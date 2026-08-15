@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/preview_config.dart';
 import '../theme/app_theme.dart';
+import '../ui/app_widgets.dart';
 
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
@@ -201,6 +202,57 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
+      // `/home` was this app's post-login destination before the tab shell
+      // landed and the target became `/dashboard`. App review 1.0(5) was
+      // rejected because four call sites still pointed here and every one of
+      // them dead-ended on the error page. The call sites are fixed; this
+      // redirect stays so a stale deep link or a persisted route can never
+      // reproduce it.
+      GoRoute(path: '/home', redirect: (context, state) => '/dashboard'),
     ],
+    // Never strand the user on go_router's default error page: its only
+    // affordance is a link to `/`, which bounces through the splash screen and
+    // can land straight back here. Apple's reviewer read that loop as the app
+    // being unresponsive.
+    errorBuilder: (context, state) => _RouteNotFound(location: state.uri.path),
   );
 });
+
+class _RouteNotFound extends StatelessWidget {
+  const _RouteNotFound({required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.paper,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Deze pagina bestaat niet', style: AppTheme.displayLarge),
+                const SizedBox(height: 14),
+                Text(
+                  'We konden "$location" niet vinden. Ga terug naar je dashboard '
+                  'om verder te lezen.',
+                  textAlign: TextAlign.center,
+                  style: AppTheme.bodyLead,
+                ),
+                const SizedBox(height: 32),
+                SiteButton(
+                  label: 'Naar dashboard',
+                  trailingIcon: Icons.arrow_forward,
+                  onPressed: () => context.go('/dashboard'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

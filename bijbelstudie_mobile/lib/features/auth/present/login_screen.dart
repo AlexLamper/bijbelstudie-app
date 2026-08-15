@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.hasValue && next.value != null) {
-        context.go('/home');
+        context.go('/dashboard');
       } else if (next.hasError) {
         final msg = next.error.toString();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,8 +67,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const Text('Welkom terug', style: AppTheme.displayLarge),
             const SizedBox(height: 14),
             const Text(
-              'Log in om je voortgang bij te houden en mee te doen op de '
-              'ranglijst.',
+              'Log in om verder te lezen waar je gebleven was en je notities '
+              'terug te vinden.',
               style: AppTheme.bodyLead,
             ),
             const SizedBox(height: 36),
