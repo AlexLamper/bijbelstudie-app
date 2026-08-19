@@ -5,9 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/analytics/analytics.dart';
 import '../../profile/data/profile_model.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';
+import '../domain/price_framing.dart';
 import 'premium_controller.dart';
 
 enum _ProPlan { monthly, yearly }
@@ -20,7 +22,12 @@ enum _ProPlan { monthly, yearly }
 /// who already pay on the web keep Pro through `/api/v1/me` and are shown a
 /// status card instead of a purchase button.
 class PremiumScreen extends ConsumerStatefulWidget {
-  const PremiumScreen({super.key});
+  const PremiumScreen({super.key, this.source});
+
+  /// Which surface sent the user here, so the contextual paywalls can be ranked
+  /// against each other. Validated against the server allowlist before it is
+  /// reported; anything unrecognised is dropped server-side.
+  final String? source;
 
   @override
   ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
@@ -28,6 +35,24 @@ class PremiumScreen extends ConsumerStatefulWidget {
 
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   _ProPlan _selectedPlan = _ProPlan.yearly;
+
+  @override
+  void initState() {
+    super.initState();
+    // Funnel entry, recorded once per visit rather than per rebuild.
+    ref.read(analyticsProvider).track(AnalyticsEvents.pricingViewed, {
+      'source': widget.source ?? 'direct',
+      'logged_in': 'yes',
+    });
+  }
+
+  void _selectPlan(_ProPlan plan) {
+    setState(() => _selectedPlan = plan);
+    ref.read(analyticsProvider).track(AnalyticsEvents.planSelected, {
+      'interval': plan == _ProPlan.yearly ? 'annual' : 'monthly',
+      'logged_in': 'yes',
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +78,20 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     final service = ref.read(purchaseServiceProvider);
     final monthlyPackage = service.findMonthlyPackage(premiumState.packages);
     final yearlyPackage = service.findYearlyPackage(premiumState.packages);
-    final monthlyPrice = monthlyPackage?.storeProduct.priceString ?? '—';
-    final yearlyPrice = yearlyPackage?.storeProduct.priceString ?? '—';
+    final monthlyProduct = monthlyPackage?.storeProduct;
+    final yearlyProduct = yearlyPackage?.storeProduct;
+    final monthlyPrice = monthlyProduct?.priceString ?? '—';
+    final yearlyPrice = yearlyProduct?.priceString ?? '—';
+
+    // Derived from the live App Store prices, so the storefront's own currency
+    // and tier are always what the customer is shown. Null when either product
+    // is missing or the currencies differ - in that case no claim is made.
+    final savingLabel = (monthlyProduct != null && yearlyProduct != null)
+        ? PriceFraming.annualSaving(monthlyProduct, yearlyProduct)
+        : null;
+    final discountPercent = (monthlyProduct != null && yearlyProduct != null)
+        ? PriceFraming.annualDiscountPercent(monthlyProduct, yearlyProduct)
+        : null;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -67,23 +104,40 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           else ...[
             const _Benefits(),
             const SizedBox(height: 24),
+            // Annual leads, in the widget order as well as by default selection.
             _PlanTile(
-              title: 'Maandelijks',
-              subtitle: 'Elke maand opzegbaar',
-              price: monthlyPrice,
-              priceSuffix: 'per maand',
-              selected: _selectedPlan == _ProPlan.monthly,
-              onTap: () => setState(() => _selectedPlan = _ProPlan.monthly),
+              title: 'Jaarlijks',
+              subtitle: yearlyProduct != null
+                  ? 'Eén keer per jaar · ${PriceFraming.effectivePerMonth(yearlyProduct)} per maand'
+                  : 'Eén keer per jaar betalen',
+              // The headline is the per-week figure; `billedLabel` below carries
+              // the amount the App Store will actually charge, which guideline
+              // 3.1.2 requires to be shown clearly.
+              price: yearlyProduct != null
+                  ? PriceFraming.perWeek(yearlyProduct, isAnnual: true)
+                  : yearlyPrice,
+              priceSuffix: 'per week',
+              billedLabel: yearlyProduct != null
+                  ? '$yearlyPrice per jaar, in één keer gefactureerd'
+                  : null,
+              savingLabel: savingLabel,
+              badge: discountPercent != null ? '$discountPercent% goedkoper' : 'Voordeligst',
+              selected: _selectedPlan == _ProPlan.yearly,
+              onTap: () => _selectPlan(_ProPlan.yearly),
             ),
             const SizedBox(height: 12),
             _PlanTile(
-              title: 'Jaarlijks',
-              subtitle: 'Eén keer per jaar betalen',
-              price: yearlyPrice,
-              priceSuffix: 'per jaar',
-              badge: 'Voordeligst',
-              selected: _selectedPlan == _ProPlan.yearly,
-              onTap: () => setState(() => _selectedPlan = _ProPlan.yearly),
+              title: 'Maandelijks',
+              subtitle: 'Elke maand opzegbaar',
+              price: monthlyProduct != null
+                  ? PriceFraming.perWeek(monthlyProduct, isAnnual: false)
+                  : monthlyPrice,
+              priceSuffix: 'per week',
+              billedLabel: monthlyProduct != null
+                  ? '$monthlyPrice per maand, maandelijks gefactureerd'
+                  : null,
+              selected: _selectedPlan == _ProPlan.monthly,
+              onTap: () => _selectPlan(_ProPlan.monthly),
             ),
             const SizedBox(height: 20),
             SiteButton(
@@ -234,6 +288,8 @@ class _PlanTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.badge,
+    this.billedLabel,
+    this.savingLabel,
   });
 
   final String title;
@@ -243,6 +299,15 @@ class _PlanTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final String? badge;
+
+  /// The amount the store will actually charge and over what period. Shown
+  /// under the derived per-week headline; guideline 3.1.2 requires the real
+  /// price and duration to be clear, and a weekly figure alone is not.
+  final String? billedLabel;
+
+  /// e.g. "Je bespaart € 29,89 per jaar". Only ever non-null when it is true of
+  /// the live store prices.
+  final String? savingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +335,24 @@ class _PlanTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(subtitle, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
+                  if (savingLabel != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Je bespaart $savingLabel per jaar',
+                      style: AppTheme.bodyMuted.copyWith(
+                        fontSize: 12,
+                        color: AppTheme.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  if (billedLabel != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      billedLabel!,
+                      style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+                    ),
+                  ],
                 ],
               ),
             ),

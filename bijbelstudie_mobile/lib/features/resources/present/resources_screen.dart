@@ -32,7 +32,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   Future<void> _open(ResourceItem item) async {
     if (item.locked) {
       if (!mounted) return;
-      context.push('/premium');
+      context.push('/premium?source=app_resources');
       return;
     }
     final uri = Uri.tryParse(item.sourceUrl);

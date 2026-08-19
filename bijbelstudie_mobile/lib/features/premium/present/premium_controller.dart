@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import '../../../core/analytics/analytics.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';
@@ -83,8 +84,16 @@ class PremiumController extends Notifier<PremiumState> {
   Future<void> purchaseMonthly() => _purchase(kRcMonthlyProductId);
   Future<void> purchaseYearly() => _purchase(kRcYearlyProductId);
 
+  /// Reported on every purchase event so the App Store funnel can be read
+  /// separately from the web one.
+  String _intervalOf(String productId) =>
+      productId == kRcYearlyProductId ? 'annual' : 'monthly';
+
   Future<void> _purchase(String productId) async {
     _log('Purchase requested for product="$productId"');
+    final interval = _intervalOf(productId);
+    final analytics = ref.read(analyticsProvider);
+    analytics.track(AnalyticsEvents.checkoutStarted, {'interval': interval});
     final package = productId == kRcMonthlyProductId
         ? _svc.findMonthlyPackage(state.packages)
         : _svc.findYearlyPackage(state.packages);
@@ -100,18 +109,21 @@ class PremiumController extends Notifier<PremiumState> {
       _log(
         'Purchase success. Active entitlements: ${info.entitlements.active.keys.join(', ')}',
       );
+      analytics.track(AnalyticsEvents.checkoutCompleted, {'interval': interval});
       await _syncServerPremium();
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
       if (code == PurchasesErrorCode.purchaseCancelledError) {
         state = state.copyWith(status: PurchaseStatus.idle);
         _log('Purchase cancelled by user.');
+        analytics.track(AnalyticsEvents.purchaseCancelled, {'interval': interval});
         return;
       }
       state = state.copyWith(
         status: PurchaseStatus.error,
         errorMessage: _errorMessage(code),
       );
+      analytics.track(AnalyticsEvents.purchaseFailed, {'interval': interval});
       _log('Purchase failed: code=$code message="${e.message}"');
     } on StateError catch (e) {
       final availableProducts = state.packages
@@ -151,6 +163,7 @@ class PremiumController extends Notifier<PremiumState> {
       _log(
         'Restore success. Active entitlements: ${info.entitlements.active.keys.join(', ')}',
       );
+      ref.read(analyticsProvider).track(AnalyticsEvents.purchasesRestored);
       await _syncServerPremium();
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);

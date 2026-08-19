@@ -196,7 +196,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/premium',
-        builder: (context, state) => const PremiumScreen(),
+        // ?source= records which surface sent the user to the paywall.
+        builder: (context, state) =>
+            PremiumScreen(source: state.uri.queryParameters['source']),
       ),
       GoRoute(
         path: '/settings',

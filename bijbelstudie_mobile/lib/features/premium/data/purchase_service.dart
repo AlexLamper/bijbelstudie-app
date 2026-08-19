@@ -52,9 +52,11 @@ class PurchaseService {
       );
     }
 
-    // Stable order in the UI: monthly first, then yearly.
+    // Stable order in the UI: yearly first, then monthly. Annual is the plan
+    // worth selling - it collects a year of cash up front and removes eleven
+    // future opportunities to churn - so it leads rather than trails.
     packages.sort((a, b) {
-      int rank(String id) => id == kRcMonthlyProductId ? 0 : (id == kRcYearlyProductId ? 1 : 99);
+      int rank(String id) => id == kRcYearlyProductId ? 0 : (id == kRcMonthlyProductId ? 1 : 99);
       return rank(a.storeProduct.identifier).compareTo(rank(b.storeProduct.identifier));
     });
 

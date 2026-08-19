@@ -29,7 +29,7 @@ class AppConfig {
   // Override per environment via dart-define if needed.
   static const String privacyPolicyUrl = String.fromEnvironment(
     'PRIVACY_POLICY_URL',
-    defaultValue: 'https://www.bijbel-studie.com/privacy-policy',
+    defaultValue: 'https://www.bijbel-studie.com/privacybeleid',
   );
   /// The subscription EULA, linked from the paywall. Apple's standard EULA is
   /// used deliberately: it is the one Apple explicitly accepts and it already
@@ -45,7 +45,7 @@ class AppConfig {
   /// signup screen links Dutch terms.
   static const String termsOfServiceUrl = String.fromEnvironment(
     'TERMS_OF_SERVICE_URL',
-    defaultValue: 'https://www.bijbel-studie.com/terms-of-service',
+    defaultValue: 'https://www.bijbel-studie.com/algemene-voorwaarden',
   );
 
   /// Get the appropriate API base URL based on build mode

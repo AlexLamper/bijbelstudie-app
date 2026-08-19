@@ -226,7 +226,7 @@ class _ProStatusCard extends StatelessWidget {
             const SizedBox(height: 14),
             SiteButton(
               label: 'Bekijk Pro',
-              onPressed: () => context.push('/premium'),
+              onPressed: () => context.push('/premium?source=app_profile'),
             ),
           ],
         ),

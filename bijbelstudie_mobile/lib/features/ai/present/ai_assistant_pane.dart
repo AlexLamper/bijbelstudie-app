@@ -157,7 +157,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => context.push('/premium'),
+                  onPressed: () => context.push('/premium?source=app_ai'),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: const Size(0, 30),

@@ -252,7 +252,7 @@ class _ProWall extends StatelessWidget {
       action: SiteButton(
         label: 'Bekijk Pro',
         expand: false,
-        onPressed: () => context.push('/premium'),
+        onPressed: () => context.push('/premium?source=app_study'),
       ),
     );
   }
