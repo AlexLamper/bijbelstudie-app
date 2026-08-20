@@ -36,9 +36,10 @@ Widget buildUserDataInfoLink(BuildContext context) {
                   'en inloggegevens.\n\n'
                   'Je gegevens worden via beveiligde verbindingen verzonden en we delen '
                   'ze niet voor advertenties zonder jouw toestemming.\n\n'
-                  'Je kunt altijd je account laten verwijderen. Neem hiervoor contact op '
-                  'via info@bijbel-studie.com of via de supportkanalen in de app. Na verwijdering '
-                  'worden je accountgegevens verwijderd volgens ons privacybeleid.',
+                  'Je kunt je account op elk moment zelf verwijderen in de app, via '
+                  'Profiel → Account verwijderen. Dat verwijdert je account en je '
+                  'gegevens volgens ons privacybeleid. Lukt het niet, dan kun je ons '
+                  'bereiken via info@bijbel-studie.com.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 18),
