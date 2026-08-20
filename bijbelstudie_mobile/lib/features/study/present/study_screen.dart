@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../ai/present/ai_assistant_pane.dart';
@@ -221,6 +222,7 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
               isPro
                   ? OriginalTextPane(location: location)
                   : const _ProWall(
+                      surface: 'original_text',
                       title: 'Grondtekst is onderdeel van Pro',
                       description:
                           'Bekijk het Hebreeuws en Grieks woord voor woord, '
@@ -237,22 +239,57 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
   }
 }
 
-class _ProWall extends StatelessWidget {
-  const _ProWall({required this.title, required this.description});
+/// A Pro gate, and the two funnel events that belong to it.
+///
+/// `paywall_hit` fires when the wall is built and `paywall_cta_clicked` when
+/// the button is tapped. Recording only the tap would say how many people this
+/// gate sent to the paywall but not how many it merely annoyed, and the ratio
+/// between the two is the number that decides whether a gate earns its place.
+///
+/// The impression is reported once per appearance rather than once per build:
+/// the study screen rebuilds on every pane switch and every profile refresh,
+/// and an impression counted five times is worse than one not counted at all.
+class _ProWall extends ConsumerStatefulWidget {
+  const _ProWall({
+    required this.surface,
+    required this.title,
+    required this.description,
+  });
 
+  /// Must be a member of the server's `paywall_hit.surface` allowlist in
+  /// `lib/analyticsSchema.ts`, or the event is dropped without a trace.
+  final String surface;
   final String title;
   final String description;
+
+  @override
+  ConsumerState<_ProWall> createState() => _ProWallState();
+}
+
+class _ProWallState extends ConsumerState<_ProWall> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+      'surface': widget.surface,
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return AppEmptyState(
       icon: Icons.workspace_premium_outlined,
-      title: title,
-      description: description,
+      title: widget.title,
+      description: widget.description,
       action: SiteButton(
         label: 'Bekijk Pro',
         expand: false,
-        onPressed: () => context.push('/premium?source=app_study'),
+        onPressed: () {
+          ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+            'surface': widget.surface,
+          });
+          context.push('/premium?source=app_study');
+        },
       ),
     );
   }

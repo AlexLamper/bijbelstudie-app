@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
@@ -26,6 +27,10 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
 
   bool _sending = false;
   String? _error;
+  /// Whether [_error] is the daily cap rather than a network or server fault.
+  /// Only the cap is a paywall: offering Pro as the answer to "the assistant is
+  /// unreachable" sells nothing and reads as opportunism.
+  bool _errorIsQuota = false;
   AiQuota? _quota;
 
   static const _suggestions = [
@@ -67,6 +72,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
       _turns.add(AiTurn(role: 'user', content: message));
       _sending = true;
       _error = null;
+      _errorIsQuota = false;
       _controller.clear();
     });
     _scrollToEnd();
@@ -90,12 +96,19 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
       if (!mounted) return;
       setState(() {
         _error = e.message;
+        _errorIsQuota = true;
         _sending = false;
+      });
+      // The one moment this surface actually refuses the user, which is what
+      // `paywall_hit` means. The generic branch below is a fault, not a gate.
+      ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+        'surface': 'ai_limit',
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = '$e'.replaceFirst('Exception: ', '');
+        _errorIsQuota = false;
         _sending = false;
       });
     }
@@ -156,14 +169,22 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                     style: AppTheme.caption.copyWith(color: AppTheme.destructive),
                   ),
                 ),
-                TextButton(
-                  onPressed: () => context.push('/premium?source=app_ai'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 30),
+                if (_errorIsQuota)
+                  TextButton(
+                    onPressed: () {
+                      ref
+                          .read(analyticsProvider)
+                          .track(AnalyticsEvents.paywallCtaClicked, {
+                            'surface': 'ai_limit',
+                          });
+                      context.push('/premium?source=app_ai');
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 30),
+                    ),
+                    child: const Text('Pro'),
                   ),
-                  child: const Text('Pro'),
-                ),
               ],
             ),
           ),

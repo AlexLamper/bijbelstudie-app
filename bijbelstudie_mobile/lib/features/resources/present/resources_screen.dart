@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/resources_repository.dart';
@@ -21,6 +22,26 @@ class ResourcesScreen extends ConsumerStatefulWidget {
 
 class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   String _category = 'alle';
+  bool _lockedImpressionReported = false;
+
+  /// One `paywall_hit` per visit, the first time the loaded library actually
+  /// contains something locked.
+  ///
+  /// The gate here is the row of lock badges, not the tap - by the time someone
+  /// taps a locked item they have already decided to look, and counting only
+  /// taps would make this surface look far more persuasive than it is. Reported
+  /// from a post-frame callback because `build` must stay free of side effects.
+  void _reportLockedImpression(ResourceLibrary library) {
+    if (_lockedImpressionReported) return;
+    if (!library.items.any((item) => item.locked)) return;
+    _lockedImpressionReported = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+        'surface': 'resources',
+      });
+    });
+  }
 
   Color _colorFor(String hex) {
     final cleaned = hex.replaceAll('#', '');
@@ -32,6 +53,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   Future<void> _open(ResourceItem item) async {
     if (item.locked) {
       if (!mounted) return;
+      ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+        'surface': 'resources',
+      });
       context.push('/premium?source=app_resources');
       return;
     }
@@ -77,6 +101,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                   ),
                 ),
                 data: (data) {
+                  _reportLockedImpression(data);
+
                   final items = _category == 'alle'
                       ? data.items
                       : data.items.where((i) => i.category == _category).toList();
