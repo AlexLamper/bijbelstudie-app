@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../profile/present/profile_provider.dart';
 import '../data/bible_repository.dart';
 
 /// "Bewaar dit boek offline".
@@ -32,11 +35,26 @@ class BookDownloadButton extends ConsumerStatefulWidget {
 class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   StreamSubscription<BookDownloadProgress>? _subscription;
   BookDownloadProgress? _progress;
+  bool _lockedImpressionReported = false;
 
   @override
   void dispose() {
     _subscription?.cancel();
     super.dispose();
+  }
+
+  /// Offline reading is one of the four things the paywall sells.
+  ///
+  /// Unlike the commentaries and the grondtekst this gate can only live in the
+  /// client, and that is not a compromise: the bible text itself is free and
+  /// has to stay reachable for the reader to work at all. What Pro buys here is
+  /// the bulk download, which is a feature rather than a body of text, so the
+  /// button is the honest place to gate it.
+  void _openPaywall() {
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+      'surface': 'offline',
+    });
+    context.push('/premium?source=app_study');
   }
 
   void _start() {
@@ -71,14 +89,27 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
+    final isPro = ref.watch(profileProvider).value?.isPro ?? false;
+
+    if (!isPro && !_lockedImpressionReported && widget.chapters.isNotEmpty) {
+      _lockedImpressionReported = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+          'surface': 'offline',
+        });
+      });
+    }
 
     if (progress == null) {
       return SiteOutlineButton(
-        label: 'Bewaar dit boek offline',
-        icon: Icons.download_outlined,
+        label: isPro ? 'Bewaar dit boek offline' : 'Offline lezen met Pro',
+        icon: isPro ? Icons.download_outlined : Icons.workspace_premium_outlined,
         height: 40,
         expand: false,
-        onPressed: widget.chapters.isEmpty ? null : _start,
+        onPressed: widget.chapters.isEmpty
+            ? null
+            : (isPro ? _start : _openPaywall),
       );
     }
 

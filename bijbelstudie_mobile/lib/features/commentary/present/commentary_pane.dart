@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
@@ -72,6 +74,7 @@ class CommentaryPane extends ConsumerWidget {
               children: [
                 for (final entry in chapter.verses)
                   _CommentaryEntry(entry: entry, settings: settings),
+                if (chapter.locked) const _CommentaryPaywall(),
                 const SizedBox(height: 20),
                 const RuleLine(),
                 const SizedBox(height: 12),
@@ -210,6 +213,53 @@ class _OriginalVerseBlock extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Shown under the preview when the server withheld the rest of the chapter.
+///
+/// The entries above are real commentary, not a teaser: the free allowance is
+/// the opening of the chapter, so the reader can see what they would be buying
+/// before being asked to buy it.
+class _CommentaryPaywall extends ConsumerStatefulWidget {
+  const _CommentaryPaywall();
+
+  @override
+  ConsumerState<_CommentaryPaywall> createState() => _CommentaryPaywallState();
+}
+
+class _CommentaryPaywallState extends ConsumerState<_CommentaryPaywall> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+      'surface': 'commentary',
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: AppEmptyState(
+        icon: Icons.workspace_premium_outlined,
+        title: 'Lees het hele commentaar met Pro',
+        description:
+            'Je ziet het begin van dit hoofdstuk. Met Pro lees je Matthew '
+            'Henry en Dachsel volledig, bij elk hoofdstuk.',
+        action: SiteButton(
+          label: 'Bekijk Pro',
+          expand: false,
+          onPressed: () {
+            ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+              'surface': 'commentary',
+            });
+            context.push('/premium?source=app_study');
+          },
+        ),
       ),
     );
   }

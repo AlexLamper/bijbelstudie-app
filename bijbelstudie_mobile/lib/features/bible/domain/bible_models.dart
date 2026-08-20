@@ -55,6 +55,7 @@ class ChapterContent {
     required this.chapter,
     required this.verses,
     required this.attribution,
+    this.locked = false,
     this.fromCache = false,
   });
 
@@ -63,6 +64,12 @@ class ChapterContent {
   final int chapter;
   final List<Verse> verses;
   final String attribution;
+
+  /// True when the server withheld part of this chapter behind Pro.
+  ///
+  /// Decided server-side and simply reported here: the withheld text is not in
+  /// the payload, so the client has nothing to measure and no way to reach it.
+  final bool locked;
 
   /// True when the reader is showing text that came off disk with no network.
   final bool fromCache;
@@ -77,6 +84,7 @@ class ChapterContent {
           .map(Verse.fromJson)
           .toList(),
       attribution: json['attribution'] as String? ?? '',
+      locked: json['locked'] as bool? ?? false,
       fromCache: fromCache,
     );
   }
