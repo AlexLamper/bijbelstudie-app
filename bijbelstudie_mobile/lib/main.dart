@@ -9,7 +9,6 @@ import 'core/config/app_config.dart';
 import 'core/config/preview_config.dart';
 import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
-import 'features/settings/data/reading_settings.dart';
 
 Future<void> _initRevenueCat() async {
   if (kIsWeb) return;
@@ -80,15 +79,34 @@ class BijbelStudieApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final routerConfig = ref.watch(routerProvider);
-    final themeMode = ref.watch(readingSettingsProvider).themeMode;
 
+    // Light only, deliberately.
+    //
+    // App review 1.0 (7) was rejected under guideline 4 on an iPad in dark
+    // mode: "the font colour used makes it hard to read with the background
+    // colour". The cause is structural. `AppTheme` publishes its type ramp as
+    // `static const TextStyle`s and a const cannot depend on brightness, so
+    // thirteen of the fourteen bake a light colour — `displaySmall` is `ink`
+    // (#111827) whatever the theme says. Against the dark scaffold that is
+    // near-black on near-black; the paywall headline was invisible.
+    //
+    // There is no colour that fixes this in place: `inkMuted` clears AA on
+    // white and fails it on #212121, so the ramp has to become
+    // context-resolved before dark mode can come back. That is a refactor of
+    // every call site, and shipping it half-done risks a second guideline 4
+    // rejection, which is worse than not offering dark mode at all — Apple
+    // does not require it.
+    //
+    // `darkTheme` is pinned to the light theme as well as `themeMode`, so the
+    // app stays readable even if something upstream forces dark. The dark
+    // palette in AppTheme is kept, and test/dark_mode_contrast_test.dart holds
+    // the conditions that must be met before this is reverted.
     return MaterialApp.router(
       title: 'BijbelStudie',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      // Follows the system by default; overridable in Instellingen.
-      themeMode: themeMode,
+      darkTheme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
       routerConfig: routerConfig,
     );
   }

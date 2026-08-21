@@ -83,20 +83,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: controller.setShowVerseNumbers,
           ),
 
-          const SizedBox(height: 24),
-          const SectionHeader(eyebrow: 'Weergave', title: 'Thema'),
-          const SizedBox(height: 12),
-          _OptionRow<ThemeMode>(
-            label: 'Modus',
-            values: const [ThemeMode.system, ThemeMode.light, ThemeMode.dark],
-            selected: settings.themeMode,
-            labelOf: (v) => switch (v) {
-              ThemeMode.system => 'Systeem',
-              ThemeMode.light => 'Licht',
-              ThemeMode.dark => 'Donker',
-            },
-            onChanged: controller.setThemeMode,
-          ),
+          // The Thema picker is gone while the app is light-only. Offering a
+          // Donker option that renders near-black text on a near-black
+          // background is what got 1.0 (7) rejected under guideline 4; a
+          // control that produces an unreadable screen is worse than no
+          // control. See the note in main.dart for what has to change before
+          // it comes back.
 
           const SizedBox(height: 24),
           const SectionHeader(eyebrow: 'Herinnering', title: 'Dagelijks lezen'),
