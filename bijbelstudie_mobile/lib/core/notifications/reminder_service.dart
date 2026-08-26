@@ -89,6 +89,49 @@ class ReminderService {
     await _plugin.cancel(_dailyReminderId);
   }
 
+  /// Asks the OS - not the stored preference - what state the reminder is
+  /// really in, so a UI can never claim it is on when nothing will fire.
+  ///
+  /// `pendingNotificationRequests()` and the platform permission checks are
+  /// confirmed against the flutter_local_notifications 18.0.1 source:
+  /// - `pendingNotificationRequests` -
+  ///   lib/src/flutter_local_notifications_plugin.dart:448
+  /// - `AndroidFlutterLocalNotificationsPlugin.areNotificationsEnabled` -
+  ///   lib/src/platform_flutter_local_notifications.dart:559
+  /// - `IOSFlutterLocalNotificationsPlugin.checkPermissions` -
+  ///   lib/src/platform_flutter_local_notifications.dart:676
+  Future<ReminderStatus> currentStatus() async {
+    if (kIsWeb) {
+      return const ReminderStatus(available: false, permitted: false, pending: false);
+    }
+    try {
+      await initialise();
+
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (ios == null && android == null) {
+        // Neither platform layer resolved: this build has no notifications
+        // implementation to speak of (web is already handled above; this
+        // covers desktop, or a plugin that never registered).
+        return const ReminderStatus(available: false, permitted: false, pending: false);
+      }
+
+      final permitted = ios != null
+          ? (await ios.checkPermissions())?.isEnabled ?? false
+          : (await android!.areNotificationsEnabled() ?? false);
+      final pending = (await _plugin.pendingNotificationRequests())
+          .any((request) => request.id == _dailyReminderId);
+
+      return ReminderStatus(available: true, permitted: permitted, pending: pending);
+    } catch (_) {
+      // A channel error means the real state cannot be verified - and an
+      // unverifiable reminder is exactly what must not be shown as on.
+      return const ReminderStatus(available: false, permitted: false, pending: false);
+    }
+  }
+
   /// The next occurrence of this wall-clock time in the device's zone. Passing
   /// a time that has already gone by today would fire immediately.
   tz.TZDateTime _nextInstanceOf(int hour, int minute) {
@@ -104,3 +147,28 @@ class ReminderService {
 final reminderServiceProvider = Provider<ReminderService>((ref) {
   return ReminderService(FlutterLocalNotificationsPlugin());
 });
+
+/// The reminder's real-world state, as reported by the OS rather than the
+/// stored preference. See [ReminderService.currentStatus].
+class ReminderStatus {
+  const ReminderStatus({
+    required this.available,
+    required this.permitted,
+    required this.pending,
+  });
+
+  /// No notifications implementation exists on this platform at all (web,
+  /// desktop, or a plugin that failed to register). The feature cannot work
+  /// here regardless of anything else.
+  final bool available;
+
+  /// Whether the OS currently permits this app to show notifications.
+  final bool permitted;
+
+  /// Whether the daily reminder (id 1001) is genuinely scheduled with the OS
+  /// right now, independent of what is stored in preferences.
+  final bool pending;
+
+  /// True only when the reminder will actually fire.
+  bool get isActive => available && permitted && pending;
+}

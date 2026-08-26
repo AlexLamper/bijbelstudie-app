@@ -181,18 +181,38 @@ class ContentCache {
     final encoded = jsonEncode(payload);
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    await db.insert('chapters', {
-      'kind': kind,
-      'source_id': sourceId,
-      'book': book,
-      'chapter': chapter,
-      'payload': encoded,
-      'etag': etag,
-      'bytes': encoded.length,
-      'fetched_at': now,
-      'last_read_at': now,
-      'pinned': pinned ? 1 : 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    // Upsert rather than REPLACE, because the pin has to survive the write.
+    // The ordinary read path fetches with `pinned: false`, so a REPLACE meant
+    // that simply reading a chapter you had downloaded cleared its pin and
+    // handed it back to the LRU - the download quietly stopped being a
+    // download. `MAX(...)` keeps an existing pin and still lets a real
+    // download set one.
+    await db.rawInsert(
+      '''
+      INSERT INTO chapters
+        (kind, source_id, book, chapter, payload, etag, bytes, fetched_at, last_read_at, pinned)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (kind, source_id, book, chapter) DO UPDATE SET
+        payload      = excluded.payload,
+        etag         = excluded.etag,
+        bytes        = excluded.bytes,
+        fetched_at   = excluded.fetched_at,
+        last_read_at = excluded.last_read_at,
+        pinned       = MAX(chapters.pinned, excluded.pinned)
+      ''',
+      [
+        kind,
+        sourceId,
+        book,
+        chapter,
+        encoded,
+        etag,
+        utf8.encode(encoded).length,
+        now,
+        now,
+        pinned ? 1 : 0,
+      ],
+    );
 
     unawaited(evictIfNeeded());
   }
@@ -254,9 +274,19 @@ class ContentCache {
     await batch.commit(noResult: true);
   }
 
-  Future<void> clear() async {
+  /// Empties the read-through cache.
+  ///
+  /// Downloaded books are spared unless [includeDownloads] says otherwise. The
+  /// settings screen tells the reader in as many words that what they chose to
+  /// download stays; wiping those rows here would have made that a lie, and
+  /// would have thrown away megabytes the user deliberately fetched to read
+  /// somewhere with no signal.
+  Future<void> clear({bool includeDownloads = false}) async {
     final db = await _open();
-    await db.delete('chapters');
+    await db.delete(
+      'chapters',
+      where: includeDownloads ? null : 'pinned = 0',
+    );
   }
 
   Future<void> setPinnedForBook({
@@ -287,6 +317,97 @@ class ContentCache {
     return (result.first['n'] as num).toInt();
   }
 
+  // --- what is actually on the device --------------------------------------
+
+  /// Chapter numbers of one book that are readable with no network, ascending.
+  ///
+  /// This is the honest denominator for anything the UI says about a download:
+  /// a row exists only if its payload is on disk, so a book that lost chapters
+  /// to a failed request or to eviction reports the smaller number rather than
+  /// keeping the label it was given on the day it was downloaded.
+  Future<List<int>> cachedChaptersForBook({
+    required String kind,
+    required String sourceId,
+    required String book,
+  }) async {
+    final db = await _open();
+    final rows = await db.query(
+      'chapters',
+      columns: ['chapter'],
+      where: 'kind = ? AND source_id = ? AND book = ?',
+      whereArgs: [kind, sourceId, book],
+      orderBy: 'chapter ASC',
+    );
+    return rows.map((r) => (r['chapter'] as num).toInt()).toList();
+  }
+
+  /// Books of one source with at least one chapter on disk.
+  ///
+  /// Ordering is left to the caller: the canon order lives in `BibleBooks` and
+  /// this layer has no business knowing it.
+  Future<List<String>> cachedBooks({
+    required String kind,
+    required String sourceId,
+  }) async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT book FROM chapters WHERE kind = ? AND source_id = ?',
+      [kind, sourceId],
+    );
+    return rows.map((r) => r['book'] as String).toList();
+  }
+
+  /// Every book holding at least one pinned chapter, newest download first.
+  ///
+  /// [OfflineBook.chapterCount] counts every cached chapter of the book and
+  /// [OfflineBook.pinnedChapterCount] only the downloaded ones, because those
+  /// two can differ: reading around a downloaded book adds unpinned chapters
+  /// beside it.
+  Future<List<OfflineBook>> downloadedBooks({String kind = 'bible'}) async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      '''
+      SELECT source_id, book,
+             COUNT(*)                        AS chapters,
+             SUM(pinned)                     AS pinned_chapters,
+             COALESCE(SUM(bytes), 0)         AS bytes,
+             MAX(fetched_at)                 AS fetched_at
+      FROM chapters
+      WHERE kind = ?
+      GROUP BY source_id, book
+      HAVING SUM(pinned) > 0
+      ORDER BY fetched_at DESC
+      ''',
+      [kind],
+    );
+    return rows.map((row) {
+      return OfflineBook(
+        sourceId: row['source_id'] as String,
+        book: row['book'] as String,
+        chapterCount: (row['chapters'] as num).toInt(),
+        pinnedChapterCount: (row['pinned_chapters'] as num).toInt(),
+        bytes: (row['bytes'] as num).toInt(),
+        fetchedAt: DateTime.fromMillisecondsSinceEpoch((row['fetched_at'] as num).toInt()),
+      );
+    }).toList();
+  }
+
+  /// Deletes one book outright, pin and all. This is the "reclaim the space"
+  /// half of a download and the only way to get those bytes back short of
+  /// deleting the app.
+  Future<int> removeBook({
+    required String kind,
+    required String sourceId,
+    required String book,
+  }) async {
+    final db = await _open();
+    return db.delete(
+      'chapters',
+      where: 'kind = ? AND source_id = ? AND book = ?',
+      whereArgs: [kind, sourceId, book],
+    );
+  }
+
   // --- search history -------------------------------------------------------
 
   Future<void> recordSearch(String query) async {
@@ -313,6 +434,25 @@ class ContentCache {
     final db = await _open();
     await db.delete('search_history');
   }
+}
+
+/// One book with chapters stored on this device.
+class OfflineBook {
+  const OfflineBook({
+    required this.sourceId,
+    required this.book,
+    required this.chapterCount,
+    required this.pinnedChapterCount,
+    required this.bytes,
+    required this.fetchedAt,
+  });
+
+  final String sourceId;
+  final String book;
+  final int chapterCount;
+  final int pinnedChapterCount;
+  final int bytes;
+  final DateTime fetchedAt;
 }
 
 class CachedChapter {

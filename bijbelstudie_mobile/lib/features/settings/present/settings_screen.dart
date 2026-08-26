@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +6,8 @@ import '../../../core/db/content_cache.dart';
 import '../../../core/notifications/reminder_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../bible/present/bible_providers.dart';
+import '../../bible/present/offline_library_sheet.dart';
 import '../../notes/data/notes_repository.dart';
 import '../data/reading_settings.dart';
 
@@ -90,10 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // control. See the note in main.dart for what has to change before
           // it comes back.
 
-          const SizedBox(height: 24),
-          const SectionHeader(eyebrow: 'Herinnering', title: 'Dagelijks lezen'),
-          const SizedBox(height: 8),
-          _ReminderTile(settings: settings),
+          const _ReminderSection(),
 
           const SizedBox(height: 24),
           const SectionHeader(eyebrow: 'Offline', title: 'Opgeslagen tekst'),
@@ -121,11 +121,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     TextButton(
                       onPressed: () async {
+                        // Downloads are spared, which is what the paragraph
+                        // below promises. Wiping them here would delete
+                        // megabytes the reader deliberately fetched, without
+                        // ever saying so.
                         await ref.read(contentCacheProvider)?.clear();
+                        ref.invalidate(offlineBooksProvider);
                         await _refreshCacheSize();
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Cache geleegd')),
+                          const SnackBar(
+                            content: Text('Cache geleegd. Gedownloade boeken zijn bewaard.'),
+                          ),
                         );
                       },
                       child: const Text('Cache legen'),
@@ -142,6 +149,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'opgeruimd bij ${_formatBytes(ContentCache.defaultMaxBytes)}.',
             style: AppTheme.bodyMuted.copyWith(fontSize: 11),
           ),
+          const SizedBox(height: 16),
+          // The same list as the reader's offline sheet, so the answer to
+          // "what is actually on my phone, and how do I get that space back"
+          // is in both places a reader would look for it.
+          const OfflineBooksList(),
 
           if (_pendingChanges > 0) ...[
             const SizedBox(height: 20),
@@ -172,14 +184,79 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _ReminderTile extends ConsumerWidget {
-  const _ReminderTile({required this.settings});
+/// Derives the reminder's on-screen state from what the OS actually reports,
+/// not from [ReadingSettings.dailyReminderMinutes] alone.
+///
+/// A stored time with nothing genuinely pending means Part 1's manifest fix
+/// was missing on a previous run, or Android dropped the alarm (reinstall,
+/// force-stop) - `main.dart` re-applies the stored reminder for the same
+/// reason on every launch; this catches whatever slips past that during a
+/// running session, by trying the same fix again before the tile has to
+/// decide what to show.
+final _reminderStatusProvider = FutureProvider<ReminderStatus>((ref) async {
+  final service = ref.watch(reminderServiceProvider);
+  final minutes = ref.watch(
+    readingSettingsProvider.select((s) => s.dailyReminderMinutes),
+  );
 
-  final ReadingSettings settings;
+  var status = await service.currentStatus();
+  if (minutes != null && status.available && status.permitted && !status.pending) {
+    await service.scheduleDaily(hour: minutes ~/ 60, minute: minutes % 60);
+    status = await service.currentStatus();
+  }
+  return status;
+});
+
+class _ReminderSection extends ConsumerWidget {
+  const _ReminderSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final time = settings.dailyReminderTime;
+    // ReminderService no-ops everything on web; currentStatus() would report
+    // this too, but skip the round trip entirely.
+    if (kIsWeb) return const SizedBox.shrink();
+
+    final statusAsync = ref.watch(_reminderStatusProvider);
+    final settings = ref.watch(readingSettingsProvider);
+
+    return statusAsync.when(
+      // Resolving the real state is a platform-channel round trip. Showing
+      // the stored time before that lands would be exactly the unverified
+      // claim this rewrite exists to remove, so show nothing meanwhile.
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (status) {
+        // No notifications implementation on this platform at all: a tile
+        // the user could never make work either way.
+        if (!status.available) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            const SectionHeader(eyebrow: 'Herinnering', title: 'Dagelijks lezen'),
+            const SizedBox(height: 8),
+            _ReminderTile(settings: settings, active: status.isActive),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ReminderTile extends ConsumerWidget {
+  const _ReminderTile({required this.settings, required this.active});
+
+  final ReadingSettings settings;
+
+  /// Whether the OS confirms this reminder is both permitted and actually
+  /// scheduled - never taken from [settings] directly, see
+  /// [_reminderStatusProvider].
+  final bool active;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final time = active ? settings.dailyReminderTime : null;
 
     return RuleGrid(
       children: [
@@ -209,6 +286,7 @@ class _ReminderTile extends ConsumerWidget {
                   onPressed: () async {
                     await ref.read(reminderServiceProvider).cancelDaily();
                     await ref.read(readingSettingsProvider.notifier).setDailyReminder(null);
+                    ref.invalidate(_reminderStatusProvider);
                   },
                   child: const Text('Uitzetten'),
                 ),
@@ -243,6 +321,7 @@ class _ReminderTile extends ConsumerWidget {
     await ref
         .read(readingSettingsProvider.notifier)
         .setDailyReminder(picked.hour * 60 + picked.minute);
+    ref.invalidate(_reminderStatusProvider);
   }
 }
 

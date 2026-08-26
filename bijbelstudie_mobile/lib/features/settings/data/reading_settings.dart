@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -108,6 +110,9 @@ class ReadingSettings {
     this.dailyReminderMinutes,
     this.lastVersionId = 'statenvertaling',
     this.lastCommentaryId = 'matthew_henry_nl',
+    this.lastBook,
+    this.lastChapter,
+    this.lastLocationAt,
   });
 
   final ReaderFontSize fontSize;
@@ -121,6 +126,16 @@ class ReadingSettings {
 
   final String lastVersionId;
   final String lastCommentaryId;
+
+  /// Where the reader was last left. Null until the first chapter is opened,
+  /// which is the only case where Genesis 1 is still the right place to land.
+  final String? lastBook;
+  final int? lastChapter;
+
+  /// When [lastBook]/[lastChapter] were written, so the reader can tell this
+  /// copy apart from the server's on a device that has both. Null for a device
+  /// that stored a location before this was recorded.
+  final DateTime? lastLocationAt;
 
   TimeOfDay? get dailyReminderTime => dailyReminderMinutes == null
       ? null
@@ -136,6 +151,9 @@ class ReadingSettings {
     bool clearReminder = false,
     String? lastVersionId,
     String? lastCommentaryId,
+    String? lastBook,
+    int? lastChapter,
+    DateTime? lastLocationAt,
   }) {
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -147,6 +165,9 @@ class ReadingSettings {
           clearReminder ? null : (dailyReminderMinutes ?? this.dailyReminderMinutes),
       lastVersionId: lastVersionId ?? this.lastVersionId,
       lastCommentaryId: lastCommentaryId ?? this.lastCommentaryId,
+      lastBook: lastBook ?? this.lastBook,
+      lastChapter: lastChapter ?? this.lastChapter,
+      lastLocationAt: lastLocationAt ?? this.lastLocationAt,
     );
   }
 }
@@ -156,9 +177,16 @@ const _kLineHeight = 'reader.lineHeight';
 const _kFontFamily = 'reader.fontFamily';
 const _kVerseNumbers = 'reader.showVerseNumbers';
 const _kThemeMode = 'app.themeMode';
-const _kReminder = 'app.dailyReminderMinutes';
+
+/// Public so main.dart can re-apply a stored reminder at startup, before the
+/// widget tree (and therefore [readingSettingsProvider]) exists to read it.
+const kDailyReminderMinutesKey = 'app.dailyReminderMinutes';
+const _kReminder = kDailyReminderMinutesKey;
 const _kLastVersion = 'reader.lastVersionId';
 const _kLastCommentary = 'reader.lastCommentaryId';
+const _kLastBook = 'reader.lastBook';
+const _kLastChapter = 'reader.lastChapter';
+const _kLastLocationAt = 'reader.lastLocationAt';
 
 final readingSettingsProvider =
     NotifierProvider<ReadingSettingsController, ReadingSettings>(
@@ -166,6 +194,15 @@ final readingSettingsProvider =
     );
 
 class ReadingSettingsController extends Notifier<ReadingSettings> {
+  final Completer<void> _loaded = Completer<void>();
+
+  /// Completes once the first read from disk is done, successfully or not.
+  ///
+  /// [build] returns the defaults and fills them in a moment later, so anything
+  /// that must not act on the defaults - the reader deciding which chapter to
+  /// paint - awaits this instead of racing the notifier's state.
+  Future<void> get loaded => _loaded.future;
+
   @override
   ReadingSettings build() {
     _load();
@@ -173,7 +210,19 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
   }
 
   Future<void> _load() async {
+    try {
+      await _readInto();
+    } catch (_) {
+      // No preferences plugin (tests, an unusual platform): the defaults stand.
+      // The completer must still fire or every awaiting caller hangs forever.
+    } finally {
+      if (!_loaded.isCompleted) _loaded.complete();
+    }
+  }
+
+  Future<void> _readInto() async {
     final prefs = await SharedPreferences.getInstance();
+    final storedAt = prefs.getInt(_kLastLocationAt);
     state = ReadingSettings(
       fontSize: ReaderFontSizeX.fromId(prefs.getString(_kFontSize)),
       lineHeight: ReaderLineHeightX.fromId(prefs.getString(_kLineHeight)),
@@ -187,6 +236,11 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
       dailyReminderMinutes: prefs.getInt(_kReminder),
       lastVersionId: prefs.getString(_kLastVersion) ?? 'statenvertaling',
       lastCommentaryId: prefs.getString(_kLastCommentary) ?? 'matthew_henry_nl',
+      lastBook: prefs.getString(_kLastBook),
+      lastChapter: prefs.getInt(_kLastChapter),
+      lastLocationAt: storedAt == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(storedAt),
     );
   }
 
@@ -243,5 +297,20 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
     if (state.lastCommentaryId == commentaryId) return;
     state = state.copyWith(lastCommentaryId: commentaryId);
     (await SharedPreferences.getInstance()).setString(_kLastCommentary, commentaryId);
+  }
+
+  /// Remembers where the reader was, so reopening the app lands there rather
+  /// than back at Genesis 1.
+  ///
+  /// The timestamp is what lets the reader compare this copy with the server's
+  /// on a device that has both, so it is refreshed even when the chapter has
+  /// not changed.
+  Future<void> setLastLocation({required String book, required int chapter}) async {
+    final now = DateTime.now();
+    state = state.copyWith(lastBook: book, lastChapter: chapter, lastLocationAt: now);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kLastBook, book);
+    await prefs.setInt(_kLastChapter, chapter);
+    await prefs.setInt(_kLastLocationAt, now.millisecondsSinceEpoch);
   }
 }

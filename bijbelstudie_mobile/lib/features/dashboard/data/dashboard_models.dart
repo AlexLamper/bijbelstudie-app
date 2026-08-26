@@ -1,18 +1,25 @@
 // Shapes returned by `GET /api/v1/dashboard`, which mirrors what
 // `app/dashboard/page.tsx` assembles on the website.
 
+import '../../../core/data/bible_books.dart';
+
 class LastRead {
   const LastRead({
     required this.book,
     required this.chapter,
     required this.version,
     this.commentary,
+    this.updatedAt,
   });
 
   final String book;
   final int chapter;
   final String version;
   final String? commentary;
+
+  /// When the server last moved this. The reader compares it with the copy on
+  /// this device to decide which of the two is the more recent truth.
+  final DateTime? updatedAt;
 
   String get reference => '$book $chapter';
 
@@ -23,6 +30,7 @@ class LastRead {
       chapter: (json['chapter'] as num?)?.toInt() ?? 1,
       version: json['version'] as String? ?? 'statenvertaling',
       commentary: json['commentary'] as String?,
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
     );
   }
 }
@@ -67,14 +75,42 @@ class DailyVerse {
 
   static DailyVerse? fromJson(Map<String, dynamic>? json) {
     if (json == null || json['text'] == null) return null;
+    // BijbelAPI.com (the "via BijbelAPI.com" feed behind `GET /daytext`)
+    // returns English book names, e.g. "Zechariah" / "Zechariah 4:6"; the app
+    // is Dutch-only, so both fields are normalised here, once, at the model
+    // boundary — everything downstream (including the "Lees hoofdstuk →"
+    // navigation) then only ever sees the Dutch name.
+    final rawBook = json['book'] as String? ?? '';
+    final book = BibleBooks.toDutch(rawBook);
     return DailyVerse(
       text: json['text'] as String,
-      reference: json['reference'] as String? ?? '',
-      book: json['book'] as String? ?? '',
+      reference: _dutchReference(
+        json['reference'] as String? ?? '',
+        rawBook: rawBook,
+        dutchBook: book,
+      ),
+      book: book,
       chapter: (json['chapter'] as num?)?.toInt() ?? 1,
       verse: (json['verse'] as num?)?.toInt() ?? 1,
     );
   }
+}
+
+/// Swaps the English book name at the start of a "daytext" reference string
+/// (e.g. "Zechariah 4:6") for its Dutch equivalent, leaving the
+/// "chapter:verse" suffix untouched. Falls back to the raw string unchanged
+/// when it does not start with [rawBook] — already Dutch, or an unrecognised
+/// shape — rather than guessing.
+String _dutchReference(
+  String raw, {
+  required String rawBook,
+  required String dutchBook,
+}) {
+  if (raw.isEmpty) return dutchBook;
+  if (rawBook.isNotEmpty && raw.startsWith(rawBook)) {
+    return dutchBook + raw.substring(rawBook.length);
+  }
+  return raw;
 }
 
 class RecentNote {
@@ -106,33 +142,6 @@ class RecentNote {
   }
 }
 
-class ActivePlanSummary {
-  const ActivePlanSummary({
-    required this.id,
-    required this.title,
-    required this.duration,
-    required this.completedDays,
-    required this.progressPercentage,
-  });
-
-  final String id;
-  final String title;
-  final int duration;
-  final int completedDays;
-  final int progressPercentage;
-
-  static ActivePlanSummary? fromJson(Map<String, dynamic>? json) {
-    if (json == null || json['id'] == null) return null;
-    return ActivePlanSummary(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      duration: (json['duration'] as num?)?.toInt() ?? 0,
-      completedDays: (json['completedDays'] as num?)?.toInt() ?? 0,
-      progressPercentage: (json['progressPercentage'] as num?)?.toInt() ?? 0,
-    );
-  }
-}
-
 class DashboardData {
   const DashboardData({
     required this.name,
@@ -144,14 +153,17 @@ class DashboardData {
     required this.weekTotal,
     required this.notesCount,
     required this.recentNotes,
+    required this.badges,
     this.lastRead,
     this.dailyVerse,
-    this.activePlan,
   });
 
   final String name;
   final bool isPro;
   final int streak;
+
+  /// Days the streak can survive without a completed task. Earned one per five
+  /// days server-side; only a Pro account may spend one.
   final int freezes;
 
   /// Book name -> the chapter numbers already read.
@@ -161,9 +173,14 @@ class DashboardData {
   final int weekTotal;
   final int notesCount;
   final List<RecentNote> recentNotes;
+
+  /// Earned badge ids, as `lib/gamification.ts` writes them. Rendered as seals;
+  /// the XP and level the server derives them from stay off screen on purpose,
+  /// so what the user sees is always what they actually read.
+  final List<String> badges;
+
   final LastRead? lastRead;
   final DailyVerse? dailyVerse;
-  final ActivePlanSummary? activePlan;
 
   /// How many of the 66 books have at least one chapter read.
   int get booksStarted => readChapters.values.where((c) => c.isNotEmpty).length;
@@ -194,9 +211,11 @@ class DashboardData {
       recentNotes: (json['recentNotes'] as List? ?? const [])
           .map((n) => RecentNote.fromJson(n as Map<String, dynamic>))
           .toList(growable: false),
+      badges: (json['badges'] as List? ?? const [])
+          .map((b) => b as String)
+          .toList(growable: false),
       lastRead: LastRead.fromJson(json['lastRead'] as Map<String, dynamic>?),
       dailyVerse: DailyVerse.fromJson(json['dailyVerse'] as Map<String, dynamic>?),
-      activePlan: ActivePlanSummary.fromJson(json['activePlan'] as Map<String, dynamic>?),
     );
   }
 }

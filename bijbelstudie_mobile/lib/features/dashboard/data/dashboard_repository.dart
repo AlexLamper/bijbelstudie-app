@@ -49,12 +49,32 @@ class DashboardRepository {
     }
   }
 
-  /// Advances the daily streak. Returns the new value, or null when the call
-  /// did not go through.
-  Future<int?> bumpStreak() async {
+  /// The server's copy of where the reader was, across every device.
+  ///
+  /// The same document `recordRead` writes. Returns null when it cannot be had
+  /// - offline, signed out, or nothing recorded yet - which the caller treats
+  /// as "the server has nothing to say", never as "start at Genesis 1".
+  Future<LastRead?> getLastRead() async {
+    try {
+      final response = await _apiClient.dio.get('/last-read');
+      final data = response.data as Map<String, dynamic>?;
+      return LastRead.fromJson(data?['lastReadChapter'] as Map<String, dynamic>?);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Advances the daily streak, once per calendar day.
+  ///
+  /// The server owns every rule here: it bumps at most once a day, spends a
+  /// freeze to bridge a missed day when the account is Pro, hands out a freeze
+  /// every fifth day, and re-evaluates the badges. Returns null when the call
+  /// did not go through, which the caller treats as "no celebration", never as
+  /// "streak lost".
+  Future<StreakResult?> bumpStreak() async {
     try {
       final response = await _apiClient.dio.post('/streak');
-      return ((response.data as Map<String, dynamic>)['streak'] as num?)?.toInt();
+      return StreakResult.fromJson(response.data as Map<String, dynamic>);
     } catch (_) {
       return null;
     }
@@ -67,5 +87,31 @@ class DashboardRepository {
     } catch (_) {
       return null;
     }
+  }
+}
+
+/// What `POST /streak` answers with.
+class StreakResult {
+  const StreakResult({
+    required this.streak,
+    required this.freezes,
+    required this.newBadges,
+  });
+
+  final int streak;
+  final int freezes;
+
+  /// Badge ids that were not on the account before this call.
+  final List<String> newBadges;
+
+  factory StreakResult.fromJson(Map<String, dynamic> json) {
+    final xp = json['xp'] as Map<String, dynamic>?;
+    return StreakResult(
+      streak: (json['streak'] as num?)?.toInt() ?? 0,
+      freezes: (json['freezes'] as num?)?.toInt() ?? 0,
+      newBadges: (xp?['newBadges'] as List? ?? const [])
+          .map((b) => b as String)
+          .toList(growable: false),
+    );
   }
 }

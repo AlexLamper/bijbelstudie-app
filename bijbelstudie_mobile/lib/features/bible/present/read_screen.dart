@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/config/preview_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../dashboard/data/dashboard_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
@@ -14,6 +16,7 @@ import '../../notes/present/verse_action_sheet.dart';
 import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
+import 'offline_library_sheet.dart';
 import 'source_picker_sheet.dart';
 
 /// The reader. Everything else in the app exists to get someone here.
@@ -28,6 +31,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   final ScrollController _scrollController = ScrollController();
   Timer? _positionDebounce;
   String? _restoredFor;
+  String? _recordedFor;
 
   @override
   void initState() {
@@ -71,19 +75,66 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     );
   }
 
-  void _restoreScrollIfNeeded(ReaderLocation location) {
+  /// Tells the server the chapter was opened, once per chapter.
+  ///
+  /// `/reading-history` only carries the scroll offset. `POST /last-read` is
+  /// what fills `readChapters` (the 66-book map), writes a `ReadingSession`
+  /// (the weekly bars) and moves `lastReadChapter` (the "ga verder" card), so
+  /// without this call the whole dashboard stays empty for anyone who only
+  /// ever uses the app. It deliberately does *not* touch the streak: that is
+  /// earned by finishing the day's task, not by opening a chapter.
+  ///
+  /// It fires from the rendered chapter on purpose: this is what claims the
+  /// chapter as read. Remembering the position is a separate job and belongs to
+  /// [ReaderLocationController], which writes it the moment the user navigates,
+  /// whether or not the text ever arrives.
+  void _recordChapterOpen(ReaderLocation location) {
+    // Preview runs on canned data; it must never write a chapter onto whatever
+    // account happens to be signed in.
+    if (PreviewConfig.enabled) return;
+
+    final key = '${location.versionId}/${location.book}/${location.chapter}';
+    if (_recordedFor == key) return;
+    _recordedFor = key;
+
+    // This runs from `build` and the call below touches a provider, so the work
+    // waits until the frame is done.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      unawaited(
+        ref
+            .read(dashboardRepositoryProvider)
+            .recordRead(
+              version: location.versionId,
+              book: location.book,
+              chapter: location.chapter,
+            ),
+      );
+    });
+  }
+
+  /// Puts the reader back where they stopped inside the chapter.
+  ///
+  /// [positions] is fetched over the network, so on the first frames after this
+  /// screen mounts it is usually still in flight. Marking the chapter done then
+  /// would spend the single attempt this mount gets and leave anyone who tabs
+  /// away and back at the top of the chapter, so the key is only recorded once
+  /// there is an answer to act on.
+  void _restoreScrollIfNeeded(ReaderLocation location, List<ReadingPosition>? positions) {
+    if (positions == null) return;
+
     final key = '${location.versionId}/${location.book}/${location.chapter}';
     if (_restoredFor == key) return;
     _restoredFor = key;
 
-    final positions = ref.read(readingHistoryProvider).value;
-    final match = positions?.where(
+    final match = positions.where(
       (p) =>
           p.version == location.versionId &&
           p.book == location.book &&
           p.chapter == location.chapter,
     );
-    final progress = match == null || match.isEmpty ? 0.0 : match.first.scrollProgress;
+    final progress = match.isEmpty ? 0.0 : match.first.scrollProgress;
     if (progress <= 0.01) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -96,11 +147,25 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   @override
   Widget build(BuildContext context) {
     final location = ref.watch(readerLocationProvider);
+
+    // Nothing is painted until the stored location is known. Opening on Genesis
+    // 1 and swapping it out a moment later is the reset being fixed here, and a
+    // faster version of it would still be one.
+    if (!location.restored) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const SafeArea(child: AppLoader()),
+      );
+    }
+
     final settings = ref.watch(readingSettingsProvider);
     final chapterAsync = ref.watch(chapterContentProvider(location.ref));
     final chaptersAsync = ref.watch(
       bibleChaptersProvider(BookRef(location.versionId, location.book)),
     );
+    // Watched, not read: the offset arrives after the chapter does, and
+    // _restoreScrollIfNeeded needs a rebuild to act on it.
+    final positions = ref.watch(readingHistoryProvider).value;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -115,7 +180,8 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                 loading: () => const AppLoader(),
                 error: (error, _) => _ReaderError(error: error),
                 data: (chapter) {
-                  _restoreScrollIfNeeded(location);
+                  _recordChapterOpen(location);
+                  _restoreScrollIfNeeded(location, positions);
                   return _ChapterBody(
                     chapter: chapter,
                     settings: settings,
@@ -196,12 +262,47 @@ class _ReaderBar extends ConsumerWidget {
               ),
             ),
           ),
+          _OfflineButton(location: location),
           IconButton(
             tooltip: 'Vertaling kiezen',
             onPressed: () => showVersionPickerSheet(context, ref),
             icon: const Icon(Icons.translate, size: 20),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The reader's way into "Offline lezen".
+///
+/// The download used to live only inside the book picker's expanded chapter
+/// grid, three taps deep and below the fold - which is why offline reading
+/// could look unimplemented to someone who had paid for it. It sits next to the
+/// translation switch instead, and its icon reports the current book's real
+/// state: filled once every chapter of the book is genuinely on disk, outlined
+/// otherwise. It never anticipates a download that has not finished.
+class _OfflineButton extends ConsumerWidget {
+  const _OfflineButton({required this.location});
+
+  final ReaderLocation location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref
+        .watch(bookOfflineStatusProvider(BookRef(location.versionId, location.book)))
+        .value;
+    final complete = status?.isComplete ?? false;
+
+    return IconButton(
+      tooltip: complete
+          ? '${location.book} is offline beschikbaar'
+          : 'Offline lezen',
+      onPressed: () => showOfflineLibrarySheet(context),
+      icon: Icon(
+        complete ? Icons.offline_pin : Icons.download_outlined,
+        size: 20,
+        color: complete ? AppTheme.lapis : null,
       ),
     );
   }
@@ -347,11 +448,15 @@ class _ReaderError extends StatelessWidget {
             'Kies een andere vertaling.',
       );
     }
+    // Reaching this means the chapter is not on the device either - the
+    // repository hands back cached text before it ever throws. So it points at
+    // the fix rather than claiming the reader already has something offline.
     return const AppEmptyState(
       icon: Icons.wifi_off_outlined,
       title: 'Hoofdstuk niet geladen',
       description:
-          'Controleer je verbinding. Hoofdstukken die je eerder las blijven offline beschikbaar.',
+          'Dit hoofdstuk staat niet op je apparaat. Controleer je verbinding, of bewaar '
+          'boeken vooraf via het downloadicoon bovenaan.',
     );
   }
 }

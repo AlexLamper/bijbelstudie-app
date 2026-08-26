@@ -53,4 +53,90 @@ class BibleBooks {
   };
 
   static int chaptersIn(String book) => chapterCounts[book] ?? 1;
+
+  /// English book names the third-party BijbelAPI.com "daytext" feed (and any
+  /// other English-keyed source) can hand back, mapped to the exact Dutch
+  /// strings in [oldTestament] / [newTestament]. Mirrors `CANONICAL_NL` in
+  /// `lib/book-mapping.ts` on www.bijbel-studie.com, but keyed to *this*
+  /// app's canonical Dutch spellings rather than the website's.
+  static const Map<String, String> _englishToDutch = {
+    'Genesis': 'Genesis',
+    'Exodus': 'Exodus',
+    'Leviticus': 'Leviticus',
+    'Numbers': 'Numeri',
+    'Deuteronomy': 'Deuteronomium',
+    'Joshua': 'Jozua',
+    'Judges': 'Richteren',
+    'Ruth': 'Ruth',
+    '1 Samuel': '1 Samuël',
+    '2 Samuel': '2 Samuël',
+    '1 Kings': '1 Koningen',
+    '2 Kings': '2 Koningen',
+    '1 Chronicles': '1 Kronieken',
+    '2 Chronicles': '2 Kronieken',
+    'Ezra': 'Ezra',
+    'Nehemiah': 'Nehemia',
+    'Esther': 'Esther',
+    'Job': 'Job',
+    'Psalms': 'Psalmen',
+    'Psalm': 'Psalmen',
+    'Proverbs': 'Spreuken',
+    'Ecclesiastes': 'Prediker',
+    'Song of Solomon': 'Hooglied',
+    'Song of Songs': 'Hooglied',
+    'Isaiah': 'Jesaja',
+    'Jeremiah': 'Jeremia',
+    'Lamentations': 'Klaagliederen',
+    'Ezekiel': 'Ezechiël',
+    'Daniel': 'Daniël',
+    'Hosea': 'Hosea',
+    'Joel': 'Joël',
+    'Amos': 'Amos',
+    'Obadiah': 'Obadja',
+    'Jonah': 'Jona',
+    'Micah': 'Micha',
+    'Nahum': 'Nahum',
+    'Habakkuk': 'Habakuk',
+    'Zephaniah': 'Zefanja',
+    'Haggai': 'Haggaï',
+    'Zechariah': 'Zacharia',
+    'Malachi': 'Maleachi',
+    'Matthew': 'Mattheüs',
+    'Mark': 'Markus',
+    'Luke': 'Lukas',
+    'John': 'Johannes',
+    'Acts': 'Handelingen',
+    'Romans': 'Romeinen',
+    '1 Corinthians': '1 Korinthe',
+    '2 Corinthians': '2 Korinthe',
+    'Galatians': 'Galaten',
+    'Ephesians': 'Efeziërs',
+    'Philippians': 'Filippenzen',
+    'Colossians': 'Kolossenzen',
+    '1 Thessalonians': '1 Thessalonicenzen',
+    '2 Thessalonians': '2 Thessalonicenzen',
+    '1 Timothy': '1 Timotheüs',
+    '2 Timothy': '2 Timotheüs',
+    'Titus': 'Titus',
+    'Philemon': 'Filémon',
+    'Hebrews': 'Hebreeën',
+    'James': 'Jakobus',
+    '1 Peter': '1 Petrus',
+    '2 Peter': '2 Petrus',
+    '1 John': '1 Johannes',
+    '2 John': '2 Johannes',
+    '3 John': '3 Johannes',
+    'Jude': 'Judas',
+    'Revelation': 'Openbaring',
+    'Revelations': 'Openbaring',
+  };
+
+  /// Normalises an English book name (as BijbelAPI.com's daytext feed returns
+  /// it) to this app's canonical Dutch spelling. A no-op passthrough when
+  /// [name] is already Dutch or unrecognised — never empty, never throws.
+  static String toDutch(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return name;
+    return _englishToDutch[trimmed] ?? name;
+  }
 }

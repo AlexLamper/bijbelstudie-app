@@ -25,11 +25,14 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        bottom: false,
-        child: dashboard.when(
-          loading: () => const AppLoader(),
-          error: (error, _) => AppEmptyState(
+      // The greeting header paints its own `scheme.surface` block full-bleed to
+      // the very top of the screen (see `_DashboardBody`'s header `Container`,
+      // which adds the status-bar inset itself), so only the loading / error
+      // states — which have no header of their own — keep the top SafeArea.
+      body: dashboard.when(
+        loading: () => const SafeArea(child: AppLoader()),
+        error: (error, _) => SafeArea(
+          child: AppEmptyState(
             icon: Icons.cloud_off_outlined,
             title: 'Dashboard niet geladen',
             description: '$error',
@@ -39,7 +42,11 @@ class DashboardScreen extends ConsumerWidget {
               onPressed: () => ref.invalidate(dashboardProvider),
             ),
           ),
-          data: (data) => RefreshIndicator(
+        ),
+        data: (data) => SafeArea(
+          top: false,
+          bottom: false,
+          child: RefreshIndicator(
             color: AppTheme.teal,
             onRefresh: () async => ref.invalidate(dashboardProvider),
             child: _DashboardBody(data: data),
@@ -76,8 +83,16 @@ class _DashboardBody extends ConsumerWidget {
       padding: EdgeInsets.zero,
       children: [
         // ── Header: greeting, date, streak pill ──────────────────────────
+        // Paints full-bleed under the status bar; the outer Scaffold has no
+        // top SafeArea for this branch, so the status-bar inset is added here
+        // instead of letting the scaffold background show through above it.
         Container(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20 + MediaQuery.of(context).padding.top,
+            20,
+            18,
+          ),
           decoration: BoxDecoration(
             color: scheme.surface,
             border: Border(bottom: BorderSide(color: scheme.outline)),
@@ -139,17 +154,17 @@ class _DashboardBody extends ConsumerWidget {
                     icon: Icons.local_fire_department,
                     color: data.streak > 0 ? AppTheme.flame : AppTheme.inkFaint,
                     value: '${data.streak} ${data.streak == 1 ? 'dag' : 'dagen'}',
-                    label: 'Dagelijkse reeks',
+                    label: 'Reeks',
                   ),
                   StatItem(
                     icon: Icons.menu_book_outlined,
                     value: '${data.booksStarted} / 66',
-                    label: 'Bijbelboeken',
+                    label: 'Boeken',
                   ),
                   StatItem(
                     icon: Icons.sticky_note_2_outlined,
                     value: '${data.notesCount}',
-                    label: 'Notities geschreven',
+                    label: 'Notities',
                   ),
                 ],
               ),
@@ -189,11 +204,6 @@ class _DashboardBody extends ConsumerWidget {
 
               _WeeklyStatsCard(days: data.weekDays, total: data.weekTotal),
               const SizedBox(height: 16),
-
-              if (data.activePlan != null) ...[
-                _ActivePlanCard(plan: data.activePlan!),
-                const SizedBox(height: 16),
-              ],
 
               if (data.recentNotes.isNotEmpty) ...[
                 _RecentNotesCard(
@@ -371,7 +381,7 @@ class _BookMapCardState extends State<_BookMapCard> {
                           ),
                         ),
                         TextSpan(
-                          text: ' — ${_read(_selected!)} van '
+                          text: ' - ${_read(_selected!)} van '
                               '${BibleBooks.chaptersIn(_selected!)} hoofdstukken gelezen',
                           style: AppTheme.caption,
                         ),
@@ -738,48 +748,6 @@ class _WeeklyStatsCard extends StatelessWidget {
   }
 }
 
-class _ActivePlanCard extends StatelessWidget {
-  const _ActivePlanCard({required this.plan});
-
-  final ActivePlanSummary plan;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(18),
-      onTap: () => context.go('/studies'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text('LEESPLAN', style: AppTheme.eyebrow)),
-              const Icon(Icons.event_available_outlined, size: 14, color: AppTheme.teal),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            plan.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTheme.bodyStrong.copyWith(color: scheme.onSurface),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            'Dag ${plan.completedDays} van ${plan.duration} · ${plan.progressPercentage}%',
-            style: AppTheme.caption,
-          ),
-          const SizedBox(height: 10),
-          SiteProgressBar(value: plan.progressPercentage / 100),
-        ],
-      ),
-    );
-  }
-}
-
 class _RecentNotesCard extends StatelessWidget {
   const _RecentNotesCard({required this.notes, required this.onOpenNote});
 
@@ -860,7 +828,6 @@ class _QuickLinksCard extends StatelessWidget {
     const links = [
       ('/study', 'Bijbelstudie', Icons.menu_book_outlined),
       ('/notes', 'Mijn notities', Icons.sticky_note_2_outlined),
-      ('/studies', 'Leesplannen', Icons.event_available_outlined),
       ('/resources', 'Hulpbronnen', Icons.local_library_outlined),
       ('/groups', 'Groepen', Icons.groups_outlined),
     ];

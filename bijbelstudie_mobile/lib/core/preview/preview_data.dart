@@ -5,6 +5,7 @@ import '../db/content_cache.dart';
 import '../../features/bible/domain/bible_models.dart';
 import '../../features/bible/present/bible_providers.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
+import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
 import '../../features/notes/domain/note_models.dart';
 import '../../features/notes/present/notes_providers.dart';
@@ -27,13 +28,13 @@ class PreviewData {
       id: 'statenvertaling',
       name: 'Statenvertaling',
       language: 'nl',
-      attribution: 'Statenvertaling (1637) — publiek domein',
+      attribution: 'Statenvertaling (1637) - publiek domein',
     ),
     BibleSource(
       id: 'kjv',
       name: 'King James Version',
       language: 'en',
-      attribution: 'King James Version (1611) — publiek domein',
+      attribution: 'King James Version (1611) - publiek domein',
     ),
   ];
 
@@ -42,7 +43,7 @@ class PreviewData {
       id: 'matthew_henry_nl',
       name: 'Matthew Henry (NL)',
       language: 'nl',
-      attribution: 'Matthew Henry (1662–1714) — publiek domein',
+      attribution: 'Matthew Henry (1662–1714) - publiek domein',
     ),
   ];
 
@@ -59,7 +60,7 @@ class PreviewData {
     sourceId: 'statenvertaling',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Statenvertaling (1637) — publiek domein',
+    attribution: 'Statenvertaling (1637) - publiek domein',
     verses: [
       Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
       Verse(
@@ -88,7 +89,7 @@ class PreviewData {
     sourceId: 'matthew_henry_nl',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Matthew Henry (1662–1714) — publiek domein',
+    attribution: 'Matthew Henry (1662–1714) - publiek domein',
     verses: [
       // Verse 0 is the chapter introduction — that is how the corpus keys it.
       Verse(
@@ -160,7 +161,7 @@ class PreviewData {
       type: 'Gedeelte',
       title: 'De opstanding van Jezus',
       description:
-          'Hoe het lege graf de wereld voor altijd veranderde — van wanhoop '
+          'Hoe het lege graf de wereld voor altijd veranderde - van wanhoop '
           'naar hoop.',
       durationLabel: '3 lessen',
       startBook: 'Johannes',
@@ -222,13 +223,7 @@ class PreviewData {
       chapter: 3,
       verse: 16,
     ),
-    activePlan: const ActivePlanSummary(
-      id: 'preview-plan',
-      title: 'Het evangelie van Johannes',
-      duration: 21,
-      completedDays: 7,
-      progressPercentage: 33,
-    ),
+    badges: const ['firstlesson', 'completed1'],
   );
 
   /// Wraps the app in a ProviderScope whose network-backed providers are
@@ -248,6 +243,11 @@ class PreviewData {
         ),
         chapterContentProvider.overrideWith((ref, chapterRef) async => chapter),
         commentaryChapterProvider.overrideWith((ref, chapterRef) async => commentaryChapter),
+        // No account to restore a position from, so the reader settles on its
+        // Genesis 1 default straight away instead of waiting on a request that
+        // cannot succeed.
+        remoteReaderLocationProvider.overrideWith((ref) async => null),
+        dashboardRepositoryProvider.overrideWithValue(const _PreviewDashboardRepository()),
         profileProvider.overrideWith((ref) async => profile),
         notesListProvider.overrideWith((ref) async => notes),
         highlightsListProvider.overrideWith((ref) async => highlights),
@@ -257,4 +257,34 @@ class PreviewData {
       child: child,
     );
   }
+}
+
+/// Stands in for the real repository so nothing the reader does can reach the
+/// network from a preview.
+///
+/// The read screen posts every chapter it opens to `/last-read`. It already
+/// checks [PreviewConfig] before doing so, but that is a compile-time flag and
+/// this scope is also what the widget tests mount, where the flag is off.
+class _PreviewDashboardRepository implements DashboardRepository {
+  const _PreviewDashboardRepository();
+
+  @override
+  Future<DashboardData> getDashboard() async => PreviewData.dashboard;
+
+  @override
+  Future<void> recordRead({
+    required String book,
+    required int chapter,
+    required String version,
+    String? commentary,
+  }) async {}
+
+  @override
+  Future<LastRead?> getLastRead() async => null;
+
+  @override
+  Future<StreakResult?> bumpStreak() async => null;
+
+  @override
+  Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
 }

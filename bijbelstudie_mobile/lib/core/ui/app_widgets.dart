@@ -370,66 +370,92 @@ class StatItem {
   Color get tint => color ?? ruleColor ?? AppTheme.teal;
 }
 
-/// `grid grid-cols-3 gap-3` of `bg-white border rounded-xl p-4` tiles — the
-/// dashboard's stat strip. Each tile is icon, bold value, muted label.
+/// One `bg-white border rounded-xl` card holding the dashboard's stat trio
+/// side by side, `divide-x divide-border` in Tailwind terms — icon and value
+/// inline per column, a single-line label under each, thin vertical rules
+/// between. Replaces the old one-card-per-stat grid, which wasted a border
+/// and a row of vertical space on every tile for what is, on a phone, three
+/// numbers the reader mostly skims.
 class StatStrip extends StatelessWidget {
   const StatStrip({super.key, required this.items, this.stacked = false});
 
   final List<StatItem> items;
 
-  /// Retained for source compatibility; the site only has the one layout.
+  /// Retained for source compatibility; the strip only has the one layout.
   final bool stacked;
 
   @override
   Widget build(BuildContext context) {
-    // `stretch` needs a bounded cross axis; inside a ListView the Row's height
-    // is unbounded, so the intrinsic pass is what makes the three tiles share
-    // the tallest label's height instead of asking for infinity.
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(width: 12),
-            Expanded(
-              child: AppCard(
-                radius: AppTheme.radiusMd,
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      items[i].icon ?? Icons.circle,
-                      size: 14,
-                      color: items[i].tint,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      items[i].value,
-                      style: AppTheme.statNumber.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      items[i].label,
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.inkFaint,
-                        height: 1.25,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return AppCard(
+      radius: AppTheme.radiusMd,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      // `stretch` needs a bounded cross axis; inside a ListView the Row's
+      // height is unbounded, so the intrinsic pass is what makes the rule
+      // between columns match the tallest column instead of asking for
+      // infinity.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(width: 8),
+                Container(width: 1, color: scheme.outline),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: _StatColumn(item: items[i])),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One column of a [StatStrip] — icon beside the value, a tight one-line
+/// label underneath, everything centred so the row reads as balanced.
+class _StatColumn extends StatelessWidget {
+  const _StatColumn({required this.item});
+
+  final StatItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Scales the icon+value pair down instead of truncating it, so a
+        // wide value (e.g. "12 / 66") never overflows a narrow column on a
+        // small phone.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(item.icon ?? Icons.circle, size: 15, color: item.tint),
+              const SizedBox(width: 5),
+              Text(
+                item.value,
+                style: AppTheme.statNumber.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
-            ),
-          ],
-        ],
-      ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          item.label,
+          style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

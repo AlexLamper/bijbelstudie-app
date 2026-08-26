@@ -31,7 +31,18 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
   /// Only the cap is a paywall: offering Pro as the answer to "the assistant is
   /// unreachable" sells nothing and reads as opportunism.
   bool _errorIsQuota = false;
+  /// Whether [_error] is a dead session, which needs a way back to the login
+  /// screen rather than a retry that will fail the same way.
+  bool _errorIsAuth = false;
   AiQuota? _quota;
+
+  /// Set when the assistant cannot answer *any* question right now: the server
+  /// reports no model key, or there is no session behind the request. Both are
+  /// known before the user types, so the composer is disabled and the reason
+  /// stated - letting someone write a question that is guaranteed to fail is
+  /// the silent failure this pane used to have.
+  String? _blocked;
+  bool _blockedIsAuth = false;
 
   static const _suggestions = [
     'Wat is de kern van dit hoofdstuk?',
@@ -55,15 +66,32 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
   Future<void> _loadQuota() async {
     try {
       final quota = await ref.read(aiRepositoryProvider).getQuota();
-      if (mounted) setState(() => _quota = quota);
+      if (!mounted) return;
+      setState(() {
+        _quota = quota;
+        // A deployment without GEMINI_API_KEY answers every question with a
+        // 503. The quota call is the only place that is knowable up front, and
+        // it used to be thrown away here.
+        _blocked = quota.configured
+            ? null
+            : 'De AI-assistent is momenteel niet beschikbaar.';
+        _blockedIsAuth = false;
+      });
+    } on AiAuthRequired catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _blocked = e.message;
+        _blockedIsAuth = true;
+      });
     } catch (_) {
-      // The composer still works; only the counter is missing.
+      // A network blip. The composer still works, and a question that really
+      // cannot be sent reports it itself.
     }
   }
 
   Future<void> _send(String raw) async {
     final message = raw.trim();
-    if (message.isEmpty || _sending) return;
+    if (message.isEmpty || _sending || _blocked != null) return;
 
     final location = ref.read(readerLocationProvider);
     final history = List<AiTurn>.from(_turns);
@@ -73,6 +101,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
       _sending = true;
       _error = null;
       _errorIsQuota = false;
+      _errorIsAuth = false;
       _controller.clear();
     });
     _scrollToEnd();
@@ -94,26 +123,49 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
       });
     } on AiQuotaExceeded catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _errorIsQuota = true;
-        _sending = false;
-      });
+      _failTurn(message, e.message, isQuota: true);
       // The one moment this surface actually refuses the user, which is what
-      // `paywall_hit` means. The generic branch below is a fault, not a gate.
+      // `paywall_hit` means. The branches below are faults, not gates: the
+      // server also answers 429 for `AI_BUSY`, and counting that as a paywall
+      // both lied to the user and inflated the funnel.
       ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
         'surface': 'ai_limit',
       });
+    } on AiAuthRequired catch (e) {
+      if (!mounted) return;
+      _failTurn(message, e.message, isAuth: true);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = '$e'.replaceFirst('Exception: ', '');
-        _errorIsQuota = false;
-        _sending = false;
-      });
+      _failTurn(message, '$e'.replaceFirst('Exception: ', ''));
     }
     _loadQuota();
     _scrollToEnd();
+  }
+
+  /// Rolls back the question that never reached the model.
+  ///
+  /// Leaving its bubble in the transcript would show an unanswered turn and,
+  /// worse, send it again as history on the next question - the model would be
+  /// asked to continue from something it never saw. The text goes back into the
+  /// composer so retrying is one tap and nothing the user typed is lost.
+  void _failTurn(
+    String message,
+    String error, {
+    bool isQuota = false,
+    bool isAuth = false,
+  }) {
+    setState(() {
+      if (_turns.isNotEmpty &&
+          _turns.last.isUser &&
+          _turns.last.content == message) {
+        _turns.removeLast();
+      }
+      if (_controller.text.isEmpty) _controller.text = message;
+      _error = error;
+      _errorIsQuota = isQuota;
+      _errorIsAuth = isAuth;
+      _sending = false;
+    });
   }
 
   void _scrollToEnd() {
@@ -130,10 +182,17 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
   @override
   Widget build(BuildContext context) {
     final quota = _quota;
+    final blocked = _blocked;
+
+    // A standing block outranks a per-question error: it is the reason the
+    // question could not be sent at all.
+    final notice = blocked ?? _error;
+    final showLoginCta = blocked != null ? _blockedIsAuth : _errorIsAuth;
+    final showProCta = blocked == null && _errorIsQuota;
 
     return Column(
       children: [
-        if (quota != null && !quota.unlimited)
+        if (blocked == null && quota != null && !quota.unlimited)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -145,7 +204,11 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
           ),
         Expanded(
           child: _turns.isEmpty
-              ? _EmptyPrompt(onPick: _send, suggestions: _suggestions)
+              ? _EmptyPrompt(
+                  onPick: _send,
+                  suggestions: _suggestions,
+                  enabled: blocked == null,
+                )
               : ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -156,7 +219,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                   },
                 ),
         ),
-        if (_error != null)
+        if (notice != null)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -165,11 +228,11 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
               children: [
                 Expanded(
                   child: Text(
-                    _error!,
+                    notice,
                     style: AppTheme.caption.copyWith(color: AppTheme.destructive),
                   ),
                 ),
-                if (_errorIsQuota)
+                if (showProCta)
                   TextButton(
                     onPressed: () {
                       ref
@@ -185,6 +248,15 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                     ),
                     child: const Text('Pro'),
                   ),
+                if (showLoginCta)
+                  TextButton(
+                    onPressed: () => context.push('/login'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 30),
+                    ),
+                    child: const Text('Inloggen'),
+                  ),
               ],
             ),
           ),
@@ -197,12 +269,15 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
               Expanded(
                 child: TextField(
                   controller: _controller,
+                  enabled: blocked == null,
                   minLines: 1,
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: _send,
-                  decoration: const InputDecoration(
-                    hintText: 'Stel een vraag over dit hoofdstuk…',
+                  decoration: InputDecoration(
+                    hintText: blocked == null
+                        ? 'Stel een vraag over dit hoofdstuk…'
+                        : 'Niet beschikbaar',
                     isDense: true,
                   ),
                 ),
@@ -212,7 +287,9 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                 height: 44,
                 width: 44,
                 child: FilledButton(
-                  onPressed: _sending ? null : () => _send(_controller.text),
+                  onPressed: _sending || blocked != null
+                      ? null
+                      : () => _send(_controller.text),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTheme.ai,
                     padding: EdgeInsets.zero,
@@ -233,10 +310,18 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
 }
 
 class _EmptyPrompt extends StatelessWidget {
-  const _EmptyPrompt({required this.onPick, required this.suggestions});
+  const _EmptyPrompt({
+    required this.onPick,
+    required this.suggestions,
+    required this.enabled,
+  });
 
   final void Function(String prompt) onPick;
   final List<String> suggestions;
+
+  /// False while the assistant cannot answer at all. A suggestion that quietly
+  /// does nothing when tapped is worse than one that is visibly unavailable.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -274,7 +359,7 @@ class _EmptyPrompt extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: OutlinedButton(
-              onPressed: () => onPick(suggestion),
+              onPressed: enabled ? () => onPick(suggestion) : null,
               style: OutlinedButton.styleFrom(
                 alignment: Alignment.centerLeft,
                 minimumSize: const Size.fromHeight(44),

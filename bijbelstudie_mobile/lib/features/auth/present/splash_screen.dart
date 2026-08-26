@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../bible/present/bible_providers.dart';
 import '../../onboarding/data/onboarding_storage.dart';
 import '../present/auth_controller.dart';
 
@@ -33,10 +34,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // user instead of an anonymous RevenueCat id.
       await ref.read(authControllerProvider.notifier).restoreSession();
 
-      // A signed-in user never sees the onboarding again — it is a
+      // A signed-in user never sees the onboarding again - it is a
       // first-run intro for visitors who still have to create an account.
       // Mark it seen so signing out later also skips it.
       await ref.read(onboardingStorageProvider).markSeen();
+
+      // Starts the reader working out where it was left. It hydrates itself on
+      // first read anyway, but doing it here means it happens behind the splash
+      // and the auth call rather than behind a spinner in the reader. It has to
+      // come after restoreSession so the request goes out signed in.
+      ref.read(readerLocationProvider);
+
       if (mounted) context.go('/dashboard');
       return;
     }

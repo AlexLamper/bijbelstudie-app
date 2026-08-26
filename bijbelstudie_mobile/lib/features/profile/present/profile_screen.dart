@@ -172,7 +172,7 @@ class _ProfileBody extends ConsumerWidget {
           'Je account, notities, markeringen, bladwijzers en leesgeschiedenis worden '
           'definitief verwijderd. Dit kan niet ongedaan worden gemaakt.\n\n'
           'Heb je een abonnement via de App Store? Zeg dat apart op in je '
-          'Apple ID-instellingen — Apple staat niet toe dat een app dat voor je doet.',
+          'Apple ID-instellingen - Apple staat niet toe dat een app dat voor je doet.',
         ),
         actions: [
           TextButton(

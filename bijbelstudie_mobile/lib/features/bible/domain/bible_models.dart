@@ -1,3 +1,5 @@
+import '../../../core/data/text_format.dart';
+
 // Shapes confirmed against the running backend (GET /api/v1/...), not
 // inferred from route names.
 
@@ -19,7 +21,7 @@ class BibleSource {
       id: json['id'] as String,
       name: json['name'] as String? ?? json['id'] as String,
       language: json['language'] as String? ?? 'nl',
-      attribution: json['attribution'] as String? ?? '',
+      attribution: normaliseDashes(json['attribution'] as String? ?? ''),
     );
   }
 
@@ -83,7 +85,7 @@ class ChapterContent {
           .whereType<Map<String, dynamic>>()
           .map(Verse.fromJson)
           .toList(),
-      attribution: json['attribution'] as String? ?? '',
+      attribution: normaliseDashes(json['attribution'] as String? ?? ''),
       locked: json['locked'] as bool? ?? false,
       fromCache: fromCache,
     );
@@ -98,7 +100,7 @@ class ChapterContent {
         ? verses
         : verses.where((v) => wanted.contains(v.number)).toList();
     final body = selected.map((v) => '${v.number} ${v.text}').join('\n');
-    return '$body\n\n$reference — $attribution';
+    return '$body\n\n$reference - $attribution';
   }
 }
 
@@ -143,29 +145,46 @@ class OriginalVerse {
 }
 
 class OriginalChapter {
-  const OriginalChapter({
+  OriginalChapter({
     required this.book,
     required this.chapter,
     required this.verses,
     required this.attribution,
-  });
+    this.locked = false,
+    int? totalVerses,
+  }) : totalVerses = totalVerses ?? verses.length;
 
   final String book;
   final int chapter;
   final List<OriginalVerse> verses;
 
-  /// CC BY 4.0 requires this to be visible wherever the words are shown.
+  /// CC BY 4.0 requires this to be visible wherever the words are shown,
+  /// including in the free preview.
   final String attribution;
 
+  /// True when the server withheld part of this chapter behind Pro.
+  ///
+  /// Decided server-side and simply reported here, matching
+  /// [ChapterContent.locked].
+  final bool locked;
+
+  /// Verses in the full chapter. Equal to `verses.length` unless [locked] is
+  /// true, in which case the server withheld the rest of the chapter and this
+  /// is what tells the client how much more there is.
+  final int totalVerses;
+
   factory OriginalChapter.fromJson(Map<String, dynamic> json) {
+    final verses = (json['verses'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(OriginalVerse.fromJson)
+        .toList();
     return OriginalChapter(
       book: json['book'] as String? ?? '',
       chapter: (json['chapter'] as num?)?.toInt() ?? 0,
-      verses: (json['verses'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(OriginalVerse.fromJson)
-          .toList(),
-      attribution: json['attribution'] as String? ?? '',
+      verses: verses,
+      attribution: normaliseDashes(json['attribution'] as String? ?? ''),
+      locked: json['locked'] as bool? ?? false,
+      totalVerses: (json['totalVerses'] as num?)?.toInt() ?? verses.length,
     );
   }
 }

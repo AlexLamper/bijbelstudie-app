@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../bible/present/bible_providers.dart';
-import '../data/studies_repository.dart';
 import '../data/study_models.dart';
+import '../data/study_plan_store.dart';
 import 'studies_providers.dart';
+import 'study_banner.dart';
 
-/// `/studies` on www.bijbel-studie.com — the guided studies, with the site's
-/// type filter, plus the leesplannen the dashboard links to.
+/// `/studies` on www.bijbel-studie.com - the guided studies, with the site's
+/// type filter.
 class StudiesScreen extends ConsumerStatefulWidget {
   const StudiesScreen({super.key});
 
@@ -26,7 +26,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   @override
   Widget build(BuildContext context) {
     final studies = ref.watch(curatedStudiesProvider);
-    final plans = ref.watch(biblePlansProvider(null));
+    final plans = ref.watch(studyPlansProvider);
+    final serverLessons =
+        ref.watch(serverStudyLessonsProvider).value ??
+        const <String, Set<int>>{};
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -44,7 +47,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               ),
               child: const GradientHeader(
                 title: 'Studies',
-                subtitle: 'Begeleide studies en leesplannen door de Bijbel.',
+                subtitle:
+                    'Begeleide studies door de Bijbel. Kies er een, stel je '
+                    'ritme in en werk hem les voor les af.',
               ),
             ),
             Expanded(
@@ -52,7 +57,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 color: AppTheme.teal,
                 onRefresh: () async {
                   ref.invalidate(curatedStudiesProvider);
-                  ref.invalidate(biblePlansProvider);
+                  ref.invalidate(serverStudyLessonsProvider);
                 },
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
@@ -94,45 +99,27 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           return const AppEmptyState(
                             icon: Icons.search_off,
                             title: 'Geen studies',
-                            description: 'Er zijn geen studies in deze categorie.',
+                            description:
+                                'Er zijn geen studies in deze categorie.',
                           );
                         }
                         return Column(
                           children: [
                             for (final study in filtered) ...[
-                              _StudyCard(study: study),
+                              _StudyCard(
+                                study: study,
+                                plan: plans[study.id],
+                                completedDays: mergedCompletedDays(
+                                  studyId: study.id,
+                                  plans: plans,
+                                  serverLessons: serverLessons,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                             ],
                           ],
                         );
                       },
-                    ),
-
-                    const SizedBox(height: 12),
-                    Text('LEESPLANNEN', style: AppTheme.eyebrow),
-                    const SizedBox(height: 10),
-                    plans.when(
-                      loading: () => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: AppLoader(size: 22),
-                      ),
-                      error: (_, __) => Text(
-                        'Leesplannen konden niet worden geladen.',
-                        style: AppTheme.bodyMuted,
-                      ),
-                      data: (list) => list.isEmpty
-                          ? Text(
-                              'Er zijn nog geen leesplannen beschikbaar.',
-                              style: AppTheme.bodyMuted,
-                            )
-                          : Column(
-                              children: [
-                                for (final plan in list) ...[
-                                  _PlanCard(plan: plan),
-                                  const SizedBox(height: 12),
-                                ],
-                              ],
-                            ),
                     ),
                   ],
                 ),
@@ -181,177 +168,208 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-/// `StudyCard` — image with a type badge, title, description, duration, a
-/// Start button and a collapsible lesson list.
-class _StudyCard extends ConsumerStatefulWidget {
-  const _StudyCard({required this.study});
+/// `StudyCard` in `app/studies/page.tsx`, rewritten to answer the question the
+/// website's card leaves open: what is this study actually about, and what will
+/// I be reading?
+///
+/// The site card shows a banner, a title, a one-line description and an
+/// expander full of lessons. On a phone that reads as a picture with a Start
+/// button, so the three facts that decide whether a study is worth beginning -
+/// what kind of study it is, which part of the Bible it walks through, and how
+/// much of it there is - are on the face of the card now. Start no longer drops
+/// the reader straight into a chapter either: the card opens `/studies/:id`,
+/// where the study is configured first.
+class _StudyCard extends ConsumerWidget {
+  const _StudyCard({
+    required this.study,
+    required this.plan,
+    required this.completedDays,
+  });
 
   final CuratedStudy study;
+  final StudyPlan? plan;
+  final Set<int> completedDays;
 
   @override
-  ConsumerState<_StudyCard> createState() => _StudyCardState();
-}
-
-class _StudyCardState extends ConsumerState<_StudyCard> {
-  bool _open = false;
-
-  void _start(StudyLesson lesson) {
-    ref
-        .read(readerLocationProvider.notifier)
-        .openChapter(
-          versionId: widget.study.startVersion,
-          book: lesson.book,
-          chapter: lesson.chapter,
-        );
-    context.go('/study');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final study = widget.study;
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final total = study.lessonCount;
+    final done = completedDays.length;
+    final finished = total > 0 && done >= total;
+    final started = plan?.started ?? done > 0;
+    final next = _nextLesson();
 
     return AppCard(
       radius: AppTheme.radiusMd,
       padding: EdgeInsets.zero,
       clip: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (study.image.isNotEmpty)
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 6,
-                  child: Image.network(
-                    study.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppTheme.teal.withValues(alpha: 0.08),
+      // The ripple needs its own Material above the card's fill, or it paints
+      // on the Scaffold underneath and never shows.
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/studies/${study.id}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 6,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    StudyBanner(study: study),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: _BannerPill(label: study.type),
                     ),
-                  ),
+                    if (finished)
+                      const Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _BannerPill(
+                          label: 'Voltooid',
+                          icon: Icons.check_circle,
+                        ),
+                      )
+                    else if (started)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _BannerPill(label: '$done van $total'),
+                      ),
+                  ],
                 ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.teal.withValues(alpha: 0.88),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                    ),
-                    child: Text(
-                      study.type,
-                      style: AppTheme.overline.copyWith(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      study.title,
+                      style: AppTheme.displayBase.copyWith(
+                        color: scheme.onSurface,
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  study.title,
-                  style: AppTheme.displayBase.copyWith(color: scheme.onSurface),
-                ),
-                const SizedBox(height: 4),
-                Text(study.description, style: AppTheme.caption),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 11, color: AppTheme.inkFaint),
-                    const SizedBox(width: 4),
-                    Text(study.durationLabel, style: AppTheme.overline.copyWith(letterSpacing: 0)),
-                    const Spacer(),
+                    const SizedBox(height: 3),
+                    Text(
+                      study.typeSummary,
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      study.description,
+                      style: AppTheme.caption,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _MetaChip(
+                          icon: Icons.list_alt_outlined,
+                          label: total == 1 ? '1 les' : '$total lessen',
+                        ),
+                        _MetaChip(
+                          icon: Icons.menu_book_outlined,
+                          label: study.scopeLabel,
+                        ),
+                        _MetaChip(
+                          icon: Icons.schedule,
+                          label: 'ca. ${study.estimatedMinutes} min',
+                        ),
+                      ],
+                    ),
+                    if (next != null) ...[
+                      const SizedBox(height: 12),
+                      Eyebrow(started ? 'Volgende les' : 'Je begint bij'),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${next.title} - ${next.reference}',
+                        style: AppTheme.bodyStrong.copyWith(
+                          fontSize: 13,
+                          color: scheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        next.focus,
+                        style: AppTheme.caption,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (started && total > 0) ...[
+                      const SizedBox(height: 12),
+                      SiteProgressBar(value: done / total),
+                    ],
+                    const SizedBox(height: 14),
                     SiteButton(
-                      label: 'Start',
-                      expand: false,
-                      height: 32,
+                      label: finished
+                          ? 'Studie bekijken'
+                          : started
+                          ? 'Verder met de studie'
+                          : 'Bekijk en start studie',
+                      height: 40,
                       trailingIcon: Icons.arrow_forward,
-                      onPressed: study.lessons.isEmpty
-                          ? null
-                          : () => _start(study.lessons.first),
+                      onPressed: () => context.push('/studies/${study.id}'),
                     ),
                   ],
                 ),
-                if (study.lessons.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  InkWell(
-                    onTap: () => setState(() => _open = !_open),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          Text(
-                            _open ? 'Verberg lessen' : '${study.lessons.length} lessen',
-                            style: AppTheme.caption.copyWith(
-                              color: AppTheme.teal,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Icon(
-                            _open ? Icons.expand_less : Icons.expand_more,
-                            size: 15,
-                            color: AppTheme.teal,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_open)
-                    for (final lesson in study.lessons)
-                      InkWell(
-                        onTap: () => _start(lesson),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                child: Text(
-                                  '${lesson.day}',
-                                  style: AppTheme.caption.copyWith(
-                                    color: AppTheme.inkFaint,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      lesson.title,
-                                      style: AppTheme.bodyStrong.copyWith(
-                                        fontSize: 13,
-                                        color: scheme.onSurface,
-                                      ),
-                                    ),
-                                    Text(lesson.reference, style: AppTheme.caption),
-                                  ],
-                                ),
-                              ),
-                              const Icon(
-                                Icons.chevron_right,
-                                size: 16,
-                                color: AppTheme.inkFaint,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                ],
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The lowest-numbered lesson still to do, or the first lesson for a study
+  /// that has not been started. Null only when the study has no lessons.
+  StudyLesson? _nextLesson() {
+    for (final lesson in study.lessons) {
+      if (!completedDays.contains(lesson.day)) return lesson;
+    }
+    return study.firstLesson;
+  }
+}
+
+/// The translucent pill that sits on the banner, matching the site's badge.
+class _BannerPill extends StatelessWidget {
+  const _BannerPill({required this.label, this.icon});
+
+  final String label;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.teal.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 9, color: Colors.white),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: AppTheme.overline.copyWith(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -360,103 +378,32 @@ class _StudyCardState extends ConsumerState<_StudyCard> {
   }
 }
 
-class _PlanCard extends ConsumerStatefulWidget {
-  const _PlanCard({required this.plan});
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
 
-  final BiblePlan plan;
-
-  @override
-  ConsumerState<_PlanCard> createState() => _PlanCardState();
-}
-
-class _PlanCardState extends ConsumerState<_PlanCard> {
-  bool _busy = false;
-
-  Future<void> _toggleEnrollment() async {
-    setState(() => _busy = true);
-    final repo = ref.read(studiesRepositoryProvider);
-
-    String? failure;
-    if (widget.plan.isEnrolled) {
-      await repo.unenroll(widget.plan.id);
-    } else {
-      failure = await repo.enroll(widget.plan.id);
-    }
-
-    if (!mounted) return;
-    setState(() => _busy = false);
-
-    if (failure != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure)));
-      return;
-    }
-    ref.invalidate(biblePlansProvider);
-  }
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final plan = widget.plan;
-    final scheme = Theme.of(context).colorScheme;
-
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              const IconChip(icon: Icons.event_available_outlined, size: 26),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      plan.title,
-                      style: AppTheme.displayBase.copyWith(color: scheme.onSurface),
-                    ),
-                    Text(
-                      '${plan.duration} dagen'
-                      '${plan.author == null ? '' : ' · ${plan.author}'}',
-                      style: AppTheme.caption,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(plan.description, style: AppTheme.bodyMuted),
-          if (plan.isEnrolled) ...[
-            const SizedBox(height: 12),
-            SiteProgressBar(value: plan.progressPercentage / 100),
-            const SizedBox(height: 6),
-            Text(
-              'Dag ${plan.completedDays.length} van ${plan.duration} · '
-              '${plan.progressPercentage}%',
-              style: AppTheme.caption,
+          Icon(icon, size: 11, color: AppTheme.inkMuted),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTheme.caption.copyWith(
+              fontSize: 11,
+              color: AppTheme.inkSoft,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (plan.isEnrolled)
-                SiteOutlineButton(
-                  label: 'Verlaten',
-                  expand: false,
-                  height: 36,
-                  onPressed: _busy ? null : _toggleEnrollment,
-                )
-              else
-                SiteButton(
-                  label: 'Meedoen',
-                  expand: false,
-                  height: 36,
-                  loading: _busy,
-                  onPressed: _busy ? null : _toggleEnrollment,
-                ),
-            ],
           ),
         ],
       ),

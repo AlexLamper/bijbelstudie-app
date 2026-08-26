@@ -160,7 +160,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
-              'Meer resultaten beschikbaar — verfijn je zoekopdracht of zoek in één boek.',
+              'Meer resultaten beschikbaar - verfijn je zoekopdracht of zoek in één boek.',
               style: AppTheme.bodyMuted.copyWith(fontSize: 12),
             ),
           );

@@ -17,6 +17,7 @@ import 'package:bijbelstudie_mobile/features/bible/present/bible_providers.dart'
 import 'package:bijbelstudie_mobile/features/bible/present/read_screen.dart';
 import 'package:bijbelstudie_mobile/features/commentary/present/commentary_screen.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_models.dart';
+import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_repository.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_providers.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_screen.dart';
 import 'package:bijbelstudie_mobile/features/notes/domain/note_models.dart';
@@ -27,7 +28,6 @@ import 'package:bijbelstudie_mobile/features/premium/present/premium_screen.dart
 import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
-import 'package:bijbelstudie_mobile/features/studies/data/study_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart';
 
@@ -90,12 +90,18 @@ final GlobalKey _captureKey = GlobalKey();
 /// from the Flutter cache. Without it every `Icon()` renders as an empty box.
 Future<void> loadMaterialIcons() async {
   final root = Platform.environment['FLUTTER_ROOT'] ?? 'C:/flutter';
-  final file = File('$root/bin/cache/artifacts/material_fonts/materialicons-regular.otf');
+  final file = File(
+    '$root/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+  );
   if (!file.existsSync()) {
     throw StateError('Material icon font not found at ${file.path}');
   }
   final loader = FontLoader('MaterialIcons')
-    ..addFont(Future.value(ByteData.view(Uint8List.fromList(file.readAsBytesSync()).buffer)));
+    ..addFont(
+      Future.value(
+        ByteData.view(Uint8List.fromList(file.readAsBytesSync()).buffer),
+      ),
+    );
   await loader.load();
 }
 
@@ -117,10 +123,37 @@ Future<void> loadAppFonts() async {
     final loader = FontLoader(entry.key);
     for (final path in entry.value) {
       final bytes = await File(path).readAsBytes();
-      loader.addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
+      loader.addFont(
+        Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
+      );
     }
     await loader.load();
   }
+}
+
+/// The reader tells the server which chapter was opened. A screenshot run must
+/// not, so the repository is swapped for one that answers without a socket —
+/// an in-flight Dio request also leaves a pending timer and fails the test.
+class _StubDashboardRepository implements DashboardRepository {
+  @override
+  Future<DashboardData> getDashboard() async => _dashboard;
+
+  @override
+  Future<void> recordRead({
+    required String book,
+    required int chapter,
+    required String version,
+    String? commentary,
+  }) async {}
+
+  @override
+  Future<LastRead?> getLastRead() async => null;
+
+  @override
+  Future<StreakResult?> bumpStreak() async => null;
+
+  @override
+  Future<DailyVerse?> getDailyVerse() async => _dashboard.dailyVerse;
 }
 
 /// A paywall that shows real prices instead of the `—` placeholder the empty
@@ -194,40 +227,10 @@ final DashboardData _dashboard = DashboardData(
   weekTotal: PreviewData.dashboard.weekTotal,
   notesCount: PreviewData.dashboard.notesCount,
   recentNotes: PreviewData.dashboard.recentNotes,
+  badges: PreviewData.dashboard.badges,
   lastRead: PreviewData.dashboard.lastRead,
   dailyVerse: PreviewData.dashboard.dailyVerse,
-  activePlan: PreviewData.dashboard.activePlan,
 );
-
-const List<BiblePlan> _plans = [
-  BiblePlan(
-    id: 'p1',
-    title: 'Het evangelie van Johannes in 21 dagen',
-    description: 'Elke dag een hoofdstuk, met een korte vraag om over door te denken.',
-    duration: 21,
-    category: 'Nieuwe Testament',
-    isEnrolled: true,
-    completedDays: [1, 2, 3, 4, 5],
-    progressPercentage: 24,
-    readings: [
-      PlanReading(day: 1, book: 'Johannes', chapter: 1, title: 'Het Woord werd vlees'),
-      PlanReading(day: 2, book: 'Johannes', chapter: 2, title: 'De bruiloft te Kana'),
-    ],
-  ),
-  BiblePlan(
-    id: 'p2',
-    title: 'De Psalmen in een maand',
-    description: 'Vijf psalmen per dag, van klaagzang tot lofprijzing.',
-    duration: 30,
-    category: 'Oude Testament',
-    isEnrolled: false,
-    completedDays: [],
-    progressPercentage: 0,
-    readings: [
-      PlanReading(day: 1, book: 'Psalmen', chapter: 1, title: 'De twee wegen'),
-    ],
-  ),
-];
 
 void main() {
   setUpAll(() async {
@@ -327,7 +330,8 @@ void main() {
       chapter: 23,
       verse: 1,
       verseText: 'De HEERE is mijn Herder, mij zal niets ontbreken.',
-      noteText: 'Herder is hier geen sfeerbeeld maar een bestuursvorm: de herder '
+      noteText:
+          'Herder is hier geen sfeerbeeld maar een bestuursvorm: de herder '
           'bepaalt de route.',
       translation: 'statenvertaling',
       isHighlight: false,
@@ -339,7 +343,8 @@ void main() {
       chapter: 1,
       verse: 27,
       verseText: 'En God schiep den mens naar Zijn beeld.',
-      noteText: 'Naar Zijn beeld — gezegd van iedereen, voordat er ook maar iets '
+      noteText:
+          'Naar Zijn beeld — gezegd van iedereen, voordat er ook maar iets '
           'gepresteerd is.',
       translation: 'statenvertaling',
       isHighlight: false,
@@ -374,11 +379,14 @@ void main() {
     ),
   ];
 
+  // A saved position in a chapter these shots do not show. The reader restores
+  // the offset it holds for the chapter on screen, and a store screenshot has
+  // to open at the top of Genesis 1, not forty percent into it.
   final history = [
     ReadingPosition(
       id: 'r1',
-      book: 'Genesis',
-      chapter: 1,
+      book: 'Johannes',
+      chapter: 3,
       version: 'statenvertaling',
       scrollProgress: 0.4,
       readAt: DateTime(2026, 8, 5),
@@ -391,20 +399,34 @@ void main() {
         contentCacheProvider.overrideWithValue(null),
         bibleVersionsProvider.overrideWith((ref) async => versions),
         commentarySourcesProvider.overrideWith((ref) async => commentaries),
-        bibleBooksProvider.overrideWith((ref, versionId) async => const ['Genesis', 'Exodus']),
+        bibleBooksProvider.overrideWith(
+          (ref, versionId) async => const ['Genesis', 'Exodus'],
+        ),
         bibleChaptersProvider.overrideWith(
           (ref, bookRef) async => List<int>.generate(50, (i) => i + 1),
         ),
         chapterContentProvider.overrideWith((ref, chapterRef) async => chapter),
-        commentaryChapterProvider.overrideWith((ref, chapterRef) async => commentaryChapter),
+        commentaryChapterProvider.overrideWith(
+          (ref, chapterRef) async => commentaryChapter,
+        ),
         profileProvider.overrideWith((ref) async => profile),
         notesListProvider.overrideWith((ref) async => notes),
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => bookmarks),
         readingHistoryProvider.overrideWith((ref) async => history),
         dashboardProvider.overrideWith((ref) async => _dashboard),
-        curatedStudiesProvider.overrideWith((ref) async => PreviewData.curatedStudies),
-        biblePlansProvider.overrideWith((ref, type) async => _plans),
+        dashboardRepositoryProvider.overrideWithValue(
+          _StubDashboardRepository(),
+        ),
+        curatedStudiesProvider.overrideWith(
+          (ref) async => PreviewData.curatedStudies,
+        ),
+        // The studies screen also asks the account which lessons are already
+        // done. There is no account here, so answer it locally rather than
+        // leaving a real request pending past the end of the test.
+        serverStudyLessonsProvider.overrideWith(
+          (ref) async => const <String, Set<int>>{},
+        ),
         premiumControllerProvider.overrideWith(_StubPremiumController.new),
       ],
       child: MaterialApp(
@@ -415,11 +437,16 @@ void main() {
     );
   }
 
-  Future<void> capture(WidgetTester tester, ShotDevice device, String fileName) async {
+  Future<void> capture(
+    WidgetTester tester,
+    ShotDevice device,
+    String fileName,
+  ) async {
     // Let any pending image/layout work finish before reading pixels.
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-    final boundary = _captureKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final boundary =
+        _captureKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
 
     late final ByteData? png;
     await tester.runAsync(() async {
@@ -464,9 +491,18 @@ void main() {
 
   for (final device in kDevices) {
     group(device.slug, () {
-      void shot(String fileName, Widget Function() screen, {bool free = false}) {
+      void shot(
+        String fileName,
+        Widget Function() screen, {
+        bool free = false,
+      }) {
         testWidgets(fileName, (tester) async {
-          await pump(tester, device, screen(), profile: free ? freeProfile : null);
+          await pump(
+            tester,
+            device,
+            screen(),
+            profile: free ? freeProfile : null,
+          );
           await capture(tester, device, fileName);
         });
       }

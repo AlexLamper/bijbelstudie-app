@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bijbelstudie_mobile/core/config/preview_config.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
@@ -8,6 +9,14 @@ import 'package:bijbelstudie_mobile/features/bible/present/read_screen.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_screen.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    // ReadScreen waits for the stored reader location before it paints, and
+    // that read goes through the preferences plugin. Without a mock the channel
+    // never answers and the reader stays on its loader.
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   test('preview mode is off unless the dart-define is passed', () {
     // The suite runs without --dart-define=PREVIEW=true, so this must be false.
     // Together with the kReleaseMode guard this keeps canned data out of

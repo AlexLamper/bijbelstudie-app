@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../ai/present/ai_assistant_pane.dart';
@@ -10,6 +8,7 @@ import '../../bible/present/read_screen.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_pane.dart';
 import '../../notes/present/notes_providers.dart';
+import '../../notes/present/verse_action_sheet.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/context_repository.dart';
@@ -32,6 +31,15 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // An IndexedStack builds every child, so the materials pane used to mount
+    // during the brief window before the reader knows where it is - firing its
+    // fetches at the Genesis 1 placeholder and then again at the real chapter.
+    // `restored` always flips, even when hydration times out, so this defers
+    // the pane rather than risking a tab that never appears.
+    final restored = ref.watch(
+      readerLocationProvider.select((location) => location.restored),
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -47,7 +55,13 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
               // scroll offset or an in-flight AI answer.
               child: IndexedStack(
                 index: _showMaterials ? 1 : 0,
-                children: const [ReadScreen(), StudyMaterialsPane()],
+                children: [
+                  const ReadScreen(),
+                  if (restored)
+                    const StudyMaterialsPane()
+                  else
+                    const AppLoader(),
+                ],
               ),
             ),
           ],
@@ -217,80 +231,21 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
             controller: _tabController,
             children: [
               CommentaryPane(location: location, settings: settings),
-              // The site marks Grondtekst `isPro: true`; the server enforces
-              // it too, so this is a nicer wall, not the wall.
-              isPro
-                  ? OriginalTextPane(location: location)
-                  : const _ProWall(
-                      surface: 'original_text',
-                      title: 'Grondtekst is onderdeel van Pro',
-                      description:
-                          'Bekijk het Hebreeuws en Grieks woord voor woord, '
-                          'met transliteratie en Strong-nummers.',
-                    ),
+              // The server already truncates this to the free preview and
+              // reports `locked` when it did, so the pane itself decides what
+              // to show - see the doc comment on OriginalTextPane.
+              OriginalTextPane(location: location),
               _GeneralInfoPane(book: location.book, chapter: location.chapter),
-              _ChapterNotesPane(book: location.book, chapter: location.chapter),
+              _ChapterNotesPane(
+                book: location.book,
+                chapter: location.chapter,
+                versionId: location.versionId,
+              ),
               const AiAssistantPane(),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-/// A Pro gate, and the two funnel events that belong to it.
-///
-/// `paywall_hit` fires when the wall is built and `paywall_cta_clicked` when
-/// the button is tapped. Recording only the tap would say how many people this
-/// gate sent to the paywall but not how many it merely annoyed, and the ratio
-/// between the two is the number that decides whether a gate earns its place.
-///
-/// The impression is reported once per appearance rather than once per build:
-/// the study screen rebuilds on every pane switch and every profile refresh,
-/// and an impression counted five times is worse than one not counted at all.
-class _ProWall extends ConsumerStatefulWidget {
-  const _ProWall({
-    required this.surface,
-    required this.title,
-    required this.description,
-  });
-
-  /// Must be a member of the server's `paywall_hit.surface` allowlist in
-  /// `lib/analyticsSchema.ts`, or the event is dropped without a trace.
-  final String surface;
-  final String title;
-  final String description;
-
-  @override
-  ConsumerState<_ProWall> createState() => _ProWallState();
-}
-
-class _ProWallState extends ConsumerState<_ProWall> {
-  @override
-  void initState() {
-    super.initState();
-    ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
-      'surface': widget.surface,
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppEmptyState(
-      icon: Icons.workspace_premium_outlined,
-      title: widget.title,
-      description: widget.description,
-      action: SiteButton(
-        label: 'Bekijk Pro',
-        expand: false,
-        onPressed: () {
-          ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
-            'surface': widget.surface,
-          });
-          context.push('/premium?source=app_study');
-        },
-      ),
     );
   }
 }
@@ -416,12 +371,24 @@ class _GeneralInfoPane extends ConsumerWidget {
   }
 }
 
-/// Every note the reader has on the open chapter — `ChapterNotes.tsx`.
+/// Every note the reader has on the open chapter - `ChapterNotes.tsx`.
+///
+/// The empty state's `+ Nieuwe notitie` button matches the create-note
+/// affordance `ChapterNotes.tsx` shows in the same spot, so an empty tab is
+/// not a dead end on mobile either.
 class _ChapterNotesPane extends ConsumerWidget {
-  const _ChapterNotesPane({required this.book, required this.chapter});
+  const _ChapterNotesPane({
+    required this.book,
+    required this.chapter,
+    required this.versionId,
+  });
 
   final String book;
   final int chapter;
+
+  /// The open Bible version, used as the note's `translation` when the
+  /// reader creates one here rather than off a specific verse.
+  final String versionId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -442,12 +409,23 @@ class _ChapterNotesPane extends ConsumerWidget {
           ..sort((a, b) => (a.verse ?? 0).compareTo(b.verse ?? 0));
 
         if (mine.isEmpty) {
-          return const AppEmptyState(
+          return AppEmptyState(
             icon: Icons.sticky_note_2_outlined,
             title: 'Nog geen notities',
             description:
                 'Houd een vers lang ingedrukt in de Bijbel-pane om een notitie '
                 'of markering te maken.',
+            action: SiteButton(
+              label: '+ Nieuwe notitie',
+              expand: false,
+              onPressed: () => showAddNoteDialog(
+                context: context,
+                ref: ref,
+                book: book,
+                chapter: chapter,
+                translation: versionId,
+              ),
+            ),
           );
         }
 

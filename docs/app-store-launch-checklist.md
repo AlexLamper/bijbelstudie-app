@@ -140,6 +140,37 @@ back to `'—'` for both prices. A reviewer opening the paywall would see dashes
 instead of prices — a fresh 3.1.2 rejection. So: App Store Connect first, then
 the sandbox purchase, then submit.
 
+### 2e. The App Description must carry the Terms of Use (EULA) link
+
+Added after the **1.0.1 (11)** rejection, guideline 3.1.2 / Schedule 2:
+
+> The submission offers auto-renewable subscriptions but does not include a
+> functional link to the Terms of Use (EULA) in the app metadata that appears on
+> the app's App Store product page.
+
+This is about the **product page**, not the paywall. The paywall already carries
+both links and was not changed. The app uses Apple's **standard** EULA
+(`AppConfig.termsOfUseUrl`), so of Apple's two remedies the App Description one
+applies - do **not** paste a custom EULA into App Store Connect.
+
+- [ ] Paste the block under "The App Description to paste" in
+      `docs/app-review-1.0.1-rejection.md` into the version's **Description**.
+      It carries the EULA URL, the Privacy Policy URL, the Dutch algemene
+      voorwaarden, and the name, length and price of both subscriptions.
+- [ ] Before pasting, read the two live subscription prices in App Store Connect
+      and correct the ABONNEMENTEN lines if they are no longer EUR 9,99 / month
+      and EUR 69,99 / year. A description naming a price the store does not
+      charge is its own 3.1.2 problem.
+- [ ] Set **Privacy Policy URL** to `https://www.bijbel-studie.com/privacybeleid`
+      rather than the old `/privacy-policy`, which only answers through a 308.
+- [ ] Confirm **App Information → License Agreement** is still Apple's standard
+      EULA.
+- [ ] Click all three URLs from the product-page preview. That click is the
+      check that failed.
+
+No rebuild is needed for any of this. Metadata-only rejections are cleared by
+editing the version and resubmitting the build that is already attached.
+
 ### On the in-app price
 
 `APP_STORE_MONETISATION.md` recommends **€10,99 / month** and **€99,99 / year**
@@ -236,6 +267,10 @@ Submit*, on TestFlight build 7:
 
 ### Before hitting Submit
 
+- [ ] **App Description** carries the Terms of Use (EULA) URL, the Privacy
+      Policy URL and both subscription prices - see 2e above and
+      `docs/app-review-1.0.1-rejection.md`. This is what the 1.0.1 (11)
+      rejection was about, and it is the one item here that needs no rebuild.
 - [ ] Both subscriptions read **Ready to Submit**
 - [ ] Build **1.0 (7)** selected on the version
 - [ ] Both subscriptions attached to the version

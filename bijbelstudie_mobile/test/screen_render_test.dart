@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
@@ -12,9 +13,10 @@ import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
 import 'package:bijbelstudie_mobile/features/bible/present/bible_providers.dart';
 import 'package:bijbelstudie_mobile/features/bible/present/read_screen.dart';
+import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_models.dart';
+import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_repository.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_providers.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_screen.dart';
-import 'package:bijbelstudie_mobile/features/studies/data/study_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart';
 import 'package:bijbelstudie_mobile/features/commentary/present/commentary_screen.dart';
@@ -26,6 +28,33 @@ import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
 import 'package:bijbelstudie_mobile/features/settings/present/settings_screen.dart';
+
+/// Keeps these renders off the network.
+///
+/// The reader posts the open chapter to `/last-read` from a post-frame
+/// callback; against the real repository that leaves a Dio timer pending after
+/// the tree is torn down, which the test binding reports as a failure.
+class _StubDashboardRepository implements DashboardRepository {
+  @override
+  Future<DashboardData> getDashboard() async => PreviewData.dashboard;
+
+  @override
+  Future<void> recordRead({
+    required String book,
+    required int chapter,
+    required String version,
+    String? commentary,
+  }) async {}
+
+  @override
+  Future<LastRead?> getLastRead() async => null;
+
+  @override
+  Future<StreakResult?> bumpStreak() async => null;
+
+  @override
+  Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
+}
 
 /// Fails with the full error text (including the offending widget chain)
 /// instead of the one-line summary `expect` would print.
@@ -43,7 +72,9 @@ void expectNoLayoutError(WidgetTester tester) {
     culprits.add(element.debugGetCreatorChain(10));
   }
 
-  fail('Layout error:\n$error\n\nOverflowing widget(s):\n${culprits.join('\n\n')}');
+  fail(
+    'Layout error:\n$error\n\nOverflowing widget(s):\n${culprits.join('\n\n')}',
+  );
 }
 
 /// Registers the real Inter / Newsreader files with the test engine.
@@ -68,7 +99,9 @@ Future<void> loadAppFonts() async {
     final loader = FontLoader(entry.key);
     for (final path in entry.value) {
       final bytes = await File(path).readAsBytes();
-      loader.addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
+      loader.addFont(
+        Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
+      );
     }
     await loader.load();
   }
@@ -79,6 +112,9 @@ Future<void> loadAppFonts() async {
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
+    // ReadScreen and CommentaryScreen read the reader preferences on mount;
+    // without a mock the plugin channel throws MissingPluginException.
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     await loadAppFonts();
   });
 
@@ -112,14 +148,20 @@ void main() {
     chapter: 1,
     attribution: 'Statenvertaling (1637) — publiek domein',
     verses: [
-      Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
+      Verse(
+        number: 1,
+        text: 'In den beginne schiep God den hemel en de aarde.',
+      ),
       Verse(
         number: 2,
         text:
             'De aarde nu was woest en ledig, en duisternis was op den afgrond; '
             'en de Geest Gods zweefde op de wateren.',
       ),
-      Verse(number: 3, text: 'En God zeide: Daar zij licht! en daar werd licht.'),
+      Verse(
+        number: 3,
+        text: 'En God zeide: Daar zij licht! en daar werd licht.',
+      ),
     ],
   );
 
@@ -131,8 +173,14 @@ void main() {
     verses: [
       // Verse 0 is how the corpus keys a chapter introduction — the renderer
       // has to label it "Inleiding", not "Vers 0".
-      Verse(number: 0, text: 'De grondslag van alle Godsdienst ligt in God als Schepper.'),
-      Verse(number: 1, text: 'De eerste woorden stellen God voor als de Schepper.'),
+      Verse(
+        number: 0,
+        text: 'De grondslag van alle Godsdienst ligt in God als Schepper.',
+      ),
+      Verse(
+        number: 1,
+        text: 'De eerste woorden stellen God voor als de Schepper.',
+      ),
     ],
   );
 
@@ -205,17 +253,28 @@ void main() {
         contentCacheProvider.overrideWithValue(null),
         bibleVersionsProvider.overrideWith((ref) async => versions),
         commentarySourcesProvider.overrideWith((ref) async => commentaries),
-        bibleBooksProvider.overrideWith((ref, versionId) async => const ['Genesis', 'Exodus']),
+        bibleBooksProvider.overrideWith(
+          (ref, versionId) async => const ['Genesis', 'Exodus'],
+        ),
         bibleChaptersProvider.overrideWith(
           (ref, bookRef) async => List<int>.generate(50, (i) => i + 1),
         ),
         chapterContentProvider.overrideWith((ref, chapterRef) async => chapter),
-        commentaryChapterProvider.overrideWith((ref, chapterRef) async => commentaryChapter),
+        // No account behind these renders, so the reader settles on its
+        // Genesis 1 default rather than waiting on a request that cannot land.
+        remoteReaderLocationProvider.overrideWith((ref) async => null),
+        dashboardRepositoryProvider.overrideWithValue(
+          _StubDashboardRepository(),
+        ),
+        commentaryChapterProvider.overrideWith(
+          (ref, chapterRef) async => commentaryChapter,
+        ),
         originalChapterProvider.overrideWith(
-          (ref, chapterRef) async => const OriginalChapter(
+          (ref, chapterRef) async => OriginalChapter(
             book: 'Genesis',
             chapter: 1,
-            attribution: 'Grondtekst: STEPBible (TAHOT/TAGNT), CC BY 4.0 — tyndale.org',
+            attribution:
+                'Grondtekst: STEPBible (TAHOT/TAGNT), CC BY 4.0 - tyndale.org',
             verses: [
               OriginalVerse(
                 number: 1,
@@ -239,8 +298,15 @@ void main() {
         // The preview fixtures already describe a fully-populated account,
         // which is exactly what these render checks need.
         dashboardProvider.overrideWith((ref) async => PreviewData.dashboard),
-        curatedStudiesProvider.overrideWith((ref) async => PreviewData.curatedStudies),
-        biblePlansProvider.overrideWith((ref, type) async => const <BiblePlan>[]),
+        curatedStudiesProvider.overrideWith(
+          (ref) async => PreviewData.curatedStudies,
+        ),
+        // The studies screen also asks the account which lessons are already
+        // done. There is no account here, so answer it locally rather than
+        // leaving a real request pending past the end of the test.
+        serverStudyLessonsProvider.overrideWith(
+          (ref) async => const <String, Set<int>>{},
+        ),
       ],
       child: MaterialApp(theme: AppTheme.lightTheme, home: child),
     );
@@ -264,7 +330,11 @@ void main() {
     for (var i = 0; i < 12; i++) {
       await tester.drag(list, const Offset(0, -400));
       await tester.pump();
-      expect(tester.takeException(), isNull, reason: 'layout error after scroll step $i');
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'layout error after scroll step $i',
+      );
     }
   }
 
@@ -280,7 +350,9 @@ void main() {
     await scrollThrough(tester);
   });
 
-  testWidgets('studies screen renders the filter chips and a study card', (tester) async {
+  testWidgets('studies screen renders the filter chips and a study card', (
+    tester,
+  ) async {
     await pumpAtPhoneSize(tester, const StudiesScreen());
 
     expectNoLayoutError(tester);
@@ -308,7 +380,9 @@ void main() {
     expect(find.text('VERS 0'), findsNothing);
   });
 
-  testWidgets('notes screen renders notes, highlights and bookmarks', (tester) async {
+  testWidgets('notes screen renders notes, highlights and bookmarks', (
+    tester,
+  ) async {
     await pumpAtPhoneSize(tester, const NotesScreen());
 
     expectNoLayoutError(tester);
@@ -320,7 +394,9 @@ void main() {
     expect(find.text('Johannes 3:16'), findsOneWidget);
   });
 
-  testWidgets('profile renders Pro status and the delete action', (tester) async {
+  testWidgets('profile renders Pro status and the delete action', (
+    tester,
+  ) async {
     await pumpAtPhoneSize(tester, const ProfileScreen());
 
     expectNoLayoutError(tester);
@@ -339,7 +415,9 @@ void main() {
     await scrollThrough(tester);
   });
 
-  testWidgets('onboarding renders all pages without layout errors', (tester) async {
+  testWidgets('onboarding renders all pages without layout errors', (
+    tester,
+  ) async {
     await pumpAtPhoneSize(tester, const OnboardingScreen());
     expect(tester.takeException(), isNull);
 

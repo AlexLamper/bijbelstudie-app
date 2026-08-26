@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../config/app_config.dart';
 import '../theme/app_theme.dart';
 
@@ -6,10 +8,16 @@ class ServerImage extends StatelessWidget {
   final String imagePath;
   final BoxFit fit;
 
+  /// Painted instead of the default broken-image tile when the file is
+  /// missing, undecodable, or the path resolves to nothing. Study cards pass
+  /// their own banner so a failed request still reads as a card.
+  final Widget? fallback;
+
   const ServerImage({
     super.key,
     required this.imagePath,
     this.fit = BoxFit.cover,
+    this.fallback,
   });
 
   static final RegExp _httpUrlPattern = RegExp(
@@ -37,7 +45,7 @@ class ServerImage extends StatelessWidget {
       return trimmed;
     }
 
-    final withForwardSlashes = trimmed.replaceAll('\\', '/');
+    final withForwardSlashes = trimmed.replaceAll(r'\', '/');
     final withoutPublicPrefix = withForwardSlashes.replaceFirst(
       RegExp(r'^/?public/'),
       '/',
@@ -83,19 +91,25 @@ class ServerImage extends StatelessWidget {
     return fullUrl;
   }
 
+  /// Whether the file behind [url] is a vector the raster codecs cannot read.
+  ///
+  /// The study banners `GET /api/v1/studies` hands out are hand-authored SVGs
+  /// (`lib/data/curated-studies.ts` on the website), and `Image.network` has no
+  /// SVG decoder - it fails every one of them and paints its error builder
+  /// instead, which is why the study cards showed no image at all. The
+  /// extension is read off the path so a query string cannot hide it.
+  static bool isVector(String url) {
+    final path = Uri.tryParse(url)?.path ?? url;
+    return path.toLowerCase().endsWith('.svg');
+  }
+
   String _buildFullUrl() {
     return getFullUrl(imagePath);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Image.network(
-      _buildFullUrl(),
-      fit: fit,
-      filterQuality: FilterQuality.low,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
+  Widget _fallback() {
+    return fallback ??
+        Container(
           color: AppTheme.paperSunken,
           child: const Icon(
             Icons.image_not_supported_outlined,
@@ -103,7 +117,28 @@ class ServerImage extends StatelessWidget {
             size: 20,
           ),
         );
-      },
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = _buildFullUrl();
+    if (url.isEmpty) return _fallback();
+
+    if (isVector(url)) {
+      return SvgPicture.network(
+        url,
+        fit: fit,
+        placeholderBuilder: (_) => Container(color: AppTheme.paperSunken),
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
+
+    return Image.network(
+      url,
+      fit: fit,
+      filterQuality: FilterQuality.low,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) => _fallback(),
     );
   }
 }

@@ -22,6 +22,7 @@ import '../../features/resources/present/resources_screen.dart';
 import '../../features/search/present/search_screen.dart';
 import '../../features/settings/present/settings_screen.dart';
 import '../../features/studies/present/studies_screen.dart';
+import '../../features/studies/present/study_detail_screen.dart';
 import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
@@ -70,8 +71,8 @@ class MainScaffold extends StatelessWidget {
   }
 
   static const List<_NavItemData> _items = [
-    _NavItemData(Icons.dashboard_outlined, Icons.dashboard, 'Start', '/dashboard'),
-    _NavItemData(Icons.menu_book_outlined, Icons.menu_book, 'Bijbel', '/study'),
+    _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard'),
+    _NavItemData(Icons.auto_stories_outlined, Icons.auto_stories, 'Bijbel', '/study'),
     _NavItemData(Icons.school_outlined, Icons.school, 'Studies', '/studies'),
     _NavItemData(Icons.sticky_note_2_outlined, Icons.sticky_note_2, 'Notities', '/notes'),
     _NavItemData(Icons.person_outline, Icons.person, 'Profiel', '/profile'),
@@ -193,6 +194,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/groups/:id',
         builder: (context, state) =>
             GroupDetailScreen(groupId: state.pathParameters['id']!),
+      ),
+      // Outside the shell, like `/groups/:id`: a study is configured and then
+      // left for the reader, so it gets a back arrow rather than a tab bar.
+      GoRoute(
+        path: '/studies/:id',
+        builder: (context, state) =>
+            StudyDetailScreen(studyId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/premium',

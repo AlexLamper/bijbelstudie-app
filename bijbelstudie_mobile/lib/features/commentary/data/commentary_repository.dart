@@ -42,7 +42,7 @@ class CommentaryRepository {
   /// Two shapes come back from the corpus and both are normal:
   ///  - Matthew Henry keys its chapter introduction as verse **0**;
   ///  - Dachsel's entries are HTML fragments (`<ol><li><div class="s9">...`).
-  /// The renderer handles both; see `commentary_html.dart`.
+  /// The renderer handles both; see `commentary_format.dart`.
   Future<ChapterContent> getChapter(String commentaryId, String book, int chapter) async {
     final path = '/commentaries/$commentaryId/${Uri.encodeComponent(book)}/$chapter';
 

@@ -1,14 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'core/notifications/reminder_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/config/app_config.dart';
 import 'core/config/preview_config.dart';
 import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
+import 'features/settings/data/reading_settings.dart';
 
 Future<void> _initRevenueCat() async {
   if (kIsWeb) return;
@@ -46,6 +50,24 @@ Future<void> _initRevenueCat() async {
   }());
 }
 
+/// Re-arms the daily reading reminder with the OS on every launch.
+///
+/// The alarm does not survive a reinstall, and Android can drop it on a
+/// force-stop; `scheduleDaily` cancels before it sets, so calling it again
+/// with the stored time is a no-op when the reminder is already in place and
+/// a fix when it is not. Nothing runs when no reminder is stored.
+Future<void> _initReminders() async {
+  if (kIsWeb) return;
+  final service = ReminderService(FlutterLocalNotificationsPlugin());
+  await service.initialise();
+
+  final prefs = await SharedPreferences.getInstance();
+  final minutes = prefs.getInt(kDailyReminderMinutesKey);
+  if (minutes != null) {
+    await service.scheduleDaily(hour: minutes ~/ 60, minute: minutes % 60);
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Paper-coloured system chrome, matching --paper on www.bijbel-studie.com.
@@ -55,7 +77,7 @@ void main() async {
     // Point image URLs at the live site so artwork resolves without a local
     // backend, then run with canned data and no auth.
     AppConfig.setCustomApiBaseUrl('https://www.bijbel-studie.com/api/v1');
-    debugPrint('[Preview] Design-preview mode active — using canned data.');
+    debugPrint('[Preview] Design-preview mode active - using canned data.');
     runApp(PreviewData.scope(const BijbelStudieApp()));
     return;
   }
@@ -67,6 +89,18 @@ void main() async {
     // works without an entitlement check.
     assert(() {
       debugPrint('[RevenueCat][Main] init failed: $e\n$st');
+      return true;
+    }());
+  }
+
+  try {
+    await _initReminders();
+  } catch (e, st) {
+    // A notifications hiccup must never stop the app from starting either;
+    // the settings tile re-checks the real state itself and will not claim
+    // the reminder is on if this failed.
+    assert(() {
+      debugPrint('[Reminders][Main] init failed: $e\n$st');
       return true;
     }());
   }

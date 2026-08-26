@@ -163,14 +163,29 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 
 - [ ] **App name.** Currently `BijbelStudie App`. Rename to `BijbelStudie` if
       it is still free, under **App Information**.
-- [ ] **Subtitle**, **Promotional text**, **Description**, **Keywords** — Dutch.
+- [ ] **Subtitle**, **Promotional text**, **Keywords** - Dutch.
+- [ ] **Description.** Paste the block under "The App Description to paste" in
+      `docs/app-review-1.0.1-rejection.md` verbatim. It is not free copy: the
+      1.0.1 (11) rejection was guideline 3.1.2, because the product page carried
+      no Terms of Use (EULA) link. The description must keep, as plain-text
+      clickable URLs, all three of:
+      `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`,
+      `https://www.bijbel-studie.com/privacybeleid` and
+      `https://www.bijbel-studie.com/algemene-voorwaarden`, plus the name,
+      length and price of both subscriptions. Rewriting the description without
+      them re-earns the same rejection.
+- [ ] **App Information → License Agreement.** Leave it on Apple's **standard**
+      EULA. The app links that EULA from the paywall (`AppConfig.termsOfUseUrl`),
+      so a custom agreement pasted here would contradict the binary.
 - [ ] **Screenshots.** 6.7" (1290×2796) and 6.5" (1284×2778) are mandatory.
       Take them on an iPhone 15 Pro Max simulator: `flutter run`, then ⌘S.
 - [ ] **Subscription review screenshots.** Each of the two products needs one
       under **Review Information**, or it stays in *Missing Metadata* forever.
       A simulator shot of the paywall is fine.
 - [ ] **Support URL:** `https://www.bijbel-studie.com/contact`
-- [ ] **Privacy policy URL:** `https://www.bijbel-studie.com/privacy-policy`
+- [ ] **Privacy policy URL:** `https://www.bijbel-studie.com/privacybeleid`
+      (the old `/privacy-policy` only resolves through a 308, and review does
+      click these)
 - [ ] **Age rating:** 4+, nothing objectionable.
 - [ ] **Privacy nutrition labels:** email address, name, user content
       (notes/highlights), identifiers, purchases. Linked to identity: yes.

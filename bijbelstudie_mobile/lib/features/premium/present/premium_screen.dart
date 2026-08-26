@@ -80,8 +80,8 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     final yearlyPackage = service.findYearlyPackage(premiumState.packages);
     final monthlyProduct = monthlyPackage?.storeProduct;
     final yearlyProduct = yearlyPackage?.storeProduct;
-    final monthlyPrice = monthlyProduct?.priceString ?? '—';
-    final yearlyPrice = yearlyProduct?.priceString ?? '—';
+    final monthlyPrice = monthlyProduct?.priceString ?? '-';
+    final yearlyPrice = yearlyProduct?.priceString ?? '-';
 
     // Derived from the live App Store prices, so the storefront's own currency
     // and tier are always what the customer is shown. Null when either product

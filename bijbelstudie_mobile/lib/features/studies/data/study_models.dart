@@ -21,6 +21,25 @@ class StudyLesson {
   String get reference =>
       verseRange == null ? '$book $chapter' : '$book $chapter:$verseRange';
 
+  /// Chapter-level reference, for the places a verse range is more detail than
+  /// the line has room for.
+  String get chapterReference => '$book $chapter';
+
+  /// The first and last verse of [verseRange], or null when the lesson covers
+  /// the whole chapter.
+  ///
+  /// The website writes the range with an en dash (1 to 18), so both dash
+  /// forms are accepted; `POST /api/v1/study-progress` wants plain integers.
+  (int, int)? get verseBounds {
+    final raw = verseRange;
+    if (raw == null || raw.trim().isEmpty) return null;
+    final parts = raw.split(RegExp(r'[-\u2013\u2014]'));
+    final start = int.tryParse(parts.first.trim());
+    if (start == null) return null;
+    final end = parts.length > 1 ? int.tryParse(parts[1].trim()) : null;
+    return (start, end ?? start);
+  }
+
   factory StudyLesson.fromJson(Map<String, dynamic> json) {
     return StudyLesson(
       day: (json['day'] as num?)?.toInt() ?? 1,
@@ -47,7 +66,7 @@ class CuratedStudy {
     required this.lessons,
   });
 
-  /// `Gedeelte` / `Persoon` / `Onderwerp` / `Boek` — the badge on the card.
+  /// `Gedeelte` / `Persoon` / `Onderwerp` / `Boek` - the badge on the card.
   final String type;
 
   final String id;
@@ -59,6 +78,55 @@ class CuratedStudy {
   final String startVersion;
   final String image;
   final List<StudyLesson> lessons;
+
+  int get lessonCount => lessons.length;
+
+  /// The distinct books the lessons walk through, in lesson order. This is the
+  /// single most concrete answer to "what am I going to read", and the website
+  /// only ever shows it a lesson at a time behind an expander.
+  List<String> get books {
+    final seen = <String>[];
+    for (final lesson in lessons) {
+      if (lesson.book.isNotEmpty && !seen.contains(lesson.book)) {
+        seen.add(lesson.book);
+      }
+    }
+    return seen;
+  }
+
+  /// `Johannes 20` for a study that stays put, `Genesis 12 - Jakobus 2` for one
+  /// that travels. Verses are left off deliberately: this sits on one line of a
+  /// card next to two other chips.
+  String get scopeLabel {
+    if (lessons.isEmpty) return '$startBook $startChapter';
+    final first = lessons.first.chapterReference;
+    final last = lessons.last.chapterReference;
+    return first == last ? first : '$first - $last';
+  }
+
+  /// Roughly ten minutes of reading and reflection per lesson, which is what
+  /// the lesson lengths on the website work out to. Shown as a total so the
+  /// reader can judge the commitment before starting rather than after.
+  int get estimatedMinutes => lessonCount * 10;
+
+  /// Plain-language gloss of [type]. The badge alone says `Gedeelte`, which
+  /// tells a first-time reader nothing about what the study is.
+  String get typeSummary => switch (type) {
+    'Persoon' => 'Volg het leven van een persoon uit de Bijbel',
+    'Gedeelte' => 'Lees een bijbelgedeelte van dichtbij',
+    'Boek' => 'Werk een bijbelboek van begin tot eind door',
+    _ => 'Volg een thema door de hele Bijbel',
+  };
+
+  StudyLesson? get firstLesson => lessons.isEmpty ? null : lessons.first;
+
+  /// The lesson for [day], or null when the study has no such lesson.
+  StudyLesson? lessonForDay(int day) {
+    for (final lesson in lessons) {
+      if (lesson.day == day) return lesson;
+    }
+    return null;
+  }
 
   factory CuratedStudy.fromJson(Map<String, dynamic> json) {
     return CuratedStudy(
@@ -74,81 +142,6 @@ class CuratedStudy {
       lessons: (json['lessons'] as List? ?? const [])
           .map((l) => StudyLesson.fromJson(l as Map<String, dynamic>))
           .toList(growable: false),
-    );
-  }
-}
-
-/// A leesplan from `GET /api/v1/plans`.
-class BiblePlan {
-  const BiblePlan({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.duration,
-    required this.category,
-    required this.isEnrolled,
-    required this.completedDays,
-    required this.progressPercentage,
-    required this.readings,
-    this.author,
-    this.isOwner = false,
-  });
-
-  final String id;
-  final String title;
-  final String description;
-  final int duration;
-  final String category;
-  final bool isEnrolled;
-  final List<int> completedDays;
-  final int progressPercentage;
-  final List<PlanReading> readings;
-  final String? author;
-  final bool isOwner;
-
-  factory BiblePlan.fromJson(Map<String, dynamic> json) {
-    return BiblePlan(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      duration: (json['duration'] as num?)?.toInt() ?? 0,
-      category: json['category'] as String? ?? 'evangelie',
-      isEnrolled: json['isEnrolled'] as bool? ?? false,
-      completedDays: (json['completedDays'] as List? ?? const [])
-          .map((d) => (d as num).toInt())
-          .toList(growable: false),
-      progressPercentage: (json['progressPercentage'] as num?)?.toInt() ?? 0,
-      readings: (json['readings'] as List? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(PlanReading.fromJson)
-          .toList(growable: false),
-      author: json['author'] as String?,
-      isOwner: json['isOwner'] as bool? ?? false,
-    );
-  }
-}
-
-class PlanReading {
-  const PlanReading({
-    required this.day,
-    required this.book,
-    required this.chapter,
-    this.title,
-  });
-
-  final int day;
-  final String book;
-  final int chapter;
-  final String? title;
-
-  String get reference => '$book $chapter';
-
-  factory PlanReading.fromJson(Map<String, dynamic> json) {
-    return PlanReading(
-      day: (json['day'] as num?)?.toInt() ?? 1,
-      book: json['book'] as String? ?? '',
-      chapter: (json['chapter'] as num?)?.toInt() ?? 1,
-      title: json['title'] as String?,
     );
   }
 }

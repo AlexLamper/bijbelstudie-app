@@ -28,6 +28,67 @@ Future<void> showVerseActionSheet({
   );
 }
 
+/// Prompts for note text, then saves it through [NotesRepository] and
+/// invalidates [notesListProvider] so any open list picks it up without a
+/// manual refresh.
+///
+/// The one note editor in the app: [_VerseActionSheet] calls this for a
+/// single verse, and the empty state of the Notities tab in
+/// `study_screen.dart` calls it for the chapter as a whole, with [verse] left
+/// `null`.
+Future<void> showAddNoteDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required String book,
+  required int chapter,
+  int? verse,
+  String verseText = '',
+  required String translation,
+}) async {
+  final controller = TextEditingController();
+  final reference = verse == null ? '$book $chapter' : '$book $chapter:$verse';
+  final text = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(reference),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        maxLines: 5,
+        decoration: const InputDecoration(hintText: 'Jouw notitie'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Annuleren'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+          child: const Text('Opslaan'),
+        ),
+      ],
+    ),
+  );
+
+  if (text == null || text.isEmpty) return;
+
+  await ref.read(notesRepositoryProvider).saveNote(
+        StudyNote(
+          id: newClientId(),
+          book: book,
+          chapter: chapter,
+          verse: verse,
+          verseText: verseText,
+          noteText: text,
+          translation: translation,
+          isHighlight: false,
+          updatedAt: DateTime.now(),
+        ),
+      );
+  ref.invalidate(notesListProvider);
+  await HapticFeedback.lightImpact();
+}
+
 class _VerseActionSheet extends ConsumerWidget {
   const _VerseActionSheet({required this.chapter, required this.verse});
 
@@ -133,47 +194,15 @@ class _VerseActionSheet extends ConsumerWidget {
 
   Future<void> _addNote(BuildContext context, WidgetRef ref) async {
     Navigator.of(context).pop();
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
+    await showAddNoteDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('${chapter.book} ${chapter.chapter}:${verse.number}'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 5,
-          decoration: const InputDecoration(hintText: 'Jouw notitie'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Annuleren'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Opslaan'),
-          ),
-        ],
-      ),
+      ref: ref,
+      book: chapter.book,
+      chapter: chapter.chapter,
+      verse: verse.number,
+      verseText: verse.text,
+      translation: chapter.sourceId,
     );
-
-    if (text == null || text.isEmpty) return;
-
-    await ref.read(notesRepositoryProvider).saveNote(
-          StudyNote(
-            id: newClientId(),
-            book: chapter.book,
-            chapter: chapter.chapter,
-            verse: verse.number,
-            verseText: verse.text,
-            noteText: text,
-            translation: chapter.sourceId,
-            isHighlight: false,
-            updatedAt: DateTime.now(),
-          ),
-        );
-    ref.invalidate(notesListProvider);
-    await HapticFeedback.lightImpact();
   }
 
   Future<void> _addBookmark(BuildContext context, WidgetRef ref) async {
@@ -204,7 +233,7 @@ class _VerseActionSheet extends ConsumerWidget {
 
   Future<void> _copy(BuildContext context, String reference) async {
     await Clipboard.setData(
-      ClipboardData(text: '${verse.text}\n\n$reference — ${chapter.attribution}'),
+      ClipboardData(text: '${verse.text}\n\n$reference - ${chapter.attribution}'),
     );
     if (!context.mounted) return;
     Navigator.of(context).pop();
