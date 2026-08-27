@@ -199,6 +199,29 @@ class _StudyCard extends ConsumerWidget {
     final started = plan?.started ?? done > 0;
     final next = _nextLesson();
 
+    return Opacity(
+      opacity: finished ? 0.55 : 1,
+      child: _buildCard(
+        context,
+        scheme: scheme,
+        total: total,
+        done: done,
+        finished: finished,
+        started: started,
+        next: next,
+      ),
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context, {
+    required ColorScheme scheme,
+    required int total,
+    required int done,
+    required bool finished,
+    required bool started,
+    required StudyLesson? next,
+  }) {
     return AppCard(
       radius: AppTheme.radiusMd,
       padding: EdgeInsets.zero,

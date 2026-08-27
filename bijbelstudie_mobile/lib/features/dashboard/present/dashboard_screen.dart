@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../studies/data/study_models.dart';
+import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/dashboard_models.dart';
 import 'dashboard_providers.dart';
@@ -106,7 +107,9 @@ class _DashboardBody extends ConsumerWidget {
                   children: [
                     Text(
                       greetingFor(data.name),
-                      style: AppTheme.displaySmall.copyWith(color: scheme.onSurface),
+                      style: AppTheme.displaySmall.copyWith(
+                        color: scheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(dutchLongDate(), style: AppTheme.bodyMuted),
@@ -153,7 +156,8 @@ class _DashboardBody extends ConsumerWidget {
                   StatItem(
                     icon: Icons.local_fire_department,
                     color: data.streak > 0 ? AppTheme.flame : AppTheme.inkFaint,
-                    value: '${data.streak} ${data.streak == 1 ? 'dag' : 'dagen'}',
+                    value:
+                        '${data.streak} ${data.streak == 1 ? 'dag' : 'dagen'}',
                     label: 'Reeks',
                   ),
                   StatItem(
@@ -330,7 +334,9 @@ class _BookMapCardState extends State<_BookMapCard> {
                   children: [
                     Text(
                       'Bijbelboeken',
-                      style: AppTheme.displayBase.copyWith(color: scheme.onSurface),
+                      style: AppTheme.displayBase.copyWith(
+                        color: scheme.onSurface,
+                      ),
                     ),
                     Text(
                       '${widget.booksStarted} van 66 '
@@ -347,7 +353,10 @@ class _BookMapCardState extends State<_BookMapCard> {
           // Legend: Minder ▢▢▢▢▢ Meer
           Row(
             children: [
-              Text('Minder', style: AppTheme.overline.copyWith(letterSpacing: 0)),
+              Text(
+                'Minder',
+                style: AppTheme.overline.copyWith(letterSpacing: 0),
+              ),
               const SizedBox(width: 6),
               for (final ratio in const [0.0, 0.15, 0.37, 0.75, 1.0]) ...[
                 Container(
@@ -381,7 +390,8 @@ class _BookMapCardState extends State<_BookMapCard> {
                           ),
                         ),
                         TextSpan(
-                          text: ' - ${_read(_selected!)} van '
+                          text:
+                              ' - ${_read(_selected!)} van '
                               '${BibleBooks.chaptersIn(_selected!)} hoofdstukken gelezen',
                           style: AppTheme.caption,
                         ),
@@ -396,9 +406,8 @@ class _BookMapCardState extends State<_BookMapCard> {
             books: BibleBooks.oldTestament,
             selected: _selected,
             colorFor: (book) => _color(_ratio(book), scheme),
-            onTap: (book) => setState(
-              () => _selected = _selected == book ? null : book,
-            ),
+            onTap: (book) =>
+                setState(() => _selected = _selected == book ? null : book),
             onOpen: widget.onOpenBook,
           ),
           const SizedBox(height: 14),
@@ -407,9 +416,8 @@ class _BookMapCardState extends State<_BookMapCard> {
             books: BibleBooks.newTestament,
             selected: _selected,
             colorFor: (book) => _color(_ratio(book), scheme),
-            onTap: (book) => setState(
-              () => _selected = _selected == book ? null : book,
-            ),
+            onTap: (book) =>
+                setState(() => _selected = _selected == book ? null : book),
             onOpen: widget.onOpenBook,
           ),
         ],
@@ -484,6 +492,10 @@ class _RecommendedStudiesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final studies = ref.watch(curatedStudiesProvider);
+    final plans = ref.watch(studyPlansProvider);
+    final serverLessons =
+        ref.watch(serverStudyLessonsProvider).value ??
+        const <String, Set<int>>{};
     final scheme = Theme.of(context).colorScheme;
 
     return AppCard(
@@ -511,64 +523,74 @@ class _RecommendedStudiesCard extends ConsumerWidget {
               children: [
                 for (var i = 0; i < list.length && i < 5; i++) ...[
                   if (i > 0) const RuleLine(),
-                  InkWell(
-                    onTap: () => onOpen(list[i]),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.teal.withValues(alpha: 0.88),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              list[i].type.toUpperCase(),
-                              style: AppTheme.overline.copyWith(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
+                  Opacity(
+                    opacity:
+                        isStudyFinished(
+                          study: list[i],
+                          plans: plans,
+                          serverLessons: serverLessons,
+                        )
+                        ? 0.55
+                        : 1,
+                    child: InkWell(
+                      onTap: () => onOpen(list[i]),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.teal.withValues(alpha: 0.88),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                list[i].type.toUpperCase(),
+                                style: AppTheme.overline.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  list[i].title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTheme.bodyStrong.copyWith(
-                                    fontSize: 13,
-                                    color: scheme.onSurface,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    list[i].title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTheme.bodyStrong.copyWith(
+                                      fontSize: 13,
+                                      color: scheme.onSurface,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${list[i].durationLabel} · ${list[i].startBook}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTheme.caption.copyWith(
-                                    fontSize: 11,
-                                    color: AppTheme.inkFaint,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${list[i].durationLabel} · ${list[i].startBook}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTheme.caption.copyWith(
+                                      fontSize: 11,
+                                      color: AppTheme.inkFaint,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const Icon(
-                            Icons.arrow_forward,
-                            size: 13,
-                            color: AppTheme.teal,
-                          ),
-                        ],
+                            const Icon(
+                              Icons.arrow_forward,
+                              size: 13,
+                              color: AppTheme.teal,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -638,7 +660,9 @@ class _DailyVerseCard extends StatelessWidget {
                   foregroundColor: AppTheme.inkMuted,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   minimumSize: const Size(0, 32),
-                  textStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w500),
+                  textStyle: AppTheme.caption.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 child: const Text('Lees hoofdstuk →'),
               ),
@@ -661,7 +685,10 @@ class _WeeklyStatsCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final week = days.isEmpty
         ? const ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
-              .map((l) => WeekDay(label: l, count: 0, heightPct: 0, isToday: false))
+              .map(
+                (l) =>
+                    WeekDay(label: l, count: 0, heightPct: 0, isToday: false),
+              )
               .toList()
         : days;
 
@@ -735,7 +762,9 @@ class _WeeklyStatsCard extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: AppTheme.overline.copyWith(
                       letterSpacing: 0,
-                      color: week[i].isToday ? AppTheme.teal : AppTheme.inkFaint,
+                      color: week[i].isToday
+                          ? AppTheme.teal
+                          : AppTheme.inkFaint,
                     ),
                   ),
                 ),
@@ -764,8 +793,14 @@ class _RecentNotesCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('RECENTE NOTITIES', style: AppTheme.eyebrow)),
-              const Icon(Icons.sticky_note_2_outlined, size: 14, color: AppTheme.teal),
+              Expanded(
+                child: Text('RECENTE NOTITIES', style: AppTheme.eyebrow),
+              ),
+              const Icon(
+                Icons.sticky_note_2_outlined,
+                size: 14,
+                color: AppTheme.teal,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -790,7 +825,9 @@ class _RecentNotesCard extends StatelessWidget {
                       note.text,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.inkFaint,
+                      ),
                     ),
                   ],
                 ),
@@ -852,7 +889,9 @@ class _QuickLinksCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     Text(
                       label,
-                      style: AppTheme.bodyMuted.copyWith(color: scheme.onSurface),
+                      style: AppTheme.bodyMuted.copyWith(
+                        color: scheme.onSurface,
+                      ),
                     ),
                   ],
                 ),

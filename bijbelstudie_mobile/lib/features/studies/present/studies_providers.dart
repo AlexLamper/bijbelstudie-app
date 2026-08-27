@@ -5,10 +5,35 @@ import '../data/study_models.dart';
 import '../data/study_plan_store.dart';
 import '../data/study_progress_repository.dart';
 
+final _rawCuratedStudiesProvider =
+    FutureProvider.autoDispose<List<CuratedStudy>>((ref) {
+      return ref.watch(studiesRepositoryProvider).getCuratedStudies();
+    });
+
+/// The curated studies, with finished ones sunk to the bottom so a completed
+/// study stops being the first thing shown here and on the dashboard's
+/// recommendations, which reads this same provider.
+///
+/// The fetch itself is delegated to [_rawCuratedStudiesProvider] so marking a
+/// lesson done - which changes [studyPlansProvider] and
+/// [serverStudyLessonsProvider] - only resorts the cached list instead of
+/// hitting the network again.
 final curatedStudiesProvider = FutureProvider.autoDispose<List<CuratedStudy>>((
   ref,
-) {
-  return ref.watch(studiesRepositoryProvider).getCuratedStudies();
+) async {
+  final list = await ref.watch(_rawCuratedStudiesProvider.future);
+  final plans = ref.watch(studyPlansProvider);
+  final serverLessons =
+      ref.watch(serverStudyLessonsProvider).value ?? const <String, Set<int>>{};
+  final active = <CuratedStudy>[];
+  final finished = <CuratedStudy>[];
+  for (final study in list) {
+    (isStudyFinished(study: study, plans: plans, serverLessons: serverLessons)
+            ? finished
+            : active)
+        .add(study);
+  }
+  return [...active, ...finished];
 });
 
 /// One study by id, for the detail screen reached through `/studies/:id`.
@@ -45,4 +70,21 @@ Set<int> mergedCompletedDays({
   required Map<String, Set<int>> serverLessons,
 }) {
   return {...?plans[studyId]?.completedDays, ...?serverLessons[studyId]};
+}
+
+/// Whether every lesson in [study] has been completed, merging the device and
+/// account copies the same way [mergedCompletedDays] does.
+bool isStudyFinished({
+  required CuratedStudy study,
+  required Map<String, StudyPlan> plans,
+  required Map<String, Set<int>> serverLessons,
+}) {
+  final total = study.lessonCount;
+  if (total == 0) return false;
+  final done = mergedCompletedDays(
+    studyId: study.id,
+    plans: plans,
+    serverLessons: serverLessons,
+  ).length;
+  return done >= total;
 }

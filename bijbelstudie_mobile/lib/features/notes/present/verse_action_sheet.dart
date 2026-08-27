@@ -51,11 +51,14 @@ Future<void> showAddNoteDialog({
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text(reference),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        maxLines: 5,
-        decoration: const InputDecoration(hintText: 'Jouw notitie'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(dialogContext).width * 0.85).clamp(0, 420),
+        child: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 5,
+          decoration: const InputDecoration(hintText: 'Jouw notitie'),
+        ),
       ),
       actions: [
         TextButton(
