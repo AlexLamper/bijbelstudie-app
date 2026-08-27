@@ -110,15 +110,13 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
               subtitle: yearlyProduct != null
                   ? 'Eén keer per jaar · ${PriceFraming.effectivePerMonth(yearlyProduct)} per maand'
                   : 'Eén keer per jaar betalen',
-              // The headline is the per-week figure; `billedLabel` below carries
-              // the amount the App Store will actually charge, which guideline
-              // 3.1.2 requires to be shown clearly.
-              price: yearlyProduct != null
-                  ? PriceFraming.perWeek(yearlyProduct, isAnnual: true)
-                  : yearlyPrice,
-              priceSuffix: 'per week',
-              billedLabel: yearlyProduct != null
-                  ? '$yearlyPrice per jaar, in één keer gefactureerd'
+              // Guideline 3.1.2(c): the billed amount must be the most clear
+              // and conspicuous price on the tile. The per-week figure is only
+              // a subordinate reference, shown smaller underneath it.
+              price: yearlyPrice,
+              priceSuffix: 'per jaar',
+              perWeekLabel: yearlyProduct != null
+                  ? '${PriceFraming.perWeek(yearlyProduct, isAnnual: true)} per week'
                   : null,
               savingLabel: savingLabel,
               badge: discountPercent != null ? '$discountPercent% goedkoper' : 'Voordeligst',
@@ -129,12 +127,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             _PlanTile(
               title: 'Maandelijks',
               subtitle: 'Elke maand opzegbaar',
-              price: monthlyProduct != null
-                  ? PriceFraming.perWeek(monthlyProduct, isAnnual: false)
-                  : monthlyPrice,
-              priceSuffix: 'per week',
-              billedLabel: monthlyProduct != null
-                  ? '$monthlyPrice per maand, maandelijks gefactureerd'
+              price: monthlyPrice,
+              priceSuffix: 'per maand',
+              perWeekLabel: monthlyProduct != null
+                  ? '${PriceFraming.perWeek(monthlyProduct, isAnnual: false)} per week'
                   : null,
               selected: _selectedPlan == _ProPlan.monthly,
               onTap: () => _selectPlan(_ProPlan.monthly),
@@ -288,22 +284,27 @@ class _PlanTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.badge,
-    this.billedLabel,
+    this.perWeekLabel,
     this.savingLabel,
   });
 
   final String title;
   final String subtitle;
+
+  /// The amount the store will actually charge. This is the headline figure —
+  /// guideline 3.1.2(c) requires the billed amount to be the most clear and
+  /// conspicuous price on the tile, more so than any calculated figure.
   final String price;
+
+  /// Billing period for [price], e.g. "per jaar" / "per maand".
   final String priceSuffix;
   final bool selected;
   final VoidCallback onTap;
   final String? badge;
 
-  /// The amount the store will actually charge and over what period. Shown
-  /// under the derived per-week headline; guideline 3.1.2 requires the real
-  /// price and duration to be clear, and a weekly figure alone is not.
-  final String? billedLabel;
+  /// The derived per-week figure, shown smaller and below the billed amount —
+  /// a subordinate reference, never the headline.
+  final String? perWeekLabel;
 
   /// e.g. "Je bespaart € 29,89 per jaar". Only ever non-null when it is true of
   /// the live store prices.
@@ -346,13 +347,6 @@ class _PlanTile extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (billedLabel != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      billedLabel!,
-                      style: AppTheme.bodyMuted.copyWith(fontSize: 11),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -361,6 +355,13 @@ class _PlanTile extends StatelessWidget {
               children: [
                 Text(price, style: Theme.of(context).textTheme.headlineMedium),
                 Text(priceSuffix, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
+                if (perWeekLabel != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    perWeekLabel!,
+                    style: AppTheme.bodyMuted.copyWith(fontSize: 10),
+                  ),
+                ],
               ],
             ),
             const SizedBox(width: 12),

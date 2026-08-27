@@ -134,10 +134,13 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
   }
 }
 
-/// "Vanaf €x,xx per week" plus the billed-amount fine print underneath,
-/// exactly the shape of the web component's price paragraph. Never rendered
-/// with placeholder digits - the parent only builds this when a real
-/// `StoreProduct` was found.
+/// The billed amount, bold and up top, with the per-week figure as a small
+/// subordinate reference underneath.
+///
+/// Guideline 3.1.2(c): the amount the App Store actually charges must be the
+/// most clear and conspicuous price shown, more so than any calculated
+/// figure like a per-week breakdown. Never rendered with placeholder digits -
+/// the parent only builds this when a real `StoreProduct` was found.
 class _PriceBlock extends StatelessWidget {
   const _PriceBlock({required this.product});
 
@@ -150,22 +153,14 @@ class _PriceBlock extends StatelessWidget {
 
     return Column(
       children: [
-        RichText(
+        Text(
+          billedLabel,
           textAlign: TextAlign.center,
-          text: TextSpan(
-            style: AppTheme.caption.copyWith(fontSize: 11),
-            children: [
-              const TextSpan(text: 'Vanaf '),
-              TextSpan(text: perWeek, style: AppTheme.monoTextStyle(
-                const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.ink),
-              )),
-              const TextSpan(text: ' per week'),
-            ],
-          ),
+          style: AppTheme.bodyStrong.copyWith(fontSize: 13, color: AppTheme.ink),
         ),
         const SizedBox(height: 2),
         Text(
-          billedLabel,
+          '$perWeek per week',
           textAlign: TextAlign.center,
           style: AppTheme.caption.copyWith(fontSize: 10, color: AppTheme.inkFaint),
         ),
