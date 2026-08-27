@@ -179,4 +179,68 @@ void main() {
     expect(prefs.getInt('reader.lastChapter'), 4);
     expect(container.read(readingSettingsProvider).lastChapter, 4);
   });
+
+  group('applyPreferredVersion', () {
+    test('moves the reader onto the chosen translation and stores it', () async {
+      final container = hostWith(
+        prefs: {
+          'reader.lastBook': 'Johannes',
+          'reader.lastChapter': 3,
+          'reader.lastVersionId': 'statenvertaling',
+          'reader.lastLocationAt': DateTime(2026, 8, 20).millisecondsSinceEpoch,
+        },
+      );
+      await settled(container);
+
+      container.read(readerLocationProvider.notifier).applyPreferredVersion('kjv');
+
+      expect(container.read(readerLocationProvider).versionId, 'kjv');
+      expect(container.read(readingSettingsProvider).lastVersionId, 'kjv');
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('reader.lastVersionId'), 'kjv');
+    });
+
+    test('leaves the chapter and its timestamp alone', () async {
+      // Unlike openChapter, this must not stamp a reading position: doing so
+      // would claim "Johannes 3, just now" on a device that has only been
+      // through the setup wizard, and beat a genuinely newer position the
+      // account has on the website.
+      final storedAt = DateTime(2026, 8, 20).millisecondsSinceEpoch;
+      final container = hostWith(
+        prefs: {
+          'reader.lastBook': 'Johannes',
+          'reader.lastChapter': 3,
+          'reader.lastLocationAt': storedAt,
+        },
+      );
+      await settled(container);
+
+      container.read(readerLocationProvider.notifier).applyPreferredVersion('kjv');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final location = container.read(readerLocationProvider);
+      expect(location.book, 'Johannes');
+      expect(location.chapter, 3);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('reader.lastLocationAt'), storedAt);
+    });
+
+    test('a choice made before hydration finishes still wins', () async {
+      // The setup wizard is often what triggers the very first read of the
+      // reading settings, so the disk load can still be in flight when the
+      // reader taps a translation. The stored value must not overwrite it.
+      final container = hostWith(
+        prefs: {'reader.lastVersionId': 'statenvertaling'},
+      );
+
+      container.read(readerLocationProvider.notifier).applyPreferredVersion('kjv');
+      await settled(container);
+
+      expect(container.read(readerLocationProvider).versionId, 'kjv');
+      expect(container.read(readingSettingsProvider).lastVersionId, 'kjv');
+    });
+  });
 }

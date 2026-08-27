@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:go_router/go_router.dart';
+
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
+import 'package:bijbelstudie_mobile/core/router/app_router.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
@@ -18,6 +21,9 @@ import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_repository
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_providers.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_screen.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
+import 'package:bijbelstudie_mobile/features/study/data/context_repository.dart';
+import 'package:bijbelstudie_mobile/features/study/present/study_pane_controller.dart';
+import 'package:bijbelstudie_mobile/features/study/present/study_screen.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart';
 import 'package:bijbelstudie_mobile/features/commentary/present/commentary_screen.dart';
 import 'package:bijbelstudie_mobile/features/notes/domain/note_models.dart';
@@ -25,10 +31,12 @@ import 'package:bijbelstudie_mobile/features/notes/present/notes_providers.dart'
 import 'package:bijbelstudie_mobile/features/notes/present/notes_screen.dart';
 import 'package:bijbelstudie_mobile/features/onboarding/present/onboarding_screen.dart';
 import 'package:bijbelstudie_mobile/features/onboarding/present/setup_flow_screen.dart';
-import 'package:bijbelstudie_mobile/features/onboarding/present/tour_screen.dart';
+import 'package:bijbelstudie_mobile/features/onboarding/present/tour_controller.dart';
+import 'package:bijbelstudie_mobile/features/onboarding/present/tour_overlay.dart';
 import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
+import 'package:bijbelstudie_mobile/features/settings/data/reading_settings.dart';
 import 'package:bijbelstudie_mobile/features/settings/present/settings_screen.dart';
 
 /// Keeps these renders off the network.
@@ -74,9 +82,7 @@ void expectNoLayoutError(WidgetTester tester) {
     culprits.add(element.debugGetCreatorChain(10));
   }
 
-  fail(
-    'Layout error:\n$error\n\nOverflowing widget(s):\n${culprits.join('\n\n')}',
-  );
+  fail('Layout error:\n$error\n\nOverflowing widget(s):\n${culprits.join('\n\n')}');
 }
 
 /// Registers the real Inter / Newsreader files with the test engine.
@@ -101,9 +107,7 @@ Future<void> loadAppFonts() async {
     final loader = FontLoader(entry.key);
     for (final path in entry.value) {
       final bytes = await File(path).readAsBytes();
-      loader.addFont(
-        Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
-      );
+      loader.addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
     }
     await loader.load();
   }
@@ -150,20 +154,14 @@ void main() {
     chapter: 1,
     attribution: 'Statenvertaling (1637) — publiek domein',
     verses: [
-      Verse(
-        number: 1,
-        text: 'In den beginne schiep God den hemel en de aarde.',
-      ),
+      Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
       Verse(
         number: 2,
         text:
             'De aarde nu was woest en ledig, en duisternis was op den afgrond; '
             'en de Geest Gods zweefde op de wateren.',
       ),
-      Verse(
-        number: 3,
-        text: 'En God zeide: Daar zij licht! en daar werd licht.',
-      ),
+      Verse(number: 3, text: 'En God zeide: Daar zij licht! en daar werd licht.'),
     ],
   );
 
@@ -175,14 +173,8 @@ void main() {
     verses: [
       // Verse 0 is how the corpus keys a chapter introduction — the renderer
       // has to label it "Inleiding", not "Vers 0".
-      Verse(
-        number: 0,
-        text: 'De grondslag van alle Godsdienst ligt in God als Schepper.',
-      ),
-      Verse(
-        number: 1,
-        text: 'De eerste woorden stellen God voor als de Schepper.',
-      ),
+      Verse(number: 0, text: 'De grondslag van alle Godsdienst ligt in God als Schepper.'),
+      Verse(number: 1, text: 'De eerste woorden stellen God voor als de Schepper.'),
     ],
   );
 
@@ -247,69 +239,67 @@ void main() {
     ),
   ];
 
-  Widget host(Widget child) {
-    return ProviderScope(
-      overrides: [
-        // sqflite has no databaseFactory under flutter_test; the cache is
-        // optional by design, so the widgets take the null path.
-        contentCacheProvider.overrideWithValue(null),
-        bibleVersionsProvider.overrideWith((ref) async => versions),
-        commentarySourcesProvider.overrideWith((ref) async => commentaries),
-        bibleBooksProvider.overrideWith(
-          (ref, versionId) async => const ['Genesis', 'Exodus'],
-        ),
-        bibleChaptersProvider.overrideWith(
-          (ref, bookRef) async => List<int>.generate(50, (i) => i + 1),
-        ),
-        chapterContentProvider.overrideWith((ref, chapterRef) async => chapter),
-        // No account behind these renders, so the reader settles on its
-        // Genesis 1 default rather than waiting on a request that cannot land.
-        remoteReaderLocationProvider.overrideWith((ref) async => null),
-        dashboardRepositoryProvider.overrideWithValue(
-          _StubDashboardRepository(),
-        ),
-        commentaryChapterProvider.overrideWith(
-          (ref, chapterRef) async => commentaryChapter,
-        ),
-        originalChapterProvider.overrideWith(
-          (ref, chapterRef) async => OriginalChapter(
-            book: 'Genesis',
-            chapter: 1,
-            attribution:
-                'Grondtekst: STEPBible (TAHOT/TAGNT), CC BY 4.0 - tyndale.org',
-            verses: [
-              OriginalVerse(
-                number: 1,
-                words: [
-                  OriginalWord(
-                    original: 'בְּרֵאשִׁית',
-                    transliteration: 'be.re.Shit',
-                    gloss: 'in beginning',
-                    strongs: 'H7225',
-                  ),
-                ],
+  // Type inferred: `Override` is not exported from flutter_riverpod.
+  final testOverrides = [
+    // sqflite has no databaseFactory under flutter_test; the cache is
+    // optional by design, so the widgets take the null path.
+    contentCacheProvider.overrideWithValue(null),
+    bibleVersionsProvider.overrideWith((ref) async => versions),
+    commentarySourcesProvider.overrideWith((ref) async => commentaries),
+    bibleBooksProvider.overrideWith((ref, versionId) async => const ['Genesis', 'Exodus']),
+    bibleChaptersProvider.overrideWith(
+      (ref, bookRef) async => List<int>.generate(50, (i) => i + 1),
+    ),
+    chapterContentProvider.overrideWith((ref, chapterRef) async => chapter),
+    // No account behind these renders, so the reader settles on its
+    // Genesis 1 default rather than waiting on a request that cannot land.
+    remoteReaderLocationProvider.overrideWith((ref) async => null),
+    dashboardRepositoryProvider.overrideWithValue(_StubDashboardRepository()),
+    commentaryChapterProvider.overrideWith((ref, chapterRef) async => commentaryChapter),
+    originalChapterProvider.overrideWith(
+      (ref, chapterRef) async => OriginalChapter(
+        book: 'Genesis',
+        chapter: 1,
+        attribution: 'Grondtekst: STEPBible (TAHOT/TAGNT), CC BY 4.0 - tyndale.org',
+        verses: [
+          OriginalVerse(
+            number: 1,
+            words: [
+              OriginalWord(
+                original: 'בְּרֵאשִׁית',
+                transliteration: 'be.re.Shit',
+                gloss: 'in beginning',
+                strongs: 'H7225',
               ),
             ],
           ),
-        ),
-        profileProvider.overrideWith((ref) async => profile),
-        notesListProvider.overrideWith((ref) async => notes),
-        highlightsListProvider.overrideWith((ref) async => highlights),
-        bookmarksProvider.overrideWith((ref) async => bookmarks),
-        readingHistoryProvider.overrideWith((ref) async => history),
-        // The preview fixtures already describe a fully-populated account,
-        // which is exactly what these render checks need.
-        dashboardProvider.overrideWith((ref) async => PreviewData.dashboard),
-        curatedStudiesProvider.overrideWith(
-          (ref) async => PreviewData.curatedStudies,
-        ),
-        // The studies screen also asks the account which lessons are already
-        // done. There is no account here, so answer it locally rather than
-        // leaving a real request pending past the end of the test.
-        serverStudyLessonsProvider.overrideWith(
-          (ref) async => const <String, Set<int>>{},
-        ),
-      ],
+        ],
+      ),
+    ),
+    profileProvider.overrideWith((ref) async => profile),
+    notesListProvider.overrideWith((ref) async => notes),
+    highlightsListProvider.overrideWith((ref) async => highlights),
+    bookmarksProvider.overrideWith((ref) async => bookmarks),
+    readingHistoryProvider.overrideWith((ref) async => history),
+    // The preview fixtures already describe a fully-populated account,
+    // which is exactly what these render checks need.
+    dashboardProvider.overrideWith((ref) async => PreviewData.dashboard),
+    curatedStudiesProvider.overrideWith((ref) async => PreviewData.curatedStudies),
+    // The studies screen also asks the account which lessons are already
+    // done. There is no account here, so answer it locally rather than
+    // leaving a real request pending past the end of the test.
+    serverStudyLessonsProvider.overrideWith((ref) async => const <String, Set<int>>{}),
+    // The study screen's IndexedStack builds every tab, so the materials
+    // pane's own fetches have to be answered locally too — otherwise these
+    // renders reach the network, which is the thing this harness exists to
+    // prevent.
+    bookSummaryProvider.overrideWith((ref, book) async => 'Genesis opent met de schepping.'),
+    geoImagesProvider.overrideWith((ref, geoRef) async => const <GeoImage>[]),
+  ];
+
+  Widget host(Widget child) {
+    return ProviderScope(
+      overrides: testOverrides,
       child: MaterialApp(theme: AppTheme.lightTheme, home: child),
     );
   }
@@ -325,6 +315,61 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   }
 
+  /// Mounts [screen] with the tour overlay above it, exactly as `main.dart`
+  /// does, and starts the tour.
+  ///
+  /// `routerProvider` is overridden because the overlay navigates between
+  /// steps; the real one starts at the splash screen and would take the test
+  /// through auth. The routes here render nothing - only `/dashboard` matters,
+  /// and a step whose anchor is not mounted simply shows its card centred,
+  /// which is the behaviour being relied on for the later steps.
+  Future<void> pumpTour(WidgetTester tester, Widget screen) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final router = GoRouter(
+      initialLocation: '/dashboard',
+      routes: [
+        GoRoute(path: '/dashboard', builder: (_, __) => screen),
+        for (final path in ['/study', '/studies', '/notes', '/profile'])
+          GoRoute(path: path, builder: (_, __) => const SizedBox.shrink()),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    late WidgetRef captured;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [...testOverrides, routerProvider.overrideWithValue(router)],
+        child: Consumer(
+          builder: (context, ref, _) {
+            captured = ref;
+            return MaterialApp.router(
+              theme: AppTheme.lightTheme,
+              routerConfig: router,
+              builder: (context, child) => TourHost(child: child ?? const SizedBox.shrink()),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    captured.read(tourControllerProvider.notifier).start();
+    await tester.pumpAndSettle();
+  }
+
+  /// The rectangle the overlay cut out of the scrim, or null when it never
+  /// found the step's anchor and fell back to a centred card.
+  Rect? tourSpotlight(WidgetTester tester) {
+    final paint = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .where((p) => p.painter is TourScrimPainter)
+        .firstOrNull;
+    return (paint?.painter as TourScrimPainter?)?.hole;
+  }
+
   /// Scrolls the page to the bottom so lazily-built slivers are laid out too —
   /// an overflow further down the list stays invisible otherwise.
   Future<void> scrollThrough(WidgetTester tester) async {
@@ -332,11 +377,7 @@ void main() {
     for (var i = 0; i < 12; i++) {
       await tester.drag(list, const Offset(0, -400));
       await tester.pump();
-      expect(
-        tester.takeException(),
-        isNull,
-        reason: 'layout error after scroll step $i',
-      );
+      expect(tester.takeException(), isNull, reason: 'layout error after scroll step $i');
     }
   }
 
@@ -352,9 +393,7 @@ void main() {
     await scrollThrough(tester);
   });
 
-  testWidgets('studies screen renders the filter chips and a study card', (
-    tester,
-  ) async {
+  testWidgets('studies screen renders the filter chips and a study card', (tester) async {
     await pumpAtPhoneSize(tester, const StudiesScreen());
 
     expectNoLayoutError(tester);
@@ -382,9 +421,7 @@ void main() {
     expect(find.text('VERS 0'), findsNothing);
   });
 
-  testWidgets('notes screen renders notes, highlights and bookmarks', (
-    tester,
-  ) async {
+  testWidgets('notes screen renders notes, highlights and bookmarks', (tester) async {
     await pumpAtPhoneSize(tester, const NotesScreen());
 
     expectNoLayoutError(tester);
@@ -396,9 +433,7 @@ void main() {
     expect(find.text('Johannes 3:16'), findsOneWidget);
   });
 
-  testWidgets('profile renders Pro status and the delete action', (
-    tester,
-  ) async {
+  testWidgets('profile renders Pro status and the delete action', (tester) async {
     await pumpAtPhoneSize(tester, const ProfileScreen());
 
     expectNoLayoutError(tester);
@@ -417,9 +452,7 @@ void main() {
     await scrollThrough(tester);
   });
 
-  testWidgets('onboarding renders all pages without layout errors', (
-    tester,
-  ) async {
+  testWidgets('onboarding renders all pages without layout errors', (tester) async {
     await pumpAtPhoneSize(tester, const OnboardingScreen());
     expect(tester.takeException(), isNull);
 
@@ -431,59 +464,215 @@ void main() {
     expect(find.text('Aan de slag'), findsOneWidget);
   });
 
-  testWidgets(
-    'setup wizard walks through translation, reading prefs and reminder',
-    (tester) async {
+  testWidgets('setup wizard walks through translation, reading prefs and reminder', (tester) async {
+    await pumpAtPhoneSize(tester, const SetupFlowScreen());
+    expectNoLayoutError(tester);
+    expect(find.text('Kies je bijbelvertaling'), findsOneWidget);
+    // From the canned bibleVersionsProvider override.
+    expect(find.text('Statenvertaling'), findsOneWidget);
+
+    await tester.tap(find.text('Volgende'));
+    await tester.pumpAndSettle();
+    expectNoLayoutError(tester);
+    expect(find.text('Stel je leesvoorkeuren in'), findsOneWidget);
+    expect(find.text('Tekstgrootte'), findsOneWidget);
+    expect(find.text('Regelafstand'), findsOneWidget);
+
+    await tester.tap(find.text('Volgende'));
+    await tester.pumpAndSettle();
+    expectNoLayoutError(tester);
+    expect(find.text('Wil je een dagelijkse herinnering?'), findsOneWidget);
+    expect(find.text('07:00'), findsOneWidget);
+    // Last step: the button reads "Aan de slag", not "Volgende". Not tapped
+    // - finishing writes to secure storage, which has no test double here.
+    expect(find.text('Aan de slag'), findsOneWidget);
+  });
+
+  testWidgets('a translation dropped from the app falls back instead of dead-ending',
+      (tester) async {
+    // Luther 1912 left MOBILE_ALLOWED_BIBLES, but the id the reader last used
+    // lives on the device. Such a device would open on the 451 empty state
+    // every launch; the reader bar switches it to the first translation the
+    // server still offers.
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'reader.lastVersionId': 'luther_1912',
+      'reader.lastBook': 'Genesis',
+      'reader.lastChapter': 1,
+    });
+    addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+    await pumpAtPhoneSize(tester, const ReadScreen());
+    final container = ProviderScope.containerOf(tester.element(find.byType(ReadScreen)));
+    await tester.pumpAndSettle();
+
+    expect(container.read(readerLocationProvider).versionId, 'statenvertaling');
+    expect(find.text('Niet beschikbaar in de app'), findsNothing);
+  });
+
+  group('study screen panes', () {
+    testWidgets('opens on the reader and switches to the materials tabs',
+        (tester) async {
+      await pumpAtPhoneSize(tester, const StudyScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(StudyScreen)),
+      );
+
+      expect(container.read(studyPaneProvider).showMaterials, isFalse);
+      expect(find.textContaining('In den beginne'), findsOneWidget);
+
+      await tester.tap(find.text('Studie'));
+      await tester.pumpAndSettle();
+      expectNoLayoutError(tester);
+
+      expect(container.read(studyPaneProvider).showMaterials, isTrue);
+      expect(find.text('Commentaar'), findsWidgets);
+      expect(find.text('Grondtekst'), findsOneWidget);
+    });
+
+    testWidgets('the tab bar and the provider stay in step both ways',
+        (tester) async {
+      // The pane state moved out of the screen so the guided tour can drive
+      // it; the screen has to keep writing back, or the tour reads a stale
+      // tab index.
+      await pumpAtPhoneSize(tester, const StudyScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(StudyScreen)),
+      );
+
+      container.read(studyPaneProvider.notifier).showMaterials();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Notities'));
+      await tester.pumpAndSettle();
+      expect(container.read(studyPaneProvider).materialsTab, 3);
+
+      // Driven from outside, as the tour does it.
+      container.read(studyPaneProvider.notifier).setMaterialsTab(1);
+      await tester.pumpAndSettle();
+      expectNoLayoutError(tester);
+      expect(find.textContaining('be.re.Shit'), findsOneWidget);
+    });
+  });
+
+  group('setup wizard applies what it asks for', () {
+    testWidgets('groups translations by language with a separator', (tester) async {
       await pumpAtPhoneSize(tester, const SetupFlowScreen());
-      expectNoLayoutError(tester);
-      expect(find.text('Kies je bijbelvertaling'), findsOneWidget);
-      // From the canned bibleVersionsProvider override.
+
+      // Dutch first, no heading above it; the heading appears where the
+      // language actually changes.
       expect(find.text('Statenvertaling'), findsOneWidget);
+      expect(find.text('King James Version'), findsOneWidget);
+      expect(find.text('NEDERLANDS'), findsNothing);
+      expect(find.text('ENGELS'), findsOneWidget);
+
+      final dutch = tester.getTopLeft(find.text('Statenvertaling')).dy;
+      final separator = tester.getTopLeft(find.text('ENGELS')).dy;
+      final english = tester.getTopLeft(find.text('King James Version')).dy;
+      expect(dutch, lessThan(separator));
+      expect(separator, lessThan(english));
+    });
+
+    testWidgets('picking a translation moves the reader, not just the setting', (tester) async {
+      await pumpAtPhoneSize(tester, const SetupFlowScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SetupFlowScreen)),
+      );
+
+      // The reader hydrates before the wizard is even reached on a returning
+      // account (splash warms it deliberately), so writing the preference
+      // alone left the choice with nothing listening — the reader kept
+      // whatever it had already settled on for the rest of the session.
+      await tester.pumpAndSettle();
+      expect(container.read(readerLocationProvider).versionId, 'statenvertaling');
+
+      await tester.tap(find.text('King James Version'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(readingSettingsProvider).lastVersionId, 'kjv');
+      expect(container.read(readerLocationProvider).versionId, 'kjv');
+    });
+
+    testWidgets('reading preferences take effect immediately', (tester) async {
+      await pumpAtPhoneSize(tester, const SetupFlowScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SetupFlowScreen)),
+      );
 
       await tester.tap(find.text('Volgende'));
       await tester.pumpAndSettle();
-      expectNoLayoutError(tester);
-      expect(find.text('Stel je leesvoorkeuren in'), findsOneWidget);
-      expect(find.text('Tekstgrootte'), findsOneWidget);
-      expect(find.text('Regelafstand'), findsOneWidget);
 
-      await tester.tap(find.text('Volgende'));
+      await tester.ensureVisible(find.text('Groot'));
       await tester.pumpAndSettle();
-      expectNoLayoutError(tester);
-      expect(find.text('Wil je een dagelijkse herinnering?'), findsOneWidget);
-      expect(find.text('07:00'), findsOneWidget);
-      // Last step: the button reads "Aan de slag", not "Volgende". Not tapped
-      // - finishing writes to secure storage, which has no test double here.
-      expect(find.text('Aan de slag'), findsOneWidget);
-    },
-  );
+      await tester.tap(find.text('Groot'));
+      await tester.pumpAndSettle();
+      expect(container.read(readingSettingsProvider).fontSize, ReaderFontSize.large);
 
-  testWidgets(
-    'tour walks through the app sections and hides the Pro step for a subscriber',
-    (tester) async {
-      await pumpAtPhoneSize(tester, const TourScreen());
-      expectNoLayoutError(tester);
-      expect(find.text('Je dashboard'), findsOneWidget);
-      // The canned profile is Pro (see `profile` above), so the paywall step
-      // is filtered out: 5 stops, not 6.
-      expect(find.text('Stap 1 van 5'), findsOneWidget);
+      await tester.ensureVisible(find.text('Zeer ruim'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zeer ruim'));
+      await tester.pumpAndSettle();
+      expect(container.read(readingSettingsProvider).lineHeight, ReaderLineHeight.loose);
+    });
+  });
 
-      for (final title in [
-        'Bijbelstudie',
-        'Begeleide studies',
-        'Je notities',
-        'Je profiel',
-      ]) {
-        await tester.tap(find.text('Volgende'));
-        await tester.pumpAndSettle();
-        expectNoLayoutError(tester);
-        expect(find.text(title), findsOneWidget);
+  group('guided tour', () {
+    test('drops the Pro step for a subscriber and keeps it for a free account', () {
+      final free = TourController.stepsFor(isPro: false);
+      final pro = TourController.stepsFor(isPro: true);
+
+      expect(free.map((s) => s.title), contains('Upgrade naar Pro'));
+      expect(pro.map((s) => s.title), isNot(contains('Upgrade naar Pro')));
+      expect(pro.length, free.length - 1);
+    });
+
+    test('every step names an anchor and a route the app actually has', () {
+      const routes = {'/dashboard', '/study', '/studies', '/notes', '/profile'};
+      for (final step in TourController.stepsFor(isPro: false)) {
+        expect(step.anchorId, isNotEmpty, reason: '${step.title} has no anchor');
+        expect(routes, contains(step.route), reason: '${step.title} points at ${step.route}');
+        expect(step.description, isNotEmpty);
       }
+    });
 
-      expect(find.text('Upgrade naar Pro'), findsNothing);
-      // Last step: not tapped - finishing writes to secure storage, which
-      // has no test double here.
-      expect(find.text('Klaar'), findsOneWidget);
-    },
-  );
+    testWidgets('spotlights the live dashboard card and steps forward', (tester) async {
+      // The tour paints over the running app rather than replacing it, so the
+      // harness is the real dashboard with the overlay on top - the same shape
+      // main.dart builds.
+      await pumpTour(tester, const DashboardScreen());
+
+      expect(find.text('Je dashboard'), findsOneWidget);
+      expect(find.text('Rondleiding · 1/9'), findsOneWidget);
+
+      // The hero card is a TourAnchor, so the overlay found a rect and the
+      // scrim was painted with a hole rather than falling back to a centred
+      // card with no spotlight.
+      expect(tourSpotlight(tester), isNotNull);
+
+      await tester.tap(find.text('Volgende'));
+      await tester.pumpAndSettle();
+      expectNoLayoutError(tester);
+      // "Bijbelstudie" is also the dashboard's own copy, so the step is
+      // identified by the counter and its description instead of its title.
+      expect(find.text('Rondleiding · 2/9'), findsOneWidget);
+      expect(find.textContaining('Dit is het hart van de app'), findsOneWidget);
+
+      await tester.tap(find.text('Vorige'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rondleiding · 1/9'), findsOneWidget);
+      expect(find.text('Je dashboard'), findsOneWidget);
+    });
+
+    testWidgets('Overslaan closes the overlay and leaves the app alone', (tester) async {
+      await pumpTour(tester, const DashboardScreen());
+      expect(find.text('Je dashboard'), findsOneWidget);
+
+      await tester.tap(find.text('Overslaan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Je dashboard'), findsNothing);
+      expect(find.text('Overslaan'), findsNothing);
+      // The screen underneath is untouched.
+      expect(find.byType(DashboardScreen), findsOneWidget);
+    });
+  });
 }

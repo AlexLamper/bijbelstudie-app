@@ -9,6 +9,7 @@ import '../ui/app_widgets.dart';
 import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
+import '../../features/onboarding/present/tour_controller.dart';
 import '../../features/onboarding/present/setup_flow_screen.dart';
 import '../../features/onboarding/present/tour_screen.dart';
 import '../../features/auth/present/login_screen.dart';
@@ -59,10 +60,15 @@ class MainScaffold extends StatelessWidget {
               children: [
                 for (var i = 0; i < _items.length; i++)
                   Expanded(
-                    child: _NavItem(
-                      item: _items[i],
-                      active: currentIndex == i,
-                      onTap: () => context.go(_items[i].route),
+                    // Anchored so the guided tour can point at the tab it is
+                    // describing rather than describing it in the abstract.
+                    child: TourAnchor(
+                      id: _items[i].tourAnchorId,
+                      child: _NavItem(
+                        item: _items[i],
+                        active: currentIndex == i,
+                        onTap: () => context.go(_items[i].route),
+                      ),
                     ),
                   ),
               ],
@@ -74,11 +80,15 @@ class MainScaffold extends StatelessWidget {
   }
 
   static const List<_NavItemData> _items = [
-    _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard'),
-    _NavItemData(Icons.auto_stories_outlined, Icons.auto_stories, 'Bijbel', '/study'),
-    _NavItemData(Icons.school_outlined, Icons.school, 'Studies', '/studies'),
-    _NavItemData(Icons.sticky_note_2_outlined, Icons.sticky_note_2, 'Notities', '/notes'),
-    _NavItemData(Icons.person_outline, Icons.person, 'Profiel', '/profile'),
+    _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard', 'nav-dashboard'),
+    _NavItemData(Icons.auto_stories_outlined, Icons.auto_stories, 'Bijbel', '/study',
+        TourAnchorIds.navStudy),
+    _NavItemData(Icons.school_outlined, Icons.school, 'Studies', '/studies',
+        TourAnchorIds.navStudies),
+    _NavItemData(Icons.sticky_note_2_outlined, Icons.sticky_note_2, 'Notities', '/notes',
+        TourAnchorIds.navNotes),
+    _NavItemData(Icons.person_outline, Icons.person, 'Profiel', '/profile',
+        TourAnchorIds.navProfile),
   ];
 
   static int _calculateSelectedIndex(BuildContext context) {
@@ -95,12 +105,22 @@ class MainScaffold extends StatelessWidget {
 }
 
 class _NavItemData {
-  const _NavItemData(this.icon, this.activeIcon, this.label, this.route);
+  const _NavItemData(
+    this.icon,
+    this.activeIcon,
+    this.label,
+    this.route,
+    this.tourAnchorId,
+  );
 
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final String route;
+
+  /// See [TourAnchorIds]. Every tab carries one even where no step points at
+  /// it yet, so adding a step is a change to the step list alone.
+  final String tourAnchorId;
 }
 
 /// The active tab is teal, matching every other active affordance on the site.

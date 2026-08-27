@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../core/analytics/analytics.dart';
+import '../../../core/config/revenuecat_config.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';
@@ -10,18 +14,42 @@ import '../data/purchase_service.dart';
 
 enum PurchaseStatus { idle, loading, success, error }
 
+/// Whether the paywall has real store prices to show.
+///
+/// Split out from [PurchaseStatus], which is about a purchase in flight. The
+/// prices load once when the paywall is first reached and can fail on their
+/// own - no API key in the build, products not approved in App Store Connect,
+/// no offering marked current, a simulator with no StoreKit - and every one of
+/// those used to render as a bare `-` with nothing else said.
+enum PriceStatus { loading, ready, unavailable }
+
 class PremiumState {
   const PremiumState({
     this.status = PurchaseStatus.idle,
     this.packages = const [],
     this.customerInfo,
     this.errorMessage,
+    this.priceStatus = PriceStatus.loading,
+    this.priceError,
+    this.monthlyProduct,
+    this.yearlyProduct,
   });
 
   final PurchaseStatus status;
   final List<Package> packages;
   final CustomerInfo? customerInfo;
   final String? errorMessage;
+
+  final PriceStatus priceStatus;
+
+  /// Why the prices are missing, in Dutch and safe to show. Null unless
+  /// [priceStatus] is [PriceStatus.unavailable].
+  final String? priceError;
+
+  /// The two products the paywall renders, resolved from the current offering
+  /// or, failing that, looked up by product id.
+  final StoreProduct? monthlyProduct;
+  final StoreProduct? yearlyProduct;
 
   bool get isPro =>
       customerInfo?.entitlements.active.containsKey(kRcProEntitlement) ??
@@ -38,6 +66,33 @@ class PremiumState {
       packages: packages ?? this.packages,
       customerInfo: customerInfo ?? this.customerInfo,
       errorMessage: errorMessage ?? this.errorMessage,
+      priceStatus: priceStatus,
+      priceError: priceError,
+      monthlyProduct: monthlyProduct,
+      yearlyProduct: yearlyProduct,
+    );
+  }
+
+  /// Prices replace themselves wholesale rather than merging: a reload that
+  /// found nothing must clear what a previous one found, or the paywall keeps
+  /// quoting a price the store no longer offers.
+  PremiumState withPrices({
+    required PriceStatus priceStatus,
+    String? priceError,
+    List<Package> packages = const [],
+    StoreProduct? monthlyProduct,
+    StoreProduct? yearlyProduct,
+    CustomerInfo? customerInfo,
+  }) {
+    return PremiumState(
+      status: status,
+      errorMessage: errorMessage,
+      packages: packages,
+      customerInfo: customerInfo ?? this.customerInfo,
+      priceStatus: priceStatus,
+      priceError: priceError,
+      monthlyProduct: monthlyProduct,
+      yearlyProduct: yearlyProduct,
     );
   }
 }
@@ -60,24 +115,94 @@ class PremiumController extends Notifier<PremiumState> {
 
   @override
   PremiumState build() {
-    _loadProducts();
+    unawaited(loadPrices());
     return const PremiumState();
   }
 
   PurchaseService get _svc => ref.read(purchaseServiceProvider);
 
-  Future<void> _loadProducts() async {
+  /// Fetches the prices the paywall renders.
+  ///
+  /// Public and re-runnable: this provider is not autoDispose, so `build` runs
+  /// once for the whole app run. A single failed attempt - the app opened on a
+  /// dead network, the store not yet reachable at launch - used to mean the
+  /// paywall showed `-` until the app was killed and relaunched, with no way to
+  /// try again. The paywall calls this on entry and from its retry button.
+  Future<void> loadPrices() async {
+    if (kIsWeb) {
+      state = state.withPrices(
+        priceStatus: PriceStatus.unavailable,
+        priceError: 'Aankopen zijn niet beschikbaar in de webversie.',
+      );
+      return;
+    }
+
+    // The SDK is configured in main.dart and only when a key was supplied. No
+    // key means no store connection at all, and every call below would throw
+    // an opaque platform error - so say what is actually wrong instead.
+    if (RevenueCatConfig.sdkPublicApiKey().isEmpty) {
+      _log('No RevenueCat SDK key in this build (${RevenueCatConfig.sdkKeySource()}).');
+      state = state.withPrices(
+        priceStatus: PriceStatus.unavailable,
+        priceError:
+            'Deze build bevat geen winkelconfiguratie, dus prijzen kunnen niet '
+            'worden opgehaald.',
+      );
+      return;
+    }
+
+    state = state.withPrices(
+      priceStatus: PriceStatus.loading,
+      packages: state.packages,
+      monthlyProduct: state.monthlyProduct,
+      yearlyProduct: state.yearlyProduct,
+    );
+
     try {
       _log('Loading packages and customer info...');
       final packages = await _svc.getPackages();
+      var monthly = _svc.findMonthlyPackage(packages)?.storeProduct;
+      var yearly = _svc.findYearlyPackage(packages)?.storeProduct;
+
+      // The offering is the usual source, but it is also the usual thing to be
+      // misconfigured. Falling back to a direct product lookup means a missing
+      // or empty "current" offering costs the packaging, not the prices.
+      if (monthly == null || yearly == null) {
+        _log('Offering incomplete (monthly=${monthly != null}, yearly=${yearly != null}); '
+            'falling back to a direct product lookup.');
+        final direct = await _svc.getProductsById(const [
+          kRcMonthlyProductId,
+          kRcYearlyProductId,
+        ]);
+        monthly ??= direct[kRcMonthlyProductId];
+        yearly ??= direct[kRcYearlyProductId];
+      }
+
       final info = await _svc.getCustomerInfo();
-      state = state.copyWith(packages: packages, customerInfo: info);
-      _log(
-        'Loaded ${packages.length} package(s); isPro=${info.entitlements.active.containsKey(kRcProEntitlement)}',
+      final found = monthly != null || yearly != null;
+      state = state.withPrices(
+        priceStatus: found ? PriceStatus.ready : PriceStatus.unavailable,
+        priceError: found
+            ? null
+            : 'De App Store gaf geen abonnementen terug. Controleer of de '
+                  'producten actief en goedgekeurd zijn.',
+        packages: packages,
+        monthlyProduct: monthly,
+        yearlyProduct: yearly,
+        customerInfo: info,
       );
-    } catch (_) {
-      // Graceful degradation on web/simulator.
-      _log('Failed to load packages/customer info.');
+      _log(
+        'Prices: monthly=${monthly?.priceString ?? '(none)'} '
+        'yearly=${yearly?.priceString ?? '(none)'} '
+        'from ${packages.length} package(s); '
+        'isPro=${info.entitlements.active.containsKey(kRcProEntitlement)}',
+      );
+    } catch (e) {
+      _log('Failed to load prices: $e');
+      state = state.withPrices(
+        priceStatus: PriceStatus.unavailable,
+        priceError: 'Prijzen konden niet worden geladen. Controleer je verbinding.',
+      );
     }
   }
 

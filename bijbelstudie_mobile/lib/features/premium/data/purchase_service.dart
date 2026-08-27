@@ -63,6 +63,22 @@ class PurchaseService {
     return packages;
   }
 
+  /// Store products looked up by id, keyed by id.
+  ///
+  /// The offering is the right source of truth for packaging, but it is also
+  /// the part most likely to be misconfigured: an offering that is not marked
+  /// "current", or one whose packages were never attached, yields zero
+  /// packages and therefore no prices at all. Asking the store for the two
+  /// product ids directly is a second, independent route to the same numbers,
+  /// and it works as long as the products themselves exist and are approved.
+  Future<Map<String, StoreProduct>> getProductsById(List<String> ids) async {
+    if (kIsWeb) return const {};
+    _log('Fetching products directly: ${ids.join(', ')}');
+    final products = await Purchases.getProducts(ids);
+    _log('Store returned ${products.length} product(s) for ${ids.length} id(s).');
+    return {for (final product in products) product.identifier: product};
+  }
+
   Package? findMonthlyPackage(List<Package> packages) {
     return _findPackage(
       packages,

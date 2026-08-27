@@ -162,57 +162,65 @@ class _StubDashboardRepository implements DashboardRepository {
 class _StubPremiumController extends PremiumController {
   static const _context = PresentedOfferingContext('default', null, null);
 
-  static Package _package(
-    String packageId,
-    PackageType type,
+  static StoreProduct _product(
     String productId,
     double price,
     String priceString,
     String title,
     String period,
   ) {
-    return Package(
-      packageId,
-      type,
-      StoreProduct(
-        productId,
-        'BijbelStudie Pro',
-        title,
-        price,
-        priceString,
-        'EUR',
-        subscriptionPeriod: period,
-        presentedOfferingContext: _context,
-      ),
-      _context,
+    return StoreProduct(
+      productId,
+      'BijbelStudie Pro',
+      title,
+      price,
+      priceString,
+      'EUR',
+      subscriptionPeriod: period,
+      presentedOfferingContext: _context,
     );
   }
 
+  static Package _package(String packageId, PackageType type, StoreProduct product) {
+    return Package(packageId, type, product, _context);
+  }
+
+  static final StoreProduct _monthly = _product(
+    'bijbelstudie_pro_monthly',
+    9.99,
+    '€ 9,99',
+    'BijbelStudie Pro maandelijks',
+    'P1M',
+  );
+
+  static final StoreProduct _yearly = _product(
+    'bijbelstudie_pro_yearly',
+    69.99,
+    '€ 69,99',
+    'BijbelStudie Pro jaarlijks',
+    'P1Y',
+  );
+
   @override
   PremiumState build() {
+    // `priceStatus: ready` with both products present is what a store that
+    // answered looks like. Leaving it at the default (`loading`) would put the
+    // paywall's buy button in its spinner state, which never settles and is
+    // not a screenshot anyone wants on the App Store.
     return PremiumState(
+      priceStatus: PriceStatus.ready,
+      monthlyProduct: _monthly,
+      yearlyProduct: _yearly,
       packages: [
-        _package(
-          r'$rc_monthly',
-          PackageType.monthly,
-          'bijbelstudie_pro_monthly',
-          9.99,
-          '€ 9,99',
-          'BijbelStudie Pro maandelijks',
-          'P1M',
-        ),
-        _package(
-          r'$rc_annual',
-          PackageType.annual,
-          'bijbelstudie_pro_yearly',
-          69.99,
-          '€ 69,99',
-          'BijbelStudie Pro jaarlijks',
-          'P1Y',
-        ),
+        _package(r'$rc_monthly', PackageType.monthly, _monthly),
+        _package(r'$rc_annual', PackageType.annual, _yearly),
       ],
     );
   }
+
+  /// The screenshot host must never reach the real store.
+  @override
+  Future<void> loadPrices() async {}
 }
 
 /// `PreviewData.dashboard` greets "Preview Gebruiker"; a store screenshot

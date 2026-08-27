@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../feedback/present/feedback_sheet.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import 'profile_provider.dart';
@@ -58,7 +59,10 @@ class _ProfileBody extends ConsumerWidget {
         const SizedBox(height: 4),
         Text(profile.email, style: AppTheme.bodyMuted),
         const SizedBox(height: 20),
-        _ProStatusCard(profile: profile),
+        TourAnchor(
+          id: TourAnchorIds.profilePro,
+          child: _ProStatusCard(profile: profile),
+        ),
 
         // The website's sidebar sections that have no tab of their own.
         const SizedBox(height: 28),

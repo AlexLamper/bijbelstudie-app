@@ -10,12 +10,18 @@ import '../../dashboard/data/dashboard_repository.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/bible_repository.dart';
 import '../domain/bible_models.dart';
+import '../domain/version_catalog.dart';
 
 /// Same Riverpod vocabulary as the reference app: a `Repository` that takes the
 /// `ApiClient`, exposed through `FutureProvider.autoDispose.family`.
 
-final bibleVersionsProvider = FutureProvider.autoDispose<List<BibleSource>>((ref) {
-  return ref.watch(bibleRepositoryProvider).getVersions();
+/// Every translation the server will serve this client, in the app's own
+/// display order rather than the manifest's - see [VersionCatalog]. Sorted
+/// here rather than in each picker so the setup wizard, the reader's version
+/// sheet and anything added later cannot disagree about the order.
+final bibleVersionsProvider = FutureProvider.autoDispose<List<BibleSource>>((ref) async {
+  final versions = await ref.watch(bibleRepositoryProvider).getVersions();
+  return VersionCatalog.sorted(versions);
 });
 
 final commentarySourcesProvider = FutureProvider.autoDispose<List<BibleSource>>((ref) {
@@ -274,6 +280,24 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
     if (remote == null) return false;
     if (local == null) return true;
     return remote.isAfter(local);
+  }
+
+  /// Applies a translation chosen outside the reader - the setup wizard - to
+  /// both the stored preference and the reader itself.
+  ///
+  /// Deliberately not [openChapter]: that pins the reader and writes a reading
+  /// position, which would stamp "Genesis 1, just now" over a position this
+  /// account may already have on the website. This only says which translation
+  /// to open in; where to open stays whatever [_hydrate] works out.
+  ///
+  /// It does not set `restored`. If hydration is still in flight it will
+  /// finish and read `lastVersionId` back out - the value just written - so
+  /// the answer is the same either way round.
+  void applyPreferredVersion(String versionId) {
+    unawaited(ref.read(readingSettingsProvider.notifier).setLastVersion(versionId));
+    if (state.versionId != versionId) {
+      state = state.copyWith(versionId: versionId);
+    }
   }
 
   void openChapter({String? versionId, String? book, int? chapter}) {

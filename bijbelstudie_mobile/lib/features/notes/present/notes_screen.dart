@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
@@ -40,14 +41,17 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
               padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Align(alignment: Alignment.centerLeft, child: Eyebrow('Jouw studie')),
             ),
-            TabBar(
-              controller: _tabController,
-              labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
-              tabs: const [
-                Tab(text: 'Notities'),
-                Tab(text: 'Markeringen'),
-                Tab(text: 'Bladwijzers'),
-              ],
+            TourAnchor(
+              id: TourAnchorIds.notesTabs,
+              child: TabBar(
+                controller: _tabController,
+                labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'Notities'),
+                  Tab(text: 'Markeringen'),
+                  Tab(text: 'Bladwijzers'),
+                ],
+              ),
             ),
             const RuleLine(),
             Expanded(

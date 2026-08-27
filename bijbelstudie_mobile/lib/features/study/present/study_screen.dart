@@ -9,9 +9,11 @@ import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_pane.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/context_repository.dart';
+import 'study_pane_controller.dart';
 
 /// `/studie` on www.bijbel-studie.com.
 ///
@@ -27,10 +29,13 @@ class StudyScreen extends ConsumerStatefulWidget {
 }
 
 class _StudyScreenState extends ConsumerState<StudyScreen> {
-  bool _showMaterials = false;
-
   @override
   Widget build(BuildContext context) {
+    // Held in a provider rather than local state so the guided tour can walk
+    // from the bible text to the study materials - see StudyPaneController.
+    final showMaterials = ref.watch(
+      studyPaneProvider.select((pane) => pane.showMaterials),
+    );
     // An IndexedStack builds every child, so the materials pane used to mount
     // during the brief window before the reader knows where it is - firing its
     // fetches at the Genesis 1 placeholder and then again at the real chapter.
@@ -46,15 +51,20 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
         bottom: false,
         child: Column(
           children: [
-            _PaneSwitcher(
-              showMaterials: _showMaterials,
-              onChanged: (value) => setState(() => _showMaterials = value),
+            TourAnchor(
+              id: TourAnchorIds.studyPaneSwitcher,
+              child: _PaneSwitcher(
+                showMaterials: showMaterials,
+                onChanged: (value) => value
+                    ? ref.read(studyPaneProvider.notifier).showMaterials()
+                    : ref.read(studyPaneProvider.notifier).showReader(),
+              ),
             ),
             Expanded(
               // IndexedStack so switching panes does not lose the reader's
               // scroll offset or an in-flight AI answer.
               child: IndexedStack(
-                index: _showMaterials ? 1 : 0,
+                index: showMaterials ? 1 : 0,
                 children: [
                   const ReadScreen(),
                   if (restored)
@@ -177,7 +187,23 @@ class StudyMaterialsPane extends ConsumerStatefulWidget {
 
 class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 5, vsync: this);
+  late final TabController _tabController = TabController(
+    length: 5,
+    vsync: this,
+    initialIndex: ref.read(studyPaneProvider).materialsTab,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // Two-way: a swipe or a tap on the tab bar writes back, so the provider is
+    // never stale when the tour reads it, and the tour writing to the provider
+    // moves the tabs (see the listen in build).
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      ref.read(studyPaneProvider.notifier).setMaterialsTab(_tabController.index);
+    });
+  }
 
   @override
   void dispose() {
@@ -187,6 +213,10 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(studyPaneProvider.select((pane) => pane.materialsTab), (_, tab) {
+      if (tab != _tabController.index) _tabController.animateTo(tab);
+    });
+
     final location = ref.watch(readerLocationProvider);
     final settings = ref.watch(readingSettingsProvider);
     final isPro = ref.watch(profileProvider).value?.isPro ?? false;
@@ -200,30 +230,33 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
               bottom: BorderSide(color: Theme.of(context).colorScheme.outline),
             ),
           ),
-          child: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
-            tabs: [
-              const Tab(height: 42, text: 'Commentaar'),
-              Tab(
-                height: 42,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Grondtekst'),
-                    if (!isPro) ...[
-                      const SizedBox(width: 5),
-                      const Icon(Icons.lock_outline, size: 12),
+          child: TourAnchor(
+            id: TourAnchorIds.studyMaterialsTabs,
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
+              tabs: [
+                const Tab(height: 42, text: 'Commentaar'),
+                Tab(
+                  height: 42,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Grondtekst'),
+                      if (!isPro) ...[
+                        const SizedBox(width: 5),
+                        const Icon(Icons.lock_outline, size: 12),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Tab(height: 42, text: 'Algemene info'),
-              const Tab(height: 42, text: 'Notities'),
-              const Tab(height: 42, text: 'AI-assistent'),
-            ],
+                const Tab(height: 42, text: 'Algemene info'),
+                const Tab(height: 42, text: 'Notities'),
+                const Tab(height: 42, text: 'AI-assistent'),
+              ],
+            ),
           ),
         ),
         Expanded(

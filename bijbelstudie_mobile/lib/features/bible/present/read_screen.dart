@@ -13,6 +13,7 @@ import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
@@ -173,22 +174,28 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
         bottom: false,
         child: Column(
           children: [
-            _ReaderBar(location: location),
+            TourAnchor(
+              id: TourAnchorIds.readerBar,
+              child: _ReaderBar(location: location),
+            ),
             const RuleLine(),
             Expanded(
-              child: chapterAsync.when(
-                loading: () => const AppLoader(),
-                error: (error, _) => _ReaderError(error: error),
-                data: (chapter) {
-                  _recordChapterOpen(location);
-                  _restoreScrollIfNeeded(location, positions);
-                  return _ChapterBody(
-                    chapter: chapter,
-                    settings: settings,
-                    scrollController: _scrollController,
-                    onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
-                  );
-                },
+              child: TourAnchor(
+                id: TourAnchorIds.readerText,
+                child: chapterAsync.when(
+                  loading: () => const AppLoader(),
+                  error: (error, _) => _ReaderError(error: error),
+                  data: (chapter) {
+                    _recordChapterOpen(location);
+                    _restoreScrollIfNeeded(location, positions);
+                    return _ChapterBody(
+                      chapter: chapter,
+                      settings: settings,
+                      scrollController: _scrollController,
+                      onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
+                    );
+                  },
+                ),
               ),
             ),
             const RuleLine(),
@@ -225,6 +232,23 @@ class _ReaderBar extends ConsumerWidget {
     final version = versions
         .where((v) => v.id == location.versionId)
         .firstOrNull;
+
+    // A translation can leave the app between releases - Luther 1912 was
+    // dropped from the mobile allowlist - and the id the reader last used is
+    // stored on the device. Without this, such a device opens on "Niet
+    // beschikbaar in de app" every launch and stays there until the reader
+    // works out that the answer is hidden behind the translate icon. Falling
+    // back to the first translation the server does offer costs nothing when
+    // the stored one is still valid, because then `version` is not null.
+    if (versions.isNotEmpty && version == null) {
+      // Captured now: a post-frame callback must not reach back through `ref`,
+      // which is unsafe the moment this widget is gone.
+      final controller = ref.read(readerLocationProvider.notifier);
+      final fallback = versions.first.id;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => controller.applyPreferredVersion(fallback),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),

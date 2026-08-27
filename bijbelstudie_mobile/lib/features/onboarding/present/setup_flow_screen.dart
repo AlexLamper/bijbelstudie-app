@@ -7,6 +7,7 @@ import '../../../core/notifications/reminder_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
+import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/onboarding_storage.dart';
@@ -182,8 +183,24 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
 /// off [ReadingSettingsController] rather than staged in local state, so
 /// tapping a row takes effect immediately, exactly as the reader would expect
 /// if it changed the same setting from Instellingen.
+///
+/// The list is grouped by language ([VersionCatalog]): Dutch first, then a
+/// rule and a heading before the English ones, so it is obvious at a glance
+/// where the Dutch translations stop.
 class _TranslationStep extends ConsumerWidget {
   const _TranslationStep();
+
+  /// Applies the choice to the reader as well as to the stored preference.
+  ///
+  /// [ReadingSettingsController.setLastVersion] alone was not enough: nothing
+  /// re-reads it once [ReaderLocationController] has hydrated, and the splash
+  /// screen deliberately hydrates the reader *before* it works out that this
+  /// user still owes the setup wizard. So the translation picked here was
+  /// written to disk, shown as selected, and then ignored for the rest of the
+  /// session - the reader opened whatever it had already settled on.
+  void _select(WidgetRef ref, String versionId) {
+    ref.read(readerLocationProvider.notifier).applyPreferredVersion(versionId);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -217,23 +234,65 @@ class _TranslationStep extends ConsumerWidget {
               'instellen bij Instellingen.',
               style: AppTheme.bodyMuted,
             ),
-            data: (versions) => Column(
-              children: [
-                for (final version in versions) ...[
-                  _SelectableRow(
-                    title: version.name,
-                    subtitle: version.attribution,
-                    selected: version.id == selected,
-                    onTap: () => ref
-                        .read(readingSettingsProvider.notifier)
-                        .setLastVersion(version.id),
-                  ),
-                  const SizedBox(height: 10),
+            data: (versions) {
+              final groups = VersionCatalog.grouped(versions);
+              return Column(
+                children: [
+                  for (var g = 0; g < groups.length; g++) ...[
+                    // No heading above the first group: the screen's own
+                    // question already says these are Bible translations, and
+                    // a "Nederlands" label above the very first row reads as
+                    // noise. The separator earns its place only where the
+                    // language actually changes.
+                    if (g > 0) _LanguageSeparator(label: groups[g].label),
+                    for (final version in groups[g].versions) ...[
+                      _SelectableRow(
+                        title: version.name,
+                        subtitle: version.attribution,
+                        selected: version.id == selected,
+                        onTap: () => _select(ref, version.id),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
                 ],
-              ],
-            ),
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A hairline with the language name sitting on it, drawn between two
+/// language groups in the translation list. Same rule colour and eyebrow type
+/// as every other divider in the app, so it reads as structure rather than as
+/// another option.
+class _LanguageSeparator extends StatelessWidget {
+  const _LanguageSeparator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 18),
+        child: Row(
+          children: [
+            const Expanded(child: RuleLine()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              // Eyebrow, not a bare Text: it carries the app's uppercase
+              // treatment for section labels, and reusing it keeps this
+              // divider looking like every other one.
+              child: Eyebrow(label, compact: true),
+            ),
+            const Expanded(child: RuleLine()),
+          ],
+        ),
       ),
     );
   }

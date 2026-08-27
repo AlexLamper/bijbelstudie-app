@@ -8,7 +8,6 @@ import '../../../core/ui/app_widgets.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../profile/data/profile_model.dart';
 import '../../profile/present/profile_provider.dart';
-import '../data/purchase_service.dart';
 import '../domain/price_framing.dart';
 import 'premium_controller.dart';
 
@@ -44,6 +43,17 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       'source': widget.source ?? 'direct',
       'logged_in': 'yes',
     });
+
+    // The controller loads prices once for the whole app run, so a load that
+    // failed at launch would otherwise leave this screen showing "-" forever.
+    // Re-entering the paywall is exactly the moment to try again; a load that
+    // already succeeded is left alone.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (ref.read(premiumControllerProvider).priceStatus == PriceStatus.unavailable) {
+        ref.read(premiumControllerProvider.notifier).loadPrices();
+      }
+    });
   }
 
   void _selectPlan(_ProPlan plan) {
@@ -75,13 +85,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     final profile = ref.watch(profileProvider).value;
     final isLoading = premiumState.status == PurchaseStatus.loading;
 
-    final service = ref.read(purchaseServiceProvider);
-    final monthlyPackage = service.findMonthlyPackage(premiumState.packages);
-    final yearlyPackage = service.findYearlyPackage(premiumState.packages);
-    final monthlyProduct = monthlyPackage?.storeProduct;
-    final yearlyProduct = yearlyPackage?.storeProduct;
-    final monthlyPrice = monthlyProduct?.priceString ?? '-';
-    final yearlyPrice = yearlyProduct?.priceString ?? '-';
+    // Resolved by the controller from the current offering, or by a direct
+    // product lookup when the offering could not supply them.
+    final monthlyProduct = premiumState.monthlyProduct;
+    final yearlyProduct = premiumState.yearlyProduct;
+    final pricesLoading = premiumState.priceStatus == PriceStatus.loading;
+    // A dash is honest while the store is still answering; it is not an
+    // acceptable resting state, which is what `_PriceNotice` below is for.
+    final placeholder = pricesLoading ? '...' : '-';
+    final monthlyPrice = monthlyProduct?.priceString ?? placeholder;
+    final yearlyPrice = yearlyProduct?.priceString ?? placeholder;
 
     // Derived from the live App Store prices, so the storefront's own currency
     // and tier are always what the customer is shown. Null when either product
@@ -104,6 +117,15 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           else ...[
             const _Benefits(),
             const SizedBox(height: 24),
+            if (premiumState.priceStatus == PriceStatus.unavailable) ...[
+              _PriceNotice(
+                message: premiumState.priceError ??
+                    'Prijzen konden niet worden geladen.',
+                onRetry: () =>
+                    ref.read(premiumControllerProvider.notifier).loadPrices(),
+              ),
+              const SizedBox(height: 16),
+            ],
             // Annual leads, in the widget order as well as by default selection.
             _PlanTile(
               title: 'Jaarlijks',
@@ -138,8 +160,15 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             const SizedBox(height: 20),
             SiteButton(
               label: 'Pro nemen',
-              loading: isLoading,
-              onPressed: isLoading
+              loading: isLoading || pricesLoading,
+              // Without a price for the selected plan there is no product to
+              // buy, so the tap can only end in an error dialog. Saying that
+              // up front beats staging a purchase that cannot start.
+              onPressed: isLoading ||
+                      pricesLoading ||
+                      (_selectedPlan == _ProPlan.monthly
+                          ? monthlyProduct == null
+                          : yearlyProduct == null)
                   ? null
                   : () {
                       final notifier = ref.read(premiumControllerProvider.notifier);
@@ -187,6 +216,45 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   Future<void> _open(String url) async {
     final uri = Uri.tryParse(url);
     if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// Shown in place of a price when the store had none to give.
+///
+/// The paywall used to render a bare `-` for every one of these cases, which
+/// reads as a bug and leaves the reader with nothing to do about it. This says
+/// what happened and offers the one action that can fix a transient cause.
+class _PriceNotice extends StatelessWidget {
+  const _PriceNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      borderColor: AppTheme.flame,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.error_outline, size: 16, color: AppTheme.flame),
+              const SizedBox(width: 8),
+              Text('Prijzen niet beschikbaar', style: AppTheme.bodyStrong),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(message, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
+          const SizedBox(height: 12),
+          SiteOutlineButton(
+            label: 'Opnieuw proberen',
+            expand: false,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
   }
 }
 

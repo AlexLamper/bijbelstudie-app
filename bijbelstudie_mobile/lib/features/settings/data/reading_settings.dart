@@ -207,6 +207,12 @@ final readingSettingsProvider =
 class ReadingSettingsController extends Notifier<ReadingSettings> {
   final Completer<void> _loaded = Completer<void>();
 
+  /// True once any setter has run. The disk read in [build] is asynchronous,
+  /// so without this a choice made while it is still in flight - the setup
+  /// wizard's first screen is often what triggers the read in the first place
+  /// - would be silently overwritten by the stored value a moment later.
+  bool _written = false;
+
   /// Completes once the first read from disk is done, successfully or not.
   ///
   /// [build] returns the defaults and fills them in a moment later, so anything
@@ -233,6 +239,10 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
 
   Future<void> _readInto() async {
     final prefs = await SharedPreferences.getInstance();
+    // A setter beat the disk read. Whatever it wrote is both newer and already
+    // persisted, so replaying the stored snapshot over it would undo a choice
+    // the user has just watched take effect.
+    if (_written) return;
     final storedAt = prefs.getInt(_kLastLocationAt);
     state = ReadingSettings(
       fontSize: ReaderFontSizeX.fromId(prefs.getString(_kFontSize)),
@@ -256,26 +266,31 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
   }
 
   Future<void> setFontSize(ReaderFontSize value) async {
+    _written = true;
     state = state.copyWith(fontSize: value);
     (await SharedPreferences.getInstance()).setString(_kFontSize, value.id);
   }
 
   Future<void> setLineHeight(ReaderLineHeight value) async {
+    _written = true;
     state = state.copyWith(lineHeight: value);
     (await SharedPreferences.getInstance()).setString(_kLineHeight, value.id);
   }
 
   Future<void> setFontFamily(ReaderFontFamily value) async {
+    _written = true;
     state = state.copyWith(fontFamily: value);
     (await SharedPreferences.getInstance()).setString(_kFontFamily, value.id);
   }
 
   Future<void> setShowVerseNumbers(bool value) async {
+    _written = true;
     state = state.copyWith(showVerseNumbers: value);
     (await SharedPreferences.getInstance()).setBool(_kVerseNumbers, value);
   }
 
   Future<void> setThemeMode(ThemeMode value) async {
+    _written = true;
     state = state.copyWith(themeMode: value);
     final id = switch (value) {
       ThemeMode.light => 'light',
@@ -286,6 +301,7 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
   }
 
   Future<void> setDailyReminder(int? minutesPastMidnight) async {
+    _written = true;
     state = state.copyWith(
       dailyReminderMinutes: minutesPastMidnight,
       clearReminder: minutesPastMidnight == null,
@@ -299,12 +315,14 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
   }
 
   Future<void> setLastVersion(String versionId) async {
+    _written = true;
     if (state.lastVersionId == versionId) return;
     state = state.copyWith(lastVersionId: versionId);
     (await SharedPreferences.getInstance()).setString(_kLastVersion, versionId);
   }
 
   Future<void> setLastCommentary(String commentaryId) async {
+    _written = true;
     if (state.lastCommentaryId == commentaryId) return;
     state = state.copyWith(lastCommentaryId: commentaryId);
     (await SharedPreferences.getInstance()).setString(_kLastCommentary, commentaryId);
@@ -317,6 +335,7 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
   /// on a device that has both, so it is refreshed even when the chapter has
   /// not changed.
   Future<void> setLastLocation({required String book, required int chapter}) async {
+    _written = true;
     final now = DateTime.now();
     state = state.copyWith(lastBook: book, lastChapter: chapter, lastLocationAt: now);
     final prefs = await SharedPreferences.getInstance();

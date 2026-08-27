@@ -12,6 +12,7 @@ import 'core/config/app_config.dart';
 import 'core/config/preview_config.dart';
 import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
+import 'features/onboarding/present/tour_overlay.dart';
 import 'features/settings/data/reading_settings.dart';
 
 Future<void> _initRevenueCat() async {
@@ -146,6 +147,10 @@ class BijbelStudieApp extends ConsumerWidget {
       darkTheme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
       routerConfig: routerConfig,
+      // The guided tour paints a spotlight over the running app, so it has to
+      // sit above the router's Navigator - including the bottom tab bar, which
+      // two of its steps point at. It builds nothing while the tour is off.
+      builder: (context, child) => TourHost(child: child ?? const SizedBox.shrink()),
     );
   }
 }

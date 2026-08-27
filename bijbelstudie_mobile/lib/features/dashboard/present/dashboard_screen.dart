@@ -6,6 +6,7 @@ import '../../../core/data/bible_books.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
@@ -136,18 +137,21 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _HeroCard(
-                lastRead: data.lastRead,
-                onContinue: () {
-                  final last = data.lastRead;
-                  _openChapter(
-                    context,
-                    ref,
-                    book: last?.book ?? 'Genesis',
-                    chapter: last?.chapter ?? 1,
-                    version: last?.version ?? 'statenvertaling',
-                  );
-                },
+              TourAnchor(
+                id: TourAnchorIds.dashboardHero,
+                child: _HeroCard(
+                  lastRead: data.lastRead,
+                  onContinue: () {
+                    final last = data.lastRead;
+                    _openChapter(
+                      context,
+                      ref,
+                      book: last?.book ?? 'Genesis',
+                      chapter: last?.chapter ?? 1,
+                      version: last?.version ?? 'statenvertaling',
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 16),
 
