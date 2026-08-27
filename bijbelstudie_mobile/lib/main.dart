@@ -112,6 +112,10 @@ class BijbelStudieApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Must be watched before any screen can make an authenticated request -
+    // it is what turns a dead refresh token into an actual sign-out instead
+    // of tokens quietly vanishing while the app keeps acting logged in.
+    ref.watch(sessionExpiryWiringProvider);
     final routerConfig = ref.watch(routerProvider);
 
     // Light only, deliberately.

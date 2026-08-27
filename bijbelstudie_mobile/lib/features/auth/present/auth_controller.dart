@@ -80,6 +80,23 @@ class AuthController extends AsyncNotifier<User?> {
     }
   }
 
+  /// Pushes anything queued while signed out.
+  ///
+  /// Without this, only [restoreSession] ever flushed the queue - a device
+  /// that writes a note offline, then logs out and straight back in (or logs
+  /// into a second account), would leave that write stuck until the next app
+  /// launch. `listNotes`/`listBookmarks`/etc. already merge the local queue in
+  /// so nothing is invisible meanwhile, but the server itself, and any other
+  /// device on the same account, should not have to wait for a relaunch.
+  Future<void> _flushPendingAfterSignIn() async {
+    try {
+      await ref.read(notesRepositoryProvider).flushPendingChanges();
+    } catch (_) {
+      // Best-effort: a fresh login is not blocked on this, and the next
+      // successful write or app launch will try again.
+    }
+  }
+
   /// Restore a persisted session on app launch.
   ///
   /// Without this, a returning user (token already stored) reaches the app
@@ -127,6 +144,7 @@ class AuthController extends AsyncNotifier<User?> {
       final repository = ref.read(authRepositoryProvider);
       final user = await repository.login(email, password);
       await _linkRevenueCat(user);
+      await _flushPendingAfterSignIn();
       state = AsyncValue.data(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -139,6 +157,7 @@ class AuthController extends AsyncNotifier<User?> {
       final repository = ref.read(authRepositoryProvider);
       final user = await repository.register(name, email, password);
       await _linkRevenueCat(user);
+      await _flushPendingAfterSignIn();
       state = AsyncValue.data(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -194,6 +213,7 @@ class AuthController extends AsyncNotifier<User?> {
     final repository = ref.read(authRepositoryProvider);
     final user = await repository.loginWithGoogle(idToken);
     await _linkRevenueCat(user);
+    await _flushPendingAfterSignIn();
     state = AsyncValue.data(user);
   }
 
@@ -229,6 +249,7 @@ class AuthController extends AsyncNotifier<User?> {
         email: credential.email,
       );
       await _linkRevenueCat(user);
+      await _flushPendingAfterSignIn();
       state = AsyncValue.data(user);
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
@@ -291,6 +312,16 @@ class AuthController extends AsyncNotifier<User?> {
         redirectUri: redirectUri,
       ),
     );
+  }
+
+  /// Called when [ApiClient.onSessionExpired] fires - the refresh token is
+  /// dead and `_storage.clear()` already ran. Only the in-memory state needs
+  /// to catch up: without this the app kept rendering as if the account were
+  /// still signed in while every authenticated request 401'd and every write
+  /// was silently queued as if it were an offline blip.
+  void signOutExpiredSession() {
+    if (state.value == null) return; // already signed out
+    state = const AsyncValue.data(null);
   }
 
   Future<void> logout() async {

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/primary_button.dart';
 import '../../../core/ui/custom_text_field.dart';
+import '../../onboarding/data/onboarding_gate.dart';
 import 'auth_controller.dart';
 import 'widgets/google_sign_in_button.dart';
 import 'widgets/user_data_info_link.dart';
@@ -23,7 +24,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  /// Whether the in-flight auth call is the plain register form rather than
+  /// "Verder met Google" below - the latter can just as well sign an
+  /// *existing* Google-linked account back in, so only this form is a
+  /// guaranteed-new account that can skip straight to the setup wizard
+  /// without asking the server first.
+  bool _isRegisterAction = false;
+
   Future<void> _register() async {
+    _isRegisterAction = true;
     final auth = ref.read(authControllerProvider.notifier);
     await auth.register(
       _nameController.text,
@@ -33,6 +42,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _registerWithGoogle() async {
+    _isRegisterAction = false;
     final auth = ref.read(authControllerProvider.notifier);
     await auth.signInWithGoogle();
   }
@@ -41,7 +51,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.hasValue && next.value != null) {
-        context.go('/dashboard');
+        resolvePostAuthRoute(ref, isNewAccount: _isRegisterAction).then((route) {
+          if (context.mounted) context.go(route);
+        });
       } else if (next.hasError) {
         final msg = next.error.toString();
         ScaffoldMessenger.of(context).showSnackBar(

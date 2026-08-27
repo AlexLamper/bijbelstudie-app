@@ -178,9 +178,16 @@ class _BookmarksTab extends ConsumerWidget {
                     tooltip: 'Bladwijzer verwijderen',
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () async {
-                      await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
-                      ref.invalidate(bookmarksProvider);
-                      await HapticFeedback.selectionClick();
+                      try {
+                        await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
+                        ref.invalidate(bookmarksProvider);
+                        await HapticFeedback.selectionClick();
+                      } on SyncRejectedException catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text(e.message)));
+                        }
+                      }
                     },
                   ),
                 ],
@@ -241,9 +248,18 @@ class _NoteTile extends ConsumerWidget {
                 tooltip: 'Verwijderen',
                 icon: const Icon(Icons.delete_outline, size: 16),
                 onPressed: () async {
-                  await ref.read(notesRepositoryProvider).deleteNote(note);
-                  ref.invalidate(note.isHighlight ? highlightsListProvider : notesListProvider);
-                  await HapticFeedback.selectionClick();
+                  try {
+                    await ref.read(notesRepositoryProvider).deleteNote(note);
+                    ref.invalidate(
+                      note.isHighlight ? highlightsListProvider : notesListProvider,
+                    );
+                    await HapticFeedback.selectionClick();
+                  } on SyncRejectedException catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(e.message)));
+                    }
+                  }
                 },
               ),
             ],

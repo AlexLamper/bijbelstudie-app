@@ -95,6 +95,13 @@ class _ProfileBody extends ConsumerWidget {
               child: const _NavRow(icon: Icons.tune, label: 'Lezen en meldingen'),
             ),
             RuleListTile(
+              onTap: () => context.push('/tour'),
+              child: const _NavRow(
+                icon: Icons.explore_outlined,
+                label: 'Rondleiding opnieuw bekijken',
+              ),
+            ),
+            RuleListTile(
               onTap: () => showFeedbackSheet(context, ref),
               child: const _NavRow(
                 icon: Icons.chat_bubble_outline,

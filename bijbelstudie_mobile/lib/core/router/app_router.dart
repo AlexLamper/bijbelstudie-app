@@ -6,8 +6,11 @@ import '../config/preview_config.dart';
 import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 
+import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
+import '../../features/onboarding/present/setup_flow_screen.dart';
+import '../../features/onboarding/present/tour_screen.dart';
 import '../../features/auth/present/login_screen.dart';
 import '../../features/auth/present/register_screen.dart';
 import '../../features/bible/present/read_screen.dart';
@@ -154,11 +157,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) =>
+            LoginScreen(sessionExpired: state.uri.queryParameters['expired'] == '1'),
+      ),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
+      // Post-registration setup and the guided tour - see
+      // `resolvePostAuthRoute` for who is sent here and when. Both sit outside
+      // the shell (full screen, no bottom nav) like `/onboarding`; `/tour` is
+      // also reachable later via push from Profiel, hence no bottom nav there
+      // either even on a replay.
+      GoRoute(
+        path: '/setup',
+        builder: (context, state) => const SetupFlowScreen(),
+      ),
+      GoRoute(path: '/tour', builder: (context, state) => const TourScreen()),
       ShellRoute(
         builder: (context, state, child) => MainScaffold(child: child),
         routes: [
@@ -226,6 +243,24 @@ final routerProvider = Provider<GoRouter>((ref) {
     // being unresponsive.
     errorBuilder: (context, state) => _RouteNotFound(location: state.uri.path),
   );
+});
+
+/// Wires [ApiClient.onSessionExpired] to actually sign the user out.
+///
+/// `ApiClient` clears the stored tokens itself the moment a refresh fails, but
+/// nothing used to be listening: the in-memory auth state stayed "signed in"
+/// and the user kept looking at an app that worked, while every authenticated
+/// request 401'd and every note, highlight, bookmark or reading position
+/// written from then on was silently queued as if it were an offline blip.
+/// `main.dart` reads this provider once, before the splash screen can make
+/// its first authenticated request, so the hook is always set in time.
+final sessionExpiryWiringProvider = Provider<void>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  final router = ref.watch(routerProvider);
+  apiClient.onSessionExpired = () {
+    ref.read(authControllerProvider.notifier).signOutExpiredSession();
+    router.go('/login?expired=1');
+  };
 });
 
 class _RouteNotFound extends StatelessWidget {

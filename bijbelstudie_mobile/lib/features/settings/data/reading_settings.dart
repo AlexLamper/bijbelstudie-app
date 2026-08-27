@@ -72,6 +72,17 @@ extension ReaderLineHeightX on ReaderLineHeight {
   );
 }
 
+extension ReaderLineHeightSyncX on ReaderLineHeight {
+  /// The id to send to `/preferences`.
+  ///
+  /// The website only knows `normal`/`relaxed`/`loose` (`lib/preferenceClasses.ts`)
+  /// and silently falls back to `relaxed` for anything else — so syncing our
+  /// extra `snug` step would turn the reader's tightest setting into its
+  /// second-loosest in the browser. `normal` is the closest thing the website
+  /// can actually render.
+  String get syncId => this == ReaderLineHeight.snug ? 'normal' : id;
+}
+
 extension ReaderFontFamilyX on ReaderFontFamily {
   String get id => switch (this) {
     ReaderFontFamily.sans => 'sans',

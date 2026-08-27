@@ -6,13 +6,19 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/primary_button.dart';
 import '../../../core/ui/custom_text_field.dart';
+import '../../onboarding/data/onboarding_gate.dart';
 import 'auth_controller.dart';
 import 'splash_screen.dart' show BijbelStudieWordmark;
 import 'widgets/google_sign_in_button.dart';
 import 'widgets/user_data_info_link.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.sessionExpired = false});
+
+  /// Set when the router lands here after [ApiClient.onSessionExpired] fired,
+  /// so the reader is told why they are suddenly looking at the login screen
+  /// instead of assuming the app just lost their session for no reason.
+  final bool sessionExpired;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -22,6 +28,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sessionExpired) {
+      // Post-frame: a SnackBar needs a ScaffoldMessenger already in the tree.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Je sessie is verlopen. Log opnieuw in.')),
+        );
+      });
+    }
+  }
 
   Future<void> _login() async {
     final auth = ref.read(authControllerProvider.notifier);
@@ -37,7 +57,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.hasValue && next.value != null) {
-        context.go('/dashboard');
+        // An existing account may already have finished setup and the tour
+        // on the website or another device - resolvePostAuthRoute is what
+        // checks that before deciding to show them again.
+        resolvePostAuthRoute(ref).then((route) {
+          if (context.mounted) context.go(route);
+        });
       } else if (next.hasError) {
         final msg = next.error.toString();
         ScaffoldMessenger.of(context).showSnackBar(

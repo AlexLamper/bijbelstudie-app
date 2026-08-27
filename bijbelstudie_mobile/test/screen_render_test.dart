@@ -24,6 +24,8 @@ import 'package:bijbelstudie_mobile/features/notes/domain/note_models.dart';
 import 'package:bijbelstudie_mobile/features/notes/present/notes_providers.dart';
 import 'package:bijbelstudie_mobile/features/notes/present/notes_screen.dart';
 import 'package:bijbelstudie_mobile/features/onboarding/present/onboarding_screen.dart';
+import 'package:bijbelstudie_mobile/features/onboarding/present/setup_flow_screen.dart';
+import 'package:bijbelstudie_mobile/features/onboarding/present/tour_screen.dart';
 import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
@@ -428,4 +430,60 @@ void main() {
     }
     expect(find.text('Aan de slag'), findsOneWidget);
   });
+
+  testWidgets(
+    'setup wizard walks through translation, reading prefs and reminder',
+    (tester) async {
+      await pumpAtPhoneSize(tester, const SetupFlowScreen());
+      expectNoLayoutError(tester);
+      expect(find.text('Kies je bijbelvertaling'), findsOneWidget);
+      // From the canned bibleVersionsProvider override.
+      expect(find.text('Statenvertaling'), findsOneWidget);
+
+      await tester.tap(find.text('Volgende'));
+      await tester.pumpAndSettle();
+      expectNoLayoutError(tester);
+      expect(find.text('Stel je leesvoorkeuren in'), findsOneWidget);
+      expect(find.text('Tekstgrootte'), findsOneWidget);
+      expect(find.text('Regelafstand'), findsOneWidget);
+
+      await tester.tap(find.text('Volgende'));
+      await tester.pumpAndSettle();
+      expectNoLayoutError(tester);
+      expect(find.text('Wil je een dagelijkse herinnering?'), findsOneWidget);
+      expect(find.text('07:00'), findsOneWidget);
+      // Last step: the button reads "Aan de slag", not "Volgende". Not tapped
+      // - finishing writes to secure storage, which has no test double here.
+      expect(find.text('Aan de slag'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tour walks through the app sections and hides the Pro step for a subscriber',
+    (tester) async {
+      await pumpAtPhoneSize(tester, const TourScreen());
+      expectNoLayoutError(tester);
+      expect(find.text('Je dashboard'), findsOneWidget);
+      // The canned profile is Pro (see `profile` above), so the paywall step
+      // is filtered out: 5 stops, not 6.
+      expect(find.text('Stap 1 van 5'), findsOneWidget);
+
+      for (final title in [
+        'Bijbelstudie',
+        'Begeleide studies',
+        'Je notities',
+        'Je profiel',
+      ]) {
+        await tester.tap(find.text('Volgende'));
+        await tester.pumpAndSettle();
+        expectNoLayoutError(tester);
+        expect(find.text(title), findsOneWidget);
+      }
+
+      expect(find.text('Upgrade naar Pro'), findsNothing);
+      // Last step: not tapped - finishing writes to secure storage, which
+      // has no test double here.
+      expect(find.text('Klaar'), findsOneWidget);
+    },
+  );
 }

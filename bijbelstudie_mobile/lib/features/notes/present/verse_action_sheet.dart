@@ -75,21 +75,27 @@ Future<void> showAddNoteDialog({
 
   if (text == null || text.isEmpty) return;
 
-  await ref.read(notesRepositoryProvider).saveNote(
-        StudyNote(
-          id: newClientId(),
-          book: book,
-          chapter: chapter,
-          verse: verse,
-          verseText: verseText,
-          noteText: text,
-          translation: translation,
-          isHighlight: false,
-          updatedAt: DateTime.now(),
-        ),
-      );
-  ref.invalidate(notesListProvider);
-  await HapticFeedback.lightImpact();
+  try {
+    await ref.read(notesRepositoryProvider).saveNote(
+          StudyNote(
+            id: newClientId(),
+            book: book,
+            chapter: chapter,
+            verse: verse,
+            verseText: verseText,
+            noteText: text,
+            translation: translation,
+            isHighlight: false,
+            updatedAt: DateTime.now(),
+          ),
+        );
+    ref.invalidate(notesListProvider);
+    await HapticFeedback.lightImpact();
+  } on SyncRejectedException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
 }
 
 class _VerseActionSheet extends ConsumerWidget {
@@ -164,34 +170,40 @@ class _VerseActionSheet extends ConsumerWidget {
     await HapticFeedback.lightImpact();
     final repo = ref.read(notesRepositoryProvider);
 
-    if (existing == color) {
-      // Tapping the active colour clears the highlight.
-      final all = ref.read(highlightsListProvider).value ?? const <StudyNote>[];
-      final match = all.where(
-        (h) =>
-            h.book == chapter.book &&
-            h.chapter == chapter.chapter &&
-            h.verse == verse.number,
-      );
-      if (match.isNotEmpty) await repo.deleteNote(match.first);
-    } else {
-      await repo.saveNote(
-        StudyNote(
-          id: newClientId(),
-          book: chapter.book,
-          chapter: chapter.chapter,
-          verse: verse.number,
-          verseText: verse.text,
-          noteText: '',
-          translation: chapter.sourceId,
-          color: color,
-          isHighlight: true,
-          updatedAt: DateTime.now(),
-        ),
-      );
+    try {
+      if (existing == color) {
+        // Tapping the active colour clears the highlight.
+        final all = ref.read(highlightsListProvider).value ?? const <StudyNote>[];
+        final match = all.where(
+          (h) =>
+              h.book == chapter.book &&
+              h.chapter == chapter.chapter &&
+              h.verse == verse.number,
+        );
+        if (match.isNotEmpty) await repo.deleteNote(match.first);
+      } else {
+        await repo.saveNote(
+          StudyNote(
+            id: newClientId(),
+            book: chapter.book,
+            chapter: chapter.chapter,
+            verse: verse.number,
+            verseText: verse.text,
+            noteText: '',
+            translation: chapter.sourceId,
+            color: color,
+            isHighlight: true,
+            updatedAt: DateTime.now(),
+          ),
+        );
+      }
+      ref.invalidate(highlightsListProvider);
+    } on SyncRejectedException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     }
 
-    ref.invalidate(highlightsListProvider);
     if (context.mounted) Navigator.of(context).pop();
   }
 
@@ -210,19 +222,25 @@ class _VerseActionSheet extends ConsumerWidget {
 
   Future<void> _addBookmark(BuildContext context, WidgetRef ref) async {
     final location = ref.read(readerLocationProvider);
-    await ref.read(notesRepositoryProvider).saveBookmark(
-          Bookmark(
-            id: newClientId(),
-            book: chapter.book,
-            chapter: chapter.chapter,
-            verse: verse.number,
-            version: location.versionId,
-            label: verse.text.length > 60 ? '${verse.text.substring(0, 57)}…' : verse.text,
-            updatedAt: DateTime.now(),
-          ),
-        );
-    ref.invalidate(bookmarksProvider);
-    await HapticFeedback.lightImpact();
+    try {
+      await ref.read(notesRepositoryProvider).saveBookmark(
+            Bookmark(
+              id: newClientId(),
+              book: chapter.book,
+              chapter: chapter.chapter,
+              verse: verse.number,
+              version: location.versionId,
+              label: verse.text.length > 60 ? '${verse.text.substring(0, 57)}…' : verse.text,
+              updatedAt: DateTime.now(),
+            ),
+          );
+      ref.invalidate(bookmarksProvider);
+      await HapticFeedback.lightImpact();
+    } on SyncRejectedException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
     if (context.mounted) Navigator.of(context).pop();
   }
 

@@ -41,6 +41,11 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // An email the keyboard has "helpfully" capitalized is a different string
+    // to the server, which matches the address as stored. Autocorrect can also
+    // rewrite a domain mid-typing.
+    final isEmail = keyboardType == TextInputType.emailAddress;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,6 +59,10 @@ class CustomTextField extends StatelessWidget {
           onChanged: onChanged,
           textInputAction: textInputAction,
           enabled: enabled,
+          autocorrect: !isEmail,
+          enableSuggestions: !isEmail,
+          textCapitalization:
+              isEmail ? TextCapitalization.none : TextCapitalization.sentences,
           cursorColor: AppTheme.ink,
           cursorWidth: 1.4,
           style: const TextStyle(

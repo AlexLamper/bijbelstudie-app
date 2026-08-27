@@ -12,9 +12,14 @@ class AuthRepository {
 
   AuthRepository(this._apiClient, this._localStorage);
 
+  /// Addresses are matched as stored, so a stray capital from the keyboard or
+  /// a paste with trailing whitespace is a failed login on an account that
+  /// exists. Normalising here means register and login always agree.
+  static String _normaliseEmail(String email) => email.trim().toLowerCase();
+
   Future<User?> login(String email, String password) async {
     return _post('/auth/login', {
-      'email': email,
+      'email': _normaliseEmail(email),
       'password': password,
       ..._deviceInfo(),
     }, 'Inloggen mislukt');
@@ -22,8 +27,8 @@ class AuthRepository {
 
   Future<User?> register(String name, String email, String password) async {
     return _post('/auth/register', {
-      'name': name,
-      'email': email,
+      'name': name.trim(),
+      'email': _normaliseEmail(email),
       'password': password,
       ..._deviceInfo(),
     }, 'Registreren mislukt');

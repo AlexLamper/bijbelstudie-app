@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../onboarding/data/onboarding_gate.dart';
 import '../../onboarding/data/onboarding_storage.dart';
 import '../present/auth_controller.dart';
 
@@ -34,9 +35,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // user instead of an anonymous RevenueCat id.
       await ref.read(authControllerProvider.notifier).restoreSession();
 
-      // A signed-in user never sees the onboarding again - it is a
-      // first-run intro for visitors who still have to create an account.
-      // Mark it seen so signing out later also skips it.
+      // A dead refresh token during restoreSession already triggered
+      // ApiClient.onSessionExpired, which clears storage and sends the router
+      // to /login itself. Falling through to the dashboard route below would
+      // immediately clobber that redirect for an account that is no longer
+      // signed in. Re-reading the token (rather than the controller's state)
+      // is what tells the two failure modes apart: a generic offline hiccup
+      // in restoreSession leaves the token alone and must still reach the
+      // dashboard for offline reading, same as before.
+      final stillHasToken = await storage.getToken();
+      if (stillHasToken == null || stillHasToken.isEmpty) return;
+
+      // A signed-in user never sees the pre-login marketing intro again - it
+      // is a first-run pitch for visitors who still have to create an
+      // account. Mark it seen so signing out later also skips it. This is
+      // independent of the setup wizard and the tour below, which track
+      // whether *this* account has been configured and shown around.
       await ref.read(onboardingStorageProvider).markSeen();
 
       // Starts the reader working out where it was left. It hydrates itself on
@@ -45,7 +59,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // come after restoreSession so the request goes out signed in.
       ref.read(readerLocationProvider);
 
-      if (mounted) context.go('/dashboard');
+      final route = await resolvePostAuthRoute(ref);
+      if (mounted) context.go(route);
       return;
     }
 

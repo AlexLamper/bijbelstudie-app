@@ -96,9 +96,18 @@ class ContentCache {
   }
 
   /// Pending writes in the shape `POST /api/v1/sync` expects.
-  Future<List<Map<String, dynamic>>> pendingChanges() async {
+  ///
+  /// Pass [kind] to see only one record type's queue - that is what a list
+  /// screen wants when it merges its own not-yet-synced writes into what the
+  /// server returned; leave it out for the full queue that `/sync` replays.
+  Future<List<Map<String, dynamic>>> pendingChanges({String? kind}) async {
     final db = await _open();
-    final rows = await db.query('pending_changes', orderBy: 'updated_at ASC');
+    final rows = await db.query(
+      'pending_changes',
+      where: kind == null ? null : 'kind = ?',
+      whereArgs: kind == null ? null : [kind],
+      orderBy: 'updated_at ASC',
+    );
     return rows.map((row) {
       final updatedAt =
           DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int).toUtc().toIso8601String();
