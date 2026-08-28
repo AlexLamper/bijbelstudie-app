@@ -49,6 +49,18 @@ jobs:
         working-directory: bijbelstudie_mobile
         run: flutter pub get
 
+      # The App Store icon cannot be uploaded in App Store Connect — since
+      # Xcode 9 it is extracted from the 1024x1024 `ios-marketing` entry in the
+      # build's asset catalog. So a build carrying a stale catalog silently
+      # ships a stale App Store listing icon, which is exactly what happened to
+      # 1.0.4. Regenerating here makes assets/images/app_icon.png the single
+      # source of truth: whatever that file holds is what the store shows.
+      - name: Regenerate launcher icons from assets/images/app_icon.png
+        working-directory: bijbelstudie_mobile
+        run: |
+          dart run flutter_launcher_icons
+          git --no-pager diff --stat -- ios/Runner/Assets.xcassets/AppIcon.appiconset || true
+
       # ── 3. Code signing ──────────────────────────────────────────────────────
       # Secrets required (set in GitHub repo Settings → Secrets and variables → Actions):
       #   BUILD_CERTIFICATE_BASE64      — base64 of your Distribution .p12 certificate
@@ -233,6 +245,32 @@ jobs:
             fi
           else
             echo "::warning::Could not read codesign entitlements from exported app. Continuing because IPA export succeeded."
+          fi
+
+          # ── App icon gate ────────────────────────────────────────────────
+          # App Store Connect takes the listing icon out of the build; there is
+          # no field to upload it. A build with no CFBundleIconName, or with an
+          # asset catalog that never got the current mark, ships a wrong icon
+          # and the only remedy is another build. Catch it here instead.
+          APP_PLIST="$APP_PATH/Info.plist"
+          if ! /usr/libexec/PlistBuddy -c "Print CFBundleIconName" "$APP_PLIST" >/dev/null 2>&1; then
+            echo "CFBundleIconName is missing from the built app — the asset catalog's"
+            echo "app icon set was not compiled in. Check ASSETCATALOG_COMPILER_APPICON_NAME."
+            exit 1
+          fi
+
+          # The 1024 marketing icon lives only inside Assets.car, so assert on
+          # the loose copies Xcode writes alongside it: they are generated from
+          # the same set, so if these are current the marketing icon is too.
+          if ! ls "$APP_PATH"/AppIcon*.png >/dev/null 2>&1; then
+            echo "No AppIcon*.png in the built app bundle. The icon set did not compile."
+            exit 1
+          fi
+
+          if ! /usr/bin/xcrun assetutil --info "$APP_PATH/Assets.car" 2>/dev/null                | grep -q '"SizeOnDisk"'; then
+            echo "::warning::Could not inspect Assets.car; skipping the 1024 icon check."
+          else
+            echo "Verified: app icon compiled into the build (CFBundleIconName present)."
           fi
 
       # ── 6. Upload to TestFlight ───────────────────────────────────────────────

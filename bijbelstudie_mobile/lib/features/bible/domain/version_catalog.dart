@@ -11,9 +11,12 @@ import 'bible_models.dart';
 ///
 /// Two rules, in this order:
 ///
-///  1. Language. Dutch first (this is a Dutch product), then English, then
-///     anything else. [groupVersions] turns the same ranking into labelled
-///     sections so a picker can draw a rule between the languages.
+///  1. Language. Dutch first (this is a Dutch product), then English. The app
+///     ships nothing else - the German translations are website-only - but the
+///     rule is written as an ordering rather than a filter, so a language the
+///     server starts serving lands after these two instead of disappearing.
+///     [grouped] turns the same ranking into labelled sections so a picker can
+///     draw a rule between the languages.
 ///  2. Within a language, most-reached-for first. Hand-ranked rather than
 ///     alphabetical: "Statenvertaling, NBG-vertaling 1951, Canisiusbijbel" is
 ///     the order a Dutch reader expects, and "American Standard Version,
@@ -28,7 +31,7 @@ class VersionCatalog {
   /// Language codes in the order their groups appear. Anything not listed
   /// sorts after these, by code, so a new language cannot silently outrank
   /// Dutch.
-  static const List<String> _languageOrder = ['nl', 'en', 'de'];
+  static const List<String> _languageOrder = ['nl', 'en'];
 
   /// Popularity rank inside a language group, low number first.
   static const Map<String, int> _rank = {
@@ -43,8 +46,6 @@ class VersionCatalog {
     'web': 2,
     'geneva': 3,
     'coverdale': 4,
-    // Deutsch
-    'elberfelder_1905': 0,
   };
 
   /// Ranks past every hand-ranked id, so an unknown version sorts to the end

@@ -15,7 +15,6 @@ void main() {
   final fromServer = [
     version('canisiusbijbel', 'Canisiusbijbel 1939', 'nl'),
     version('heilige_schrift_1917', 'De Heilige Schrift 1917', 'nl'),
-    version('elberfelder_1905', 'Elberfelder 1905', 'de'),
     version('statenvertaling', 'Statenvertaling', 'nl'),
     version('nbg51', 'NBG-vertaling 1951', 'nl'),
     version('kjv', 'King James Version', 'en'),
@@ -25,7 +24,7 @@ void main() {
     version('coverdale', 'Coverdale Bible (1535)', 'en'),
   ];
 
-  test('Dutch first, then English, then the rest', () {
+  test('Dutch first, then English', () {
     final ids = VersionCatalog.sorted(fromServer).map((v) => v.id).toList();
 
     expect(ids, [
@@ -38,7 +37,6 @@ void main() {
       'web',
       'geneva',
       'coverdale',
-      'elberfelder_1905',
     ]);
   });
 
@@ -51,10 +49,10 @@ void main() {
   test('groups carry the Dutch language name and keep the order', () {
     final groups = VersionCatalog.grouped(fromServer);
 
-    expect(groups.map((g) => g.label), ['Nederlands', 'Engels', 'Duits']);
+    // Two groups, so exactly one separator in the picker.
+    expect(groups.map((g) => g.label), ['Nederlands', 'Engels']);
     expect(groups.first.versions.first.id, 'statenvertaling');
-    expect(groups[1].versions.first.id, 'kjv');
-    expect(groups.last.versions.single.id, 'elberfelder_1905');
+    expect(groups.last.versions.first.id, 'kjv');
   });
 
   test('an unranked version lands at the end of its own language group', () {
@@ -68,27 +66,31 @@ void main() {
 
     final groups = VersionCatalog.grouped(withNewcomer);
     expect(groups.first.versions.last.id, 'nieuwe_nl');
-    expect(groups[1].versions.last.id, 'ylt');
-    expect(groups.map((g) => g.label), ['Nederlands', 'Engels', 'Duits']);
+    expect(groups.last.versions.last.id, 'ylt');
+    expect(groups.map((g) => g.label), ['Nederlands', 'Engels']);
   });
 
-  test('an unknown language sorts after the three we ship, never before', () {
+  test('a language we do not ship sorts after the two we do, never before', () {
+    // German is website-only now, so if it ever reappeared in the manifest it
+    // must land at the end rather than in the middle of the English block.
     final withUnknown = [
+      version('elberfelder_1905', 'Elberfelder 1905', 'de'),
       version('afri', 'Afrikaans', 'af'),
       ...fromServer,
     ];
 
     final languages = VersionCatalog.sorted(withUnknown).map((v) => v.language).toList();
     expect(languages.first, 'nl');
-    expect(languages.last, 'af');
+    expect(languages.sublist(languages.length - 2), ['af', 'de']);
   });
 
-  test('Luther 1912 is simply absent — nothing in the client filters it', () {
-    // The removal is server-side (MOBILE_ALLOWED_BIBLES). This asserts the
-    // client has no opinion of its own that could quietly resurrect it.
-    expect(
-      VersionCatalog.sorted(fromServer).map((v) => v.id),
-      isNot(contains('luther_1912')),
-    );
+  test('the German translations are simply absent from what the server sends', () {
+    // Luther 1912 and Elberfelder 1905 were dropped server-side
+    // (MOBILE_ALLOWED_BIBLES). This asserts the client has no opinion of its
+    // own that could quietly resurrect either.
+    final ids = VersionCatalog.sorted(fromServer).map((v) => v.id);
+    expect(ids, isNot(contains('luther_1912')));
+    expect(ids, isNot(contains('elberfelder_1905')));
+    expect(VersionCatalog.grouped(fromServer).map((g) => g.label), isNot(contains('Duits')));
   });
 }
