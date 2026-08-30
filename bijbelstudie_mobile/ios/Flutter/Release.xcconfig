@@ -1,5 +1,1 @@
 #include "Generated.xcconfig"
-
-// Manual signing with distribution cert (required for App Store build with entitlements)
-CODE_SIGN_STYLE = Manual
-CODE_SIGN_IDENTITY = Apple Distribution
