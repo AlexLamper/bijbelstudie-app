@@ -229,9 +229,9 @@ jobs:
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
             archive \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$PP_UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
@@ -273,9 +273,38 @@ jobs:
           # asset catalog that never got the current mark, ships a wrong icon
           # and the only remedy is another build. Catch it here instead.
           APP_PLIST="$APP_PATH/Info.plist"
+
+          # Evidence first, verdict second. This gate used to exit with nothing
+          # but its own error message, which said to "check
+          # ASSETCATALOG_COMPILER_APPICON_NAME" — a setting that is in fact
+          # correct in all three Runner configurations. With the xcodebuild log
+          # truncated by the Actions log viewer there was then no way to tell
+          # whether actool had run at all, whether it produced Assets.car, or
+          # whether only the plist merge went missing. Printing the bundle's
+          # actual icon state costs one screenful and answers that directly.
+          echo "── App icon diagnostics ────────────────────────────────────────"
+          echo "Bundle: $APP_PATH"
+          echo "-- icon-related Info.plist keys --"
+          /usr/libexec/PlistBuddy -c "Print" "$APP_PLIST" 2>/dev/null \
+            | grep -iE "icon" || echo "(none)"
+          echo "-- AppIcon*.png in bundle --"
+          ls -la "$APP_PATH"/AppIcon*.png 2>/dev/null || echo "(none)"
+          echo "-- Assets.car --"
+          ls -la "$APP_PATH/Assets.car" 2>/dev/null || echo "(none)"
+          echo "-- app icon entries inside Assets.car --"
+          /usr/bin/xcrun assetutil --info "$APP_PATH/Assets.car" 2>/dev/null \
+            | grep -iE '"Name"|"RenditionName"' | grep -i appicon | head -10 \
+            || echo "(could not read Assets.car)"
+          echo "────────────────────────────────────────────────────────────────"
+
           if ! /usr/libexec/PlistBuddy -c "Print CFBundleIconName" "$APP_PLIST" >/dev/null 2>&1; then
-            echo "CFBundleIconName is missing from the built app — the asset catalog's"
-            echo "app icon set was not compiled in. Check ASSETCATALOG_COMPILER_APPICON_NAME."
+            echo "CFBundleIconName is missing from the built app."
+            echo "The asset catalog itself is not the suspect: the icon set, its"
+            echo "image dimensions and ASSETCATALOG_COMPILER_APPICON_NAME have all"
+            echo "been verified. Read the diagnostics above to tell the two cases"
+            echo "apart — Assets.car present means actool ran and only the"
+            echo "Info.plist merge went missing; Assets.car absent means the asset"
+            echo "catalog was never compiled into this archive."
             exit 1
           fi
 
