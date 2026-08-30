@@ -22,10 +22,37 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<!-- No Google Sign-In URL scheme / GIDClientID on iOS: the login and register
-	     screens hide the Google button on iOS (`showGoogleSignIn = !isIOSApp`)
-	     and offer native Sign in with Apple instead. Adding the keys back means
-	     also creating an iOS OAuth client in Google Cloud. -->
+	<!-- Google Sign-In on iOS.
+
+	     Both values come from the *iOS* OAuth client in Google Cloud (type iOS,
+	     bundle id com.bijbel-studie.app) - not the web client. Replace the two
+	     placeholders below with that client's values:
+
+	       GIDClientID              123456789012-abcdefg.apps.googleusercontent.com
+	       CFBundleURLSchemes       com.googleusercontent.apps.123456789012-abcdefg
+	                                (the client id with its two halves swapped -
+	                                 Google calls this the "reversed client ID")
+
+	     Neither is a secret; an iOS OAuth client is public by design and is
+	     bound to the bundle id. Until they are replaced the app still builds and
+	     the Google button stays hidden, because it is gated on the
+	     GOOGLE_IOS_CLIENT_ID dart-define rather than on these keys - see
+	     lib/core/config/google_sign_in_config.dart and docs/ios-release-setup.md. -->
+	<key>GIDClientID</key>
+	<string>GOOGLE_IOS_CLIENT_ID_PLACEHOLDER.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.bijbel-studie.app.googlesignin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.GOOGLE_IOS_CLIENT_ID_PLACEHOLDER</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

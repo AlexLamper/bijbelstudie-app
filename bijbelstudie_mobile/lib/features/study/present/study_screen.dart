@@ -13,6 +13,7 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/context_repository.dart';
+import '../domain/summary_format.dart';
 import 'study_pane_controller.dart';
 
 /// `/studie` on www.bijbel-studie.com.
@@ -380,27 +381,132 @@ class _GeneralInfoPane extends ConsumerWidget {
             'Informatie kon niet worden geladen.',
             style: AppTheme.bodyMuted,
           ),
-          data: (text) => text == null || text.isEmpty
-              ? const AppEmptyState(
-                  icon: Icons.info_outline,
-                  title: 'Geen achtergrondinformatie',
-                  description: 'Voor dit boek is nog geen inleiding beschikbaar.',
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: SelectableText(
-                    text,
-                    style: TextStyle(
-                      fontFamily: AppTheme.sansFontName,
-                      fontSize: 15,
-                      height: 1.75,
-                      color: scheme.onSurface.withValues(alpha: 0.88),
-                    ),
-                  ),
-                ),
+          data: (text) {
+            final paragraphs = formatSummary(text);
+            if (paragraphs.isEmpty) {
+              return const AppEmptyState(
+                icon: Icons.info_outline,
+                title: 'Geen achtergrondinformatie',
+                description: 'Voor dit boek is nog geen inleiding beschikbaar.',
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: _SummaryBody(paragraphs: paragraphs),
+            );
+          },
         ),
       ],
     );
+  }
+}
+
+/// The book introduction, set as paragraphs.
+///
+/// This used to be one `SelectableText` holding the API's raw string. The
+/// separators in that string are bare carriage returns, which buy no vertical
+/// space in a Flutter paragraph, so several thousand words arrived as a single
+/// unbroken block — readable in the sense that the glyphs were on screen, and
+/// in no other sense. Paragraphs are laid out individually here so the gap
+/// between them is a real gap, matching what the website does with the same
+/// text.
+class _SummaryBody extends StatelessWidget {
+  const _SummaryBody({required this.paragraphs});
+
+  final List<SummaryParagraph> paragraphs;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bodyStyle = TextStyle(
+      fontFamily: AppTheme.sansFontName,
+      fontSize: 15,
+      height: 1.75,
+      color: scheme.onSurface.withValues(alpha: 0.88),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < paragraphs.length; i++)
+          Padding(
+            padding: EdgeInsets.only(
+              // A heading needs room above it to read as a break in the text,
+              // but not when it opens the section.
+              top: i == 0
+                  ? 0
+                  : (paragraphs[i].kind == SummaryParagraphKind.heading ? 26 : 16),
+              bottom: paragraphs[i].kind == SummaryParagraphKind.heading ? 2 : 0,
+            ),
+            child: _SummaryParagraphText(
+              paragraph: paragraphs[i],
+              bodyStyle: bodyStyle,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SummaryParagraphText extends StatelessWidget {
+  const _SummaryParagraphText({required this.paragraph, required this.bodyStyle});
+
+  final SummaryParagraph paragraph;
+  final TextStyle bodyStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (paragraph.kind) {
+      case SummaryParagraphKind.heading:
+        // A teal rule down the left, as on the website, so a section title is
+        // structure rather than a shouted sentence.
+        return Container(
+          padding: const EdgeInsets.only(left: 10),
+          decoration: const BoxDecoration(
+            border: Border(left: BorderSide(color: AppTheme.teal, width: 3)),
+          ),
+          child: SelectableText(
+            paragraph.text,
+            style: bodyStyle.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        );
+      case SummaryParagraphKind.numbered:
+        return Padding(
+          padding: const EdgeInsets.only(left: 18),
+          child: _referenceRichText(paragraph.text, bodyStyle),
+        );
+      case SummaryParagraphKind.body:
+        return _referenceRichText(paragraph.text, bodyStyle);
+    }
+  }
+
+  /// Scripture references are tinted and kept on one line, so `(Gen 1:1)`
+  /// cannot wrap across a line break mid-citation.
+  Widget _referenceRichText(String text, TextStyle style) {
+    final spans = <TextSpan>[];
+    var index = 0;
+    for (final match in summaryReferencePattern.allMatches(text)) {
+      if (match.start > index) {
+        spans.add(TextSpan(text: text.substring(index, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: const TextStyle(
+            color: AppTheme.teal,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      index = match.end;
+    }
+    if (index < text.length) spans.add(TextSpan(text: text.substring(index)));
+
+    return SelectableText.rich(TextSpan(style: style, children: spans));
   }
 }
 

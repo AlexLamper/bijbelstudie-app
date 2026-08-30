@@ -167,6 +167,11 @@ jobs:
           REVENUECAT_APPLE_KEY: ${{ secrets.REVENUECAT_APPLE_KEY }}
           APPLE_SERVICE_ID: ${{ vars.APPLE_SERVICE_ID }}
           APPLE_REDIRECT_URI: ${{ vars.APPLE_REDIRECT_URI }}
+          # Google Sign-In. Optional: leave both unset and the build is
+          # byte-for-byte what it was, with the Google button hidden on iOS.
+          # Setting them turns it on - see docs/ios-release-setup.md.
+          GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: |
           # Version name: use the manual input, else the version from pubspec.yaml.
           BUILD_NAME="${{ github.event.inputs.build_name }}"
@@ -189,13 +194,28 @@ jobs:
             exit 1
           fi
 
+          # Info.plist carries a placeholder client id so the repo never holds
+          # a half-configured OAuth entry. Substitute the real one when the
+          # variable is set; skip silently when it is not, in which case the
+          # button stays hidden anyway.
+          if [ -n "${GOOGLE_IOS_CLIENT_ID:-}" ]; then
+            REVERSED="$(printf "%s" "$GOOGLE_IOS_CLIENT_ID" | sed "s/[.]apps[.]googleusercontent[.]com$//")"
+            /usr/libexec/PlistBuddy -c "Set :GIDClientID $GOOGLE_IOS_CLIENT_ID" ios/Runner/Info.plist
+            /usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 com.googleusercontent.apps.$REVERSED" ios/Runner/Info.plist
+            echo "Google Sign-In enabled for iOS client $GOOGLE_IOS_CLIENT_ID"
+          else
+            echo "GOOGLE_IOS_CLIENT_ID not set - Google button stays hidden on iOS."
+          fi
+
           flutter build ios --release --no-codesign \
             --build-name="$BUILD_NAME" \
             --build-number="$BUILD_NUMBER" \
             --dart-define=USE_PRODUCTION_API=true \
             --dart-define=REVENUECAT_APPLE_KEY="$REVENUECAT_APPLE_KEY" \
             --dart-define=APPLE_SERVICE_ID="$APPLE_SERVICE_ID" \
-            --dart-define=APPLE_REDIRECT_URI="$APPLE_REDIRECT_URI"
+            --dart-define=APPLE_REDIRECT_URI="$APPLE_REDIRECT_URI" \
+            --dart-define=GOOGLE_IOS_CLIENT_ID="${GOOGLE_IOS_CLIENT_ID:-}" \
+            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}"
 
       - name: Archive and export signed IPA
         working-directory: bijbelstudie_mobile/ios

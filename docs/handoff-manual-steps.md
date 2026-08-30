@@ -25,7 +25,7 @@ Last updated 2026-08-12.
 | Provisioning profile | **regenerated** as `BijbelStudie App Store CI` (id `2XWYGY5WRY`) — see the warning below |
 | GitHub secrets | all set except `REVENUECAT_APPLE_KEY` |
 | GitHub variables | `APPLE_SERVICE_ID`, `APPLE_REDIRECT_URI` |
-| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories |
+| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories — **both are currently *Developer Rejected*, so neither is purchasable: see `subscriptions-developer-rejected.md`** |
 | Vercel env vars | `MOBILE_JWT_SECRET`, `APPLE_CLIENT_IDS`, `GEMINI_API_KEY`, `GOOGLE_TTS_API_KEY`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `REVENUECAT_PRO_ENTITLEMENT_ID` added to Production/Preview/Development and redeployed |
 
 > **Why the profile was regenerated.** The `BijbelStudie App Store` profile you
@@ -210,18 +210,38 @@ It drops Apple's cut from 30% to 15% — on €9,99 that is €8,49 to you inste
 
 ---
 
-## Step 4 — Optional: Google Sign-In on iOS
+## Step 4 — Google Sign-In on iOS
 
-Currently **off on iOS by design**. `login_screen.dart` and
-`register_screen.dart` both do `showGoogleSignIn = !isIOSApp`, and the Google
-keys were removed from `ios/Runner/Info.plist` so the build does not carry a
-placeholder URL scheme.
+The code side is done. What is left is **three pieces of configuration**, all
+manual, none of which can be created from this repo:
 
-To turn it on you need a Google Cloud iOS OAuth client for
-`com.bijbel-studie.app`, its reversed client ID back in `Info.plist`, the client
-IDs in `GOOGLE_MOBILE_CLIENT_IDS` on Vercel, and the `!isIOSApp` guard removed.
-Not needed to ship — Sign in with Apple plus email/password satisfies
-guideline 4.8.
+1. **Google Cloud** — create an OAuth client, type *iOS*, bundle ID
+   `com.bijbel-studie.app`, in the same project as the existing web client.
+2. **Vercel** — add that client id to `GOOGLE_MOBILE_CLIENT_IDS`
+   (comma-separated, alongside the web client id) and redeploy. The server pins
+   the ID token's `aud`, so it rejects tokens from a client it has not been
+   told about.
+3. **GitHub repository variables** — `GOOGLE_IOS_CLIENT_ID` and
+   `GOOGLE_WEB_CLIENT_ID`. The workflow passes both as `--dart-define` and
+   substitutes the `Info.plist` placeholders during the build.
+
+Full walkthrough with examples: `docs/ios-release-setup.md`, Step 2.
+
+Until all three are in place the app behaves exactly as it did before: the
+Google button is gated on `GoogleSignInConfig.isAvailable`, which is false
+without a client id, so the login and register screens render Sign in with Apple
+and email/password only.
+
+**Sign in with Apple is no longer optional once Google is on.** Guideline 4.8
+requires a privacy-preserving equivalent beside any third-party login, so both
+screens now render the Apple button on iOS. It was already implemented in
+`AuthController.signInWithApple`; it had simply never been placed on a screen,
+which was fine only while iOS offered no third-party login at all.
+
+Accounts link themselves: `/api/v1/auth/google` matches on `googleId`, then
+falls back to a case-insensitive email match and attaches `googleId` to the
+account it finds. Signing in with Google on the phone therefore reaches the same
+account as the website — including one originally created with a password.
 
 ---
 

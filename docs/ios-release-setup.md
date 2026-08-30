@@ -31,22 +31,77 @@ Generate the profile **after** enabling the capability (Step 4), never before.
 
 ---
 
-## Step 2 — Fill in the Google Sign-In placeholders
+## Step 2 — Google Sign-In
 
-`bijbelstudie_mobile/ios/Runner/Info.plist` ships with placeholders so no other
-app's OAuth client can leak into this binary:
+Google issues a **different OAuth client per platform**, and the server pins the
+ID token's `aud` claim (`lib/oauthVerify.ts` → `googleAudiences()`). A token
+minted for the wrong client is a perfectly valid JWT and is rejected on purpose,
+so every client id below has to be registered in both places or sign-in fails
+with `INVALID_TOKEN`.
 
-| Key | Placeholder | Replace with |
-|---|---|---|
-| `CFBundleURLTypes` → `CFBundleURLSchemes` | `PUT_YOUR_REVERSED_CLIENT_ID_HERE` | reversed client ID, e.g. `com.googleusercontent.apps.1234-abcd` |
-| `GIDClientID` | `PUT_YOUR_GID_CLIENT_ID_HERE` | iOS client ID, e.g. `1234-abcd.apps.googleusercontent.com` |
+### 2a. Create the iOS OAuth client
 
-Get both from **Google Cloud Console → Credentials → OAuth client ID (iOS)**
-created for `com.bijbel-studie.app`.
+**Google Cloud Console → APIs & Services → Credentials → Create credentials →
+OAuth client ID**, type **iOS**, bundle ID `com.bijbel-studie.app`. Use the same
+project as the existing web client. Neither value it gives you is a secret — an
+iOS OAuth client is public by design and is bound to the bundle ID.
 
-Android additionally needs a *web* client ID passed at build time:
-`--dart-define=GOOGLE_WEB_CLIENT_ID=...`. iOS does not — it reads `GIDClientID`
-from Info.plist — so the iOS workflow does not set it.
+You get two forms of the same id:
+
+| | Example |
+|---|---|
+| Client ID | `123456789012-abcdefg.apps.googleusercontent.com` |
+| Reversed client ID | `com.googleusercontent.apps.123456789012-abcdefg` |
+
+### 2b. Tell the server to accept it
+
+Add the iOS client id to **`GOOGLE_MOBILE_CLIENT_IDS`** on Vercel
+(Production + Preview + Development), comma-separated alongside the web client
+id, then redeploy:
+
+```
+GOOGLE_MOBILE_CLIENT_IDS=<web client id>,<ios client id>
+```
+
+Without this the app gets a token Google is happy with and the server answers
+401 `INVALID_TOKEN`.
+
+### 2c. Tell the build about it
+
+Set two **repository variables** (Settings → Secrets and variables → Actions →
+Variables — not secrets; these are public ids):
+
+| Variable | Value |
+|---|---|
+| `GOOGLE_IOS_CLIENT_ID` | the iOS client ID from 2a |
+| `GOOGLE_WEB_CLIENT_ID` | the existing web client ID (used by Android and web) |
+
+`ios-release.yml` passes both as `--dart-define` and rewrites the two
+`Info.plist` placeholders (`GIDClientID`, `CFBundleURLSchemes`) with PlistBuddy
+before building. For a local build, do the same by hand:
+
+```
+flutter build ios --release   --dart-define=GOOGLE_IOS_CLIENT_ID=<ios client id>   --dart-define=GOOGLE_WEB_CLIENT_ID=<web client id>
+```
+
+### What happens if you skip this
+
+Nothing breaks. `GoogleSignInConfig.isAvailable` is false without a client id
+for the platform, so the Google button simply does not render and the screens
+look exactly as they did before — Sign in with Apple plus email/password, which
+already satisfies guideline 4.8 on its own.
+
+### Account linking
+
+Already handled server-side, in both directions and with no extra work:
+`app/api/v1/auth/google/route.ts` looks up `googleId` first, then falls back to
+a **case-insensitive email match** and links `googleId` onto the account it
+finds. So signing into the app with Google lands on the *same* account as the
+website, and a password account whose address matches gains Google as a second
+way in rather than a second account. `/auth/apple` does the same with `appleId`.
+
+Linking by email is safe here only because Google asserts the address in a
+signed token — never do it from a client-supplied email.
 
 ---
 

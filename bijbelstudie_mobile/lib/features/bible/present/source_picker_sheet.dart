@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/bible_models.dart';
+import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
 import 'book_download_button.dart';
+import 'language_separator.dart';
 
 /// Translation picker. Only allowlisted versions ever reach the client, so
 /// there is nothing to filter here — the server already did it.
@@ -78,37 +80,60 @@ class _VersionPicker extends ConsumerWidget {
           title: 'Vertalingen niet geladen',
           description: 'Controleer je verbinding en probeer het opnieuw.',
         ),
-        data: (versions) => ListView.builder(
-          itemCount: versions.length,
-          itemBuilder: (context, index) {
-            final version = versions[index];
-            return RuleListTile(
-              onTap: () {
-                ref.read(readerLocationProvider.notifier).openChapter(versionId: version.id);
-                Navigator.of(context).pop();
-              },
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        // Grouped by language rather than listed flat. The catalog already
+        // orders Dutch before English; what was missing was any visible break
+        // between them, so the English translations read as more Dutch ones
+        // that happened to have English names.
+        data: (versions) {
+          final groups = VersionCatalog.grouped(versions);
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              for (var g = 0; g < groups.length; g++) ...[
+                // The first group is labelled too, unlike the setup wizard's
+                // list: this sheet's only title is "Vertaling", so nothing
+                // else here says which language the top rows are in.
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20).copyWith(
+                    top: g == 0 ? 4 : 0,
+                  ),
+                  child: LanguageSeparator(label: groups[g].label),
+                ),
+                for (final version in groups[g].versions)
+                  RuleListTile(
+                    onTap: () {
+                      ref
+                          .read(readerLocationProvider.notifier)
+                          .openChapter(versionId: version.id);
+                      Navigator.of(context).pop();
+                    },
+                    child: Row(
                       children: [
-                        Text(version.name, style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${version.languageLabel} · ${version.attribution}',
-                          style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                version.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                version.attribution,
+                                style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
+                        if (version.id == current)
+                          const Icon(Icons.check, size: 18, color: AppTheme.lapis),
                       ],
                     ),
                   ),
-                  if (version.id == current)
-                    const Icon(Icons.check, size: 18, color: AppTheme.lapis),
-                ],
-              ),
-            );
-          },
-        ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

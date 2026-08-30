@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/config/google_sign_in_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/primary_button.dart';
@@ -9,6 +9,7 @@ import '../../../core/ui/custom_text_field.dart';
 import '../../onboarding/data/onboarding_gate.dart';
 import 'auth_controller.dart';
 import 'splash_screen.dart' show BijbelStudieWordmark;
+import 'widgets/apple_sign_in_button.dart';
 import 'widgets/google_sign_in_button.dart';
 import 'widgets/user_data_info_link.dart';
 
@@ -53,16 +54,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await auth.signInWithGoogle();
   }
 
+  Future<void> _loginWithApple() async {
+    final auth = ref.read(authControllerProvider.notifier);
+    await auth.signInWithApple();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
+      // `/register` is *pushed* on top of this screen, so this State stays
+      // mounted and keeps listening while the user registers. Both screens
+      // then saw the same success and both called `context.go`, racing over
+      // where a brand-new account lands — and this one resolves the route
+      // with `isNewAccount: false`, so when it won, a user who had just
+      // created an account was sent to the dashboard instead of the setup
+      // wizard. Only the screen actually on top may act.
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+
       if (next.hasValue && next.value != null) {
         // An existing account may already have finished setup and the tour
         // on the website or another device - resolvePostAuthRoute is what
         // checks that before deciding to show them again.
-        resolvePostAuthRoute(ref).then((route) {
-          if (context.mounted) context.go(route);
-        });
+        // `onError` is not optional here. The user is authenticated the
+        // moment this listener runs; if route resolution rejects and nothing
+        // catches it, the failure disappears into the zone and they are left
+        // sitting on this screen, signed in, with no error and no navigation.
+        // The dashboard is the safe destination — the wizard and the tour can
+        // still be replayed from Profiel.
+        resolvePostAuthRoute(ref)
+            .then((route) {
+              if (context.mounted) context.go(route);
+            })
+            .catchError((_) {
+              if (context.mounted) context.go('/dashboard');
+            });
       } else if (next.hasError) {
         final msg = next.error.toString();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,13 +97,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     final state = ref.watch(authControllerProvider);
-    final isIOSApp = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
-    final showGoogleSignIn = !isIOSApp;
-    final hasSocialLoginOption = showGoogleSignIn;
-    final isGoogleInit = showGoogleSignIn
-        ? ref.watch(googleSignInInitProvider).hasValue
-        : true;
-    final isLoading = state.isLoading || !isGoogleInit;
+    // Guideline 4.8: offering Google on iOS obliges the app to offer Sign in
+    // with Apple beside it. Until now neither appeared on iOS, so the rule was
+    // satisfied by having nothing to satisfy.
+    final showAppleSignIn = isAppleSignInAvailable;
+
+    final googleInit = GoogleSignInConfig.isAvailable
+        ? ref.watch(googleSignInInitProvider)
+        : const AsyncValue<void>.data(null);
+    // A client id that Google rejects makes `initialize` throw. That used to
+    // leave `isGoogleInit` false forever, and because the whole screen shared
+    // one `isLoading` flag, it disabled the email/password button too - a
+    // misconfigured Google client took down the login that does not use it.
+    // Google's own readiness is now the Google button's business alone.
+    // Config, not platform. iOS used to be excluded outright because no iOS
+    // OAuth client existed; the button now appears wherever a client id was
+    // actually built in - see GoogleSignInConfig.
+    final showGoogleSignIn = GoogleSignInConfig.isAvailable && !googleInit.hasError;
+    final isGoogleReady = googleInit.hasValue;
+
+    final hasSocialLoginOption = showGoogleSignIn || showAppleSignIn;
+    final isLoading = state.isLoading;
 
     return Scaffold(
       backgroundColor: AppTheme.paper,
@@ -147,11 +186,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              buildGoogleSignInButton(
-                context: context,
-                isLoading: isLoading,
-                onPressed: isLoading ? null : _loginWithGoogle,
-              ),
+              if (showGoogleSignIn)
+                buildGoogleSignInButton(
+                  context: context,
+                  isLoading: isLoading || !isGoogleReady,
+                  onPressed: (isLoading || !isGoogleReady) ? null : _loginWithGoogle,
+                ),
+              if (showGoogleSignIn && showAppleSignIn) const SizedBox(height: 12),
+              if (showAppleSignIn)
+                buildAppleSignInButton(
+                  isLoading: isLoading,
+                  onPressed: isLoading ? null : _loginWithApple,
+                ),
             ],
             const SizedBox(height: 32),
             const RuleLine(),

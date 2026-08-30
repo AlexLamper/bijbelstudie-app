@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/present/auth_controller.dart';
 import '../data/onboarding_storage.dart';
 import '../data/preferences_repository.dart';
 
@@ -216,7 +217,8 @@ class TourController extends Notifier<TourState> {
     state = const TourState();
 
     unawaited(() async {
-      await ref.read(onboardingStorageProvider).markTourSeen();
+      final accountId = ref.read(authControllerProvider).value?.id;
+      await ref.read(onboardingStorageProvider).markTourSeen(accountId);
       try {
         await ref
             .read(preferencesRepositoryProvider)

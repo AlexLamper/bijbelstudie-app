@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart' as google_auth;
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/config/apple_sign_in_config.dart';
+import '../../../core/config/google_sign_in_config.dart';
 import '../data/auth_repository.dart';
 import '../../../core/api/api_client.dart';
 import '../data/auth_local_storage.dart';
@@ -38,30 +39,15 @@ final googleSignInInitProvider = FutureProvider<void>((ref) async {
 class AuthController extends AsyncNotifier<User?> {
   bool _googleSignInInitialized = false;
 
-  /// Web/Android OAuth client id for BijbelStudie. Supplied at build time —
-  /// no client id from another app is baked in here.
-  /// `--dart-define=GOOGLE_WEB_CLIENT_ID=...`
-  static const String _googleWebClientId = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '',
-  );
-
+  /// Per-platform client ids live in [GoogleSignInConfig]; nothing is
+  /// hardcoded here.
   Future<void> ensureGoogleSignInInitialized() async {
-    if (!_googleSignInInitialized) {
-      final webClientId = _googleWebClientId.isEmpty ? null : _googleWebClientId;
-      await google_auth.GoogleSignIn.instance.initialize(
-        // Web requires explicit clientId. Native iOS/Android should rely on
-        // platform OAuth setup (Info.plist / google-services).
-        clientId: kIsWeb ? webClientId : null,
-        // Android requires a serverClientId with google_sign_in v7 for token
-        // based auth. Keep iOS null to avoid invalid_request issues there.
-        serverClientId:
-            !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-            ? webClientId
-            : null,
-      );
-      _googleSignInInitialized = true;
-    }
+    if (_googleSignInInitialized) return;
+    await google_auth.GoogleSignIn.instance.initialize(
+      clientId: GoogleSignInConfig.clientId,
+      serverClientId: GoogleSignInConfig.serverClientId,
+    );
+    _googleSignInInitialized = true;
   }
 
   @override
@@ -74,9 +60,16 @@ class AuthController extends AsyncNotifier<User?> {
   Future<void> _linkRevenueCat(User? user) async {
     if (user == null || kIsWeb) return;
     try {
-      await Purchases.logIn(user.id);
+      // Bounded. The sign-in screens keep their button in the loading state
+      // until the auth state settles, so anything awaited between a successful
+      // credential check and `state = AsyncValue.data(user)` is a spinner the
+      // user cannot escape. `Purchases.logIn` is a network identity switch and
+      // carries no deadline of its own; on a stalled connection it is the
+      // difference between a slow login and one that never finishes.
+      await Purchases.logIn(user.id).timeout(const Duration(seconds: 8));
     } catch (_) {
-      // Non-fatal: RC linking failure shouldn't block auth.
+      // Non-fatal: RC linking failure shouldn't block auth. The next launch
+      // re-links in `restoreSession`.
     }
   }
 
@@ -95,6 +88,31 @@ class AuthController extends AsyncNotifier<User?> {
       // Best-effort: a fresh login is not blocked on this, and the next
       // successful write or app launch will try again.
     }
+  }
+
+  /// The single "you are signed in now" step for every sign-in path.
+  ///
+  /// Two rules, both learned from a login that appeared to do nothing:
+  ///
+  ///  1. A null user is an error, not a success. `state = AsyncValue.data(null)`
+  ///     reads as "signed out" to every listener, so the screens neither
+  ///     navigated nor showed a message — the button just stopped spinning.
+  ///  2. Nothing best-effort runs *before* the state is published. Queue
+  ///     flushing is a whole sync round trip whose size depends on how much
+  ///     the device wrote while offline; awaiting it here held an
+  ///     already-authenticated user on the login screen for its duration.
+  ///     That is also the asymmetry that made login look broken while
+  ///     registration looked fine: a brand-new account has an empty queue.
+  Future<void> _completeSignIn(User? user) async {
+    if (user == null) {
+      throw Exception(
+        'Inloggen gelukt, maar de server stuurde geen accountgegevens terug. '
+        'Probeer het opnieuw.',
+      );
+    }
+    await _linkRevenueCat(user);
+    state = AsyncValue.data(user);
+    unawaited(_flushPendingAfterSignIn());
   }
 
   /// Restore a persisted session on app launch.
@@ -143,9 +161,7 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       final repository = ref.read(authRepositoryProvider);
       final user = await repository.login(email, password);
-      await _linkRevenueCat(user);
-      await _flushPendingAfterSignIn();
-      state = AsyncValue.data(user);
+      await _completeSignIn(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -156,9 +172,7 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       final repository = ref.read(authRepositoryProvider);
       final user = await repository.register(name, email, password);
-      await _linkRevenueCat(user);
-      await _flushPendingAfterSignIn();
-      state = AsyncValue.data(user);
+      await _completeSignIn(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -212,9 +226,7 @@ class AuthController extends AsyncNotifier<User?> {
     state = const AsyncValue.loading();
     final repository = ref.read(authRepositoryProvider);
     final user = await repository.loginWithGoogle(idToken);
-    await _linkRevenueCat(user);
-    await _flushPendingAfterSignIn();
-    state = AsyncValue.data(user);
+    await _completeSignIn(user);
   }
 
   Future<void> signInWithApple() async {
@@ -248,9 +260,7 @@ class AuthController extends AsyncNotifier<User?> {
         familyName: credential.familyName,
         email: credential.email,
       );
-      await _linkRevenueCat(user);
-      await _flushPendingAfterSignIn();
-      state = AsyncValue.data(user);
+      await _completeSignIn(user);
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
         return;
@@ -329,8 +339,14 @@ class AuthController extends AsyncNotifier<User?> {
     final repository = ref.read(authRepositoryProvider);
     await repository.logout();
 
-    await ensureGoogleSignInInitialized();
-    await google_auth.GoogleSignIn.instance.signOut();
+    if (GoogleSignInConfig.isAvailable) {
+      // Never fatal: a user who cannot sign out is far worse than a Google
+      // session that outlives the app's own.
+      try {
+        await ensureGoogleSignInInitialized();
+        await google_auth.GoogleSignIn.instance.signOut();
+      } catch (_) {}
+    }
 
     if (!kIsWeb) {
       try {

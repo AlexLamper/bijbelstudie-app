@@ -41,6 +41,11 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Credential endpoints establish a session; they never act on one.
+          // Sending a stale bearer token with a login is at best noise, and it
+          // is what made the 401 below ambiguous in the first place.
+          if (_isPublicAuthCall(options)) return handler.next(options);
+
           final token = await _storage.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -48,7 +53,7 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException e, handler) async {
-          if (e.response?.statusCode != 401 || _isRefreshCall(e.requestOptions)) {
+          if (e.response?.statusCode != 401 || _isPublicAuthCall(e.requestOptions)) {
             return handler.next(e);
           }
 
@@ -73,7 +78,36 @@ class ApiClient {
     );
   }
 
-  bool _isRefreshCall(RequestOptions options) => options.path.contains('/auth/refresh');
+  /// The endpoints that *establish* a session rather than consume one.
+  ///
+  /// A 401 from any of these means "those credentials are wrong", not "your
+  /// session expired", and the difference is not cosmetic. Only `/auth/refresh`
+  /// used to be excluded here, so a mistyped password on the login screen fell
+  /// straight into the refresh branch below: the client spent the device's
+  /// refresh token trying to rescue a session that was never in trouble, and
+  /// when that failed — as it does on any device whose last session had already
+  /// ended — it wiped secure storage and fired [onSessionExpired], which sends
+  /// the router to `/login?expired=1`.
+  ///
+  /// The visible result was a login that "does nothing": the typed credentials
+  /// were discarded along with the screen, and the real message
+  /// ("E-mailadres of wachtwoord klopt niet") was replaced by "Je sessie is
+  /// verlopen" for a user who had not been signed in at all. It also cost two
+  /// requests per attempt, so the server's 10-per-15-minutes login limit was
+  /// reached in five tries.
+  ///
+  /// Registration never showed any of this, which is what made it look like a
+  /// login-only bug: `/auth/register` answers 201 or 409, never 401.
+  static bool _isPublicAuthCall(RequestOptions options) {
+    const publicAuthPaths = [
+      '/auth/login',
+      '/auth/register',
+      '/auth/google',
+      '/auth/apple',
+      '/auth/refresh',
+    ];
+    return publicAuthPaths.any(options.path.contains);
+  }
 
   Future<String?> _refreshAccessToken() {
     return _refreshInFlight ??= _doRefresh().whenComplete(() {
