@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../settings/data/reading_settings.dart';
@@ -158,7 +159,10 @@ class _StudyDetailScreenState extends ConsumerState<StudyDetailScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: Text(study.value?.title ?? 'Studie')),
       body: study.when(
-        loading: () => const AppLoader(),
+        loading: () => const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: SkeletonCardColumn(count: 2),
+        ),
         error: (error, _) => AppEmptyState(
           icon: Icons.wifi_off_outlined,
           title: 'Studie niet geladen',

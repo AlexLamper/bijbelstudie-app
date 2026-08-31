@@ -139,4 +139,37 @@ class BibleBooks {
     if (trimmed.isEmpty) return name;
     return _englishToDutch[trimmed] ?? name;
   }
+
+  /// Statenvertaling / older-data spellings that differ from the canonical set
+  /// in [oldTestament] / [newTestament]. `readChapters` keys arrive spelled the
+  /// way the translation that was read spells them, so the dashboard folds them
+  /// through here (and [toDutch]) before matching against the 66-book grid.
+  static const Map<String, String> _spellingAliases = {
+    'Numberi': 'Numeri', // source-data typo
+    '1 Corinthiërs': '1 Korinthe',
+    '1 Corinthiers': '1 Korinthe',
+    '1 Korintiërs': '1 Korinthe',
+    '2 Corinthiër': '2 Korinthe',
+    '2 Corinthiërs': '2 Korinthe',
+    '2 Korintiërs': '2 Korinthe',
+    'Colossenzen': 'Kolossenzen',
+    'Efeze': 'Efeziërs',
+    'Filemon': 'Filémon',
+    'Matteüs': 'Mattheüs',
+    'Marcus': 'Markus',
+    'Lucas': 'Lukas',
+    '1 Tessalonicenzen': '1 Thessalonicenzen',
+    '2 Tessalonicenzen': '2 Thessalonicenzen',
+  };
+
+  static final Set<String> _canonical = {...oldTestament, ...newTestament};
+
+  /// The canonical Dutch book name for [name], whatever a translation called it
+  /// (English, or a Statenvertaling spelling). Falls back to [name] unchanged
+  /// when it is already canonical or is not recognised.
+  static String toCanonical(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || _canonical.contains(trimmed)) return trimmed;
+    return _spellingAliases[trimmed] ?? _englishToDutch[trimmed] ?? trimmed;
+  }
 }

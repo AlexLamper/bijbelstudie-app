@@ -185,6 +185,30 @@ class DashboardData {
   /// How many of the 66 books have at least one chapter read.
   int get booksStarted => readChapters.values.where((c) => c.isNotEmpty).length;
 
+  /// Folds `readChapters` keys onto their canonical Dutch spelling and merges
+  /// the chapter lists behind keys that collapse together.
+  ///
+  /// The server does this now too, but an older build of the API — or a
+  /// response served from cache — can still hand back keys spelled the way the
+  /// translation that was read spells them ("1 Corinthiërs", "John",
+  /// "Numberi"). Without this fold those chapters never match the 66-book grid
+  /// and never count towards "… van 66 boeken geopend".
+  static Map<String, List<int>> _canonicaliseProgress(Map<String, dynamic> raw) {
+    final out = <String, List<int>>{};
+    raw.forEach((book, chapters) {
+      final key = BibleBooks.toCanonical(book);
+      final nums = (chapters as List? ?? const [])
+          .map((c) => (c as num).toInt())
+          .where((n) => n >= 1);
+      out.update(
+        key,
+        (existing) => {...existing, ...nums}.toList()..sort(),
+        ifAbsent: () => nums.toSet().toList()..sort(),
+      );
+    });
+    return out;
+  }
+
   factory DashboardData.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>? ?? const {};
     final weekly = json['weeklyStats'] as Map<String, dynamic>? ?? const {};
@@ -195,14 +219,7 @@ class DashboardData {
       isPro: user['isPro'] as bool? ?? false,
       streak: (json['streak'] as num?)?.toInt() ?? 0,
       freezes: (json['freezes'] as num?)?.toInt() ?? 0,
-      readChapters: rawProgress.map(
-        (book, chapters) => MapEntry(
-          book,
-          (chapters as List? ?? const [])
-              .map((c) => (c as num).toInt())
-              .toList(growable: false),
-        ),
-      ),
+      readChapters: _canonicaliseProgress(rawProgress),
       weekDays: (weekly['days'] as List? ?? const [])
           .map((d) => WeekDay.fromJson(d as Map<String, dynamic>))
           .toList(growable: false),

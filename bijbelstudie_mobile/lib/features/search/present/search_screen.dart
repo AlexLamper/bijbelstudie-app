@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/db/content_cache.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../bible/data/bible_repository.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
@@ -136,7 +137,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _body(ReaderLocation location) {
-    if (_loading) return const AppLoader();
+    if (_loading) return const SkeletonList(rows: 6);
     if (_error != null) {
       return AppEmptyState(icon: Icons.error_outline, title: 'Zoeken mislukt', description: _error);
     }

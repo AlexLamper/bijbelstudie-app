@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/config/preview_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
@@ -18,6 +19,7 @@ import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
 import 'offline_library_sheet.dart';
+import 'reader_settings_sheet.dart';
 import 'source_picker_sheet.dart';
 
 /// The reader. Everything else in the app exists to get someone here.
@@ -155,7 +157,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     if (!location.restored) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: const SafeArea(child: AppLoader()),
+        body: const SafeArea(child: ReaderSkeleton()),
       );
     }
 
@@ -183,7 +185,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
               child: TourAnchor(
                 id: TourAnchorIds.readerText,
                 child: chapterAsync.when(
-                  loading: () => const AppLoader(),
+                  loading: () => const ReaderSkeleton(),
                   error: (error, _) => _ReaderError(error: error),
                   data: (chapter) {
                     _recordChapterOpen(location);
@@ -287,6 +289,11 @@ class _ReaderBar extends ConsumerWidget {
             ),
           ),
           _OfflineButton(location: location),
+          IconButton(
+            tooltip: 'Weergave',
+            onPressed: () => showReaderSettingsSheet(context, ref),
+            icon: const Icon(Icons.text_fields, size: 20),
+          ),
           IconButton(
             tooltip: 'Vertaling kiezen',
             onPressed: () => showVersionPickerSheet(context, ref),
@@ -430,6 +437,7 @@ class _VerseRow extends ConsumerWidget {
               fontFamily: settings.fontFamily.fontName,
               fontSize: fontSize,
               height: settings.lineHeight.factor,
+              letterSpacing: settings.letterSpacing.points,
               color: Theme.of(context).textTheme.bodyLarge?.color,
             ),
           ),

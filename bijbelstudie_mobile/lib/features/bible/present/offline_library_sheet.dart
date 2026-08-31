@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/db/content_cache.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../data/bible_repository.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
@@ -105,8 +106,8 @@ class OfflineBooksList extends ConsumerWidget {
 
     return booksAsync.when(
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: AppLoader(size: 20),
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: SkeletonText(lines: 4, lineHeight: 12, gap: 14),
       ),
       error: (_, __) => Text(
         'Opgeslagen boeken konden niet worden gelezen.',

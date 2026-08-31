@@ -16,6 +16,8 @@ enum ReaderLineHeight { snug, normal, relaxed, loose }
 
 enum ReaderFontFamily { sans, serif, mono }
 
+enum ReaderLetterSpacing { tight, normal, wide, wider }
+
 extension ReaderFontSizeX on ReaderFontSize {
   String get id => switch (this) {
     ReaderFontSize.small => 'sm',
@@ -83,6 +85,37 @@ extension ReaderLineHeightSyncX on ReaderLineHeight {
   String get syncId => this == ReaderLineHeight.snug ? 'normal' : id;
 }
 
+extension ReaderLetterSpacingX on ReaderLetterSpacing {
+  String get id => switch (this) {
+    ReaderLetterSpacing.tight => 'tight',
+    ReaderLetterSpacing.normal => 'normal',
+    ReaderLetterSpacing.wide => 'wide',
+    ReaderLetterSpacing.wider => 'wider',
+  };
+
+  String get label => switch (this) {
+    ReaderLetterSpacing.tight => 'Krap',
+    ReaderLetterSpacing.normal => 'Normaal',
+    ReaderLetterSpacing.wide => 'Ruim',
+    ReaderLetterSpacing.wider => 'Zeer ruim',
+  };
+
+  /// Logical pixels added between glyphs, passed straight to
+  /// [TextStyle.letterSpacing].
+  double get points => switch (this) {
+    ReaderLetterSpacing.tight => -0.3,
+    ReaderLetterSpacing.normal => 0.0,
+    ReaderLetterSpacing.wide => 0.6,
+    ReaderLetterSpacing.wider => 1.2,
+  };
+
+  static ReaderLetterSpacing fromId(String? id) =>
+      ReaderLetterSpacing.values.firstWhere(
+        (v) => v.id == id,
+        orElse: () => ReaderLetterSpacing.normal,
+      );
+}
+
 extension ReaderFontFamilyX on ReaderFontFamily {
   String get id => switch (this) {
     ReaderFontFamily.sans => 'sans',
@@ -116,6 +149,7 @@ class ReadingSettings {
     this.fontSize = ReaderFontSize.base,
     this.lineHeight = ReaderLineHeight.relaxed,
     this.fontFamily = ReaderFontFamily.sans,
+    this.letterSpacing = ReaderLetterSpacing.normal,
     this.showVerseNumbers = true,
     this.themeMode = ThemeMode.system,
     this.dailyReminderMinutes,
@@ -129,6 +163,7 @@ class ReadingSettings {
   final ReaderFontSize fontSize;
   final ReaderLineHeight lineHeight;
   final ReaderFontFamily fontFamily;
+  final ReaderLetterSpacing letterSpacing;
   final bool showVerseNumbers;
   final ThemeMode themeMode;
 
@@ -156,6 +191,7 @@ class ReadingSettings {
     ReaderFontSize? fontSize,
     ReaderLineHeight? lineHeight,
     ReaderFontFamily? fontFamily,
+    ReaderLetterSpacing? letterSpacing,
     bool? showVerseNumbers,
     ThemeMode? themeMode,
     int? dailyReminderMinutes,
@@ -170,6 +206,7 @@ class ReadingSettings {
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
       fontFamily: fontFamily ?? this.fontFamily,
+      letterSpacing: letterSpacing ?? this.letterSpacing,
       showVerseNumbers: showVerseNumbers ?? this.showVerseNumbers,
       themeMode: themeMode ?? this.themeMode,
       dailyReminderMinutes:
@@ -186,6 +223,7 @@ class ReadingSettings {
 const _kFontSize = 'reader.fontSize';
 const _kLineHeight = 'reader.lineHeight';
 const _kFontFamily = 'reader.fontFamily';
+const _kLetterSpacing = 'reader.letterSpacing';
 const _kVerseNumbers = 'reader.showVerseNumbers';
 const _kThemeMode = 'app.themeMode';
 
@@ -248,6 +286,7 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
       fontSize: ReaderFontSizeX.fromId(prefs.getString(_kFontSize)),
       lineHeight: ReaderLineHeightX.fromId(prefs.getString(_kLineHeight)),
       fontFamily: ReaderFontFamilyX.fromId(prefs.getString(_kFontFamily)),
+      letterSpacing: ReaderLetterSpacingX.fromId(prefs.getString(_kLetterSpacing)),
       showVerseNumbers: prefs.getBool(_kVerseNumbers) ?? true,
       themeMode: switch (prefs.getString(_kThemeMode)) {
         'light' => ThemeMode.light,
@@ -281,6 +320,12 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
     _written = true;
     state = state.copyWith(fontFamily: value);
     (await SharedPreferences.getInstance()).setString(_kFontFamily, value.id);
+  }
+
+  Future<void> setLetterSpacing(ReaderLetterSpacing value) async {
+    _written = true;
+    state = state.copyWith(letterSpacing: value);
+    (await SharedPreferences.getInstance()).setString(_kLetterSpacing, value.id);
   }
 
   Future<void> setShowVerseNumbers(bool value) async {

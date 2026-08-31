@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../data/study_models.dart';
 import '../data/study_plan_store.dart';
 import 'studies_providers.dart';
@@ -82,10 +83,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     const SizedBox(height: 16),
 
                     studies.when(
-                      loading: () => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: AppLoader(),
-                      ),
+                      loading: () => const SkeletonCardColumn(count: 4),
                       error: (error, _) => AppEmptyState(
                         icon: Icons.wifi_off_outlined,
                         title: 'Studies niet geladen',

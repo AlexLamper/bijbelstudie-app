@@ -78,6 +78,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             labelOf: (v) => v.label,
             onChanged: controller.setFontFamily,
           ),
+          const SizedBox(height: 12),
+          _OptionRow<ReaderLetterSpacing>(
+            label: 'Letterafstand',
+            values: ReaderLetterSpacing.values,
+            selected: settings.letterSpacing,
+            labelOf: (v) => v.label,
+            onChanged: controller.setLetterSpacing,
+          ),
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -353,6 +361,7 @@ class _SamplePreview extends StatelessWidget {
           fontFamily: settings.fontFamily.fontName,
           fontSize: settings.fontSize.points,
           height: settings.lineHeight.factor,
+          letterSpacing: settings.letterSpacing.points,
           color: Theme.of(context).textTheme.bodyLarge?.color,
         ),
       ),

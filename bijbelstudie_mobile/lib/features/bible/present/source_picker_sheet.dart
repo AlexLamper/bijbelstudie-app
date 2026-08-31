@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../domain/bible_models.dart';
 import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
@@ -74,7 +75,7 @@ class _VersionPicker extends ConsumerWidget {
     return _SheetFrame(
       title: 'Vertaling',
       child: versionsAsync.when(
-        loading: () => const AppLoader(),
+        loading: () => const SkeletonList(rows: 8),
         error: (_, __) => const AppEmptyState(
           icon: Icons.wifi_off_outlined,
           title: 'Vertalingen niet geladen',
@@ -157,7 +158,7 @@ class _BookPickerState extends ConsumerState<_BookPicker> {
     return _SheetFrame(
       title: 'Boek en hoofdstuk',
       child: booksAsync.when(
-        loading: () => const AppLoader(),
+        loading: () => const SkeletonList(rows: 10),
         error: (error, __) => AppEmptyState(
           icon: error is ContentNotLicensedException
               ? Icons.gavel_outlined
@@ -228,7 +229,7 @@ class _ChapterGrid extends ConsumerWidget {
       child: chaptersAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 16),
-          child: AppLoader(size: 20),
+          child: SkeletonText(lines: 2, lineHeight: 12, gap: 12),
         ),
         error: (_, __) => Text('Hoofdstukken niet geladen', style: AppTheme.bodyMuted),
         data: (chapters) => Column(

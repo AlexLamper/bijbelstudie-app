@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/notes_repository.dart';
@@ -75,7 +76,7 @@ class _NotesTab extends ConsumerWidget {
     final notesAsync = ref.watch(notesListProvider);
 
     return notesAsync.when(
-      loading: () => const AppLoader(),
+      loading: () => const SkeletonList(),
       error: (_, __) => const _LoadError(),
       data: (notes) {
         if (notes.isEmpty) {
@@ -104,7 +105,7 @@ class _HighlightsTab extends ConsumerWidget {
     final highlightsAsync = ref.watch(highlightsListProvider);
 
     return highlightsAsync.when(
-      loading: () => const AppLoader(),
+      loading: () => const SkeletonList(),
       error: (_, __) => const _LoadError(),
       data: (highlights) {
         if (highlights.isEmpty) {
@@ -132,7 +133,7 @@ class _BookmarksTab extends ConsumerWidget {
     final bookmarksAsync = ref.watch(bookmarksProvider);
 
     return bookmarksAsync.when(
-      loading: () => const AppLoader(),
+      loading: () => const SkeletonList(),
       error: (_, __) => const _LoadError(),
       data: (bookmarks) {
         if (bookmarks.isEmpty) {

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../feedback/present/feedback_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
@@ -25,7 +26,7 @@ class ProfileScreen extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: profileAsync.when(
-          loading: () => const AppLoader(),
+          loading: () => const _ProfileSkeleton(),
           error: (_, __) => AppEmptyState(
             icon: Icons.wifi_off_outlined,
             title: 'Profiel niet geladen',
@@ -71,10 +72,6 @@ class _ProfileBody extends ConsumerWidget {
         RuleGrid(
           children: [
             RuleListTile(
-              onTap: () => context.go('/groups'),
-              child: const _NavRow(icon: Icons.groups_outlined, label: 'Groepen'),
-            ),
-            RuleListTile(
               onTap: () => context.go('/resources'),
               child: const _NavRow(
                 icon: Icons.local_library_outlined,
@@ -95,9 +92,20 @@ class _ProfileBody extends ConsumerWidget {
         RuleGrid(
           children: [
             RuleListTile(
+              showRule: false,
               onTap: () => context.push('/settings'),
               child: const _NavRow(icon: Icons.tune, label: 'Lezen en meldingen'),
             ),
+          ],
+        ),
+
+        // "Feedback geven", "Privacybeleid" en "Gebruiksvoorwaarden" zijn geen
+        // instellingen — die staan hieronder onder Ondersteuning en Juridisch.
+        const SizedBox(height: 28),
+        const SectionHeader(title: 'Ondersteuning'),
+        const SizedBox(height: 12),
+        RuleGrid(
+          children: [
             RuleListTile(
               onTap: () => context.push('/tour'),
               child: const _NavRow(
@@ -106,12 +114,21 @@ class _ProfileBody extends ConsumerWidget {
               ),
             ),
             RuleListTile(
+              showRule: false,
               onTap: () => showFeedbackSheet(context, ref),
               child: const _NavRow(
                 icon: Icons.chat_bubble_outline,
                 label: 'Feedback geven',
               ),
             ),
+          ],
+        ),
+
+        const SizedBox(height: 28),
+        const SectionHeader(title: 'Juridisch'),
+        const SizedBox(height: 12),
+        RuleGrid(
+          children: [
             RuleListTile(
               onTap: () => _open(AppConfig.privacyPolicyUrl),
               child: const _NavRow(icon: Icons.privacy_tip_outlined, label: 'Privacybeleid'),
@@ -211,6 +228,45 @@ class _ProfileBody extends ConsumerWidget {
         const SnackBar(content: Text('Verwijderen mislukt. Probeer het opnieuw.')),
       );
     }
+  }
+}
+
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      children: [
+        const Skeleton(height: 10, width: 70),
+        const SizedBox(height: 14),
+        const Skeleton(height: 22, width: 160),
+        const SizedBox(height: 10),
+        const Skeleton(height: 12, width: 200),
+        const SizedBox(height: 24),
+        SkeletonCard(height: 150, child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Skeleton(height: 20, width: 70, radius: 20),
+            SizedBox(height: 14),
+            Skeleton(height: 16, width: 150),
+            SizedBox(height: 10),
+            SkeletonText(lines: 2, lineHeight: 11),
+          ],
+        )),
+        const SizedBox(height: 28),
+        for (var i = 0; i < 3; i++) ...[
+          const Skeleton(height: 14, width: 110),
+          const SizedBox(height: 12),
+          const SkeletonCard(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: SkeletonText(lines: 2, lineHeight: 12),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ],
+    );
   }
 }
 

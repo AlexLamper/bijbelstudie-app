@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../premium/present/upgrade_prompt.dart';
@@ -56,7 +57,7 @@ class CommentaryPane extends ConsumerWidget {
           ),
         Expanded(
           child: chapterAsync.when(
-            loading: () => const AppLoader(),
+            loading: () => const ReaderSkeleton(),
             error: (error, _) => AppEmptyState(
               icon: error is ContentNotLicensedException
                   ? Icons.gavel_outlined
@@ -219,7 +220,7 @@ class OriginalTextPane extends ConsumerWidget {
     );
 
     return originalAsync.when(
-      loading: () => const AppLoader(),
+      loading: () => const ReaderSkeleton(),
       error: (_, __) => const AppEmptyState(
         icon: Icons.translate_outlined,
         title: 'Geen grondtekst',

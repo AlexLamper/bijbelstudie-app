@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/data/bible_books.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
@@ -32,7 +33,7 @@ class DashboardScreen extends ConsumerWidget {
       // which adds the status-bar inset itself), so only the loading / error
       // states — which have no header of their own — keep the top SafeArea.
       body: dashboard.when(
-        loading: () => const SafeArea(child: AppLoader()),
+        loading: () => const DashboardSkeleton(),
         error: (error, _) => SafeArea(
           child: AppEmptyState(
             icon: Icons.cloud_off_outlined,
@@ -516,8 +517,8 @@ class _RecommendedStudiesCard extends ConsumerWidget {
           const SizedBox(height: 12),
           studies.when(
             loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: AppLoader(size: 20),
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: SkeletonText(lines: 4, lineHeight: 12, gap: 14),
             ),
             error: (_, __) => Text(
               'Studies konden niet worden geladen.',
@@ -870,7 +871,6 @@ class _QuickLinksCard extends StatelessWidget {
       ('/study', 'Bijbelstudie', Icons.menu_book_outlined),
       ('/notes', 'Mijn notities', Icons.sticky_note_2_outlined),
       ('/resources', 'Hulpbronnen', Icons.local_library_outlined),
-      ('/groups', 'Groepen', Icons.groups_outlined),
     ];
 
     return AppCard(

@@ -17,8 +17,6 @@ import '../../features/auth/present/register_screen.dart';
 import '../../features/bible/present/read_screen.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
-import '../../features/groups/present/group_detail_screen.dart';
-import '../../features/groups/present/groups_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
@@ -31,9 +29,10 @@ import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
 /// (`components/layout/app-sidebar.tsx`): Dashboard, Bijbelstudie, Studies,
-/// Groepen, Notities, Hulpbronnen — trimmed to the five that fit a phone bar,
-/// with Hulpbronnen and Groepen reachable from the dashboard's "Snel naar"
-/// card and from Profiel.
+/// Notities, Hulpbronnen — trimmed to the five that fit a phone bar, with
+/// Hulpbronnen reachable from the dashboard's "Snel naar" card and from
+/// Profiel. Groepen is hidden for the MVP: no tab, no links, and `/groups`
+/// redirects to the dashboard so a stale deep link cannot strand anyone.
 class MainScaffold extends StatelessWidget {
   const MainScaffold({super.key, required this.child});
 
@@ -98,7 +97,7 @@ class MainScaffold extends StatelessWidget {
     }
     // Sections without their own tab still highlight where they belong.
     if (location.startsWith('/read') || location.startsWith('/commentary')) return 1;
-    if (location.startsWith('/groups') || location.startsWith('/resources')) return 0;
+    if (location.startsWith('/resources')) return 0;
     if (location.startsWith('/search')) return 1;
     return 0;
   }
@@ -166,6 +165,28 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+/// The "into the app" transition: the screen fades up from a hair under full
+/// size, so arriving from the splash reads as a move inward rather than a cut.
+/// Used for the three routes the splash can hand off to.
+Page<void> _diveInPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 440),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, _, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: Transform.scale(scale: 0.96 + 0.04 * curved.value, child: child),
+      );
+    },
+    child: child,
+  );
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     // Design-preview mode skips splash/onboarding/login and lands on the
@@ -175,12 +196,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) =>
+            _diveInPage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) =>
-            LoginScreen(sessionExpired: state.uri.queryParameters['expired'] == '1'),
+        pageBuilder: (context, state) => _diveInPage(
+          state,
+          LoginScreen(
+            sessionExpired: state.uri.queryParameters['expired'] == '1',
+          ),
+        ),
       ),
       GoRoute(
         path: '/register',
@@ -201,7 +227,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (context, state) =>
+                _diveInPage(state, const DashboardScreen()),
           ),
           GoRoute(path: '/study', builder: (context, state) => const StudyScreen()),
           GoRoute(
@@ -218,7 +245,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/resources',
             builder: (context, state) => const ResourcesScreen(),
           ),
-          GoRoute(path: '/groups', builder: (context, state) => const GroupsScreen()),
+          // Groepen is out for the MVP. The route stays as a redirect so any
+          // persisted route or old deep link resolves instead of hitting the
+          // not-found page.
+          GoRoute(path: '/groups', redirect: (context, state) => '/dashboard'),
           GoRoute(path: '/read', builder: (context, state) => const ReadScreen()),
           GoRoute(
             path: '/commentary',
@@ -229,11 +259,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/groups/:id',
-        builder: (context, state) =>
-            GroupDetailScreen(groupId: state.pathParameters['id']!),
+        redirect: (context, state) => '/dashboard',
       ),
-      // Outside the shell, like `/groups/:id`: a study is configured and then
-      // left for the reader, so it gets a back arrow rather than a tab bar.
+      // Outside the shell: a study is configured and then left for the reader,
+      // so it gets a back arrow rather than a tab bar.
       GoRoute(
         path: '/studies/:id',
         builder: (context, state) =>

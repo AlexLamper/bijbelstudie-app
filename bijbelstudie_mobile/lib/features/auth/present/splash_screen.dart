@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/data/onboarding_gate.dart';
 import '../../onboarding/data/onboarding_storage.dart';
@@ -15,16 +14,55 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with TickerProviderStateMixin {
+  /// Fills the loading bar. Runs once over ~1.6s and is what the reader
+  /// watches instead of a spinner. The real auth work usually finishes before
+  /// it does; [_leave] waits for the bar to land so the hand-off looks
+  /// deliberate rather than cut short.
+  late final AnimationController _progress = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..forward();
+
+  /// The short "into the app" move: the wordmark scales up a touch and the
+  /// whole splash fades out, so the first real screen is dived into rather
+  /// than swapped in.
+  late final AnimationController _exit = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  bool _leaving = false;
+
   @override
   void initState() {
     super.initState();
     _checkAuth();
   }
 
+  @override
+  void dispose() {
+    _progress.dispose();
+    _exit.dispose();
+    super.dispose();
+  }
+
+  /// Plays the exit animation, then routes on. Every navigation in
+  /// [_checkAuth] goes through here so the transition is never skipped.
+  Future<void> _leave(String route) async {
+    if (_leaving || !mounted) return;
+    _leaving = true;
+    // Let the bar finish if it has not yet, then dive in.
+    if (_progress.value < 1) await _progress.forward();
+    if (!mounted) return;
+    await _exit.forward();
+    if (mounted) context.go(route);
+  }
+
   Future<void> _checkAuth() async {
-    // Artificial delay to show logo
-    await Future.delayed(const Duration(seconds: 2));
+    // Hold on the wordmark while the loading bar fills.
+    await Future.delayed(const Duration(milliseconds: 900));
 
     final storage = ref.read(authStorageProvider);
     final token = await storage.getToken();
@@ -60,7 +98,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ref.read(readerLocationProvider);
 
       final route = await resolvePostAuthRoute(ref);
-      if (mounted) context.go(route);
+      await _leave(route);
       return;
     }
 
@@ -68,24 +106,64 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         .read(onboardingStorageProvider)
         .hasSeen();
     if (!mounted) return;
-    context.go(hasSeenOnboarding ? '/login' : '/onboarding');
+    await _leave(hasSeenOnboarding ? '/login' : '/onboarding');
   }
 
   @override
   Widget build(BuildContext context) {
     // Paper background with the site wordmark — the site has no dark hero.
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.paper,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            BijbelStudieWordmark(fontSize: 34),
-            SizedBox(height: 18),
-            Text('LEES EN BESTUDEER DE BIJBEL', style: AppTheme.overline),
-            SizedBox(height: 44),
-            AppLoader(size: 20),
-          ],
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_progress, _exit]),
+          builder: (context, _) {
+            final exit = Curves.easeIn.transform(_exit.value);
+            return Opacity(
+              opacity: 1 - exit,
+              child: Transform.scale(
+                scale: 1 + exit * 0.12,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const BijbelStudieWordmark(fontSize: 34),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'LEES EN BESTUDEER DE BIJBEL',
+                      style: AppTheme.overline,
+                    ),
+                    const SizedBox(height: 44),
+                    _LoadingBar(value: Curves.easeOut.transform(_progress.value)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// A slim determinate bar — the professional stand-in for the old spinner on
+/// the launch screen.
+class _LoadingBar extends StatelessWidget {
+  const _LoadingBar({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 168,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+        child: LinearProgressIndicator(
+          value: value.clamp(0.0, 1.0),
+          minHeight: 4,
+          backgroundColor: AppTheme.paperSunkenStrong,
+          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.lapis),
         ),
       ),
     );
