@@ -229,7 +229,9 @@ jobs:
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
             archive \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE="$PP_UUID"
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
 
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
@@ -295,8 +297,16 @@ jobs:
             || echo "(could not read Assets.car)"
           echo "────────────────────────────────────────────────────────────────"
 
-          if ! /usr/libexec/PlistBuddy -c "Print CFBundleIconName" "$APP_PLIST" >/dev/null 2>&1; then
-            echo "CFBundleIconName is missing from the built app."
+          # actool writes the icon name nested under CFBundlePrimaryIcon, and
+          # only sometimes mirrors it to the top level. This gate used to read
+          # the top-level key alone and so failed builds whose icon had in fact
+          # compiled correctly — Assets.car, the AppIcon renditions and the
+          # loose PNGs were all present and correct every time it fired.
+          # Accept either location; what matters is that the name is there.
+          if ! /usr/libexec/PlistBuddy -c "Print CFBundleIconName" "$APP_PLIST" >/dev/null 2>&1 \
+             && ! /usr/libexec/PlistBuddy -c "Print CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName" "$APP_PLIST" >/dev/null 2>&1; then
+            echo "CFBundleIconName is missing from the built app, at the top"
+            echo "level and under CFBundleIcons:CFBundlePrimaryIcon alike."
             echo "The asset catalog itself is not the suspect: the icon set, its"
             echo "image dimensions and ASSETCATALOG_COMPILER_APPICON_NAME have all"
             echo "been verified. Read the diagnostics above to tell the two cases"
