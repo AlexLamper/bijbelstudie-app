@@ -129,9 +129,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 44),
             const Eyebrow('Inloggen'),
             const SizedBox(height: 18),
-            const Text('Welkom terug', style: AppTheme.displayLarge),
+            Text('Welkom terug', style: AppTheme.displayLarge),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Log in om verder te lezen waar je gebleven was en je notities '
               'terug te vinden.',
               style: AppTheme.bodyLead,
@@ -208,7 +208,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Text.rich(
                   TextSpan(
                     style: AppTheme.bodyMuted,
-                    children: const [
+                    children: [
                       TextSpan(text: 'Nog geen account?  '),
                       TextSpan(
                         text: 'Registreren',

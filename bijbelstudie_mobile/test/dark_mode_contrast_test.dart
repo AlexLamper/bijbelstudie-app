@@ -7,23 +7,22 @@ import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 
 /// Guards the app against the rejection it actually received.
 ///
-/// App review 1.0 (7), guideline 4 — Design, on an iPad Air 11-inch running
+/// App review 1.0 (7), guideline 4 - Design, on an iPad Air 11-inch running
 /// iPadOS 26.6.1:
 ///
 /// > We noticed the font colour used makes it hard to read with the background
 /// > colour, this is for user who use the dark mode setting on their device.
 ///
-/// The cause was structural, not a few bad screens. `AppTheme` publishes its
+/// The cause was structural, not a few bad screens. `AppTheme` published its
 /// type ramp as `static const TextStyle`s, and a const cannot depend on
-/// brightness, so thirteen of the fourteen bake a light-mode colour:
-/// `displaySmall` is `ink` (#111827) whatever the theme says. `ThemeData` was
-/// built correctly for both brightnesses, so a bare `Text` was always fine —
-/// but `Text(…, style: AppTheme.displaySmall)` painted near-black on the dark
-/// scaffold, which is why the paywall's own headline was invisible.
+/// brightness, so thirteen of the fourteen baked a light-mode colour:
+/// `displaySmall` was `ink` (#111827) whatever the theme said. The ramp and
+/// the semantic palette are brightness-resolved getters now, fed by
+/// [AppTheme.applyBrightness] from the root widget in main.dart, and dark mode
+/// is back on.
 ///
-/// The app is therefore pinned to the light theme, and these tests hold that
-/// line: one fails the moment dark mode is switched back on while the ramp is
-/// still unfixed, and the others say what has to be true before it can be.
+/// These tests are what keeps it shippable: every ramp style, resolved in dark
+/// brightness, has to clear WCAG AA against every surface a screen paints on.
 void main() {
   /// Relative luminance, WCAG 2.1.
   double luminance(Color c) {
@@ -38,6 +37,13 @@ void main() {
     return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
   }
 
+  /// WCAG AA: 3:1 for large text (>=18pt, or >=14pt bold), 4.5:1 otherwise.
+  double thresholdFor(TextStyle style) {
+    final size = style.fontSize ?? 14;
+    final bold = (style.fontWeight?.index ?? 0) >= FontWeight.w700.index;
+    return (size >= 18 || (size >= 14 && bold)) ? 3.0 : 4.5;
+  }
+
   /// Every surface a screen paints text onto, in the dark palette.
   const darkSurfaces = <String, Color>{
     'paper': AppTheme.darkPaper,
@@ -46,8 +52,9 @@ void main() {
     'paperSunkenStrong': AppTheme.darkPaperSunkenStrong,
   };
 
-  /// The type ramp, by the name a call site would use.
-  const ramp = <String, TextStyle>{
+  /// The type ramp, by the name a call site would use, resolved against the
+  /// brightness that is current when this runs.
+  Map<String, TextStyle> ramp() => <String, TextStyle>{
     'displayLarge': AppTheme.displayLarge,
     'displayMedium': AppTheme.displayMedium,
     'displaySmall': AppTheme.displaySmall,
@@ -64,84 +71,91 @@ void main() {
     'buttonLabel': AppTheme.buttonLabel,
   };
 
-  /// Ramp entries whose baked colour is unreadable somewhere in the dark
-  /// palette, with the worst ratio each one reaches.
-  Map<String, double> unreadableInDark() {
-    final worst = <String, double>{};
-    for (final entry in ramp.entries) {
-      final color = entry.value.color;
-      if (color == null) continue;
+  // The flag is process-wide, so every test here puts it back. A test file
+  // that leaked dark brightness would quietly recolour the render tests.
+  setUp(() => AppTheme.applyBrightness(Brightness.dark));
+  tearDown(() => AppTheme.applyBrightness(Brightness.light));
 
-      final size = entry.value.fontSize ?? 14;
-      final bold = (entry.value.fontWeight?.index ?? 0) >= FontWeight.w700.index;
-      // WCAG AA: 3:1 for large text (>=18pt, or >=14pt bold), 4.5:1 otherwise.
-      final threshold = (size >= 18 || (size >= 14 && bold)) ? 3.0 : 4.5;
+  test('the ramp resolves against brightness rather than baking a colour', () {
+    AppTheme.applyBrightness(Brightness.light);
+    final light = ramp();
+    AppTheme.applyBrightness(Brightness.dark);
+    final dark = ramp();
 
-      for (final surface in darkSurfaces.values) {
-        final ratio = contrast(color, surface);
-        if (ratio < threshold) {
-          worst[entry.key] = math.min(worst[entry.key] ?? 99, ratio);
-        }
+    final unchanged = <String>[];
+    for (final entry in dark.entries) {
+      if (entry.value.color == null) continue; // buttonLabel inherits.
+      if (entry.value.color == light[entry.key]!.color) {
+        unchanged.add(entry.key);
       }
     }
-    return worst;
-  }
 
-  test('the ramp is still light-only, which is why dark mode is off', () {
-    final broken = unreadableInDark();
-
-    // Characterises the damage rather than asserting a count, so a failure
-    // reads as the actual list instead of "expected 13, got 12".
     expect(
-      broken,
-      isNotEmpty,
+      unchanged,
+      isEmpty,
       reason:
-          'No ramp style is unreadable on the dark palette any more. If that is '
-          'because the ramp became context-resolved, dark mode can come back: '
-          'restore themeMode/darkTheme in main.dart and the Thema picker in '
-          'settings_screen.dart, then delete this test.',
+          'These ramp styles paint the same colour in both brightnesses, so '
+          'they are back to being light-only: $unchanged. That is the '
+          'guideline 4 rejection.',
     );
   });
 
-  testWidgets('a dark-mode device still gets the light theme', (tester) async {
-    // The rejection, reproduced: platform brightness dark, and the app must
-    // not follow it.
+  group('every ramp style clears AA on every dark surface', () {
+    for (final name in ramp().keys) {
+      for (final surface in darkSurfaces.entries) {
+        test('$name on ${surface.key}', () {
+          final style = ramp()[name]!;
+          final color = style.color;
+          if (color == null) return; // Inherits from the ThemeData role.
+
+          final threshold = thresholdFor(style);
+          final ratio = contrast(color, surface.value);
+          expect(
+            ratio,
+            greaterThanOrEqualTo(threshold),
+            reason:
+                '$name ($color, ${style.fontSize}pt ${style.fontWeight}) on '
+                '${surface.key} (${surface.value}) is only '
+                '${ratio.toStringAsFixed(2)}:1, below $threshold:1. Move the '
+                'dark palette value - never the threshold.',
+          );
+        });
+      }
+    }
+  });
+
+  testWidgets('a dark-mode device gets the dark theme', (tester) async {
+    // The rejection, reproduced: platform brightness dark. main.dart passes
+    // the stored ThemeMode straight through, so `system` is what a device
+    // that has never been asked resolves with.
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-    late Brightness rendered;
+    late ThemeData rendered;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.lightTheme,
-        themeMode: ThemeMode.light,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
         home: Builder(
           builder: (context) {
-            rendered = Theme.of(context).brightness;
+            rendered = Theme.of(context);
             return const SizedBox.shrink();
           },
         ),
       ),
     );
 
-    expect(
-      rendered,
-      Brightness.light,
-      reason:
-          'The app rendered dark on a dark-mode device. Every const in the type '
-          'ramp carries a light colour, so this is the guideline 4 rejection '
-          'coming back.',
-    );
+    expect(rendered.brightness, Brightness.dark);
+    expect(rendered.scaffoldBackgroundColor, AppTheme.darkPaper);
   });
 
   group('the dark palette itself is sound, and stays that way', () {
-    // Kept alive on purpose. The palette is not the problem — the const ramp
-    // is — and these are the values a context-resolved ramp would resolve to,
-    // so they have to still be correct when that work happens.
     const foregrounds = <String, Color>{
       'darkInk': AppTheme.darkInk,
       'darkInkSoft': AppTheme.darkInkSoft,
       'darkInkMuted': AppTheme.darkInkMuted,
+      'darkInkFaint': AppTheme.darkInkFaint,
       'darkTeal': AppTheme.darkTeal,
       'darkFlame': AppTheme.darkFlame,
       'darkPositive': AppTheme.darkPositive,
@@ -164,30 +178,32 @@ void main() {
     }
   });
 
-  test('the dark body roles that already fail AA are recorded, not forgotten', () {
-    // `darkInkMuted` (#808080) clears 3:1 but not the 4.5:1 body text needs, on
-    // every surface lighter than the scaffold. Fixing the ramp alone would not
-    // be enough — this has to move too, or muted body text in dark mode is
-    // still below AA.
+  test('the dark body roles clear AA, not just the large-text ratio', () {
+    // `--muted-foreground` on the website is #808080, which clears 3:1 but not
+    // the 4.5:1 body text needs on #333333. The app deliberately runs a
+    // lighter value; this is what stops it drifting back.
     final text = AppTheme.darkTheme.textTheme;
     final failing = <String>[];
 
-    for (final role in {'bodyMedium': text.bodyMedium, 'bodySmall': text.bodySmall}.entries) {
+    for (final role in {
+      'bodyLarge': text.bodyLarge,
+      'bodyMedium': text.bodyMedium,
+      'bodySmall': text.bodySmall,
+      'labelMedium': text.labelMedium,
+      'labelSmall': text.labelSmall,
+    }.entries) {
       final color = role.value?.color;
       if (color == null) continue;
       for (final surface in darkSurfaces.entries) {
-        if (contrast(color, surface.value) < 4.5) {
-          failing.add('${role.key} on ${surface.key}');
+        final ratio = contrast(color, surface.value);
+        if (ratio < 4.5) {
+          failing.add(
+            '${role.key} on ${surface.key} (${ratio.toStringAsFixed(2)}:1)',
+          );
         }
       }
     }
 
-    expect(
-      failing,
-      isNotEmpty,
-      reason:
-          'The dark body roles now clear AA everywhere. Update this test — it '
-          'exists so that fix is not mistaken for one that has not happened.',
-    );
+    expect(failing, isEmpty, reason: 'Below AA in dark mode: $failing');
   });
 }

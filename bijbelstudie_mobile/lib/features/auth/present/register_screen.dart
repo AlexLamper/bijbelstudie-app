@@ -127,9 +127,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           children: [
             const Eyebrow('Registreren'),
             const SizedBox(height: 18),
-            const Text('Account aanmaken', style: AppTheme.displayLarge),
+            Text('Account aanmaken', style: AppTheme.displayLarge),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Maak een account aan om je leesvoortgang, notities en '
               'markeringen op te slaan en te synchroniseren met de website.',
               style: AppTheme.bodyLead,
@@ -212,7 +212,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: Text.rich(
                   TextSpan(
                     style: AppTheme.bodyMuted,
-                    children: const [
+                    children: [
                       TextSpan(text: 'Heb je al een account?  '),
                       TextSpan(
                         text: 'Inloggen',

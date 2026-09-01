@@ -12,8 +12,10 @@ import 'core/config/app_config.dart';
 import 'core/config/preview_config.dart';
 import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
+import 'features/feedback/present/review_prompt_host.dart';
 import 'features/onboarding/present/tour_overlay.dart';
 import 'features/settings/data/reading_settings.dart';
+import 'features/settings/present/theme_mode_provider.dart';
 
 Future<void> _initRevenueCat() async {
   if (kIsWeb) return;
@@ -119,38 +121,49 @@ class BijbelStudieApp extends ConsumerWidget {
     ref.watch(sessionExpiryWiringProvider);
     final routerConfig = ref.watch(routerProvider);
 
-    // Light only, deliberately.
+    // Dark mode, resolved before anything below this line builds.
     //
-    // App review 1.0 (7) was rejected under guideline 4 on an iPad in dark
-    // mode: "the font colour used makes it hard to read with the background
-    // colour". The cause is structural. `AppTheme` publishes its type ramp as
-    // `static const TextStyle`s and a const cannot depend on brightness, so
-    // thirteen of the fourteen bake a light colour — `displaySmall` is `ink`
-    // (#111827) whatever the theme says. Against the dark scaffold that is
-    // near-black on near-black; the paywall headline was invisible.
-    //
-    // There is no colour that fixes this in place: `inkMuted` clears AA on
-    // white and fails it on #212121, so the ramp has to become
-    // context-resolved before dark mode can come back. That is a refactor of
-    // every call site, and shipping it half-done risks a second guideline 4
-    // rejection, which is worse than not offering dark mode at all — Apple
-    // does not require it.
-    //
-    // `darkTheme` is pinned to the light theme as well as `themeMode`, so the
-    // app stays readable even if something upstream forces dark. The dark
-    // palette in AppTheme is kept, and test/dark_mode_contrast_test.dart holds
-    // the conditions that must be met before this is reverted.
+    // App review 1.0 (7) was rejected under guideline 4 because `AppTheme`
+    // published its type ramp as `static const TextStyle`s: a const cannot
+    // depend on brightness, so thirteen of the fourteen baked a light colour
+    // and painted near-black on the dark scaffold. The ramp and the semantic
+    // palette are getters now, resolved against one app-wide flag, and this
+    // is where that flag is set — before `MaterialApp` builds, so the very
+    // first frame is already correct.
+    final themeMode = ref.watch(themeModeProvider);
+    final brightness = switch (themeMode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => MediaQuery.platformBrightnessOf(context),
+    };
+    if (AppTheme.applyBrightness(brightness)) {
+      SystemChrome.setSystemUIOverlayStyle(AppTheme.overlayStyle);
+    }
+
+    // Keyed on the brightness on purpose. `AppTheme`'s tokens are read at
+    // build time from a static flag, not from an InheritedWidget, so a plain
+    // `Theme` swap would only rebuild the widgets that call `Theme.of` and
+    // leave every `AppTheme.ink` in the tree painting the old palette. The key
+    // discards the subtree instead. go_router holds the route stack in
+    // `routerConfig`, so the current location survives.
     return MaterialApp.router(
+      key: ValueKey(brightness),
       title: 'BijbelStudie',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.lightTheme,
-      themeMode: ThemeMode.light,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: routerConfig,
       // The guided tour paints a spotlight over the running app, so it has to
       // sit above the router's Navigator - including the bottom tab bar, which
       // two of its steps point at. It builds nothing while the tour is off.
-      builder: (context, child) => TourHost(child: child ?? const SizedBox.shrink()),
+      // The rating prompt sits outside the tour host on purpose: it renders
+      // nothing until its gate opens, and it refuses to open while the tour is
+      // running, so the two can never fight over the same window.
+      builder: (context, child) => ReviewPromptHost(
+        enabled: !PreviewConfig.enabled,
+        child: TourHost(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

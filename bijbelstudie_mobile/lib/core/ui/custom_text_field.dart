@@ -65,7 +65,7 @@ class CustomTextField extends StatelessWidget {
               isEmail ? TextCapitalization.none : TextCapitalization.sentences,
           cursorColor: AppTheme.ink,
           cursorWidth: 1.4,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: AppTheme.sansFontName,
             fontSize: 15,
             color: AppTheme.ink,

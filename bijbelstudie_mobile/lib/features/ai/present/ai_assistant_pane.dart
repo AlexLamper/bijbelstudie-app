@@ -336,7 +336,7 @@ class _EmptyPrompt extends StatelessWidget {
               color: AppTheme.ai.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
-            child: const Icon(Icons.auto_awesome, size: 20, color: AppTheme.ai),
+            child: Icon(Icons.auto_awesome, size: 20, color: AppTheme.ai),
           ),
         ),
         const SizedBox(height: 14),
@@ -428,7 +428,7 @@ class _TypingBubble extends StatelessWidget {
           border: Border.all(color: scheme.outline),
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         ),
-        child: const SizedBox(
+        child: SizedBox(
           width: 18,
           height: 18,
           child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.ai),

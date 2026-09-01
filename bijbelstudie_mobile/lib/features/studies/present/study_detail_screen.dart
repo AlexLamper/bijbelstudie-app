@@ -266,7 +266,7 @@ class _Body extends ConsumerWidget {
                   SiteBadge.teal(study.type),
                   const SizedBox(width: 8),
                   if (finished)
-                    const SiteBadge.positive(
+                    SiteBadge.positive(
                       'Voltooid',
                       icon: Icons.check_circle,
                     )

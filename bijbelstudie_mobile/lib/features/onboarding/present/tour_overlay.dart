@@ -364,7 +364,7 @@ class _TourCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.explore_outlined, size: 15, color: AppTheme.teal),
+              Icon(Icons.explore_outlined, size: 15, color: AppTheme.teal),
               const SizedBox(width: 6),
               Expanded(
                 child: Text('Rondleiding · ${index + 1}/$total', style: AppTheme.overline),
@@ -372,7 +372,7 @@ class _TourCard extends StatelessWidget {
               InkWell(
                 onTap: onSkip,
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.all(4),
                   child: Icon(Icons.close, size: 16, color: AppTheme.inkMuted),
                 ),

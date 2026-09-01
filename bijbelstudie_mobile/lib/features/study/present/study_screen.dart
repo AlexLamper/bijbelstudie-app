@@ -303,7 +303,7 @@ class _GeneralInfoPane extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.menu_book_outlined, size: 15, color: AppTheme.teal),
+            Icon(Icons.menu_book_outlined, size: 15, color: AppTheme.teal),
             const SizedBox(width: 8),
             Text(book, style: AppTheme.bodyStrong.copyWith(color: scheme.onSurface)),
           ],
@@ -462,7 +462,7 @@ class _SummaryParagraphText extends StatelessWidget {
         // structure rather than a shouted sentence.
         return Container(
           padding: const EdgeInsets.only(left: 10),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(left: BorderSide(color: AppTheme.teal, width: 3)),
           ),
           child: SelectableText(
@@ -496,7 +496,7 @@ class _SummaryParagraphText extends StatelessWidget {
       spans.add(
         TextSpan(
           text: match.group(0),
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.teal,
             fontWeight: FontWeight.w600,
           ),

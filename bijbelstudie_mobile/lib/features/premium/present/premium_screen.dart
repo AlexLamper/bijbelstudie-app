@@ -239,7 +239,7 @@ class _PriceNotice extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.error_outline, size: 16, color: AppTheme.flame),
+              Icon(Icons.error_outline, size: 16, color: AppTheme.flame),
               const SizedBox(width: 8),
               Text('Prijzen niet beschikbaar', style: AppTheme.bodyStrong),
             ],
@@ -315,7 +315,7 @@ class _Benefits extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(top: 2),
                       child: Icon(Icons.check, size: 16, color: AppTheme.positive),
                     ),

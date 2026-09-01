@@ -111,7 +111,7 @@ class ServerImage extends StatelessWidget {
     return fallback ??
         Container(
           color: AppTheme.paperSunken,
-          child: const Icon(
+          child: Icon(
             Icons.image_not_supported_outlined,
             color: AppTheme.inkMuted,
             size: 20,

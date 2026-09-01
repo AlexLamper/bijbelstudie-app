@@ -129,7 +129,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   children: [
                     const BijbelStudieWordmark(fontSize: 34),
                     const SizedBox(height: 18),
-                    const Text(
+                    Text(
                       'LEES EN BESTUDEER DE BIJBEL',
                       style: AppTheme.overline,
                     ),
@@ -163,7 +163,7 @@ class _LoadingBar extends StatelessWidget {
           value: value.clamp(0.0, 1.0),
           minHeight: 4,
           backgroundColor: AppTheme.paperSunkenStrong,
-          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.lapis),
+          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.lapis),
         ),
       ),
     );
@@ -188,7 +188,7 @@ class BijbelStudieWordmark extends StatelessWidget {
           letterSpacing: fontSize * -0.02,
           color: AppTheme.ink,
         ),
-        children: const [
+        children: [
           TextSpan(text: 'Bijbel'),
           TextSpan(
             text: 'Studie',

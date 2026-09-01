@@ -10,6 +10,7 @@ import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
 import '../../notes/data/notes_repository.dart';
 import '../data/reading_settings.dart';
+import 'theme_mode_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -94,12 +95,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: controller.setShowVerseNumbers,
           ),
 
-          // The Thema picker is gone while the app is light-only. Offering a
-          // Donker option that renders near-black text on a near-black
-          // background is what got 1.0 (7) rejected under guideline 4; a
-          // control that produces an unreadable screen is worse than no
-          // control. See the note in main.dart for what has to change before
-          // it comes back.
+          const SizedBox(height: 8),
+          // Applies on the spot: main.dart watches the same stored value and
+          // resolves AppTheme's brightness from it.
+          _OptionRow<ThemeMode>(
+            label: 'Thema',
+            values: ThemeModeLabelX.pickerOrder,
+            selected: settings.themeMode,
+            labelOf: (v) => v.label,
+            onChanged: controller.setThemeMode,
+          ),
 
           const _ReminderSection(),
 
@@ -298,7 +303,7 @@ class _ReminderTile extends ConsumerWidget {
                   },
                   child: const Text('Uitzetten'),
                 ),
-              const Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
+              Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
             ],
           ),
         ),

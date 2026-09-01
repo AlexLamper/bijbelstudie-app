@@ -229,9 +229,9 @@ class _ResourceCard extends StatelessWidget {
                 ),
               ),
               if (item.locked)
-                const Icon(Icons.lock_outline, size: 15, color: AppTheme.inkFaint)
+                Icon(Icons.lock_outline, size: 15, color: AppTheme.inkFaint)
               else
-                const Icon(Icons.open_in_new, size: 15, color: AppTheme.inkFaint),
+                Icon(Icons.open_in_new, size: 15, color: AppTheme.inkFaint),
             ],
           ),
           const SizedBox(height: 10),

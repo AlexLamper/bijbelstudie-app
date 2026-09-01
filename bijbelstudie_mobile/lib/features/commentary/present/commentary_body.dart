@@ -96,7 +96,7 @@ class _CommentaryBodyState extends State<CommentaryBody> {
         return Padding(
           padding: EdgeInsets.only(top: top(1.6), bottom: em * 0.15),
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(left: BorderSide(color: AppTheme.teal, width: 3)),
             ),
             padding: EdgeInsets.only(left: em * 0.75),
@@ -165,7 +165,7 @@ class _CommentaryBodyState extends State<CommentaryBody> {
           child: Container(
             decoration: BoxDecoration(
               color: AppTheme.teal.withValues(alpha: 0.05),
-              border: const Border(
+              border: Border(
                 left: BorderSide(color: AppTheme.teal, width: 3),
               ),
               borderRadius: const BorderRadius.only(

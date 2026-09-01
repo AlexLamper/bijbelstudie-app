@@ -191,8 +191,8 @@ class SkeletonList extends StatelessWidget {
   }
 }
 
-/// The dashboard while `/dashboard` is in flight — greeting header, the stat
-/// strip, and stand-ins for the cards below it.
+/// The dashboard while `/dashboard` is in flight — greeting header and
+/// stand-ins for the cards below it.
 class DashboardSkeleton extends StatelessWidget {
   const DashboardSkeleton({super.key});
 
@@ -237,17 +237,6 @@ class DashboardSkeleton extends StatelessWidget {
                     Skeleton(height: 20, width: 180),
                     SizedBox(height: 20),
                     Skeleton(height: 38, width: 150, radius: 12),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const SkeletonCard(
-                padding: EdgeInsets.symmetric(vertical: 18, horizontal: 24),
-                child: Row(
-                  children: [
-                    Expanded(child: Center(child: Skeleton(height: 34, width: 60))),
-                    Expanded(child: Center(child: Skeleton(height: 34, width: 60))),
-                    Expanded(child: Center(child: Skeleton(height: 34, width: 60))),
                   ],
                 ),
               ),

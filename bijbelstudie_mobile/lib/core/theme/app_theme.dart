@@ -39,88 +39,118 @@ class AppTheme {
   static const String monoFontName = 'Geist Mono';
 
   // ---------------------------------------------------------------------
-  // Raw palette — light (the site's default theme)
+  // Brightness resolution
+  //
+  // The semantic names below (`AppTheme.ink`, `AppTheme.paper`,
+  // `AppTheme.bodyMuted`, ...) are used directly by some four hundred call
+  // sites, and a `const` cannot depend on brightness. App review 1.0 (7) was
+  // rejected under guideline 4 for exactly that: every one of those names
+  // baked a light colour and painted near-black on the dark scaffold.
+  //
+  // So they are getters resolved against one app-wide flag, set from the root
+  // widget in main.dart before MaterialApp builds and on every theme change.
+  // The raw `lightX` / `darkX` values stay `const`; they are what the two
+  // ThemeData objects - and the contrast tests - are built from.
   // ---------------------------------------------------------------------
 
-  /// `--background` — the page behind everything.
-  static const Color paper = Color(0xFFF3F4F6);
+  static Brightness _brightness = Brightness.light;
 
-  /// `--card` — every card, header bar and sheet.
-  static const Color paperRaised = Color(0xFFFFFFFF);
+  /// The brightness every semantic token below resolves against.
+  static Brightness get brightness => _brightness;
 
-  /// `--secondary` / `bg-gray-100` — hover fills, skeletons, inactive chips.
-  static const Color paperSunken = Color(0xFFF3F4F6);
+  static bool get isDark => _brightness == Brightness.dark;
 
-  /// `bg-gray-200` — the stronger sunken fill (progress tracks, dividers).
-  static const Color paperSunkenStrong = Color(0xFFE5E7EB);
+  /// Points the semantic tokens at [value].
+  ///
+  /// Returns true when the value actually changed, so a caller that has to
+  /// force a repaint can tell whether it needs to.
+  static bool applyBrightness(Brightness value) {
+    if (_brightness == value) return false;
+    _brightness = value;
+    return true;
+  }
+
+  static Color _c(Color light, Color dark) =>
+      _brightness == Brightness.dark ? dark : light;
+
+  // ---------------------------------------------------------------------
+  // Raw palette - light (the site's default theme)
+  // ---------------------------------------------------------------------
+
+  /// `--background` - the page behind everything.
+  static const Color lightPaper = Color(0xFFF3F4F6);
+
+  /// `--card` - every card, header bar and sheet.
+  static const Color lightPaperRaised = Color(0xFFFFFFFF);
+
+  /// `--secondary` / `bg-gray-100` - hover fills, skeletons, inactive chips.
+  static const Color lightPaperSunken = Color(0xFFF3F4F6);
+
+  /// `bg-gray-200` - the stronger sunken fill (progress tracks, dividers).
+  static const Color lightPaperSunkenStrong = Color(0xFFE5E7EB);
 
   /// `--foreground` / `text-gray-900`.
-  static const Color ink = Color(0xFF111827);
+  static const Color lightInk = Color(0xFF111827);
 
-  /// `text-gray-700` — secondary body copy.
-  static const Color inkSoft = Color(0xFF374151);
+  /// `text-gray-700` - secondary body copy.
+  static const Color lightInkSoft = Color(0xFF374151);
 
   /// `--muted-foreground` / `text-gray-500`.
-  static const Color inkMuted = Color(0xFF6B7280);
+  static const Color lightInkMuted = Color(0xFF6B7280);
 
-  /// `text-gray-400` — the faintest label tier the site uses.
-  static const Color inkFaint = Color(0xFF9CA3AF);
+  /// `text-gray-400` - the faintest label tier the site uses.
+  static const Color lightInkFaint = Color(0xFF9CA3AF);
 
   /// Text on a solid ink/teal surface.
-  static const Color inkInverted = Color(0xFFFFFFFF);
+  static const Color lightInkInverted = Color(0xFFFFFFFF);
 
   /// `--border` / `border-gray-200`.
-  static const Color rule = Color(0xFFE5E7EB);
+  static const Color lightRule = Color(0xFFE5E7EB);
 
   /// `border-gray-300`.
-  static const Color ruleStrong = Color(0xFFD1D5DB);
+  static const Color lightRuleStrong = Color(0xFFD1D5DB);
 
-  // --- Brand teal --------------------------------------------------------
+  /// `#0D9488` - teal-600. The brand colour, hardcoded all over the site.
+  static const Color lightTeal = Color(0xFF0D9488);
 
-  /// `#0D9488` — teal-600. The brand colour, hardcoded all over the site.
-  static const Color teal = Color(0xFF0D9488);
+  /// `#0F766E` - teal-700. The dark stop of the dashboard hero gradient.
+  static const Color lightTealStrong = Color(0xFF0F766E);
 
-  /// `#0F766E` — teal-700. The dark stop of the dashboard hero gradient.
-  static const Color tealStrong = Color(0xFF0F766E);
+  /// `rgba(13,148,136,0.08)` flattened on white - icon chips, active tabs.
+  static const Color lightTealTint = Color(0xFFF0FDFA);
 
-  /// `rgba(13,148,136,0.08)` flattened on white — icon chips, active tabs.
-  static const Color tealTint = Color(0xFFF0FDFA);
+  /// `bg-teal-100` - the study-mode strip.
+  static const Color lightTealSoft = Color(0xFFCCFBF1);
 
-  /// `bg-teal-100` — the study-mode strip.
-  static const Color tealSoft = Color(0xFFCCFBF1);
+  /// `#EA580C` - orange-600, the streak flame.
+  static const Color lightFlame = Color(0xFFEA580C);
 
-  /// Legacy alias kept so older call sites keep compiling.
-  static const Color lapis = teal;
-  static const Color lapisStrong = tealStrong;
-  static const Color lapisTint = tealTint;
+  /// `rgba(234,88,12,0.08)` flattened - the streak pill background.
+  static const Color lightFlameTint = Color(0xFFFFF7ED);
 
-  // --- Accents -----------------------------------------------------------
+  static const Color lightVermilionStrong = Color(0xFFC2410C);
 
-  /// `#EA580C` — orange-600, the streak flame.
-  static const Color flame = Color(0xFFEA580C);
+  /// `#059669` - emerald-600, used for completed / positive states.
+  static const Color lightPositive = Color(0xFF059669);
+  static const Color lightPositiveTint = Color(0xFFECFDF5);
 
-  /// `rgba(234,88,12,0.08)` flattened — the streak pill background.
-  static const Color flameTint = Color(0xFFFFF7ED);
+  /// `--destructive` - `hsl(0 72% 51%)`.
+  static const Color lightDestructive = Color(0xFFDC2626);
+  static const Color lightDestructiveTint = Color(0xFFFEF2F2);
 
-  /// Legacy aliases.
-  static const Color vermilion = flame;
-  static const Color vermilionStrong = Color(0xFFC2410C);
-  static const Color vermilionTint = flameTint;
+  /// `#7C3AED` - violet-600, the AI-assistent accent.
+  static const Color lightAi = Color(0xFF7C3AED);
+  static const Color lightAiTint = Color(0xFFF5F3FF);
 
-  /// `#059669` — emerald-600, used for completed / positive states.
-  static const Color positive = Color(0xFF059669);
-  static const Color positiveTint = Color(0xFFECFDF5);
-
-  /// `--destructive` — `hsl(0 72% 51%)`.
-  static const Color destructive = Color(0xFFDC2626);
-  static const Color destructiveTint = Color(0xFFFEF2F2);
-
-  /// `#7C3AED` — violet-600, the AI-assistent accent.
-  static const Color ai = Color(0xFF7C3AED);
-  static const Color aiTint = Color(0xFFF5F3FF);
+  static const Color lightBrandLight = Color(0xFF14B8A6);
 
   // ---------------------------------------------------------------------
-  // Raw palette — dark (`.dark`)
+  // Raw palette - dark (`.dark`)
+  //
+  // The foreground tiers are lighter than the site's `.dark` values on
+  // purpose: `--muted-foreground` there is `#808080`, which clears 3:1 but
+  // not the 4.5:1 body text needs on `#333333`.
+  // test/dark_mode_contrast_test.dart holds the line.
   // ---------------------------------------------------------------------
 
   static const Color darkPaper = Color(0xFF171717);
@@ -129,63 +159,127 @@ class AppTheme {
   static const Color darkPaperSunkenStrong = Color(0xFF333333);
   static const Color darkInk = Color(0xFFE5E5E5);
   static const Color darkInkSoft = Color(0xFFCCCCCC);
-  static const Color darkInkMuted = Color(0xFF808080);
-  static const Color darkInkFaint = Color(0xFF6B6B6B);
+
+  /// AA body text (4.5:1) on every dark surface, `#333333` included.
+  static const Color darkInkMuted = Color(0xFFABABAB);
+
+  /// The faintest dark tier that still clears 4.5:1 on `#333333`. The label
+  /// styles (eyebrow, overline, metaLabel) resolve to it and all sit below
+  /// the large-text size, so they need the full body ratio.
+  static const Color darkInkFaint = Color(0xFF9C9C9C);
+
   static const Color darkInkInverted = Color(0xFF171717);
   static const Color darkRule = Color(0xFF383838);
   static const Color darkRuleStrong = Color(0xFF4A4A4A);
 
-  /// `hsl(174 60% 44%)` — the dark-mode brand/ring value.
+  /// `hsl(174 60% 44%)` - the dark-mode brand/ring value.
   static const Color darkTeal = Color(0xFF2DB4A6);
   static const Color darkTealStrong = Color(0xFF14B8A6);
   static const Color darkTealTint = Color(0xFF11312E);
+  static const Color darkTealSoft = Color(0xFF14453F);
 
   static const Color darkLapis = darkTeal;
   static const Color darkLapisStrong = darkTealStrong;
   static const Color darkLapisTint = darkTealTint;
 
   static const Color darkFlame = Color(0xFFFB923C);
+  static const Color darkFlameTint = Color(0xFF3A2413);
   static const Color darkVermilion = darkFlame;
+  static const Color darkVermilionStrong = Color(0xFFFDBA74);
   static const Color darkPositive = Color(0xFF34D399);
+  static const Color darkPositiveTint = Color(0xFF10312A);
 
-  /// `--destructive` in `.dark` — `hsl(0 62% 35%)`.
+  /// `--destructive` in `.dark` - `hsl(0 62% 35%)`.
   static const Color darkDestructive = Color(0xFF901F1F);
+  static const Color darkDestructiveTint = Color(0xFF3A1A1A);
 
   static const Color darkAi = Color(0xFFA78BFA);
+  static const Color darkAiTint = Color(0xFF2A2140);
+
+  static const Color darkBrandLight = Color(0xFF2DD4BF);
+
+  // ---------------------------------------------------------------------
+  // Palette - resolved against the current brightness
+  //
+  // These are the names every screen uses. Do not turn them back into
+  // consts: that is the guideline 4 rejection.
+  // ---------------------------------------------------------------------
+
+  static Color get paper => _c(lightPaper, darkPaper);
+  static Color get paperRaised => _c(lightPaperRaised, darkPaperRaised);
+  static Color get paperSunken => _c(lightPaperSunken, darkPaperSunken);
+  static Color get paperSunkenStrong =>
+      _c(lightPaperSunkenStrong, darkPaperSunkenStrong);
+
+  static Color get ink => _c(lightInk, darkInk);
+  static Color get inkSoft => _c(lightInkSoft, darkInkSoft);
+  static Color get inkMuted => _c(lightInkMuted, darkInkMuted);
+  static Color get inkFaint => _c(lightInkFaint, darkInkFaint);
+  static Color get inkInverted => _c(lightInkInverted, darkInkInverted);
+
+  static Color get rule => _c(lightRule, darkRule);
+  static Color get ruleStrong => _c(lightRuleStrong, darkRuleStrong);
+
+  static Color get teal => _c(lightTeal, darkTeal);
+  static Color get tealStrong => _c(lightTealStrong, darkTealStrong);
+  static Color get tealTint => _c(lightTealTint, darkTealTint);
+  static Color get tealSoft => _c(lightTealSoft, darkTealSoft);
+
+  /// Legacy aliases kept so older call sites keep compiling.
+  static Color get lapis => teal;
+  static Color get lapisStrong => tealStrong;
+  static Color get lapisTint => tealTint;
+
+  static Color get flame => _c(lightFlame, darkFlame);
+  static Color get flameTint => _c(lightFlameTint, darkFlameTint);
+  static Color get vermilion => flame;
+  static Color get vermilionStrong =>
+      _c(lightVermilionStrong, darkVermilionStrong);
+  static Color get vermilionTint => flameTint;
+
+  static Color get positive => _c(lightPositive, darkPositive);
+  static Color get positiveTint => _c(lightPositiveTint, darkPositiveTint);
+
+  static Color get destructive => _c(lightDestructive, darkDestructive);
+  static Color get destructiveTint =>
+      _c(lightDestructiveTint, darkDestructiveTint);
+
+  static Color get ai => _c(lightAi, darkAi);
+  static Color get aiTint => _c(lightAiTint, darkAiTint);
 
   // ---------------------------------------------------------------------
   // Semantic aliases
   // ---------------------------------------------------------------------
 
-  /// Page background — `bg-background`.
-  static const Color canvas = paper;
+  /// Page background - `bg-background`.
+  static Color get canvas => paper;
 
-  /// Card background — `bg-card` / `bg-white`.
-  static const Color surface = paperRaised;
+  /// Card background - `bg-card` / `bg-white`.
+  static Color get surface => paperRaised;
 
-  /// Muted text — `text-muted-foreground`.
-  static const Color muted = inkMuted;
+  /// Muted text - `text-muted-foreground`.
+  static Color get muted => inkMuted;
 
-  /// Hairline — `border-border`.
-  static const Color border = rule;
+  /// Hairline - `border-border`.
+  static Color get border => rule;
 
-  /// Brand accent — teal.
-  static const Color accent = teal;
+  /// Brand accent - teal.
+  static Color get accent => teal;
 
   /// Accent wash.
-  static const Color accentSoft = tealTint;
+  static Color get accentSoft => tealTint;
 
   /// Active filter chip on the site is the brand teal, not ink.
-  static const Color filterActive = teal;
+  static Color get filterActive => teal;
 
-  static const Color success = positive;
-  static const Color warning = flame;
-  static const Color error = destructive;
+  static Color get success => positive;
+  static Color get warning => flame;
+  static Color get error => destructive;
 
   /// The brand surface is teal.
-  static const Color brand = teal;
-  static const Color brandDeep = tealStrong;
-  static const Color brandLight = Color(0xFF14B8A6);
+  static Color get brand => teal;
+  static Color get brandDeep => tealStrong;
+  static Color get brandLight => _c(lightBrandLight, darkBrandLight);
 
   // ---------------------------------------------------------------------
   // Radii — Tailwind's scale, as used in the markup
@@ -212,21 +306,25 @@ class AppTheme {
 
   /// `linear-gradient(135deg, #0D9488 0%, #0F766E 100%)` — the dashboard hero
   /// and every "continue reading" call to action.
-  static const LinearGradient brandGradient = LinearGradient(
+  static LinearGradient get brandGradient => LinearGradient(
     colors: [teal, tealStrong],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static const LinearGradient accentGradient = brandGradient;
+  static LinearGradient get accentGradient => brandGradient;
 
   /// Status bar / nav bar styling matching the page background.
-  static const SystemUiOverlayStyle overlayStyle = SystemUiOverlayStyle(
+  static SystemUiOverlayStyle get overlayStyle => SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
+    // The icon brightness is the brightness of the *icons*, so it is the
+    // opposite of the surface they sit on.
+    statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
     systemNavigationBarColor: paper,
-    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarIconBrightness: isDark
+        ? Brightness.light
+        : Brightness.dark,
   );
 
   static TextStyle monoTextStyle([TextStyle? baseStyle]) {
@@ -241,7 +339,7 @@ class AppTheme {
   // ---------------------------------------------------------------------
 
   /// `text-3xl font-bold` — marketing / empty-state hero.
-  static const TextStyle displayLarge = TextStyle(
+  static TextStyle get displayLarge => TextStyle(
     fontFamily: displayFontName,
     fontSize: 30,
     fontWeight: FontWeight.w700,
@@ -251,7 +349,7 @@ class AppTheme {
   );
 
   /// `text-2xl font-bold` — hero card title.
-  static const TextStyle displayMedium = TextStyle(
+  static TextStyle get displayMedium => TextStyle(
     fontFamily: displayFontName,
     fontSize: 24,
     fontWeight: FontWeight.w700,
@@ -261,7 +359,7 @@ class AppTheme {
   );
 
   /// `text-xl font-bold` — page heading (`Goedemorgen, …`) and stat values.
-  static const TextStyle displaySmall = TextStyle(
+  static TextStyle get displaySmall => TextStyle(
     fontFamily: displayFontName,
     fontSize: 20,
     fontWeight: FontWeight.w700,
@@ -271,7 +369,7 @@ class AppTheme {
   );
 
   /// `text-base font-bold` — card titles.
-  static const TextStyle displayTitle = TextStyle(
+  static TextStyle get displayTitle => TextStyle(
     fontFamily: displayFontName,
     fontSize: 16,
     fontWeight: FontWeight.w700,
@@ -280,7 +378,7 @@ class AppTheme {
   );
 
   /// `text-sm font-bold` — dense card titles.
-  static const TextStyle displayBase = TextStyle(
+  static TextStyle get displayBase => TextStyle(
     fontFamily: displayFontName,
     fontSize: 14,
     fontWeight: FontWeight.w700,
@@ -289,18 +387,18 @@ class AppTheme {
   );
 
   /// `text-xl font-bold tabular-nums` — the stat numbers.
-  static const TextStyle statNumber = TextStyle(
+  static TextStyle get statNumber => TextStyle(
     fontFamily: displayFontName,
     fontSize: 20,
     fontWeight: FontWeight.w700,
     height: 1.15,
     letterSpacing: -0.25,
     color: ink,
-    fontFeatures: [FontFeature.tabularFigures()],
+    fontFeatures: const [FontFeature.tabularFigures()],
   );
 
   /// `text-xs font-semibold uppercase tracking-widest text-gray-400`
-  static const TextStyle eyebrow = TextStyle(
+  static TextStyle get eyebrow => TextStyle(
     fontFamily: sansFontName,
     fontSize: 12,
     fontWeight: FontWeight.w600,
@@ -309,7 +407,7 @@ class AppTheme {
   );
 
   /// `text-[10px] font-semibold uppercase tracking-wider`
-  static const TextStyle overline = TextStyle(
+  static TextStyle get overline => TextStyle(
     fontFamily: sansFontName,
     fontSize: 10,
     fontWeight: FontWeight.w600,
@@ -318,7 +416,7 @@ class AppTheme {
   );
 
   /// `text-xs font-semibold uppercase tracking-wider text-gray-400`
-  static const TextStyle metaLabel = TextStyle(
+  static TextStyle get metaLabel => TextStyle(
     fontFamily: sansFontName,
     fontSize: 11,
     fontWeight: FontWeight.w600,
@@ -327,7 +425,7 @@ class AppTheme {
   );
 
   /// `text-[15px] text-muted-foreground`
-  static const TextStyle bodyLead = TextStyle(
+  static TextStyle get bodyLead => TextStyle(
     fontFamily: sansFontName,
     fontSize: 15,
     height: 1.6,
@@ -335,7 +433,7 @@ class AppTheme {
   );
 
   /// `text-sm text-muted-foreground`
-  static const TextStyle bodyMuted = TextStyle(
+  static TextStyle get bodyMuted => TextStyle(
     fontFamily: sansFontName,
     fontSize: 14,
     height: 1.55,
@@ -343,7 +441,7 @@ class AppTheme {
   );
 
   /// `text-sm font-semibold text-foreground`
-  static const TextStyle bodyStrong = TextStyle(
+  static TextStyle get bodyStrong => TextStyle(
     fontFamily: sansFontName,
     fontSize: 14,
     fontWeight: FontWeight.w600,
@@ -352,7 +450,7 @@ class AppTheme {
   );
 
   /// `text-xs text-muted-foreground`
-  static const TextStyle caption = TextStyle(
+  static TextStyle get caption => TextStyle(
     fontFamily: sansFontName,
     fontSize: 12,
     height: 1.45,
@@ -360,7 +458,7 @@ class AppTheme {
   );
 
   /// Button label — `text-sm font-semibold`.
-  static const TextStyle buttonLabel = TextStyle(
+  static TextStyle get buttonLabel => TextStyle(
     fontFamily: sansFontName,
     fontSize: 14,
     fontWeight: FontWeight.w600,
@@ -373,17 +471,17 @@ class AppTheme {
 
   static ThemeData get lightTheme => _build(
     brightness: Brightness.light,
-    bg: paper,
-    card: paperRaised,
-    sunken: paperSunkenStrong,
-    fg: ink,
-    fgSoft: inkSoft,
-    fgMuted: inkMuted,
-    fgInverted: inkInverted,
-    line: rule,
-    lineStrong: ruleStrong,
-    ring: teal,
-    danger: destructive,
+    bg: lightPaper,
+    card: lightPaperRaised,
+    sunken: lightPaperSunkenStrong,
+    fg: lightInk,
+    fgSoft: lightInkSoft,
+    fgMuted: lightInkMuted,
+    fgInverted: lightInkInverted,
+    line: lightRule,
+    lineStrong: lightRuleStrong,
+    ring: lightTeal,
+    danger: lightDestructive,
   );
 
   static ThemeData get darkTheme => _build(

@@ -43,7 +43,7 @@ Widget buildUserDataInfoLink(BuildContext context) {
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 18),
-                const Divider(height: 1, color: AppTheme.rule),
+                Divider(height: 1, color: AppTheme.rule),
                 const SizedBox(height: 6),
                 _LegalLink(
                   label: 'Lees het privacybeleid',
@@ -105,7 +105,7 @@ class _LegalLink extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppTheme.sansFontName,
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
@@ -113,7 +113,7 @@ class _LegalLink extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.open_in_new, size: 14, color: AppTheme.teal),
+            Icon(Icons.open_in_new, size: 14, color: AppTheme.teal),
           ],
         ),
       ),

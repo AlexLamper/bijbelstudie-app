@@ -122,7 +122,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           children: [
             // Header rail — `sticky top-0 border-b border-rule bg-paper/90`.
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: AppTheme.rule)),
               ),
               padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
@@ -209,7 +209,7 @@ class _OnboardingPage extends StatelessWidget {
               // Serif step number, like the site's `01`/`02` list markers.
               Text(
                 data.index,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTheme.displayFontName,
                   fontSize: 14,
                   color: AppTheme.lapis,
@@ -225,7 +225,7 @@ class _OnboardingPage extends StatelessWidget {
           //  tracking-[-0.03em]`
           Text.rich(
             TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppTheme.displayFontName,
                 fontSize: 34,
                 fontWeight: FontWeight.w600,
@@ -237,7 +237,7 @@ class _OnboardingPage extends StatelessWidget {
                 TextSpan(text: data.title),
                 TextSpan(
                   text: data.accent,
-                  style: const TextStyle(color: AppTheme.lapis),
+                  style: TextStyle(color: AppTheme.lapis),
                 ),
               ],
             ),
@@ -254,7 +254,7 @@ class _OnboardingPage extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 3),
                     child: Icon(
                       Icons.check,

@@ -93,4 +93,53 @@ void main() {
     expect(ids, isNot(contains('elberfelder_1905')));
     expect(VersionCatalog.grouped(fromServer).map((g) => g.label), isNot(contains('Duits')));
   });
+
+  group('short codes', () {
+    test('the hand-kept codes are the ones readers write', () {
+      expect(VersionCatalog.shortCode(version('statenvertaling', 'Statenvertaling', 'nl')), 'SV');
+      expect(VersionCatalog.shortCode(version('nbg51', 'NBG-vertaling 1951', 'nl')), 'NBG51');
+      expect(VersionCatalog.shortCode(version('kjv', 'King James Version', 'en')), 'KJV');
+      expect(VersionCatalog.shortCode(version('hsv', 'Herziene Statenvertaling', 'nl')), 'HSV');
+    });
+
+    test('every version the server sends today gets a badge', () {
+      for (final v in fromServer) {
+        final code = VersionCatalog.shortCode(v);
+        expect(code, isNotEmpty, reason: v.id);
+        expect(code.length, lessThanOrEqualTo(VersionCatalog.maxShortCodeLength), reason: v.id);
+      }
+    });
+
+    test('an unknown version falls back to initials of its name', () {
+      expect(
+        VersionCatalog.shortCodeFor(id: 'nieuwe_nl', name: 'Een Nieuwe Vertaling'),
+        'ENV',
+      );
+      expect(
+        VersionCatalog.shortCodeFor(id: 'ylt', name: "Young's Literal Translation"),
+        'YLT',
+      );
+    });
+
+    test('a trailing year is kept only when the whole code still fits', () {
+      // `E1905` fits; `DHS1917` does not, and a truncated `DHS191` would be
+      // worse than no year at all.
+      expect(VersionCatalog.shortCodeFor(id: 'elberfelder_1905', name: 'Elberfelder 1905'), 'E1905');
+      expect(
+        VersionCatalog.shortCodeFor(id: 'unknown_1917', name: 'De Heilige Schrift 1917'),
+        'DHS',
+      );
+    });
+
+    test('the badge is never empty and never longer than the cap', () {
+      expect(VersionCatalog.shortCodeFor(id: 'x', name: ''), 'X');
+      expect(VersionCatalog.shortCodeFor(id: '', name: '---'), '?');
+      final long = VersionCatalog.shortCodeFor(
+        id: 'a_very_long_identifier_indeed',
+        name: 'Alpha Beta Gamma Delta Epsilon Zeta Eta Theta',
+      );
+      expect(long.length, VersionCatalog.maxShortCodeLength);
+      expect(long, 'ABGDEZ');
+    });
+  });
 }

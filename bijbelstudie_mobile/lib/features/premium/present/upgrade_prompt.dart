@@ -83,7 +83,7 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             border: Border.all(color: AppTheme.rule),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [AppTheme.paper, AppTheme.paperRaised],
@@ -99,7 +99,7 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.auto_awesome, size: 20, color: AppTheme.teal),
+              Icon(Icons.auto_awesome, size: 20, color: AppTheme.teal),
               const SizedBox(height: 10),
               Text(
                 widget.title,

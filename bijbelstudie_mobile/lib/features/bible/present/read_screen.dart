@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/preview_config.dart';
@@ -19,6 +20,7 @@ import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
 import 'offline_library_sheet.dart';
+import 'reader_chrome.dart';
 import 'reader_settings_sheet.dart';
 import 'source_picker_sheet.dart';
 
@@ -36,10 +38,27 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   String? _restoredFor;
   String? _recordedFor;
 
+  /// Scrolled distance in one direction since the chrome last changed. The
+  /// bars only move once it passes [_chromeDeadzone], so a few pixels of
+  /// jitter, a bounce, or a fingertip wobble cannot flicker them.
+  double _scrollAccum = 0;
+  static const double _chromeDeadzone = 28;
+
+  /// Below this the chapter is barely taller than the screen and hiding the
+  /// chrome would only cost the reader their navigation.
+  static const double _chromeMinExtent = 160;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+
+    // The reader always opens with its chrome. Doing it on mount rather than
+    // on teardown keeps the provider write out of the dispose path, where
+    // notifying listeners would land in the middle of a build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _setChromeVisible(true);
+    });
   }
 
   @override
@@ -55,6 +74,56 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   void _onScroll() {
     _positionDebounce?.cancel();
     _positionDebounce = Timer(const Duration(seconds: 2), _persistPosition);
+  }
+
+  void _setChromeVisible(bool visible) {
+    _scrollAccum = 0;
+    ref.read(readerChromeVisibleProvider.notifier).setVisible(visible);
+  }
+
+  /// Hides the top bar and the shell's tab bar while the reader scrolls down
+  /// through the chapter, and gives them straight back on the way up.
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    final metrics = notification.metrics;
+    if (metrics.axis != Axis.vertical) return false;
+
+    if (notification is ScrollEndNotification) {
+      // Resting at either end of the chapter always shows the chrome: there is
+      // nothing left to read into, and the user needs a way onward.
+      if (metrics.pixels <= metrics.minScrollExtent + 4 ||
+          metrics.pixels >= metrics.maxScrollExtent - 4) {
+        _setChromeVisible(true);
+      }
+      return false;
+    }
+
+    if (notification is! ScrollUpdateNotification) return false;
+
+    if (metrics.maxScrollExtent < _chromeMinExtent) {
+      _setChromeVisible(true);
+      return false;
+    }
+
+    // At the very top, or bouncing past either end: never a deliberate move.
+    if (metrics.pixels <= metrics.minScrollExtent + 4) {
+      _setChromeVisible(true);
+      return false;
+    }
+    if (metrics.pixels > metrics.maxScrollExtent) return false;
+
+    final delta = notification.scrollDelta ?? 0;
+    if (delta == 0) return false;
+    // A change of direction starts the deadzone over.
+    if (delta.isNegative != _scrollAccum.isNegative) _scrollAccum = 0;
+    _scrollAccum += delta;
+
+    if (_scrollAccum > _chromeDeadzone) {
+      _setChromeVisible(false);
+    } else if (_scrollAccum < -_chromeDeadzone) {
+      _setChromeVisible(true);
+    }
+    return false;
   }
 
   void _persistPosition() {
@@ -170,40 +239,67 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     // _restoreScrollIfNeeded needs a rebuild to act on it.
     final positions = ref.watch(readingHistoryProvider).value;
 
+    final chromeVisible = ref.watch(readerChromeVisibleProvider);
+    // The tab bar carries the bottom inset while it is there; once it slides
+    // away the reader has to carry it itself, in step, or the chapter nav ends
+    // up under the home indicator.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Reduced motion: the padding snaps, exactly as the bars themselves do.
+    final chromeDuration = MediaQuery.maybeOf(context)?.disableAnimations ?? false
+        ? Duration.zero
+        : ReaderChromeReveal.duration;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            TourAnchor(
-              id: TourAnchorIds.readerBar,
-              child: _ReaderBar(location: location),
+            ReaderChromeReveal(
+              visible: chromeVisible,
+              axisAlignment: -1,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TourAnchor(
+                    id: TourAnchorIds.readerBar,
+                    child: _ReaderBar(location: location),
+                  ),
+                  const RuleLine(),
+                ],
+              ),
             ),
-            const RuleLine(),
             Expanded(
-              child: TourAnchor(
-                id: TourAnchorIds.readerText,
-                child: chapterAsync.when(
-                  loading: () => const ReaderSkeleton(),
-                  error: (error, _) => _ReaderError(error: error),
-                  data: (chapter) {
-                    _recordChapterOpen(location);
-                    _restoreScrollIfNeeded(location, positions);
-                    return _ChapterBody(
-                      chapter: chapter,
-                      settings: settings,
-                      scrollController: _scrollController,
-                      onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
-                    );
-                  },
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: TourAnchor(
+                  id: TourAnchorIds.readerText,
+                  child: chapterAsync.when(
+                    loading: () => const ReaderSkeleton(),
+                    error: (error, _) => _ReaderError(error: error),
+                    data: (chapter) {
+                      _recordChapterOpen(location);
+                      _restoreScrollIfNeeded(location, positions);
+                      return _ChapterBody(
+                        chapter: chapter,
+                        settings: settings,
+                        scrollController: _scrollController,
+                        onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
             const RuleLine(),
-            _ChapterNav(
-              chapters: chaptersAsync.value ?? const [],
-              current: location.chapter,
+            AnimatedPadding(
+              duration: chromeDuration,
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(bottom: chromeVisible ? 0 : bottomInset),
+              child: _ChapterNav(
+                chapters: chaptersAsync.value ?? const [],
+                current: location.chapter,
+              ),
             ),
           ],
         ),
@@ -214,12 +310,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   Future<void> _openVerseActions(ChapterContent chapter, Verse verse) async {
     await HapticFeedback.selectionClick();
     if (!mounted) return;
-    await showVerseActionSheet(
-      context: context,
-      ref: ref,
-      chapter: chapter,
-      verse: verse,
-    );
+    await showVerseActionSheet(context: context, ref: ref, chapter: chapter, verse: verse);
   }
 }
 
@@ -231,9 +322,7 @@ class _ReaderBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final versions = ref.watch(bibleVersionsProvider).value ?? const <BibleSource>[];
-    final version = versions
-        .where((v) => v.id == location.versionId)
-        .firstOrNull;
+    final version = versions.where((v) => v.id == location.versionId).firstOrNull;
 
     // A translation can leave the app between releases - Luther 1912 was
     // dropped from the mobile allowlist - and the id the reader last used is
@@ -275,7 +364,7 @@ class _ReaderBar extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.expand_more, size: 18, color: AppTheme.inkMuted),
+                        Icon(Icons.expand_more, size: 18, color: AppTheme.inkMuted),
                       ],
                     ),
                   ),
@@ -287,6 +376,11 @@ class _ReaderBar extends ConsumerWidget {
                 ],
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'Zoeken in de Bijbel',
+            onPressed: () => context.push('/search?book=${Uri.encodeComponent(location.book)}'),
+            icon: const Icon(Icons.search, size: 20),
           ),
           _OfflineButton(location: location),
           IconButton(
@@ -326,9 +420,7 @@ class _OfflineButton extends ConsumerWidget {
     final complete = status?.isComplete ?? false;
 
     return IconButton(
-      tooltip: complete
-          ? '${location.book} is offline beschikbaar'
-          : 'Offline lezen',
+      tooltip: complete ? '${location.book} is offline beschikbaar' : 'Offline lezen',
       onPressed: () => showOfflineLibrarySheet(context),
       icon: Icon(
         complete ? Icons.offline_pin : Icons.download_outlined,
@@ -363,10 +455,7 @@ class _ChapterBody extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
       children: [
-        if (chapter.fromCache) ...[
-          const _OfflineNotice(),
-          const SizedBox(height: 16),
-        ],
+        if (chapter.fromCache) ...[const _OfflineNotice(), const SizedBox(height: 16)],
         for (final verse in chapter.verses)
           _VerseRow(
             verse: verse,
@@ -456,9 +545,12 @@ class _OfflineNotice extends StatelessWidget {
     // feature working, not failing.
     return Row(
       children: [
-        const Icon(Icons.cloud_off_outlined, size: 14, color: AppTheme.inkMuted),
+        Icon(Icons.cloud_off_outlined, size: 14, color: AppTheme.inkMuted),
         const SizedBox(width: 8),
-        Text('Offline gelezen uit je opgeslagen tekst', style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
+        Text(
+          'Offline gelezen uit je opgeslagen tekst',
+          style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+        ),
       ],
     );
   }

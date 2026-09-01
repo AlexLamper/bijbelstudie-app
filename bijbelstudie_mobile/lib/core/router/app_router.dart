@@ -15,6 +15,7 @@ import '../../features/onboarding/present/tour_screen.dart';
 import '../../features/auth/present/login_screen.dart';
 import '../../features/auth/present/register_screen.dart';
 import '../../features/bible/present/read_screen.dart';
+import '../../features/bible/present/reader_chrome.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
@@ -33,44 +34,55 @@ import '../../features/study/present/study_screen.dart';
 /// Hulpbronnen reachable from the dashboard's "Snel naar" card and from
 /// Profiel. Groepen is hidden for the MVP: no tab, no links, and `/groups`
 /// redirects to the dashboard so a stale deep link cannot strand anyone.
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends ConsumerWidget {
   const MainScaffold({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final currentIndex = _calculateSelectedIndex(context);
+
+    // The reader hides the tab bar while the user scrolls down through the
+    // chapter. Only the reader may: every other tab reads `true` regardless of
+    // what the provider holds, so a missed reset can never strand a screen
+    // without a way out.
+    final inReader = GoRouterState.of(context).uri.path.startsWith('/read');
+    final chromeVisible = !inReader || ref.watch(readerChromeVisibleProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          border: Border(top: BorderSide(color: scheme.outline)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              children: [
-                for (var i = 0; i < _items.length; i++)
-                  Expanded(
-                    // Anchored so the guided tour can point at the tab it is
-                    // describing rather than describing it in the abstract.
-                    child: TourAnchor(
-                      id: _items[i].tourAnchorId,
-                      child: _NavItem(
-                        item: _items[i],
-                        active: currentIndex == i,
-                        onTap: () => context.go(_items[i].route),
+      bottomNavigationBar: ReaderChromeReveal(
+        visible: chromeVisible,
+        axisAlignment: 1,
+        child: Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            border: Border(top: BorderSide(color: scheme.outline)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 60,
+              child: Row(
+                children: [
+                  for (var i = 0; i < _items.length; i++)
+                    Expanded(
+                      // Anchored so the guided tour can point at the tab it is
+                      // describing rather than describing it in the abstract.
+                      child: TourAnchor(
+                        id: _items[i].tourAnchorId,
+                        child: _NavItem(
+                          item: _items[i],
+                          active: currentIndex == i,
+                          onTap: () => context.go(_items[i].route),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -80,14 +92,34 @@ class MainScaffold extends StatelessWidget {
 
   static const List<_NavItemData> _items = [
     _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard', 'nav-dashboard'),
-    _NavItemData(Icons.auto_stories_outlined, Icons.auto_stories, 'Bijbel', '/study',
-        TourAnchorIds.navStudy),
-    _NavItemData(Icons.school_outlined, Icons.school, 'Studies', '/studies',
-        TourAnchorIds.navStudies),
-    _NavItemData(Icons.sticky_note_2_outlined, Icons.sticky_note_2, 'Notities', '/notes',
-        TourAnchorIds.navNotes),
-    _NavItemData(Icons.person_outline, Icons.person, 'Profiel', '/profile',
-        TourAnchorIds.navProfile),
+    _NavItemData(
+      Icons.auto_stories_outlined,
+      Icons.auto_stories,
+      'Bijbel',
+      '/study',
+      TourAnchorIds.navStudy,
+    ),
+    _NavItemData(
+      Icons.school_outlined,
+      Icons.school,
+      'Studies',
+      '/studies',
+      TourAnchorIds.navStudies,
+    ),
+    _NavItemData(
+      Icons.sticky_note_2_outlined,
+      Icons.sticky_note_2,
+      'Notities',
+      '/notes',
+      TourAnchorIds.navNotes,
+    ),
+    _NavItemData(
+      Icons.person_outline,
+      Icons.person,
+      'Profiel',
+      '/profile',
+      TourAnchorIds.navProfile,
+    ),
   ];
 
   static int _calculateSelectedIndex(BuildContext context) {
@@ -104,13 +136,7 @@ class MainScaffold extends StatelessWidget {
 }
 
 class _NavItemData {
-  const _NavItemData(
-    this.icon,
-    this.activeIcon,
-    this.label,
-    this.route,
-    this.tourAnchorId,
-  );
+  const _NavItemData(this.icon, this.activeIcon, this.label, this.route, this.tourAnchorId);
 
   final IconData icon;
   final IconData activeIcon;
@@ -124,11 +150,7 @@ class _NavItemData {
 
 /// The active tab is teal, matching every other active affordance on the site.
 class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.item,
-    required this.active,
-    required this.onTap,
-  });
+  const _NavItem({required this.item, required this.active, required this.onTap});
 
   final _NavItemData item;
   final bool active;
@@ -174,10 +196,7 @@ Page<void> _diveInPage(GoRouterState state, Widget child) {
     transitionDuration: const Duration(milliseconds: 440),
     reverseTransitionDuration: const Duration(milliseconds: 200),
     transitionsBuilder: (context, animation, _, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      );
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
       return FadeTransition(
         opacity: curved,
         child: Transform.scale(scale: 0.96 + 0.04 * curved.value, child: child),
@@ -196,88 +215,66 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/onboarding',
-        pageBuilder: (context, state) =>
-            _diveInPage(state, const OnboardingScreen()),
+        pageBuilder: (context, state) => _diveInPage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) => _diveInPage(
           state,
-          LoginScreen(
-            sessionExpired: state.uri.queryParameters['expired'] == '1',
-          ),
+          LoginScreen(sessionExpired: state.uri.queryParameters['expired'] == '1'),
         ),
       ),
-      GoRoute(
-        path: '/register',
-        builder: (context, state) => const RegisterScreen(),
-      ),
+      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       // Post-registration setup and the guided tour - see
       // `resolvePostAuthRoute` for who is sent here and when. Both sit outside
       // the shell (full screen, no bottom nav) like `/onboarding`; `/tour` is
       // also reachable later via push from Profiel, hence no bottom nav there
       // either even on a replay.
-      GoRoute(
-        path: '/setup',
-        builder: (context, state) => const SetupFlowScreen(),
-      ),
+      GoRoute(path: '/setup', builder: (context, state) => const SetupFlowScreen()),
       GoRoute(path: '/tour', builder: (context, state) => const TourScreen()),
       ShellRoute(
         builder: (context, state, child) => MainScaffold(child: child),
         routes: [
           GoRoute(
             path: '/dashboard',
-            pageBuilder: (context, state) =>
-                _diveInPage(state, const DashboardScreen()),
+            pageBuilder: (context, state) => _diveInPage(state, const DashboardScreen()),
           ),
           GoRoute(path: '/study', builder: (context, state) => const StudyScreen()),
-          GoRoute(
-            path: '/studies',
-            builder: (context, state) => const StudiesScreen(),
-          ),
+          GoRoute(path: '/studies', builder: (context, state) => const StudiesScreen()),
           GoRoute(path: '/notes', builder: (context, state) => const NotesScreen()),
-          GoRoute(
-            path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
-          ),
+          GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
           // Reachable from the dashboard and Profiel rather than the tab bar.
-          GoRoute(
-            path: '/resources',
-            builder: (context, state) => const ResourcesScreen(),
-          ),
+          GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
           // Groepen is out for the MVP. The route stays as a redirect so any
           // persisted route or old deep link resolves instead of hitting the
           // not-found page.
           GoRoute(path: '/groups', redirect: (context, state) => '/dashboard'),
           GoRoute(path: '/read', builder: (context, state) => const ReadScreen()),
+          GoRoute(path: '/commentary', builder: (context, state) => const CommentaryScreen()),
+          // ?book= carries the caller's current book so the "alleen dit boek"
+          // scope is right; ?scope=book preselects it.
           GoRoute(
-            path: '/commentary',
-            builder: (context, state) => const CommentaryScreen(),
+            path: '/search',
+            builder: (context, state) => SearchScreen(
+              initialBook: state.uri.queryParameters['book'],
+              scopeToBook: state.uri.queryParameters['scope'] == 'book',
+            ),
           ),
-          GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
         ],
       ),
-      GoRoute(
-        path: '/groups/:id',
-        redirect: (context, state) => '/dashboard',
-      ),
+      GoRoute(path: '/groups/:id', redirect: (context, state) => '/dashboard'),
       // Outside the shell: a study is configured and then left for the reader,
       // so it gets a back arrow rather than a tab bar.
       GoRoute(
         path: '/studies/:id',
-        builder: (context, state) =>
-            StudyDetailScreen(studyId: state.pathParameters['id']!),
+        builder: (context, state) => StudyDetailScreen(studyId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/premium',
         // ?source= records which surface sent the user to the paywall.
-        builder: (context, state) =>
-            PremiumScreen(source: state.uri.queryParameters['source']),
+        builder: (context, state) => PremiumScreen(source: state.uri.queryParameters['source']),
       ),
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
-      ),
+      GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       // `/home` was this app's post-login destination before the tab shell
       // landed and the target became `/dashboard`. App review 1.0(5) was
       // rejected because four call sites still pointed here and every one of
@@ -328,7 +325,7 @@ class _RouteNotFound extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Deze pagina bestaat niet', style: AppTheme.displayLarge),
+                Text('Deze pagina bestaat niet', style: AppTheme.displayLarge),
                 const SizedBox(height: 14),
                 Text(
                   'We konden "$location" niet vinden. Ga terug naar je dashboard '

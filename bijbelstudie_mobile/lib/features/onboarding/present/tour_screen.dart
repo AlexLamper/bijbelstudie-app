@@ -53,7 +53,7 @@ class _TourScreenState extends ConsumerState<TourScreen> {
     // Never seen for more than a frame. It exists so the route has something
     // to build, and it is on brand rather than blank in case a slow frame
     // makes it visible.
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.paper,
       body: Center(child: AppLoader()),
     );

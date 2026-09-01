@@ -12,8 +12,27 @@ import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
 import '../../settings/data/reading_settings.dart';
+import '../../settings/present/theme_mode_provider.dart';
 import '../data/onboarding_storage.dart';
 import '../data/preferences_repository.dart';
+
+/// Which step the wizard is on, kept above the screen.
+///
+/// Answering the Weergave step changes the app's brightness, and main.dart
+/// rebuilds the whole app under a new key when that happens (`AppTheme`'s
+/// tokens are static, not inherited). That disposes this screen's State, so
+/// the step it was on has to live somewhere the remount cannot reach -
+/// `ProviderScope` sits above `MaterialApp`.
+class SetupStepController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void moveTo(int index) => state = index;
+}
+
+final setupStepProvider = NotifierProvider<SetupStepController, int>(
+  SetupStepController.new,
+);
 
 /// Post-registration setup: the questions the marketing intro
 /// (`onboarding_screen.dart`) never asked. Reached once per account, from
@@ -33,10 +52,10 @@ class SetupFlowScreen extends ConsumerStatefulWidget {
 }
 
 class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
-  static const _totalSteps = 3;
+  static const _totalSteps = 4;
 
-  final PageController _controller = PageController();
-  int _index = 0;
+  late final PageController _controller = PageController(initialPage: _index);
+  late int _index = ref.read(setupStepProvider);
   bool _finishing = false;
 
   bool get _isLast => _index == _totalSteps - 1;
@@ -68,6 +87,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
   Future<void> _finish() async {
     if (_finishing) return;
     setState(() => _finishing = true);
+    ref.read(setupStepProvider.notifier).moveTo(0);
 
     // Scoped to the account that just finished the wizard, so a second
     // account on this phone is still asked these questions itself.
@@ -102,7 +122,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
           children: [
             // Header rail, matching the marketing intro's.
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: AppTheme.rule)),
               ),
               padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
@@ -129,10 +149,14 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
                 // Steps are driven by their own controls (chips, cards), not
                 // by a horizontal drag that could skip past an unread step.
                 physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (i) => setState(() => _index = i),
+                onPageChanged: (i) {
+                  ref.read(setupStepProvider.notifier).moveTo(i);
+                  setState(() => _index = i);
+                },
                 children: const [
                   _TranslationStep(),
                   _ReadingPrefsStep(),
+                  _ThemeStep(),
                   _ReminderStep(),
                 ],
               ),
@@ -221,9 +245,9 @@ class _TranslationStep extends ConsumerWidget {
         children: [
           const Eyebrow('Vertaling'),
           const SizedBox(height: 16),
-          const Text('Kies je bijbelvertaling', style: AppTheme.displayLarge),
+          Text('Kies je bijbelvertaling', style: AppTheme.displayLarge),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Welke vertaling wil je standaard gebruiken bij het lezen en '
             'studeren? Je kunt altijd wisselen.',
             style: AppTheme.bodyLead,
@@ -289,9 +313,9 @@ class _ReadingPrefsStep extends ConsumerWidget {
         children: [
           const Eyebrow('Leesvoorkeuren'),
           const SizedBox(height: 16),
-          const Text('Stel je leesvoorkeuren in', style: AppTheme.displayLarge),
+          Text('Stel je leesvoorkeuren in', style: AppTheme.displayLarge),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Zo lees je de bijbeltekst meteen zoals jij dat prettig vindt. '
             'Dit kun je later altijd aanpassen bij Instellingen.',
             style: AppTheme.bodyLead,
@@ -350,6 +374,55 @@ class _SamplePreview extends StatelessWidget {
           height: settings.lineHeight.factor,
           color: AppTheme.ink,
         ),
+      ),
+    );
+  }
+}
+
+/// Step 3 - light or dark.
+///
+/// Applied through [ReadingSettingsController] like every other answer here,
+/// so the wizard itself repaints in the chosen theme the moment a row is
+/// tapped: the preview is the app.
+class _ThemeStep extends ConsumerWidget {
+  const _ThemeStep();
+
+  static const _subtitles = <ThemeMode, String>{
+    ThemeMode.light: 'De lichte weergave, altijd.',
+    ThemeMode.dark: 'De donkere weergave, altijd.',
+    ThemeMode.system: 'Volgt de instelling van je telefoon.',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(readingSettingsProvider).themeMode;
+    final controller = ref.read(readingSettingsProvider.notifier);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('Weergave'),
+          const SizedBox(height: 16),
+          Text('Licht of donker?', style: AppTheme.displayLarge),
+          const SizedBox(height: 12),
+          Text(
+            'Kies hoe de app eruitziet. Je ziet het meteen, en je kunt het '
+            'later altijd aanpassen bij Instellingen.',
+            style: AppTheme.bodyLead,
+          ),
+          const SizedBox(height: 24),
+          for (final mode in ThemeModeLabelX.pickerOrder) ...[
+            _SelectableRow(
+              title: mode.label,
+              subtitle: _subtitles[mode] ?? '',
+              selected: mode == selected,
+              onTap: () => controller.setThemeMode(mode),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
       ),
     );
   }
@@ -435,9 +508,9 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
         children: [
           const Eyebrow('Herinnering'),
           const SizedBox(height: 16),
-          const Text('Wil je een dagelijkse herinnering?', style: AppTheme.displayLarge),
+          Text('Wil je een dagelijkse herinnering?', style: AppTheme.displayLarge),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Een korte melding op een vast moment helpt om het lezen vast te '
             'houden. Je kunt dit altijd wijzigen of uitzetten bij Instellingen.',
             style: AppTheme.bodyLead,

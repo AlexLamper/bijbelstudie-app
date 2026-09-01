@@ -48,6 +48,33 @@ class VersionCatalog {
     'coverdale': 4,
   };
 
+  /// Short codes, as readers actually write them. Hand-kept rather than
+  /// derived, because the derivation cannot know that "Statenvertaling" is
+  /// `SV` and not `S`, nor that "NBG-vertaling 1951" keeps its year.
+  ///
+  /// A version missing from here still gets a badge - see [shortCodeFor] -
+  /// so a translation added to the server manifest needs no app release.
+  static const Map<String, String> _shortCodes = {
+    // Nederlands
+    'statenvertaling': 'SV',
+    'nbg51': 'NBG51',
+    'canisiusbijbel': 'CANIS',
+    'heilige_schrift_1917': 'HS1917',
+    'hsv': 'HSV',
+    'bgt': 'BGT',
+    'nbv': 'NBV',
+    // English
+    'kjv': 'KJV',
+    'asv': 'ASV',
+    'web': 'WEB',
+    'geneva': 'GNV',
+    'coverdale': 'CVD',
+  };
+
+  /// Longest badge the picker will draw. Six characters is `HS1917`; past
+  /// that the square would either stretch or the text would be unreadable.
+  static const int maxShortCodeLength = 6;
+
   /// Ranks past every hand-ranked id, so an unknown version sorts to the end
   /// of its group instead of ahead of King James.
   static const int _unranked = 1 << 20;
@@ -55,6 +82,55 @@ class VersionCatalog {
   static int _languageRank(String language) {
     final index = _languageOrder.indexOf(language);
     return index == -1 ? _languageOrder.length : index;
+  }
+
+  /// The badge code for [version] - a hand-kept code when we have one, a
+  /// derivation from the name when we do not.
+  static String shortCode(BibleSource version) =>
+      shortCodeFor(id: version.id, name: version.name);
+
+  /// [shortCode] without needing a [BibleSource].
+  ///
+  /// The fallback builds initials from the name: one letter per word, plus a
+  /// trailing year if the whole thing still fits in [maxShortCodeLength], so
+  /// `Elberfelder 1905` becomes `E1905` but `De Heilige Schrift 1917` becomes
+  /// `DHS` rather than a truncated `DHS191`. A name with nothing usable in it
+  /// falls back to the id. The result is never empty and never longer than
+  /// [maxShortCodeLength].
+  static String shortCodeFor({required String id, required String name}) {
+    final known = _shortCodes[id];
+    if (known != null) return known;
+
+    // Apostrophes stay inside their word, so `Young's` contributes one Y
+    // rather than a Y and a stray S.
+    final words = name
+        .replaceAll(RegExp(r"['’]"), '')
+        .split(RegExp(r'[^A-Za-z0-9]+'))
+        .where((w) => w.isNotEmpty);
+
+    final letters = StringBuffer();
+    String? number;
+    for (final word in words) {
+      if (RegExp(r'^[0-9]+$').hasMatch(word)) {
+        number = word;
+      } else {
+        letters.write(word[0]);
+      }
+    }
+
+    var code = letters.toString().toUpperCase();
+    if (number != null && code.length + number.length <= maxShortCodeLength) {
+      code = '$code$number';
+    }
+
+    if (code.isEmpty) {
+      code = id.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    }
+    if (code.isEmpty) return '?';
+
+    return code.length <= maxShortCodeLength
+        ? code
+        : code.substring(0, maxShortCodeLength);
   }
 
   static int compare(BibleSource a, BibleSource b) {

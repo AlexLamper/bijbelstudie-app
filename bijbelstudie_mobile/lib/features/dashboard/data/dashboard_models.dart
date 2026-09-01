@@ -65,6 +65,7 @@ class DailyVerse {
     required this.book,
     required this.chapter,
     required this.verse,
+    this.version,
   });
 
   final String text;
@@ -72,6 +73,14 @@ class DailyVerse {
   final String book;
   final int chapter;
   final int verse;
+
+  /// The translation the feed served the verse in, when it says so.
+  ///
+  /// The BijbelAPI "daytext" payload does not carry one today, so this is
+  /// almost always null; the card then labels the verse with the translation
+  /// the reader has selected instead. Parsed anyway so that a feed that starts
+  /// sending it wins over that guess without an app release.
+  final String? version;
 
   static DailyVerse? fromJson(Map<String, dynamic>? json) {
     if (json == null || json['text'] == null) return null;
@@ -92,8 +101,18 @@ class DailyVerse {
       book: book,
       chapter: (json['chapter'] as num?)?.toInt() ?? 1,
       verse: (json['verse'] as num?)?.toInt() ?? 1,
+      version: _nonEmpty(json['version']) ??
+          _nonEmpty(json['translation']) ??
+          _nonEmpty(json['abbreviation']),
     );
   }
+}
+
+/// A trimmed string, or null when the value is absent, not a string, or blank.
+String? _nonEmpty(Object? value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
 }
 
 /// Swaps the English book name at the start of a "daytext" reference string

@@ -38,6 +38,7 @@ import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.da
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
 import 'package:bijbelstudie_mobile/features/settings/data/reading_settings.dart';
 import 'package:bijbelstudie_mobile/features/settings/present/settings_screen.dart';
+import 'package:bijbelstudie_mobile/features/settings/present/theme_mode_provider.dart';
 
 /// Keeps these renders off the network.
 ///
@@ -381,14 +382,18 @@ void main() {
     }
   }
 
-  testWidgets('dashboard renders the hero, stats and book map', (tester) async {
+  testWidgets('dashboard renders the hero, the book map and the daily verse', (
+    tester,
+  ) async {
     await pumpAtPhoneSize(tester, const DashboardScreen());
 
     expectNoLayoutError(tester);
     expect(find.text('GA VERDER WAAR JE GEBLEVEN WAS'), findsOneWidget);
     expect(find.text('Genesis'), findsWidgets);
-    // 3 of the 66 books have a chapter read in the canned data.
-    expect(find.text('3 / 66'), findsOneWidget);
+    // The stat strip moved to the profile screen; the photo card took its
+    // place as the first thing under the hero that carries a heading.
+    expect(find.text('TEKST VAN DE DAG'), findsOneWidget);
+    expect(find.text('Johannes 3:16 SV'), findsOneWidget);
 
     await scrollThrough(tester);
   });
@@ -477,6 +482,14 @@ void main() {
     expect(find.text('Stel je leesvoorkeuren in'), findsOneWidget);
     expect(find.text('Tekstgrootte'), findsOneWidget);
     expect(find.text('Regelafstand'), findsOneWidget);
+
+    await tester.tap(find.text('Volgende'));
+    await tester.pumpAndSettle();
+    expectNoLayoutError(tester);
+    expect(find.text('Licht of donker?'), findsOneWidget);
+    expect(find.text('Licht'), findsOneWidget);
+    expect(find.text('Donker'), findsOneWidget);
+    expect(find.text('Systeem'), findsOneWidget);
 
     await tester.tap(find.text('Volgende'));
     await tester.pumpAndSettle();
@@ -612,6 +625,30 @@ void main() {
       await tester.tap(find.text('Zeer ruim'));
       await tester.pumpAndSettle();
       expect(container.read(readingSettingsProvider).lineHeight, ReaderLineHeight.loose);
+    });
+
+    testWidgets('the theme question applies immediately', (tester) async {
+      await pumpAtPhoneSize(tester, const SetupFlowScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SetupFlowScreen)),
+      );
+
+      for (var i = 0; i < 2; i++) {
+        await tester.tap(find.text('Volgende'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Licht of donker?'), findsOneWidget);
+
+      // Stored, and therefore live: main.dart resolves AppTheme's brightness
+      // from this same value.
+      await tester.tap(find.text('Donker'));
+      await tester.pumpAndSettle();
+      expect(container.read(readingSettingsProvider).themeMode, ThemeMode.dark);
+      expect(container.read(themeModeProvider), ThemeMode.dark);
+
+      await tester.tap(find.text('Licht'));
+      await tester.pumpAndSettle();
+      expect(container.read(readingSettingsProvider).themeMode, ThemeMode.light);
     });
   });
 

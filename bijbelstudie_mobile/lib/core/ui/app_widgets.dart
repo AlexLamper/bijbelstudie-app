@@ -156,7 +156,7 @@ class SectionHeader extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 3),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
                         size: 14,
                         color: AppTheme.teal,
@@ -195,18 +195,24 @@ class IconChip extends StatelessWidget {
   const IconChip({
     super.key,
     required this.icon,
-    this.color = AppTheme.teal,
+    this.color,
     this.size = 28,
     this.iconSize = 14,
   });
 
   final IconData icon;
-  final Color color;
+
+  /// Null means the brand accent, resolved at build time. It cannot be a
+  /// default value: `AppTheme.teal` is brightness-resolved, so it is not a
+  /// constant, and this constructor has to stay `const`.
+  final Color? color;
+
   final double size;
   final double iconSize;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppTheme.teal;
     return Container(
       width: size,
       height: size,
@@ -482,19 +488,22 @@ class SiteBadge extends StatelessWidget {
   /// Filled with the accent instead of its 8% tint.
   final bool solid;
 
-  const SiteBadge.lapis(String label, {Key? key, IconData? icon})
+  // The tone shorthands cannot be const: their colours are brightness-resolved
+  // getters now, and a const redirect may only pass constant arguments.
+
+  SiteBadge.lapis(String label, {Key? key, IconData? icon})
     : this(label, key: key, foreground: AppTheme.teal, icon: icon);
 
-  const SiteBadge.teal(String label, {Key? key, IconData? icon})
+  SiteBadge.teal(String label, {Key? key, IconData? icon})
     : this(label, key: key, foreground: AppTheme.teal, icon: icon);
 
-  const SiteBadge.positive(String label, {Key? key, IconData? icon})
+  SiteBadge.positive(String label, {Key? key, IconData? icon})
     : this(label, key: key, foreground: AppTheme.positive, icon: icon);
 
-  const SiteBadge.vermilion(String label, {Key? key, IconData? icon})
+  SiteBadge.vermilion(String label, {Key? key, IconData? icon})
     : this(label, key: key, foreground: AppTheme.flame, icon: icon);
 
-  const SiteBadge.neutral(String label, {Key? key, IconData? icon})
+  SiteBadge.neutral(String label, {Key? key, IconData? icon})
     : this(label, key: key, foreground: AppTheme.inkMuted, icon: icon);
 
   @override
@@ -736,12 +745,14 @@ class SiteProgressBar extends StatelessWidget {
     super.key,
     required this.value,
     this.height = 6,
-    this.color = AppTheme.teal,
+    this.color,
   });
 
   final double value;
   final double height;
-  final Color color;
+
+  /// Null means the brand accent; see [IconChip.color].
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -751,7 +762,7 @@ class SiteProgressBar extends StatelessWidget {
         value: value.clamp(0.0, 1.0),
         minHeight: height,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        color: color,
+        color: color ?? AppTheme.teal,
       ),
     );
   }

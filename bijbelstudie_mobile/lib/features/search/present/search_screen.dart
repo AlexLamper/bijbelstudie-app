@@ -16,7 +16,16 @@ import '../../bible/present/bible_providers.dart';
 /// silently miss most of the Bible. History is local because it is personal
 /// and needs to work offline.
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.initialBook, this.scopeToBook = false});
+
+  /// The book the caller was reading, used for the "alleen dit boek" scope.
+  /// Falls back to the reader's own location when absent, which is what every
+  /// caller that does not care about scope gets.
+  final String? initialBook;
+
+  /// Opens with the scope already narrowed to [initialBook] instead of the
+  /// whole Bible. Ignored when no book is given.
+  final bool scopeToBook;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -33,8 +42,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.scopeToBook && widget.initialBook != null) _wholeBible = false;
     _loadHistory();
   }
+
+  /// The book the "alleen dit boek" scope means.
+  String _scopeBook(ReaderLocation location) => widget.initialBook ?? location.book;
 
   @override
   void dispose() {
@@ -60,10 +73,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
 
     try {
-      final results = await ref.read(bibleRepositoryProvider).search(
+      final results = await ref
+          .read(bibleRepositoryProvider)
+          .search(
             query: trimmed,
             versionId: location.versionId,
-            book: _wholeBible ? null : location.book,
+            book: _wholeBible ? null : _scopeBook(location),
           );
       await ref.read(contentCacheProvider)?.recordSearch(trimmed);
       await _loadHistory();
@@ -119,7 +134,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        label: Text('Alleen ${location.book}'),
+                        label: Text('Alleen ${_scopeBook(location)}'),
                         selected: !_wholeBible,
                         onSelected: (_) => setState(() => _wholeBible = false),
                       ),
@@ -224,7 +239,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             },
             child: Row(
               children: [
-                const Icon(Icons.history, size: 16, color: AppTheme.inkMuted),
+                Icon(Icons.history, size: 16, color: AppTheme.inkMuted),
                 const SizedBox(width: 12),
                 Expanded(child: Text(query, style: Theme.of(context).textTheme.bodyLarge)),
               ],

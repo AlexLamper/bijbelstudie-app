@@ -11,7 +11,9 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
+import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
+import 'daily_verse_card.dart';
 import 'dashboard_providers.dart';
 
 /// `/dashboard` on www.bijbel-studie.com, folded into one column.
@@ -81,6 +83,8 @@ class _DashboardBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final hasArchivedVerse =
+        ref.watch(dailyVerseStoreProvider).history.isNotEmpty;
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -156,29 +160,6 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              StatStrip(
-                items: [
-                  StatItem(
-                    icon: Icons.local_fire_department,
-                    color: data.streak > 0 ? AppTheme.flame : AppTheme.inkFaint,
-                    value:
-                        '${data.streak} ${data.streak == 1 ? 'dag' : 'dagen'}',
-                    label: 'Reeks',
-                  ),
-                  StatItem(
-                    icon: Icons.menu_book_outlined,
-                    value: '${data.booksStarted} / 66',
-                    label: 'Boeken',
-                  ),
-                  StatItem(
-                    icon: Icons.sticky_note_2_outlined,
-                    value: '${data.notesCount}',
-                    label: 'Notities',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
               _BookMapCard(
                 readChapters: data.readChapters,
                 booksStarted: data.booksStarted,
@@ -198,15 +179,14 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              if (data.dailyVerse != null) ...[
-                _DailyVerseCard(
-                  verse: data.dailyVerse!,
-                  onRead: () => _openChapter(
-                    context,
-                    ref,
-                    book: data.dailyVerse!.book,
-                    chapter: data.dailyVerse!.chapter,
-                  ),
+              // The card renders today's verse, or — offline — the newest one
+              // in its local archive. It is left out entirely only when there
+              // is neither, which is why the archive is consulted here too.
+              if (data.dailyVerse != null || hasArchivedVerse) ...[
+                DailyVerseCard(
+                  verse: data.dailyVerse,
+                  onOpenChapter: (book, chapter) =>
+                      _openChapter(context, ref, book: book, chapter: chapter),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -589,7 +569,7 @@ class _RecommendedStudiesCard extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            const Icon(
+                            Icon(
                               Icons.arrow_forward,
                               size: 13,
                               color: AppTheme.teal,
@@ -602,76 +582,6 @@ class _RecommendedStudiesCard extends ConsumerWidget {
                 ],
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DailyVerseCard extends StatelessWidget {
-  const _DailyVerseCard({required this.verse, required this.onRead});
-
-  final DailyVerse verse;
-  final VoidCallback onRead;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('VERS VAN DE DAG', style: AppTheme.eyebrow),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.only(left: 14),
-            decoration: const BoxDecoration(
-              border: Border(left: BorderSide(color: AppTheme.teal, width: 2)),
-            ),
-            child: Text(
-              '“${verse.text}”',
-              style: TextStyle(
-                fontFamily: AppTheme.serifFontName,
-                fontSize: 15,
-                fontStyle: FontStyle.italic,
-                height: 1.8,
-                color: scheme.onSurface.withValues(alpha: 0.82),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      verse.reference,
-                      style: AppTheme.bodyStrong.copyWith(color: AppTheme.teal),
-                    ),
-                    Text('via BijbelAPI.com', style: AppTheme.caption),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: onRead,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.inkMuted,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 32),
-                  textStyle: AppTheme.caption.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                child: const Text('Lees hoofdstuk →'),
-              ),
-            ],
           ),
         ],
       ),
@@ -705,7 +615,7 @@ class _WeeklyStatsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.bar_chart, size: 14, color: AppTheme.teal),
+              Icon(Icons.bar_chart, size: 14, color: AppTheme.teal),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -801,7 +711,7 @@ class _RecentNotesCard extends StatelessWidget {
               Expanded(
                 child: Text('RECENTE NOTITIES', style: AppTheme.eyebrow),
               ),
-              const Icon(
+              Icon(
                 Icons.sticky_note_2_outlined,
                 size: 14,
                 color: AppTheme.teal,

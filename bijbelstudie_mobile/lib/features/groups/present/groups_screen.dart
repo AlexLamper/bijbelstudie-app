@@ -202,7 +202,7 @@ class _GroupCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (group.isLeader) const SiteBadge.teal('Leider'),
+              if (group.isLeader) SiteBadge.teal('Leider'),
               if (!group.isMember)
                 Text(
                   'Deelnemen',
@@ -221,7 +221,7 @@ class _GroupCard extends ConsumerWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.assignment_outlined, size: 13, color: AppTheme.teal),
+                Icon(Icons.assignment_outlined, size: 13, color: AppTheme.teal),
                 const SizedBox(width: 6),
                 Text(
                   'Deze week: ${group.assignment}',
