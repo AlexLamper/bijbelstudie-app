@@ -37,3 +37,7 @@ build/
 .idea/
 *.iml
 .DS_Store
+
+# ─── Claude Code ─────────────────────────────────────────────────────────────
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

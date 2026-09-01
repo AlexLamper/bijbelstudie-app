@@ -1,0 +1,43 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Program Files\\nodejs\\node.exe\" \"${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\filter-flutter-output.js\"",
+            "timeout": 5,
+            "statusMessage": "Trimming Flutter output..."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Read(./bijbelstudie_mobile/build/**)",
+      "Read(./bijbelstudie_mobile/.dart_tool/**)",
+      "Read(./bijbelstudie_mobile/ios/Pods/**)",
+      "Read(./bijbelstudie_mobile/android/.gradle/**)",
+      "Read(./bijbelstudie_mobile/android/.kotlin/**)",
+      "Read(./screenshots/**)",
+      "Read(./bijbelstudie_mobile/assets/fonts/**)",
+      "Read(./bijbelstudie_mobile/ios/Runner.xcodeproj/**)",
+      "Read(./bijbelstudie_mobile/macos/**)",
+      "Read(./bijbelstudie_mobile/linux/**)",
+      "Read(./bijbelstudie_mobile/windows/**)",
+      "Read(./bijbelstudie_mobile/web/**)"
+    ],
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter test:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(dart format:*)"
+    ]
+  }
+}
