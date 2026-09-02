@@ -244,23 +244,28 @@ class _ProfileHeader extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 12),
-              // The tour points at the Pro pill, so the anchor sits on the row
-              // that holds it rather than on a card that no longer exists.
-              TourAnchor(
-                id: TourAnchorIds.profilePro,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (profile.isPro)
-                      SiteBadge.positive(
-                        profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
-                        icon: Icons.workspace_premium_outlined,
-                      )
-                    else
-                      // Guideline 3.1.1: only a non-subscriber is offered the
-                      // purchase route.
-                      InkWell(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (profile.isPro)
+                    SiteBadge.positive(
+                      profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
+                      icon: Icons.workspace_premium_outlined,
+                    )
+                  else
+                    // Guideline 3.1.1: only a non-subscriber is offered the
+                    // purchase route.
+                    //
+                    // The tour anchor sits on this pill alone. On the row that
+                    // holds it - where it used to be - the spotlight also took
+                    // in the streak badge beside it, so the step about Pro
+                    // pointed at two unrelated things. The step is filtered out
+                    // for a subscriber, so the branch that has no pill needs no
+                    // anchor.
+                    TourAnchor(
+                      id: TourAnchorIds.profilePro,
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(
                           AppTheme.radiusPill,
                         ),
@@ -271,13 +276,13 @@ class _ProfileHeader extends ConsumerWidget {
                           icon: Icons.workspace_premium_outlined,
                         ),
                       ),
-                    if (stats != null)
-                      SiteBadge.vermilion(
-                        '${stats.streak} ${stats.streak == 1 ? 'dag' : 'dagen'} reeks',
-                        icon: Icons.local_fire_department_outlined,
-                      ),
-                  ],
-                ),
+                    ),
+                  if (stats != null)
+                    SiteBadge.vermilion(
+                      '${stats.streak} ${stats.streak == 1 ? 'dag' : 'dagen'} reeks',
+                      icon: Icons.local_fire_department_outlined,
+                    ),
+                ],
               ),
             ],
           ),

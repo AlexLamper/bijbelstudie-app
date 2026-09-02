@@ -29,6 +29,7 @@ import '../../features/search/present/search_screen.dart';
 import '../../features/settings/present/settings_screen.dart';
 import '../../features/studies/present/studies_screen.dart';
 import '../../features/studies/present/study_detail_screen.dart';
+import '../../features/study/present/study_pane_controller.dart';
 import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
@@ -51,7 +52,19 @@ class MainScaffold extends ConsumerWidget {
     // chapter. Only the reader may: every other tab reads `true` regardless of
     // what the provider holds, so a missed reset can never strand a screen
     // without a way out.
-    final inReader = GoRouterState.of(context).uri.path.startsWith('/read');
+    //
+    // "The reader" is two routes, not one. `/read` is the standalone reader,
+    // but the reader people actually use is the left pane of `/study`, and
+    // matching `/read` alone meant the top bar (owned by ReadScreen, which does
+    // not care about the route) slid away there while the tab bar stayed put.
+    // `/study` only counts while its reader pane is the one showing, so the
+    // study materials keep their tab bar; `/studies` is excluded on purpose -
+    // `startsWith('/study')` would swallow it.
+    final path = GoRouterState.of(context).uri.path;
+    final inStudyReader =
+        (path == '/study' || path.startsWith('/study/')) &&
+        !ref.watch(studyPaneProvider.select((pane) => pane.showMaterials));
+    final inReader = path.startsWith('/read') || inStudyReader;
     final chromeVisible = !inReader || ref.watch(readerChromeVisibleProvider);
 
     return Scaffold(
@@ -73,15 +86,10 @@ class MainScaffold extends ConsumerWidget {
                 children: [
                   for (var i = 0; i < _items.length; i++)
                     Expanded(
-                      // Anchored so the guided tour can point at the tab it is
-                      // describing rather than describing it in the abstract.
-                      child: TourAnchor(
-                        id: _items[i].tourAnchorId,
-                        child: _NavItem(
-                          item: _items[i],
-                          active: currentIndex == i,
-                          onTap: () => context.go(_items[i].route),
-                        ),
+                      child: _NavItem(
+                        item: _items[i],
+                        active: currentIndex == i,
+                        onTap: () => context.go(_items[i].route),
                       ),
                     ),
                 ],
@@ -177,7 +185,18 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(active ? item.activeIcon : item.icon, size: 21, color: color),
+            // The tour's spotlight is cut around whatever this wraps. It sits
+            // on the icon alone rather than on the whole tab cell: a cell is a
+            // fifth of the bar wide and the full bar high, so spotlighting it
+            // highlighted mostly empty space and the neighbouring tabs' margins.
+            TourAnchor(
+              id: item.tourAnchorId,
+              child: Icon(
+                active ? item.activeIcon : item.icon,
+                size: 21,
+                color: color,
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               item.label,

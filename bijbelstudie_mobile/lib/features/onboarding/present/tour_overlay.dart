@@ -38,6 +38,31 @@ const double _spotlightPadding = 8;
 const double _tooltipGap = 14;
 const double _screenMargin = 16;
 
+/// How much of the screen one spotlight may take.
+///
+/// Some anchors are whole panes - the reader's chapter body fills everything
+/// between the two bars - and a spotlight that tall leaves no gap for the card
+/// to sit in, which is how the step about the bible text ended up as a sliver
+/// at the bottom of the screen. Cutting the hole off at the top of the anchor
+/// still frames the thing being talked about and keeps a usable gap below it.
+const double _maxSpotlightFraction = 0.45;
+
+/// The gap a step needs before the card is placed beside the spotlight rather
+/// than floated over it. Roughly the card at its shortest: heading, two lines,
+/// the dots and the button row.
+const double _minCardSpace = 240;
+
+/// Where the reader is left once the tour has been walked to the end.
+///
+/// The last step is on Profiel, which is nobody's starting point. Studies is
+/// what the tour calls the heart of the app and the one screen a fresh account
+/// can act on immediately, so finishing hands them that.
+///
+/// Only finishing. Overslaan means "stop showing me this", not "take me
+/// somewhere else", so it closes the overlay and leaves the reader where they
+/// were.
+const String _tourExitRoute = '/studies';
+
 /// How long to keep looking for a step's anchor before giving up on placing
 /// the card next to it. The route change, the screen's own data fetch and the
 /// first layout all have to land first, and on a cold tab that is not
@@ -174,6 +199,13 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
     }
   }
 
+  /// Closes the tour and puts the reader on the screen worth starting from.
+  void _endTour() {
+    ref.read(tourControllerProvider.notifier).finish();
+    final router = ref.read(routerProvider);
+    if (router.state.uri.path != _tourExitRoute) router.go(_tourExitRoute);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watched, not read once: the profile fetch is usually still in flight
@@ -199,7 +231,7 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
     }
 
     final media = MediaQuery.of(context);
-    final spotlight = _rect == null
+    var spotlight = _rect == null
         ? null
         : Rect.fromLTRB(
             (_rect!.left - _spotlightPadding).clamp(0.0, media.size.width),
@@ -207,6 +239,17 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
             (_rect!.right + _spotlightPadding).clamp(0.0, media.size.width),
             (_rect!.bottom + _spotlightPadding).clamp(0.0, media.size.height),
           );
+    final maxSpotlightHeight = media.size.height * _maxSpotlightFraction;
+    if (spotlight != null && spotlight.height > maxSpotlightHeight) {
+      // Keep the top: that is where an anchor's own heading or first line is,
+      // and it is what the reader looks at first.
+      spotlight = Rect.fromLTWH(
+        spotlight.left,
+        spotlight.top,
+        spotlight.width,
+        maxSpotlightHeight,
+      );
+    }
 
     return Material(
       type: MaterialType.transparency,
@@ -253,7 +296,9 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
               total: steps.length,
               onSkip: controller.finish,
               onBack: index == 0 ? null : controller.back,
-              onNext: () => controller.next(steps.length),
+              onNext: () => index + 1 >= steps.length
+                  ? _endTour()
+                  : controller.next(steps.length),
               onJump: (i) => controller.goTo(i, steps.length),
             ),
           ),
@@ -287,6 +332,19 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
     final spaceBelow = media.size.height - spotlight.bottom - bottomInset - _tooltipGap;
     final below = spaceBelow >= spaceAbove;
     final available = (below ? spaceBelow : spaceAbove).clamp(0.0, media.size.height);
+
+    // Neither gap can hold the card. Float it over the spotlight instead of
+    // squeezing it into a scrollable sliver: the card carries the explanation
+    // and the buttons, so it being readable beats it being out of the way.
+    if (available < _minCardSpace) {
+      return Positioned(
+        left: _screenMargin,
+        right: _screenMargin,
+        top: topInset,
+        bottom: bottomInset,
+        child: Center(child: SingleChildScrollView(child: card)),
+      );
+    }
 
     return Positioned(
       left: _screenMargin,

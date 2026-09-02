@@ -385,6 +385,12 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: 'layout error after scroll step $i');
     }
+    // A drag that happens to start on a widget listening for a double tap —
+    // the book map does — leaves that recognizer's countdown running, and the
+    // bare `pump` above never advances the clock far enough to retire it. Let
+    // those timers expire here, or the test ends with a timer still pending
+    // whenever the layout shifts a drag onto such a widget.
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   testWidgets('dashboard renders the hero, the book map and the daily verse', (
@@ -703,7 +709,10 @@ void main() {
       // "Bijbelstudie" is also the dashboard's own copy, so the step is
       // identified by the counter and its description instead of its title.
       expect(find.text('Rondleiding · 2/9'), findsOneWidget);
-      expect(find.textContaining('Dit is het hart van de app'), findsOneWidget);
+      expect(
+        find.textContaining('Via deze tab kom je bij de bijbeltekst'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Vorige'));
       await tester.pumpAndSettle();

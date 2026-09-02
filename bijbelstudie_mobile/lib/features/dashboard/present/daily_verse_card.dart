@@ -124,94 +124,73 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final chapter = verse?.chapter ?? fallback!.chapter;
     final version = verse == null ? fallback!.version : _versionLabel(verse);
     final liked = memory.isLiked(reference);
+    final verseNumber = verse?.verse ?? fallback?.verse;
+    final photo = dailyVersePhoto(DateTime.now());
 
-    return SizedBox(
-      height: _cardHeight,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(dailyVersePhoto(DateTime.now()), fit: BoxFit.cover),
+    // Tapping the photo opens the same card as a modal. The action buttons on
+    // top of it keep their own taps: a tap recognizer nested inside this one
+    // is the deeper entry in the gesture arena and wins it.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openExpanded(
+        photo: photo,
+        text: text,
+        reference: reference,
+        version: version,
+        book: book,
+        chapter: chapter,
+        verseNumber: verseNumber,
+      ),
+      child: SizedBox(
+        height: _cardHeight,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          child: _VerseFace(
+            photo: photo,
+            text: text,
+            reference: reference,
+            version: version,
+            liked: liked,
+            expanded: false,
+            onLike: () =>
+                ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
+            onShare: () => _share(text, reference, version),
+            onMore: () => _showMore(book, chapter, verseNumber),
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Colours from here down sit on top of a photograph, so they are
-            // literal white/black rather than theme tokens: the scrim has to
-            // hold WCAG AA over any of the six images, in either brightness.
-            const _PhotoScrim(),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TEKST VAN DE DAG',
-                    style: AppTheme.overline.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 9.5,
-                      letterSpacing: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    version.isEmpty ? reference : '$reference $version',
-                    style: AppTheme.bodyStrong.copyWith(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: Text(
-                          text,
-                          textAlign: TextAlign.left,
-                          maxLines: 6,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontFamily: AppTheme.serifFontName,
-                            fontSize: 19,
-                            height: 1.5,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _PhotoAction(
-                        icon: liked ? Icons.favorite : Icons.favorite_border,
-                        tooltip: liked ? 'Verwijder uit favorieten' : 'Favoriet',
-                        onPressed: () => ref
-                            .read(dailyVerseStoreProvider.notifier)
-                            .toggleLike(reference),
-                      ),
-                      _PhotoAction(
-                        icon: Icons.ios_share,
-                        tooltip: 'Delen',
-                        onPressed: () => _share(text, reference, version),
-                      ),
-                      _PhotoAction(
-                        icon: Icons.more_horiz,
-                        tooltip: 'Meer',
-                        onPressed: () => _showMore(
-                          book,
-                          chapter,
-                          verse?.verse ?? fallback?.verse,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+  /// Opens the card as a modal over the dashboard: the same photograph, the
+  /// same reference and the same actions, only larger and with the verse in
+  /// full rather than clipped at six lines.
+  Future<void> _openExpanded({
+    required String photo,
+    required String text,
+    required String reference,
+    required String version,
+    required String book,
+    required int chapter,
+    required int? verseNumber,
+  }) {
+    return showDialog<void>(
+      context: context,
+      // Dismissible by tapping outside; the close button is in the card.
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      builder: (dialogContext) => _ExpandedVerseDialog(
+        photo: photo,
+        text: text,
+        reference: reference,
+        version: version,
+        onShare: () => _share(text, reference, version),
+        onReadChapter: () {
+          Navigator.of(dialogContext).pop();
+          _openChapterAtVerse(book, chapter, verseNumber);
+        },
+        onHistory: () => _showHistorySheet(
+          dialogContext,
+          beforeOpen: () => Navigator.of(dialogContext).pop(),
         ),
       ),
     );
@@ -233,17 +212,30 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
       case _MoreAction.readChapter:
         _openChapterAtVerse(book, chapter, verseNumber);
       case _MoreAction.history:
-        await showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (context) => _HistorySheet(
-            onOpenChapter: (book, chapter, verse) {
-              Navigator.of(context).pop();
-              _openChapterAtVerse(book, chapter, verse);
-            },
-          ),
-        );
+        await _showHistorySheet(context);
     }
+  }
+
+  /// The local archive, as a sheet on [host]'s navigator — the dashboard's for
+  /// the card, the dialog's for the modal, so the sheet lands on top of it.
+  ///
+  /// [beforeOpen] runs after the sheet closes and before the reader is sent to
+  /// a chapter; that is where the expanded card dismisses itself.
+  Future<void> _showHistorySheet(
+    BuildContext host, {
+    VoidCallback? beforeOpen,
+  }) {
+    return showModalBottomSheet<void>(
+      context: host,
+      isScrollControlled: true,
+      builder: (sheetContext) => _HistorySheet(
+        onOpenChapter: (book, chapter, verse) {
+          Navigator.of(sheetContext).pop();
+          beforeOpen?.call();
+          _openChapterAtVerse(book, chapter, verse);
+        },
+      ),
+    );
   }
 
   /// Names the verse the reader should scroll to and highlight, then hands
@@ -254,6 +246,302 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
       ref.read(pendingVerseAnchorProvider.notifier).set(verseNumber);
     }
     widget.onOpenChapter(book, chapter);
+  }
+}
+
+/// Everything painted on the photograph: scrim, eyebrow and reference, the
+/// verse, and the action row.
+///
+/// Shared by the 330px card on the dashboard and by the modal it opens, which
+/// differ only in type scale, in whether the verse is clipped at six lines or
+/// scrolls in full, and in the extra actions the modal has room to spell out.
+class _VerseFace extends StatelessWidget {
+  const _VerseFace({
+    required this.photo,
+    required this.text,
+    required this.reference,
+    required this.version,
+    required this.liked,
+    required this.expanded,
+    required this.onLike,
+    required this.onShare,
+    this.onMore,
+    this.onReadChapter,
+    this.onHistory,
+    this.onClose,
+  });
+
+  final String photo;
+  final String text;
+  final String reference;
+  final String version;
+  final bool liked;
+
+  /// True in the modal: bigger type, the whole verse, and a close button.
+  final bool expanded;
+
+  final VoidCallback onLike;
+  final VoidCallback onShare;
+
+  /// Card only — the "…" sheet that holds what the modal spells out.
+  final VoidCallback? onMore;
+
+  /// Modal only.
+  final VoidCallback? onReadChapter;
+  final VoidCallback? onHistory;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(photo, fit: BoxFit.cover),
+
+        // Colours from here down sit on top of a photograph, so they are
+        // literal white/black rather than theme tokens: the scrim has to
+        // hold WCAG AA over any of the six images, in either brightness.
+        const _PhotoScrim(),
+
+        Padding(
+          padding: expanded
+              ? const EdgeInsets.fromLTRB(22, 16, 22, 10)
+              : const EdgeInsets.fromLTRB(20, 18, 20, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: expanded ? 10 : 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TEKST VAN DE DAG',
+                            style: AppTheme.overline.copyWith(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 9.5,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            version.isEmpty ? reference : '$reference $version',
+                            style: AppTheme.bodyStrong.copyWith(
+                              color: Colors.white,
+                              fontSize: expanded ? 17 : 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (onClose != null)
+                    _PhotoAction(
+                      icon: Icons.close,
+                      tooltip: 'Sluiten',
+                      onPressed: onClose!,
+                    ),
+                ],
+              ),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    // Platform default in the modal, so a long verse scrolls;
+                    // the card clips at six lines instead.
+                    physics: expanded
+                        ? null
+                        : const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(vertical: expanded ? 12 : 0),
+                    child: Text(
+                      text,
+                      textAlign: TextAlign.left,
+                      maxLines: expanded ? null : 6,
+                      overflow: expanded
+                          ? TextOverflow.clip
+                          : TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTheme.serifFontName,
+                        fontSize: expanded ? 21 : 19,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              _VerseActions(
+                liked: liked,
+                onLike: onLike,
+                onShare: onShare,
+                onMore: onMore,
+                onReadChapter: onReadChapter,
+                onHistory: onHistory,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The actions along the bottom of the photo.
+///
+/// On the card: favourite, share and the "…" sheet. In the modal, where there
+/// is room, the sheet's two entries are spelled out instead — "Lees het hele
+/// hoofdstuk" as a button and the archive as an icon — so both surfaces offer
+/// the same four things and the modal never stacks a sheet on a dialog.
+class _VerseActions extends StatelessWidget {
+  const _VerseActions({
+    required this.liked,
+    required this.onLike,
+    required this.onShare,
+    this.onMore,
+    this.onReadChapter,
+    this.onHistory,
+  });
+
+  final bool liked;
+  final VoidCallback onLike;
+  final VoidCallback onShare;
+  final VoidCallback? onMore;
+  final VoidCallback? onReadChapter;
+  final VoidCallback? onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final icons = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _PhotoAction(
+          icon: liked ? Icons.favorite : Icons.favorite_border,
+          tooltip: liked ? 'Verwijder uit favorieten' : 'Favoriet',
+          onPressed: onLike,
+        ),
+        _PhotoAction(
+          icon: Icons.ios_share,
+          tooltip: 'Delen',
+          onPressed: onShare,
+        ),
+        if (onMore != null)
+          _PhotoAction(
+            icon: Icons.more_horiz,
+            tooltip: 'Meer',
+            onPressed: onMore!,
+          ),
+        if (onHistory != null)
+          _PhotoAction(
+            icon: Icons.history,
+            tooltip: 'Bekijk voorgaande dagen',
+            onPressed: onHistory!,
+          ),
+      ],
+    );
+
+    if (onReadChapter == null) return icons;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: onReadChapter,
+            icon: const Icon(Icons.menu_book_outlined, size: 18),
+            label: Text(
+              'Lees het hele hoofdstuk',
+              style: AppTheme.bodyStrong.copyWith(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.34)),
+              ),
+            ),
+          ),
+        ),
+        icons,
+      ],
+    );
+  }
+}
+
+/// The card again, as a modal over the dashboard.
+///
+/// A [ConsumerWidget] rather than a snapshot of the card's state: it sits on
+/// its own route, so the heart only follows [dailyVerseStoreProvider] if it
+/// watches the store itself.
+class _ExpandedVerseDialog extends ConsumerWidget {
+  const _ExpandedVerseDialog({
+    required this.photo,
+    required this.text,
+    required this.reference,
+    required this.version,
+    required this.onShare,
+    required this.onReadChapter,
+    required this.onHistory,
+  });
+
+  final String photo;
+  final String text;
+  final String reference;
+  final String version;
+  final VoidCallback onShare;
+  final VoidCallback onReadChapter;
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liked = ref.watch(dailyVerseStoreProvider).isLiked(reference);
+
+    // Tall enough to read like an opened card, never taller than the screen —
+    // a SizedBox cannot outgrow the constraints the dialog hands it, so a
+    // short screen simply gets a shorter card and the verse scrolls.
+    final height = (MediaQuery.sizeOf(context).height * 0.74)
+        .clamp(320.0, 680.0)
+        .toDouble();
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 36),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SizedBox(
+          height: height,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            child: _VerseFace(
+              photo: photo,
+              text: text,
+              reference: reference,
+              version: version,
+              liked: liked,
+              expanded: true,
+              onLike: () =>
+                  ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
+              onShare: onShare,
+              onReadChapter: onReadChapter,
+              onHistory: onHistory,
+              onClose: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

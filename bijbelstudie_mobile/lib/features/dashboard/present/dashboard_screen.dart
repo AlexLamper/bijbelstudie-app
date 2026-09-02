@@ -12,6 +12,7 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
+import '../../studies/present/study_banner.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
 import 'daily_verse_card.dart';
@@ -186,14 +187,11 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
+              // Opens the study itself, not the chapter it happens to start
+              // in: a recommendation is an invitation to the study's own
+              // screen, where it can be read about and started.
               _RecommendedStudiesCard(
-                onOpen: (study) => _openChapter(
-                  context,
-                  ref,
-                  book: study.startBook,
-                  chapter: study.startChapter,
-                  version: study.startVersion,
-                ),
+                onOpen: (study) => context.push('/studies/${study.id}'),
               ),
               const SizedBox(height: 16),
 
@@ -477,10 +475,22 @@ class _TestamentGrid extends StatelessWidget {
   }
 }
 
+/// "Aanbevolen studies" — the lead recommendation as a hero with its own
+/// banner, then two compact rows under it.
+///
+/// A study is a picture and a promise, not a line of text: the old plain list
+/// of type-pill + title sold none of them. Both shapes here lean on
+/// [StudyBanner], the same 16:6 artwork (with its painted fallback) that the
+/// studies tab and the detail screen use, so a recommendation looks the same
+/// wherever the reader meets it.
 class _RecommendedStudiesCard extends ConsumerWidget {
   const _RecommendedStudiesCard({required this.onOpen});
 
   final void Function(CuratedStudy study) onOpen;
+
+  /// One hero plus two rows. Any more and the dashboard turns into the studies
+  /// tab, which is what "Bekijk alle" is for.
+  static const int _maxItems = 3;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -489,7 +499,20 @@ class _RecommendedStudiesCard extends ConsumerWidget {
     final serverLessons =
         ref.watch(serverStudyLessonsProvider).value ??
         const <String, Set<int>>{};
-    final scheme = Theme.of(context).colorScheme;
+
+    // A finished study stays in the list — it is still a fair suggestion to
+    // revisit — but steps back so the unread ones read first.
+    Widget dim(CuratedStudy study, Widget child) => Opacity(
+      opacity:
+          isStudyFinished(
+            study: study,
+            plans: plans,
+            serverLessons: serverLessons,
+          )
+          ? 0.55
+          : 1,
+      child: child,
+    );
 
     return AppCard(
       padding: const EdgeInsets.all(18),
@@ -502,97 +525,253 @@ class _RecommendedStudiesCard extends ConsumerWidget {
             actionLabel: 'Bekijk alle',
             onAction: () => context.go('/studies'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           studies.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: SkeletonText(lines: 4, lineHeight: 12, gap: 14),
-            ),
-            error: (_, __) => Text(
+            loading: () => const _RecommendedStudiesSkeleton(),
+            error: (_, _) => Text(
               'Studies konden niet worden geladen.',
               style: AppTheme.caption,
             ),
-            data: (list) => Column(
-              children: [
-                for (var i = 0; i < list.length && i < 5; i++) ...[
-                  if (i > 0) const RuleLine(),
-                  Opacity(
-                    opacity:
-                        isStudyFinished(
-                          study: list[i],
-                          plans: plans,
-                          serverLessons: serverLessons,
-                        )
-                        ? 0.55
-                        : 1,
-                    child: InkWell(
-                      onTap: () => onOpen(list[i]),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.teal.withValues(alpha: 0.88),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                list[i].type.toUpperCase(),
-                                style: AppTheme.overline.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    list[i].title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTheme.bodyStrong.copyWith(
-                                      fontSize: 13,
-                                      color: scheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${list[i].durationLabel} · ${list[i].startBook}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTheme.caption.copyWith(
-                                      fontSize: 11,
-                                      color: AppTheme.inkFaint,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.arrow_forward,
-                              size: 13,
-                              color: AppTheme.teal,
-                            ),
-                          ],
-                        ),
-                      ),
+            data: (list) {
+              if (list.isEmpty) {
+                return Text(
+                  'Er zijn nog geen studies beschikbaar.',
+                  style: AppTheme.caption,
+                );
+              }
+              final shown = list.take(_maxItems).toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  dim(
+                    shown.first,
+                    _StudyHero(
+                      study: shown.first,
+                      onTap: () => onOpen(shown.first),
                     ),
                   ),
+                  for (final study in shown.skip(1)) ...[
+                    const RuleLine(),
+                    dim(
+                      study,
+                      _RecommendedStudyRow(
+                        study: study,
+                        onTap: () => onOpen(study),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The lead recommendation: banner, type badge, title, pitch and the two facts
+/// that help a reader choose — how many lessons, and how long each one takes.
+class _StudyHero extends StatelessWidget {
+  const _StudyHero({required this.study, required this.onTap});
+
+  final CuratedStudy study;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              child: AspectRatio(
+                aspectRatio: 16 / 6,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    StudyBanner(study: study),
+                    Positioned(
+                      left: 10,
+                      top: 10,
+                      child: _StudyTypePill(type: study.type),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              study.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.displayTitle.copyWith(color: scheme.onSurface),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              study.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${study.lessonCount} lessen · ±${study.minutesPerLesson} min',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.metaLabel,
+                  ),
+                ),
+                Text(
+                  'Bekijk studie',
+                  style: AppTheme.caption.copyWith(
+                    color: AppTheme.teal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Icon(Icons.arrow_forward, size: 13, color: AppTheme.teal),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A runner-up: the same banner as a square thumbnail, title and lesson count.
+class _RecommendedStudyRow extends StatelessWidget {
+  const _RecommendedStudyRow({required this.study, required this.onTap});
+
+  final CuratedStudy study;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: StudyBanner(study: study),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    study.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.bodyStrong.copyWith(
+                      fontSize: 13,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${study.lessonCount} lessen · ±${study.minutesPerLesson} min',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.metaLabel,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_forward, size: 13, color: AppTheme.teal),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The `Gedeelte` / `Persoon` / `Boek` badge, on the banner rather than beside
+/// the title — it is a label for the picture, not for the sentence.
+class _StudyTypePill extends StatelessWidget {
+  const _StudyTypePill({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.teal.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        type.toUpperCase(),
+        style: AppTheme.overline.copyWith(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// The recommendation card while the catalogue is still loading: the hero
+/// banner and two rows, in the shape they will land in.
+class _RecommendedStudiesSkeleton extends StatelessWidget {
+  const _RecommendedStudiesSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Skeleton(height: 96, radius: AppTheme.radiusMd),
+        const SizedBox(height: 10),
+        const Skeleton(height: 13, width: 180),
+        const SizedBox(height: 8),
+        const SkeletonText(lines: 2, lineHeight: 10),
+        const SizedBox(height: 18),
+        for (var i = 0; i < 2; i++) ...[
+          if (i > 0) const SizedBox(height: 14),
+          Row(
+            children: [
+              const Skeleton(height: 52, width: 52, radius: AppTheme.radiusSm),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Skeleton(height: 11, width: 150),
+                    SizedBox(height: 7),
+                    Skeleton(height: 9, width: 96),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

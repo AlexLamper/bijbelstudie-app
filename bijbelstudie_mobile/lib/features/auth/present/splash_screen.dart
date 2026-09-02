@@ -179,6 +179,15 @@ class BijbelStudieWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Read through Theme rather than straight off AppTheme.ink. Every call
+    // site builds this widget `const`, and an identical const widget is never
+    // rebuilt when its parent rebuilds - so on a light/dark switch the wordmark
+    // kept the colour it was first painted in, which on light mode left
+    // "Bijbel" in near-white on paper. Depending on an inherited widget is what
+    // makes it repaint: the dependency schedules the rebuild regardless of the
+    // const identity.
+    final ink = Theme.of(context).colorScheme.onSurface;
+
     return Text.rich(
       TextSpan(
         style: TextStyle(
@@ -186,7 +195,7 @@ class BijbelStudieWordmark extends StatelessWidget {
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
           letterSpacing: fontSize * -0.02,
-          color: AppTheme.ink,
+          color: ink,
         ),
         children: [
           TextSpan(text: 'Bijbel'),

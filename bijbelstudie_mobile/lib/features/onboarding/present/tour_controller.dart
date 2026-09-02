@@ -82,8 +82,9 @@ const List<TourStep> _allSteps = [
     route: '/dashboard',
     title: 'Bijbelstudie',
     description:
-        'Dit is het hart van de app. Via deze tab kom je bij de bijbeltekst '
-        'en alle studiematerialen die erbij horen.',
+        'Via deze tab kom je bij de bijbeltekst en alle studiematerialen die '
+        'erbij horen: commentaar, grondtekst en je notities bij het '
+        'hoofdstuk.',
   ),
   TourStep(
     anchorId: TourAnchorIds.readerText,
@@ -129,9 +130,9 @@ const List<TourStep> _allSteps = [
     route: '/studies',
     title: 'Begeleide studies',
     description:
-        'Klaargestoomde studies leiden je stap voor stap door een persoon, '
-        'thema of bijbelgedeelte, met gerichte vragen per les. Je voortgang '
-        'wordt onthouden.',
+        'Dit is het hart van de app. Uitgewerkte studies leiden je stap voor '
+        'stap door een persoon, thema of bijbelgedeelte, met gerichte vragen '
+        'per les. Je voortgang wordt onthouden.',
   ),
   TourStep(
     anchorId: TourAnchorIds.notesTabs,
@@ -147,9 +148,9 @@ const List<TourStep> _allSteps = [
     route: '/profile',
     title: 'Je profiel',
     description:
-        'Hier vind je Bijbelgroepen, Hulpbronnen, je lees- en '
-        'meldingsinstellingen, en de knop om feedback te geven of een bug te '
-        'melden.',
+        'Je leesreeks, bladwijzers, badges en activiteit staan hier bij '
+        'elkaar. Met het tandwiel stel je lezen en meldingen in; achter het '
+        'menu vind je hulpbronnen, zoeken, feedback en deze rondleiding.',
   ),
   TourStep(
     anchorId: TourAnchorIds.profilePro,
