@@ -7,7 +7,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../dashboard/present/dashboard_providers.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
@@ -98,9 +97,9 @@ class _ProfileBody extends ConsumerWidget {
         const _QuickActions(),
 
         const SizedBox(height: 28),
-        const SectionHeader(title: 'Statistieken'),
+        const SectionHeader(title: 'Badges'),
         const SizedBox(height: 12),
-        const _StatsSection(),
+        const _BadgesCard(),
 
         const SizedBox(height: 28),
         const SectionHeader(title: 'Activiteit'),
@@ -341,21 +340,24 @@ class _AvatarWithEdit extends ConsumerWidget {
   }
 }
 
-/// One row of three equal cards, each to a destination this app really has.
+/// One row of four compact cards, each to a destination or figure this app
+/// really has.
 ///
-/// Bladwijzers and Notities both land on `/notes`, which is where all three of
-/// those lists live; there is no route parameter to preselect a tab.
+/// Bladwijzers and Notities both land on `/notes`, which is where both lists
+/// live; there is no route parameter to preselect a tab. The icons are kept
+/// to the theme's neutral ink tones - no per-tile colour palette - so the row
+/// reads as one restrained unit rather than a set of clashing chips.
 class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookmarks = ref.watch(bookmarksProvider).value?.length;
-    final notes = ref.watch(profileStatsProvider).value?.notesCount;
+    final stats = ref.watch(profileStatsProvider).value;
 
     // IntrinsicHeight, not `CrossAxisAlignment.stretch`: inside a ListView the
-    // Row has no bounded height to stretch into, and the three cards still have
-    // to end level even when one label wraps.
+    // Row has no bounded height to stretch into, and the four cards still
+    // have to end level even when one label wraps.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -368,23 +370,33 @@ class _QuickActions extends ConsumerWidget {
               onTap: () => context.go('/notes'),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: _QuickCard(
               icon: Icons.edit_note_outlined,
               label: 'Notities',
-              value: notes?.toString(),
-              tint: AppTheme.ai,
+              value: stats?.notesCount.toString(),
               onTap: () => context.go('/notes'),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: _QuickCard(
-              icon: Icons.local_library_outlined,
-              label: 'Hulpbronnen',
-              tint: AppTheme.positive,
-              onTap: () => context.go('/resources'),
+              icon: Icons.menu_book_outlined,
+              label: 'Bijbelboeken',
+              value: stats == null
+                  ? null
+                  : '${stats.booksRead}/${ProfileStats.canonBooks}',
+              onTap: () => context.go('/dashboard'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _QuickCard(
+              icon: Icons.local_fire_department_outlined,
+              label: 'Leesreeks',
+              value: stats?.streak.toString(),
+              onTap: () => context.go('/dashboard'),
             ),
           ),
         ],
@@ -399,200 +411,42 @@ class _QuickCard extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.value,
-    this.tint,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  /// Null where there is no number to show - Hulpbronnen is a catalogue, not a
-  /// collection of the reader's own records.
+  /// Null while the figure has not loaded yet.
   final String? value;
-
-  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconChip(icon: icon, color: tint),
-          const SizedBox(height: 10),
+          Icon(icon, size: 18, color: AppTheme.inkSoft),
+          const SizedBox(height: 6),
           Text(
-            label,
-            style: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
+            value ?? '-',
+            style: AppTheme.statNumber.copyWith(
+              fontSize: 15,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
-            value ?? 'Bekijken',
-            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+            label,
+            style: AppTheme.caption.copyWith(fontSize: 10),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The metric cards and the badge shelf.
-class _StatsSection extends ConsumerWidget {
-  const _StatsSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statsAsync = ref.watch(profileStatsProvider);
-
-    return statsAsync.when(
-      loading: () => const _StatsSkeleton(),
-      error: (_, __) => AppCard(
-        child: Row(
-          children: [
-            Icon(Icons.wifi_off_outlined, size: 18, color: AppTheme.inkMuted),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Statistieken niet geladen.',
-                style: AppTheme.bodyMuted,
-              ),
-            ),
-            TextButton(
-              onPressed: () => ref.invalidate(dashboardProvider),
-              child: const Text('Opnieuw'),
-            ),
-          ],
-        ),
-      ),
-      data: (stats) => Column(
-        children: [
-          _MetricCard(
-            icon: Icons.local_fire_department_outlined,
-            tint: AppTheme.flame,
-            label: 'Leesreeks',
-            value: '${stats.streak}',
-            unit: stats.streak == 1 ? 'dag' : 'dagen',
-            footnote: stats.freezes == 0
-                ? 'Lees vandaag om je reeks vast te houden.'
-                : '${stats.freezes} ${stats.freezes == 1 ? 'vriezer' : 'vriezers'} in reserve',
-          ),
-          const SizedBox(height: 10),
-          _MetricCard(
-            icon: Icons.menu_book_outlined,
-            tint: AppTheme.teal,
-            label: 'Bijbelboeken',
-            value: '${stats.booksRead}',
-            unit: 'van ${ProfileStats.canonBooks}',
-            progress: stats.bookProgress,
-            footnote: stats.chaptersRead == 0
-                ? 'Nog geen hoofdstukken gelezen.'
-                : '${stats.chaptersRead} ${stats.chaptersRead == 1 ? 'hoofdstuk' : 'hoofdstukken'} gelezen',
-          ),
-          const SizedBox(height: 10),
-          _MetricCard(
-            icon: Icons.edit_note_outlined,
-            tint: AppTheme.ai,
-            label: 'Notities',
-            value: '${stats.notesCount}',
-            unit: stats.notesCount == 1 ? 'notitie' : 'notities',
-            footnote:
-                '${stats.highlightsCount} ${stats.highlightsCount == 1 ? 'markering' : 'markeringen'}',
-          ),
-          const SizedBox(height: 10),
-          const _BadgesCard(),
-        ],
-      ),
-    );
-  }
-}
-
-/// A full-width metric: status icon, label, number, and an optional track.
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.icon,
-    required this.tint,
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.footnote,
-    this.progress,
-  });
-
-  final IconData icon;
-  final Color tint;
-  final String label;
-  final String value;
-  final String unit;
-  final String footnote;
-  final double? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = this.progress;
-
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: tint.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 20, color: tint),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: AppTheme.metaLabel),
-                    const SizedBox(height: 2),
-                    Text(
-                      footnote,
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.inkFaint,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: AppTheme.statNumber.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    unit,
-                    style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 14),
-            SiteProgressBar(value: progress, color: tint),
-          ],
         ],
       ),
     );
@@ -622,13 +476,13 @@ class _BadgesCard extends ConsumerWidget {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppTheme.ai.withValues(alpha: 0.12),
+                    color: AppTheme.teal.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.military_tech_outlined,
                     size: 20,
-                    color: AppTheme.ai,
+                    color: AppTheme.teal,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -756,62 +610,35 @@ class _BadgeTile extends StatelessWidget {
   }
 }
 
-class _StatsSkeleton extends StatelessWidget {
-  const _StatsSkeleton();
+class _BadgesSkeleton extends StatelessWidget {
+  const _BadgesSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < 3; i++) ...[
-          const SkeletonCard(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Skeleton.circle(40),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Skeleton(height: 12, width: 110),
-                      SizedBox(height: 8),
-                      Skeleton(height: 9, width: 150),
-                    ],
-                  ),
-                ),
-                Skeleton(height: 24, width: 40),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        const SkeletonCard(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return const SkeletonCard(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Skeleton.circle(40),
-                  SizedBox(width: 12),
-                  Expanded(child: Skeleton(height: 12, width: 100)),
-                ],
-              ),
-              SizedBox(height: 18),
-              Row(
-                children: [
-                  Skeleton.circle(52),
-                  SizedBox(width: 12),
-                  Skeleton.circle(52),
-                  SizedBox(width: 12),
-                  Skeleton.circle(52),
-                ],
-              ),
+              Skeleton.circle(40),
+              SizedBox(width: 12),
+              Expanded(child: Skeleton(height: 12, width: 100)),
             ],
           ),
-        ),
-      ],
+          SizedBox(height: 18),
+          Row(
+            children: [
+              Skeleton.circle(52),
+              SizedBox(width: 12),
+              Skeleton.circle(52),
+              SizedBox(width: 12),
+              Skeleton.circle(52),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -848,22 +675,26 @@ class _ProfileSkeleton extends StatelessWidget {
         const Row(
           children: [
             Expanded(
-              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
             ),
-            SizedBox(width: 10),
+            SizedBox(width: 8),
             Expanded(
-              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
             ),
-            SizedBox(width: 10),
+            SizedBox(width: 8),
             Expanded(
-              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
             ),
           ],
         ),
         const SizedBox(height: 28),
         const Skeleton(height: 16, width: 120),
         const SizedBox(height: 12),
-        const _StatsSkeleton(),
+        const _BadgesSkeleton(),
         const SizedBox(height: 28),
         const Skeleton(height: 16, width: 100),
         const SizedBox(height: 12),

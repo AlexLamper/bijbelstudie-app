@@ -280,6 +280,10 @@ class AppCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(color: line),
           ),
+          // `clip` used to be honoured only on the non-tappable branch, so any
+          // card with an `onTap` silently ignored it and let a full-bleed image
+          // square off its own corners inside a rounded card.
+          clipBehavior: clip ? Clip.antiAlias : Clip.none,
           child: child,
         ),
       ),

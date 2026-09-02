@@ -379,12 +379,21 @@ class _FeaturedCarousel extends StatelessWidget {
 
   final List<CuratedStudy> studies;
 
+  // The card height is a fixed budget shared by the banner, title,
+  // description and meta line below. Text is capped at a modest scale
+  // factor so a large device text-size setting can't blow this small
+  // preview card's fixed height — the full description remains reachable
+  // on the study detail screen.
+  static const double _cardHeight = 216;
+  static const double _bannerHeight = 92;
+
   @override
   Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.15);
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: SizedBox(
-        height: 232,
+        height: _cardHeight,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -393,24 +402,37 @@ class _FeaturedCarousel extends StatelessWidget {
           itemBuilder: (context, index) {
             final study = studies[index];
             return SizedBox(
-              width: 280,
-              child: AppCard(
-                radius: AppTheme.radiusMd,
-                padding: EdgeInsets.zero,
-                clip: true,
-                onTap: () => context.push('/studies/${study.id}'),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: StudyBanner(study: study),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
+              width: 260,
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(textScaler: scaler),
+                child: AppCard(
+                  radius: AppTheme.radiusMd,
+                  padding: EdgeInsets.zero,
+                  clip: true,
+                  onTap: () => context.push('/studies/${study.id}'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // AppCard's own clip only applies when it has no
+                      // onTap — the tappable Material/InkWell path never
+                      // clips its child, so the banner needs its own
+                      // rounding to follow the card's top corners.
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(AppTheme.radiusMd),
+                        ),
+                        child: SizedBox(
+                          height: _bannerHeight,
+                          width: double.infinity,
+                          child: StudyBanner(study: study),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               study.title,
@@ -419,14 +441,13 @@ class _FeaturedCarousel extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
-                            Expanded(
-                              child: Text(
-                                study.description,
-                                style: AppTheme.caption,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            Text(
+                              study.description,
+                              style: AppTheme.caption,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 6),
                             Text(
                               '${study.lessonCount} lessen · ±${study.minutesPerLesson} min',
                               style: AppTheme.metaLabel,
@@ -434,8 +455,8 @@ class _FeaturedCarousel extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );

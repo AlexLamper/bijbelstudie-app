@@ -47,6 +47,56 @@ final lessonQuizProvider = FutureProvider.autoDispose.family<LessonQuiz, LessonR
   return ref.watch(lessonRepositoryProvider).getQuiz(lesson.studyId, lesson.day);
 });
 
+/// One entry in the lesson's rail.
+///
+/// Nearly all of them are steps the server defined - [LessonPayload.steps] stays
+/// the source of truth for those. [LessonSlot.context] is the exception: the
+/// images and the book's background, which the client shows as a screen of its
+/// own rather than as panels crammed into Verdieping. The server has no key for
+/// it, so [serverStep] is null and no write ever names it.
+class LessonSlot {
+  const LessonSlot.of(this.serverStep);
+
+  const LessonSlot.context() : serverStep = null;
+
+  /// The step the server knows this slot as, or null for the client-only one.
+  final StudyStep? serverStep;
+
+  bool get isServerStep => serverStep != null;
+
+  String get label => serverStep?.label ?? 'Achtergrond';
+
+  @override
+  bool operator ==(Object other) =>
+      other is LessonSlot && other.serverStep == serverStep;
+
+  @override
+  int get hashCode => serverStep.hashCode;
+
+  @override
+  String toString() => 'LessonSlot(${serverStep?.id ?? 'context'})';
+}
+
+/// The rail the reader walks: the server's steps in the server's order, with
+/// the background screen inserted directly after Verdieping.
+///
+/// [withContext] is the shell's answer to "is there anything to put on it" - a
+/// photograph or a book introduction. Without one the slot is left out entirely
+/// rather than opening onto an empty state.
+List<LessonSlot> lessonSlots(
+  List<StudyStep> steps, {
+  required bool withContext,
+}) {
+  final slots = <LessonSlot>[];
+  for (final step in steps) {
+    slots.add(LessonSlot.of(step));
+    if (withContext && step == StudyStep.depth) {
+      slots.add(const LessonSlot.context());
+    }
+  }
+  return List.unmodifiable(slots);
+}
+
 /// Where the reader is inside the lesson, and what they have written so far.
 ///
 /// Held here rather than in the screen's State so the step body, the step rail
@@ -54,7 +104,7 @@ final lessonQuizProvider = FutureProvider.autoDispose.family<LessonQuiz, LessonR
 /// switch cannot lose the current step.
 class LessonCursor {
   const LessonCursor({
-    required this.step,
+    required this.slot,
     required this.completed,
     required this.viewTranslation,
     required this.depthPanel,
@@ -62,13 +112,15 @@ class LessonCursor {
     this.summary,
   });
 
-  final StudyStep step;
-  final Set<StudyStep> completed;
+  final LessonSlot slot;
+  final Set<LessonSlot> completed;
 
   /// The translation being read right now - the lesson's own, until switched.
   final String viewTranslation;
 
-  /// `media`, `original` or `notes`.
+  /// Which pane Verdieping is showing: `original` for the grondtekst, anything
+  /// else for the uitleg. The server's older values (`media`, `notes`) name
+  /// panels that no longer live there and simply read as the uitleg.
   final String depthPanel;
 
   final String reflectionText;
@@ -80,15 +132,15 @@ class LessonCursor {
   bool get isFinished => summary != null;
 
   LessonCursor copyWith({
-    StudyStep? step,
-    Set<StudyStep>? completed,
+    LessonSlot? slot,
+    Set<LessonSlot>? completed,
     String? viewTranslation,
     String? depthPanel,
     String? reflectionText,
     CompletionSummary? summary,
   }) {
     return LessonCursor(
-      step: step ?? this.step,
+      slot: slot ?? this.slot,
       completed: completed ?? this.completed,
       viewTranslation: viewTranslation ?? this.viewTranslation,
       depthPanel: depthPanel ?? this.depthPanel,

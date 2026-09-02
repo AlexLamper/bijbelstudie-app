@@ -13,6 +13,34 @@ const kRcYearlyPackageId = '\$rc_annual';
 // RevenueCat entitlement identifier (configured in the RC dashboard).
 const kRcProEntitlement = 'pro';
 
+/// The two ids asked of the store directly, annual first.
+const kRcProductIds = <String>[kRcYearlyProductId, kRcMonthlyProductId];
+
+/// What one call to `getOfferings` actually answered.
+///
+/// The packages alone cannot explain an empty paywall: "no offering at all",
+/// "an offering that is not marked current" and "a current offering with no
+/// packages attached" are three different dashboard mistakes that all arrive
+/// as an empty list. Carrying the identifier and the totals alongside makes
+/// them tellable apart on the device, without a debugger.
+class OfferingSnapshot {
+  const OfferingSnapshot({
+    required this.packages,
+    this.currentOfferingId,
+    this.offeringCount = 0,
+  });
+
+  static const empty = OfferingSnapshot(packages: []);
+
+  final List<Package> packages;
+
+  /// Identifier of the offering marked "current", or null when none is.
+  final String? currentOfferingId;
+
+  /// How many offerings the project has, current or not.
+  final int offeringCount;
+}
+
 // SDK is configured once in main.dart (see RevenueCatConfig).
 
 final purchaseServiceProvider = Provider<PurchaseService>((ref) {
@@ -33,14 +61,20 @@ class PurchaseService {
   /// pricing and packaging can change in the RevenueCat dashboard without an
   /// app release. The hardcoded ids exist only as a fallback for when the
   /// offering is momentarily unavailable.
-  Future<List<Package>> getPackages() async {
-    if (kIsWeb) return [];
+  Future<List<Package>> getPackages() async =>
+      (await getOfferingSnapshot()).packages;
+
+  /// The current offering's packages plus what the call revealed about the
+  /// dashboard configuration. See [OfferingSnapshot].
+  Future<OfferingSnapshot> getOfferingSnapshot() async {
+    if (kIsWeb) return OfferingSnapshot.empty;
     _log('Fetching offerings...');
     final offerings = await Purchases.getOfferings();
+    final total = offerings.all.length;
     final current = offerings.current;
     if (current == null) {
-      _log('No current offering found.');
-      return [];
+      _log('No current offering found ($total offering(s) configured).');
+      return OfferingSnapshot(packages: const [], offeringCount: total);
     }
 
     final packages = <Package>[...current.availablePackages];
@@ -67,7 +101,11 @@ class PurchaseService {
       return rank(a).compareTo(rank(b));
     });
 
-    return packages;
+    return OfferingSnapshot(
+      packages: packages,
+      currentOfferingId: current.identifier,
+      offeringCount: total,
+    );
   }
 
   /// Store products looked up by id, keyed by id.

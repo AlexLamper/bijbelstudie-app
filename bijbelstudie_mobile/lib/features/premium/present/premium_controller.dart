@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,11 +127,28 @@ class PremiumController extends Notifier<PremiumState> {
 
   @override
   PremiumState build() {
-    unawaited(loadPrices());
+    // Deferred to a microtask on purpose, and this is the whole reason the
+    // paywall showed nothing.
+    //
+    // `loadPrices()` is async, so calling it here runs its body synchronously
+    // up to the first `await` - and its first act is to read `state`. Reading
+    // a synchronous Notifier's state inside `build()`, before `build` has
+    // returned, throws "Tried to read the state of an uninitialized provider".
+    // The future was unawaited, so that throw surfaced nowhere: the provider
+    // simply kept its initial value, `PriceStatus.loading`, for the rest of
+    // the app's life. The paywall rendered "..." with a disabled buy button,
+    // the price notice never appeared (it only shows on `unavailable`) and the
+    // retry never fired. A microtask runs after `build` returns, by which time
+    // the state exists.
+    Future.microtask(loadPrices);
     return const PremiumState();
   }
 
   PurchaseService get _svc => ref.read(purchaseServiceProvider);
+
+  /// The load in flight, so re-entering the paywall while the store is still
+  /// answering joins that attempt instead of starting a second one.
+  Future<void>? _inFlight;
 
   /// Fetches the prices the paywall renders.
   ///
@@ -142,11 +157,18 @@ class PremiumController extends Notifier<PremiumState> {
   /// dead network, the store not yet reachable at launch - used to mean the
   /// paywall showed `-` until the app was killed and relaunched, with no way to
   /// try again. The paywall calls this on entry and from its retry button.
-  Future<void> loadPrices() async {
+  Future<void> loadPrices() {
+    return _inFlight ??= _load().whenComplete(() => _inFlight = null);
+  }
+
+  Future<void> _load() async {
+    final keySource = RevenueCatConfig.sdkKeySource();
+
     if (kIsWeb) {
       state = state.withPrices(
         priceStatus: PriceStatus.unavailable,
         priceError: 'Aankopen zijn niet beschikbaar in de webversie.',
+        priceDiagnostics: _diagnostics(keySource: keySource, configured: false),
       );
       return;
     }
@@ -155,21 +177,26 @@ class PremiumController extends Notifier<PremiumState> {
     // key means no store connection at all, and every call below would throw
     // an opaque platform error - so say what is actually wrong instead.
     if (RevenueCatConfig.sdkPublicApiKey().isEmpty) {
-      _log('No RevenueCat SDK key in this build (${RevenueCatConfig.sdkKeySource()}).');
+      _log('No RevenueCat SDK key in this build ($keySource).');
       state = state.withPrices(
         priceStatus: PriceStatus.unavailable,
         priceError:
             'Deze build bevat geen winkelconfiguratie, dus prijzen kunnen niet '
             'worden opgehaald.',
-        priceDiagnostics:
-            'Geen RevenueCat SDK-sleutel in deze build '
-            '(${RevenueCatConfig.sdkKeySource()}). Bouw met '
-            '--dart-define=REVENUECAT_APPLE_KEY=appl_xxx, of gebruik een '
-            'TestFlight-build.',
+        priceDiagnostics: _diagnostics(
+          keySource: keySource,
+          configured: false,
+          extra:
+              'Geen RevenueCat SDK-sleutel in deze build. Bouw met '
+              '--dart-define=REVENUECAT_APPLE_KEY=appl_xxx, of gebruik een '
+              'TestFlight-build.',
+        ),
       );
       return;
     }
 
+    // Keeps whatever is already on screen while the store is re-asked, so a
+    // retry does not blank out prices that are still perfectly valid.
     state = state.withPrices(
       priceStatus: PriceStatus.loading,
       packages: state.packages,
@@ -177,69 +204,184 @@ class PremiumController extends Notifier<PremiumState> {
       yearlyProduct: state.yearlyProduct,
     );
 
-    try {
-      _log('Loading packages and customer info...');
-      final packages = await _svc.getPackages();
-      var monthly = _svc.findMonthlyPackage(packages)?.storeProduct;
-      var yearly = _svc.findYearlyPackage(packages)?.storeProduct;
+    // Each stage below is fenced off from the next. The three store calls fail
+    // for unrelated reasons, and one of them failing must not throw away what
+    // the others already answered - one `try` around all three meant a hiccup
+    // in `getCustomerInfo`, which has nothing to do with pricing, discarded
+    // prices that had just been fetched successfully.
+    final configured = await RevenueCatConfig.ensureConfigured();
+    String? rawError;
 
-      // The offering is the usual source, but it is also the usual thing to be
-      // misconfigured. Falling back to a direct product lookup means a missing
-      // or empty "current" offering costs the packaging, not the prices.
-      if (monthly == null || yearly == null) {
-        _log('Offering incomplete (monthly=${monthly != null}, yearly=${yearly != null}); '
-            'falling back to a direct product lookup.');
-        final direct = await _svc.getProductsById(const [
-          kRcMonthlyProductId,
-          kRcYearlyProductId,
-        ]);
+    var packages = const <Package>[];
+    String? offeringId;
+    var offeringCount = 0;
+    var offeringRead = false;
+
+    if (configured) {
+      try {
+        final snapshot = await _svc.getOfferingSnapshot();
+        packages = snapshot.packages;
+        offeringId = snapshot.currentOfferingId;
+        offeringCount = snapshot.offeringCount;
+        offeringRead = true;
+      } catch (e) {
+        rawError = '$e';
+        _log('Offerings lookup failed: $e');
+      }
+    } else {
+      _log('RevenueCat SDK is not configured; skipping store calls.');
+    }
+
+    var monthly = _svc.findMonthlyPackage(packages)?.storeProduct;
+    var yearly = _svc.findYearlyPackage(packages)?.storeProduct;
+
+    // The offering is the usual source, but it is also the usual thing to be
+    // misconfigured. Falling back to a direct product lookup means a missing
+    // or empty "current" offering costs the packaging, not the prices.
+    int? productsReturned;
+    if (configured && (monthly == null || yearly == null)) {
+      _log('Offering incomplete (monthly=${monthly != null}, yearly=${yearly != null}); '
+          'falling back to a direct product lookup.');
+      try {
+        final direct = await _svc.getProductsById(kRcProductIds);
+        productsReturned = direct.length;
         monthly ??= direct[kRcMonthlyProductId];
         yearly ??= direct[kRcYearlyProductId];
+      } catch (e) {
+        rawError ??= '$e';
+        _log('Product lookup failed: $e');
       }
+    }
 
-      final info = await _svc.getCustomerInfo();
-      final found = monthly != null || yearly != null;
+    // Last, and deliberately unable to affect the prices: this only refreshes
+    // the entitlement. A null result leaves the previously known CustomerInfo
+    // in place rather than pretending the subscription went away.
+    CustomerInfo? info;
+    if (configured) {
+      try {
+        info = await _svc.getCustomerInfo();
+      } catch (e) {
+        _log('CustomerInfo failed; keeping the prices we have: $e');
+      }
+    }
 
-      // Names the failure precisely: zero packages points at the offering,
-      // packages-without-a-match points at the ids, and neither route finding
-      // anything points at App Store Connect or the simulator.
-      final diagnostics = found
+    // Both, not either. "Ready" with one product missing rendered a silent
+    // "-" on the other tile with no notice and nothing to retry.
+    final ready = monthly != null && yearly != null;
+    final diagnostics = _diagnostics(
+      keySource: keySource,
+      configured: configured,
+      offeringRead: offeringRead,
+      offeringId: offeringId,
+      offeringCount: offeringCount,
+      packages: packages,
+      productsReturned: productsReturned,
+      monthly: monthly,
+      yearly: yearly,
+      rawError: rawError,
+    );
+
+    if (!ref.mounted) return;
+    state = state.withPrices(
+      priceStatus: ready ? PriceStatus.ready : PriceStatus.unavailable,
+      priceError: ready
           ? null
-          : packages.isEmpty
-                ? 'Geen aanbod en geen producten. De App Store gaf niets terug '
-                      'voor $kRcYearlyProductId / $kRcMonthlyProductId. '
-                      'Controleer de product-ids in App Store Connect, of test '
-                      'op een echt toestel - de simulator levert geen prijzen.'
-                : 'Aanbod bevat ${packages.length} pakket(ten) '
-                      '(${packages.map((p) => p.storeProduct.identifier).join(', ')}) '
-                      'maar geen jaarlijks of maandelijks abonnement.';
+          : _priceError(
+              configured: configured,
+              partial: monthly != null || yearly != null,
+              failed: rawError != null,
+            ),
+      packages: packages,
+      monthlyProduct: monthly,
+      yearlyProduct: yearly,
+      customerInfo: info,
+      priceDiagnostics: diagnostics,
+    );
+    _log(
+      'Prices: monthly=${monthly?.priceString ?? '(none)'} '
+      'yearly=${yearly?.priceString ?? '(none)'} '
+      'from ${packages.length} package(s); configured=$configured',
+    );
+  }
 
-      state = state.withPrices(
-        priceStatus: found ? PriceStatus.ready : PriceStatus.unavailable,
-        priceError: found
-            ? null
-            : 'De App Store gaf geen abonnementen terug. Controleer of de '
-                  'producten actief en goedgekeurd zijn.',
-        packages: packages,
-        monthlyProduct: monthly,
-        yearlyProduct: yearly,
-        customerInfo: info,
-        priceDiagnostics: diagnostics,
+  /// The customer-facing sentence: calm, Dutch, and never jargon. The detail
+  /// lives in [_diagnostics], behind the "Details" expander.
+  String _priceError({
+    required bool configured,
+    required bool partial,
+    required bool failed,
+  }) {
+    if (!configured) {
+      return 'De verbinding met de App Store kon niet worden opgezet. Sluit de '
+          'app helemaal af en open hem opnieuw.';
+    }
+    if (failed) {
+      return 'Prijzen konden niet worden geladen. Controleer je verbinding en '
+          'probeer het opnieuw.';
+    }
+    if (partial) {
+      return 'Eén van de twee abonnementen kwam niet terug uit de App Store. '
+          'Het andere kun je gewoon nemen.';
+    }
+    return 'De App Store gaf geen abonnementen terug. Controleer of de '
+        'producten actief en goedgekeurd zijn.';
+  }
+
+  /// The technical block behind "Details" on the paywall.
+  ///
+  /// Everything that can still break here is store configuration that only the
+  /// account holder can see, and none of it is distinguishable from the others
+  /// once flattened into "prijzen konden niet worden geladen". So this reports,
+  /// in the order someone debugging it needs: which key the build carries,
+  /// whether the SDK came up at all, what the RevenueCat dashboard answered,
+  /// which product ids were asked of the store, how many came back, which
+  /// prices resolved, and the raw error if one was thrown.
+  String _diagnostics({
+    required String keySource,
+    required bool configured,
+    bool offeringRead = false,
+    String? offeringId,
+    int offeringCount = 0,
+    List<Package> packages = const [],
+    int? productsReturned,
+    StoreProduct? monthly,
+    StoreProduct? yearly,
+    String? rawError,
+    String? extra,
+  }) {
+    final lines = <String>[
+      'Sleutelbron: $keySource',
+      'SDK geconfigureerd: ${configured ? 'ja' : 'nee'}',
+    ];
+
+    if (!offeringRead) {
+      lines.add('Huidig aanbod: niet opgehaald');
+    } else if (offeringId == null) {
+      lines.add(
+        'Huidig aanbod: geen ("current" niet ingesteld) · '
+        '$offeringCount aanbod/aanbiedingen in het project',
       );
-      _log(
-        'Prices: monthly=${monthly?.priceString ?? '(none)'} '
-        'yearly=${yearly?.priceString ?? '(none)'} '
-        'from ${packages.length} package(s); '
-        'isPro=${info.entitlements.active.containsKey(kRcProEntitlement)}',
-      );
-    } catch (e) {
-      _log('Failed to load prices: $e');
-      state = state.withPrices(
-        priceStatus: PriceStatus.unavailable,
-        priceError: 'Prijzen konden niet worden geladen. Controleer je verbinding.',
-        priceDiagnostics: '$e',
+    } else {
+      final ids = packages.map((p) => p.identifier).join(', ');
+      lines.add(
+        'Huidig aanbod: "$offeringId" · ${packages.length} pakket(ten)'
+        '${ids.isEmpty ? '' : ' [$ids]'}',
       );
     }
+
+    lines.add('Gevraagde product-ids: ${kRcProductIds.join(', ')}');
+    lines.add(
+      productsReturned == null
+          ? 'Producten van de store: niet apart opgevraagd'
+          : 'Producten van de store: $productsReturned van ${kRcProductIds.length}',
+    );
+    lines.add(
+      'Prijzen: jaar=${yearly?.priceString ?? '(geen)'} · '
+      'maand=${monthly?.priceString ?? '(geen)'}',
+    );
+    lines.add('Fout: ${rawError ?? 'geen'}');
+    if (extra != null) lines.add(extra);
+    return lines.join('\n');
   }
 
   Future<void> purchaseMonthly() => _purchase(kRcMonthlyProductId);

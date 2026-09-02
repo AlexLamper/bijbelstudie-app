@@ -7,13 +7,16 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../../core/ui/skeleton.dart';
+import '../../../ai/present/ai_assistant_pane.dart';
 import '../../../studies/data/enrollment_models.dart';
 import '../../../studies/present/studies_providers.dart';
+import '../../data/context_repository.dart';
 import '../../data/lesson_repository.dart';
 import '../../domain/lesson_models.dart';
 import 'lesson_complete_card.dart';
 import 'lesson_providers.dart';
 import 'lesson_steps.dart';
+import 'step_context.dart';
 import 'step_depth.dart';
 import 'step_quiz.dart';
 
@@ -24,8 +27,14 @@ import 'step_quiz.dart';
 /// X, which asks first if you are mid-lesson.
 ///
 /// The server decides which steps exist ([LessonPayload.steps]) and this screen
-/// renders them in that order - it never adds, reorders or skips one. That is
-/// why a study with no authored intro simply opens on Het Woord.
+/// renders them in that order - it never reorders or skips one, and never sends
+/// back a key the server did not define. That is why a study with no authored
+/// intro simply opens on Het Woord.
+///
+/// The one screen the client adds is [LessonSlot.context] - the images and the
+/// book's background - inserted after Verdieping when there is something to put
+/// on it. It exists in the rail, the counter and the Vorige/Volgende walk only;
+/// every write names the nearest step the server actually knows.
 class LessonScreen extends ConsumerStatefulWidget {
   const LessonScreen({
     super.key,
@@ -48,6 +57,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   LessonCursor? _cursor;
   bool _busy = false;
 
+  /// Latched the moment the background screen has something to show. Sticky on
+  /// purpose: a rail that grows a step while the reader is walking it is odd,
+  /// but one that loses a step under their feet is worse.
+  bool _hasContext = false;
+
   LessonRef get _ref => LessonRef(widget.studyId, widget.day);
 
   /// Seed the cursor from the saved state the first time both the lesson and
@@ -64,8 +78,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     ].firstOrNull ?? StudyStep.word;
 
     _cursor = LessonCursor(
-      step: step,
-      completed: state.stepsCompleted.toSet(),
+      slot: LessonSlot.of(step),
+      completed: state.stepsCompleted.map(LessonSlot.of).toSet(),
       viewTranslation: state.viewTranslation ?? lesson.translation,
       depthPanel: state.depthPanel ?? 'media',
       reflectionText: state.reflectionText,
@@ -87,6 +101,14 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     String? viewTranslation,
     String? depthPanel,
   }) {
+    // The background screen has no server step, so moving on to it can leave
+    // nothing worth writing. Sending an empty patch would only cost a request.
+    if (currentStep == null &&
+        completeStep == null &&
+        viewTranslation == null &&
+        depthPanel == null) {
+      return;
+    }
     unawaited(
       ref
           .read(lessonRepositoryProvider)
@@ -102,41 +124,59 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     );
   }
 
-  void _goToStep(StudyStep step) {
-    setState(() => _cursor = _cursor!.copyWith(step: step));
-    _bestEffort(currentStep: step);
+  void _goToSlot(LessonSlot slot) {
+    setState(() => _cursor = _cursor!.copyWith(slot: slot));
+    _bestEffort(currentStep: slot.serverStep);
   }
 
-  Future<void> _next(LessonPayload lesson) async {
+  Future<void> _next(LessonPayload lesson, List<LessonSlot> slots) async {
     final cursor = _cursor!;
-    final steps = lesson.steps;
-    final index = steps.indexOf(cursor.step);
-    final isLast = index >= steps.length - 1;
+    final index = slots.indexOf(cursor.slot);
+    final isLast = index >= slots.length - 1;
 
     if (!isLast) {
-      final completed = {...cursor.completed, cursor.step};
+      final next = slots[index + 1];
       setState(() => _cursor = cursor.copyWith(
-        step: steps[index + 1],
-        completed: completed,
+        slot: next,
+        completed: {...cursor.completed, cursor.slot},
       ));
-      _bestEffort(completeStep: cursor.step, currentStep: steps[index + 1]);
+      // Only the steps the server defined are reported: leaving Verdieping for
+      // the background screen completes Verdieping and says nothing more.
+      _bestEffort(
+        completeStep: cursor.slot.serverStep,
+        currentStep: next.serverStep,
+      );
       return;
     }
 
-    await _finish(lesson);
+    await _finish(lesson, slots);
+  }
+
+  /// The step the server should hear about for [slot]: itself, or - for the
+  /// client-only background screen - the last real step before it.
+  StudyStep _serverStepFor(List<LessonSlot> slots, LessonSlot slot) {
+    for (var i = slots.indexOf(slot); i >= 0; i--) {
+      final step = slots[i].serverStep;
+      if (step != null) return step;
+    }
+    return slots
+            .map((entry) => entry.serverStep)
+            .whereType<StudyStep>()
+            .lastOrNull ??
+        StudyStep.word;
   }
 
   /// The completing write. Sent once, from the last step only - it is the
   /// branch that grants XP, keeps the reflection as a note and rolls the
   /// enrollment on.
-  Future<void> _finish(LessonPayload lesson) async {
+  Future<void> _finish(LessonPayload lesson, List<LessonSlot> slots) async {
     final cursor = _cursor!;
     setState(() => _busy = true);
     try {
       final result = await ref.read(lessonRepositoryProvider).patch(
         widget.studyId,
         widget.day,
-        completeStep: cursor.step,
+        completeStep: _serverStepFor(slots, cursor.slot),
         complete: true,
       );
 
@@ -148,7 +188,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       setState(() {
         _busy = false;
         _cursor = cursor.copyWith(
-          completed: {...cursor.completed, cursor.step},
+          completed: {...cursor.completed, cursor.slot},
           summary: result.completion ??
               const CompletionSummary(recorded: true, studyCompleted: false),
         );
@@ -160,11 +200,10 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     }
   }
 
-  void _previous(LessonPayload lesson) {
-    final cursor = _cursor!;
-    final index = lesson.steps.indexOf(cursor.step);
+  void _previous(List<LessonSlot> slots) {
+    final index = slots.indexOf(_cursor!.slot);
     if (index <= 0) return;
-    _goToStep(lesson.steps[index - 1]);
+    _goToSlot(slots[index - 1]);
   }
 
   /// Leaving mid-lesson loses nothing - every step is saved as it happens - but
@@ -209,6 +248,21 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     final state = stateAsync.value;
     if (lesson != null && state != null) _seed(lesson, state);
 
+    // Watched from the shell rather than from the screen itself: it decides
+    // whether the slot exists at all, and warming both requests here means the
+    // screen opens on its content instead of on a spinner.
+    if (lesson != null) {
+      final passage = lesson.passage;
+      final images = ref
+          .watch(geoImagesProvider(GeoRef(passage.book, passage.chapter)))
+          .value;
+      final summary = ref.watch(bookSummaryProvider(passage.book)).value;
+      if ((images != null && images.isNotEmpty) ||
+          (summary != null && summary.trim().isNotEmpty)) {
+        _hasContext = true;
+      }
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.paper,
       body: SafeArea(
@@ -242,6 +296,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           subtitle: null,
           onClose: () => _close(null),
           onTapTitle: null,
+          onOpenAssistant: null,
         ),
         Expanded(
           child: AppEmptyState(
@@ -264,9 +319,22 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   }
 
   Widget _shell(LessonPayload lesson, LessonCursor cursor) {
-    final steps = lesson.steps;
-    final index = steps.indexOf(cursor.step);
-    final isLast = index >= steps.length - 1;
+    final slots = lessonSlots(
+      lesson.steps,
+      withContext: _hasContext && lesson.steps.contains(StudyStep.depth),
+    );
+    if (slots.isEmpty) {
+      return _error(const LessonException('Deze les heeft nog geen stappen.'));
+    }
+    // The slot can vanish under the cursor only if the content behind it did;
+    // falling back to the step it follows beats rendering nothing.
+    final cursorIndex = slots.indexOf(cursor.slot);
+    final index = cursorIndex >= 0
+        ? cursorIndex
+        : slots
+              .indexWhere((slot) => slot.serverStep == StudyStep.depth)
+              .clamp(0, slots.length - 1);
+    final isLast = index >= slots.length - 1;
 
     if (cursor.isFinished) {
       return Column(
@@ -276,6 +344,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             subtitle: '${lesson.studyTitle} · les ${lesson.day} van ${lesson.lessonsTotal}',
             onClose: () => _close(lesson),
             onTapTitle: null,
+            onOpenAssistant: _openAssistant,
           ),
           Expanded(
             child: LessonCompleteCard(
@@ -294,38 +363,42 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         _TopBar(
           title: lesson.title,
           subtitle:
-              'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${steps.length}',
+              'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${slots.length}',
           onClose: () => _close(lesson),
           onTapTitle: () => _openNavigator(lesson),
+          onOpenAssistant: _openAssistant,
         ),
         _StepRail(
-          steps: steps,
-          current: cursor.step,
+          slots: slots,
+          current: slots[index],
           completed: cursor.completed,
-          onTap: (step) {
+          onTap: (slot) {
             // Forward jumps are only allowed into ground already covered,
             // otherwise the rail becomes a way to skip the reading.
-            final target = steps.indexOf(step);
-            if (cursor.completed.contains(step) || target <= index) {
-              _goToStep(step);
+            final target = slots.indexOf(slot);
+            if (cursor.completed.contains(slot) || target <= index) {
+              _goToSlot(slot);
             }
           },
         ),
         Expanded(child: _stepBody(lesson, cursor)),
         _Footer(
-          stepLabel: cursor.step.label,
+          stepLabel: slots[index].label,
           canGoBack: index > 0,
           isLast: isLast,
           busy: _busy,
-          onPrevious: () => _previous(lesson),
-          onNext: () => _next(lesson),
+          onPrevious: () => _previous(slots),
+          onNext: () => _next(lesson, slots),
         ),
       ],
     );
   }
 
   Widget _stepBody(LessonPayload lesson, LessonCursor cursor) {
-    switch (cursor.step) {
+    final step = cursor.slot.serverStep;
+    if (step == null) return LessonContextStep(lesson: lesson);
+
+    switch (step) {
       case StudyStep.intro:
         return LessonIntroStep(lesson: lesson);
       case StudyStep.word:
@@ -360,6 +433,58 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       case StudyStep.done:
         return const SizedBox.shrink();
     }
+  }
+
+  /// The assistant, on every step and inline on none.
+  ///
+  /// A pane sitting in the middle of a step invites the reader to stop reading
+  /// and start chatting; a button that opens a screen of its own does not, and
+  /// is there when a question actually comes up. The pane is the reader's own -
+  /// same quota, same chapter context - so nothing about asking changes here.
+  Future<void> _openAssistant() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: AppTheme.paperRaised,
+      builder: (sheetContext) {
+        // The composer must stay above the keyboard, so the sheet gives back
+        // exactly the height the keyboard took.
+        final media = MediaQuery.of(sheetContext);
+        final height =
+            (media.size.height - media.viewInsets.bottom) * 0.92;
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: SizedBox(
+            height: height,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome, size: 16, color: AppTheme.teal),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('AI-assistent', style: AppTheme.bodyStrong),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Sluiten',
+                        color: AppTheme.inkMuted,
+                      ),
+                    ],
+                  ),
+                ),
+                const Expanded(child: AiAssistantPane()),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Jump to another lesson in the same study. Locked ahead of where the reader
@@ -401,12 +526,16 @@ class _TopBar extends StatelessWidget {
     required this.subtitle,
     required this.onClose,
     required this.onTapTitle,
+    required this.onOpenAssistant,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback onClose;
   final VoidCallback? onTapTitle;
+
+  /// Null only where there is no lesson to ask about.
+  final VoidCallback? onOpenAssistant;
 
   @override
   Widget build(BuildContext context) {
@@ -452,8 +581,17 @@ class _TopBar extends StatelessWidget {
               ),
             ),
           ),
-          // Balances the close button so the title stays optically centred.
-          const SizedBox(width: 48),
+          // Balances the close button so the title stays optically centred -
+          // by carrying the assistant, where there is a lesson behind it.
+          if (onOpenAssistant != null)
+            IconButton(
+              onPressed: onOpenAssistant,
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: 'Vraag de AI-assistent',
+              color: AppTheme.teal,
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
     );
@@ -463,16 +601,16 @@ class _TopBar extends StatelessWidget {
 /// The segmented progress bar over the lesson's steps.
 class _StepRail extends StatelessWidget {
   const _StepRail({
-    required this.steps,
+    required this.slots,
     required this.current,
     required this.completed,
     required this.onTap,
   });
 
-  final List<StudyStep> steps;
-  final StudyStep current;
-  final Set<StudyStep> completed;
-  final ValueChanged<StudyStep> onTap;
+  final List<LessonSlot> slots;
+  final LessonSlot current;
+  final Set<LessonSlot> completed;
+  final ValueChanged<LessonSlot> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -481,16 +619,16 @@ class _StepRail extends StatelessWidget {
       color: AppTheme.paperRaised,
       child: Row(
         children: [
-          for (final step in steps) ...[
+          for (final slot in slots) ...[
             Expanded(
               child: InkWell(
-                onTap: () => onTap(step),
+                onTap: () => onTap(slot),
                 child: Column(
                   children: [
                     Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: completed.contains(step) || step == current
+                        color: completed.contains(slot) || slot == current
                             ? AppTheme.teal
                             : AppTheme.rule,
                         borderRadius: BorderRadius.circular(2),
@@ -498,9 +636,9 @@ class _StepRail extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      step.label,
+                      slot.label,
                       style: AppTheme.overline.copyWith(
-                        color: step == current ? AppTheme.tealStrong : AppTheme.inkFaint,
+                        color: slot == current ? AppTheme.tealStrong : AppTheme.inkFaint,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.clip,
@@ -510,7 +648,7 @@ class _StepRail extends StatelessWidget {
                 ),
               ),
             ),
-            if (step != steps.last) const SizedBox(width: 6),
+            if (slot != slots.last) const SizedBox(width: 6),
           ],
         ],
       ),

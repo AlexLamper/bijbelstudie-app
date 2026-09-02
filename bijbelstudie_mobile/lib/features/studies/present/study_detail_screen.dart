@@ -27,9 +27,20 @@ class StudyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final study = ref.watch(curatedStudyProvider(studyId));
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _goBack(context);
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.paper,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Terug naar studies',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => _goBack(context),
+        ),
         title: Text(study.value?.title ?? 'Studie'),
         actions: [
           if (study.value != null)
@@ -61,7 +72,16 @@ class StudyDetailScreen extends ConsumerWidget {
           return _Body(study: data);
         },
       ),
+      ),
     );
+  }
+
+  static void _goBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/studies');
+    }
   }
 
   Future<void> _openSettings(

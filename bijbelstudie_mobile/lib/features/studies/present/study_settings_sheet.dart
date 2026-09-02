@@ -313,7 +313,7 @@ class _WeekdayPicker extends StatelessWidget {
   }
 }
 
-class _TranslationPicker extends StatelessWidget {
+class _TranslationPicker extends StatefulWidget {
   const _TranslationPicker({
     required this.sources,
     required this.selected,
@@ -325,45 +325,81 @@ class _TranslationPicker extends StatelessWidget {
   final ValueChanged<String> onChanged;
 
   @override
+  State<_TranslationPicker> createState() => _TranslationPickerState();
+}
+
+class _TranslationPickerState extends State<_TranslationPicker> {
+  late bool _otherExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start expanded when the reader's own choice lives in this section —
+    // their pick should never be hidden from them.
+    _otherExpanded = widget.sources.any(
+      (s) => s.language != 'nl' && s.id == widget.selected,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Dutch first: this is a Dutch app, and the other languages are the
     // exception a reader goes looking for.
-    final dutch = sources.where((s) => s.language == 'nl').toList(growable: false);
-    final other = sources.where((s) => s.language != 'nl').toList(growable: false);
+    final dutch = widget.sources.where((s) => s.language == 'nl').toList(growable: false);
+    final other = widget.sources.where((s) => s.language != 'nl').toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        RuleGrid(
           children: [
-            for (final source in dutch)
-              ChoiceChip(
-                label: Text(source.name),
-                selected: source.id == selected,
-                onSelected: (_) => onChanged(source.id),
-              ),
+            for (final source in dutch) _translationTile(source),
           ],
         ),
         if (other.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('Overige vertalingen', style: AppTheme.metaLabel),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          RuleGrid(
             children: [
-              for (final source in other)
-                ChoiceChip(
-                  label: Text(source.name),
-                  selected: source.id == selected,
-                  onSelected: (_) => onChanged(source.id),
+              RuleListTile(
+                showRule: _otherExpanded,
+                onTap: () => setState(() => _otherExpanded = !_otherExpanded),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Overige vertalingen', style: AppTheme.metaLabel),
+                    ),
+                    AnimatedRotation(
+                      turns: _otherExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: const Icon(Icons.keyboard_arrow_down, size: 20),
+                    ),
+                  ],
                 ),
+              ),
+              if (_otherExpanded)
+                for (final source in other) _translationTile(source),
             ],
           ),
         ],
       ],
+    );
+  }
+
+  Widget _translationTile(BibleSource source) {
+    final isSelected = source.id == widget.selected;
+    return RuleListTile(
+      onTap: () => widget.onChanged(source.id),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(source.name, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+          Icon(
+            isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            color: isSelected ? AppTheme.teal : Theme.of(context).colorScheme.outline,
+          ),
+        ],
+      ),
     );
   }
 }

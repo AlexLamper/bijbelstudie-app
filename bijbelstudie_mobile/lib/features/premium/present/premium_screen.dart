@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -46,11 +47,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
     // The controller loads prices once for the whole app run, so a load that
     // failed at launch would otherwise leave this screen showing "-" forever.
-    // Re-entering the paywall is exactly the moment to try again; a load that
-    // already succeeded is left alone.
+    // Re-entering the paywall is exactly the moment to try again.
+    //
+    // Anything that is not `ready` gets a fresh attempt, not just `unavailable`.
+    // A load that never settled leaves the status on `loading`, which is the
+    // one state the old condition refused to retry - so the screen sat on its
+    // spinner permanently. The controller de-duplicates against the attempt
+    // already in flight, so this costs nothing when a load really is running.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (ref.read(premiumControllerProvider).priceStatus == PriceStatus.unavailable) {
+      if (ref.read(premiumControllerProvider).priceStatus != PriceStatus.ready) {
         ref.read(premiumControllerProvider.notifier).loadPrices();
       }
     });
@@ -242,6 +248,16 @@ class _PriceNotice extends StatelessWidget {
 
   final VoidCallback onRetry;
 
+  Future<void> _copy(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(
+      ClipboardData(text: 'BijbelStudie - prijsdiagnose\n$message\n\n$diagnostics'),
+    );
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Diagnose gekopieerd.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCard(
@@ -268,9 +284,21 @@ class _PriceNotice extends StatelessWidget {
                 childrenPadding: EdgeInsets.zero,
                 expandedCrossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  SelectableText(
                     diagnostics!,
                     style: AppTheme.caption.copyWith(fontSize: 11),
+                  ),
+                  const SizedBox(height: 8),
+                  // Everything left that can cause this lives in App Store
+                  // Connect or the RevenueCat dashboard, where only the account
+                  // holder can look. Copying the block is how what the device
+                  // saw gets back to whoever can act on it.
+                  SiteOutlineButton(
+                    label: 'Kopieer diagnose',
+                    expand: false,
+                    height: 40,
+                    icon: Icons.copy_all_outlined,
+                    onPressed: () => _copy(context),
                   ),
                 ],
               ),

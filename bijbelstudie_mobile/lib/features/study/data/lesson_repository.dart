@@ -174,16 +174,9 @@ class LessonRepository {
           ],
         },
       );
-      final data = response.data as Map<String, dynamic>;
-      return QuizResult(
-        score: (data['score'] as num?)?.toInt() ?? 0,
-        total: (data['total'] as num?)?.toInt() ?? answers.length,
-        correctAnswers: {
-          for (final entry in (data['results'] as List? ?? const [])
-              .whereType<Map<String, dynamic>>())
-            if (entry['id'] is String)
-              entry['id'] as String: entry['correct'] as bool? ?? false,
-        },
+      return QuizResult.fromJson(
+        response.data as Map<String, dynamic>,
+        fallbackTotal: answers.length,
       );
     } on DioException catch (e) {
       throw _translate(e, 'De quiz kon niet worden nagekeken.');
@@ -217,16 +210,99 @@ class LessonPatchResult {
   final CompletionSummary? completion;
 }
 
+/// How one question was marked, as `POST /study-quiz` reports it.
+///
+/// The correct answer only ever travels back *after* the reader has answered -
+/// grading happens on bijbelquiz and this app never holds the key beforehand -
+/// so this is the only place the review screen can learn what was right.
+class QuizGrade {
+  const QuizGrade({
+    required this.questionId,
+    required this.correct,
+    this.known = true,
+    this.correctAnswerId,
+    this.explanation,
+    this.bibleReference,
+  });
+
+  final String questionId;
+  final bool correct;
+
+  /// False when the grader did not recognise the question, in which case
+  /// [correct] means nothing and the review must stay silent about it.
+  final bool known;
+
+  /// The answer that was right. Null for an unknown question, and sometimes
+  /// simply absent - the review then says right or wrong and no more.
+  final String? correctAnswerId;
+
+  /// The grader's own note on the question. Never written here: an invented
+  /// explanation is worse than none.
+  final String? explanation;
+
+  final String? bibleReference;
+
+  static QuizGrade? fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    if (id is! String || id.isEmpty) return null;
+    return QuizGrade(
+      questionId: id,
+      correct: json['correct'] as bool? ?? false,
+      known: json['known'] as bool? ?? true,
+      correctAnswerId: _text(json['correctAnswerId']),
+      explanation: _text(json['explanation']),
+      bibleReference: _text(json['bibleReference']),
+    );
+  }
+
+  static String? _text(Object? value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+}
+
 class QuizResult {
   const QuizResult({
     required this.score,
     required this.total,
-    required this.correctAnswers,
+    this.grades = const [],
   });
 
   final int score;
   final int total;
 
+  /// Per question, in the order the server marked them.
+  final List<QuizGrade> grades;
+
   /// Question id to whether the reader got it right.
-  final Map<String, bool> correctAnswers;
+  Map<String, bool> get correctAnswers => {
+    for (final grade in grades) grade.questionId: grade.correct,
+  };
+
+  QuizGrade? gradeFor(String questionId) {
+    for (final grade in grades) {
+      if (grade.questionId == questionId) return grade;
+    }
+    return null;
+  }
+
+  /// True when the server sent enough to show the reader what they got wrong.
+  bool get hasReview => grades.any((grade) => grade.known);
+
+  factory QuizResult.fromJson(
+    Map<String, dynamic> json, {
+    int fallbackTotal = 0,
+  }) {
+    final grades = (json['results'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(QuizGrade.fromJson)
+        .whereType<QuizGrade>()
+        .toList(growable: false);
+    return QuizResult(
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? fallbackTotal,
+      grades: grades,
+    );
+  }
 }

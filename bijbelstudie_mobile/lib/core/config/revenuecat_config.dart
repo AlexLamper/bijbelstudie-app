@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 /// RevenueCat **SDK (public) API keys** for the Purchases Flutter SDK.
 ///
@@ -82,5 +83,40 @@ class RevenueCatConfig {
     }
 
     return googleKey;
+  }
+
+  /// Whether `Purchases.configure` has actually run in this process.
+  ///
+  /// Returns false rather than throwing when the plugin is not registered at
+  /// all (unit tests, desktop), so callers can treat it as a plain question.
+  static Future<bool> isConfigured() async {
+    if (kIsWeb) return false;
+    try {
+      return await Purchases.isConfigured;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Configures the SDK if it is not configured yet, and reports whether the
+  /// store is reachable afterwards.
+  ///
+  /// `main.dart` configures at launch but deliberately swallows any failure so
+  /// a RevenueCat outage cannot stop the app from starting. That leaves a real
+  /// hole: after a failed launch-time configure, every store call throws an
+  /// opaque platform error for the rest of the run and no amount of tapping
+  /// "opnieuw proberen" can recover it. Calling this before loading prices
+  /// closes that hole — it is a no-op when the SDK is already up.
+  static Future<bool> ensureConfigured() async {
+    if (kIsWeb) return false;
+    final key = sdkPublicApiKey();
+    if (key.isEmpty) return false;
+    if (await isConfigured()) return true;
+    try {
+      await Purchases.configure(PurchasesConfiguration(key));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }

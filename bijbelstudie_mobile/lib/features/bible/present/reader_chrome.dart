@@ -92,11 +92,22 @@ class _ReaderChromeRevealState extends State<ReaderChromeReveal>
 
   @override
   Widget build(BuildContext context) {
+    // Position and opacity move together, on the same curve, so the bar
+    // reads as floating away rather than shrinking or snapping: it slides
+    // off along its own axis while it fades, and the space it held
+    // collapses in the same motion so the content next to it glides into
+    // place instead of jumping once the bar is gone.
+    final offset = widget.axisAlignment < 0
+        ? Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+        : Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero);
     return ClipRect(
       child: SizeTransition(
         sizeFactor: _curve,
         axisAlignment: widget.axisAlignment,
-        child: FadeTransition(opacity: _curve, child: widget.child),
+        child: SlideTransition(
+          position: offset.animate(_curve),
+          child: FadeTransition(opacity: _curve, child: widget.child),
+        ),
       ),
     );
   }

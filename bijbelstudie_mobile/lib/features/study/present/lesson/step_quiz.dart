@@ -46,7 +46,7 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
       _result = QuizResult(
         score: quiz.savedScore!,
         total: quiz.savedTotal!,
-        correctAnswers: const {},
+
       );
       _index = quiz.questions.length;
       return;
@@ -118,7 +118,7 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
         _seed(quiz);
 
         final result = _result;
-        if (result != null) return _scoreCard(result);
+        if (result != null) return _scoreCard(quiz, result);
         if (_grading) return const Center(child: AppLoader());
 
         final question = quiz.questions[_index.clamp(0, quiz.questions.length - 1)];
@@ -175,7 +175,15 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     );
   }
 
-  Widget _scoreCard(QuizResult result) {
+  /// The score, then the questions one by one.
+  ///
+  /// A bare score teaches nothing: the reader who got two wrong wants to know
+  /// which two and what the answer was. Where the grader recognised the
+  /// question this shows right or wrong, the reader's own pick, the correct
+  /// answer when they missed it, and the grader's explanation if it sent one.
+  /// Nothing is written here that the grader did not say - an invented
+  /// explanation of Scripture is worse than no explanation.
+  Widget _scoreCard(LessonQuiz quiz, QuizResult result) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
@@ -200,7 +208,23 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+
+        if (quiz.questions.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const SectionHeader(eyebrow: 'Nakijken', title: 'Jouw antwoorden'),
+          const SizedBox(height: 10),
+          for (final question in quiz.questions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ReviewCard(
+                question: question,
+                pickedAnswerId: _answers[question.id],
+                grade: result.gradeFor(question.id),
+              ),
+            ),
+        ],
+
+        const SizedBox(height: 8),
         Text(
           'Rond de les af om verder te gaan.',
           style: AppTheme.caption,
@@ -245,6 +269,121 @@ class _AnswerRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// One question, after marking.
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({
+    required this.question,
+    required this.pickedAnswerId,
+    required this.grade,
+  });
+
+  final QuizQuestion question;
+  final String? pickedAnswerId;
+  final QuizGrade? grade;
+
+  String? _answerText(String? id) {
+    if (id == null) return null;
+    for (final answer in question.answers) {
+      if (answer.id == id) return answer.text;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // An unmarked question says nothing about right or wrong - the grader did
+    // not recognise it, so claiming either way would be a guess.
+    final marked = grade != null && grade!.known;
+    final correct = marked && grade!.correct;
+
+    final picked = _answerText(pickedAnswerId);
+    final rightAnswer = _answerText(grade?.correctAnswerId);
+
+    final tone = !marked
+        ? AppTheme.inkMuted
+        : correct
+        ? AppTheme.positive
+        : AppTheme.destructive;
+
+    return AppCard(
+      radius: AppTheme.radiusMd,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                !marked
+                    ? Icons.help_outline
+                    : correct
+                    ? Icons.check_circle
+                    : Icons.cancel,
+                size: 16,
+                color: tone,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(question.text, style: AppTheme.bodyStrong)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (picked != null)
+            _ReviewLine(
+              label: 'Jouw antwoord',
+              value: picked,
+              color: marked ? tone : null,
+            ),
+          // Only worth stating when they missed it; repeating their own
+          // correct answer back at them is noise.
+          if (marked && !correct && rightAnswer != null) ...[
+            const SizedBox(height: 6),
+            _ReviewLine(
+              label: 'Juiste antwoord',
+              value: rightAnswer,
+              color: AppTheme.positive,
+            ),
+          ],
+          if (grade?.explanation != null) ...[
+            const SizedBox(height: 10),
+            Text(grade!.explanation!, style: AppTheme.bodyMuted),
+          ],
+          if (grade?.bibleReference != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              grade!.bibleReference!,
+              style: AppTheme.caption.copyWith(color: AppTheme.teal),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewLine extends StatelessWidget {
+  const _ReviewLine({required this.label, required this.value, this.color});
+
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: AppTheme.overline),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: AppTheme.bodyMuted.copyWith(color: color ?? AppTheme.ink),
+        ),
+      ],
     );
   }
 }
