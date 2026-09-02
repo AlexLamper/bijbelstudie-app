@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/notifications/reminder_copy.dart';
 import 'core/notifications/reminder_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
@@ -59,9 +60,20 @@ Future<void> _initRevenueCat() async {
 /// force-stop; `scheduleDaily` cancels before it sets, so calling it again
 /// with the stored time is a no-op when the reminder is already in place and
 /// a fix when it is not. Nothing runs when no reminder is stored.
+///
+/// It also re-arms the rolling batch of reminders, which is now a fortnight of
+/// one-shot notifications rather than one repeating alarm. Someone who does not
+/// open the app for two weeks therefore stops being reminded - which is the
+/// behaviour we want anyway: a nudge nobody has acted on in a fortnight should
+/// go quiet rather than repeat forever.
 Future<void> _initReminders() async {
   if (kIsWeb) return;
-  final service = ReminderService(FlutterLocalNotificationsPlugin());
+  // Cache-only: a cold start must not wait on a network call. The batch is
+  // refreshed from the server once the app is running and signed in.
+  final service = ReminderService(
+    FlutterLocalNotificationsPlugin(),
+    const ReminderCopySource.cacheOnly(),
+  );
   await service.initialise();
 
   final prefs = await SharedPreferences.getInstance();

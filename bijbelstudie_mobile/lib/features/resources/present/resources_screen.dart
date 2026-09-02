@@ -57,7 +57,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
         'surface': 'resources',
       });
-      context.push('/premium?source=app_resources');
+      context.push('/pro-intro?source=app_resources');
       return;
     }
     final uri = Uri.tryParse(item.sourceUrl);

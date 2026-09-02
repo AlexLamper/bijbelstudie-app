@@ -64,7 +64,7 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
     ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
       'surface': widget.surface,
     });
-    context.push('/premium?source=app_study');
+    context.push('/pro-intro?source=app_study');
   }
 
   @override

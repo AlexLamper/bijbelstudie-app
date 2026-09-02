@@ -72,5 +72,40 @@ void main() {
       });
       expect(data.booksStarted, 0);
     });
+
+    // `$*` is the schema path of the server's readChapters Map and sat as a
+    // literal key on live accounts. It reached the app once the API stopped
+    // dropping the whole map over it, and `chapters as List?` threw on its
+    // object value - one bad key would have taken the dashboard down.
+    test('ignores a key that is not a book, and keeps the books beside it', () {
+      final data = parse({
+        r'$*': {'0': 1},
+        'a.b': [1],
+        'Genesis': [4],
+        'Ruth': [1, 2],
+      });
+      expect(data.booksStarted, 2);
+      expect(data.readChapters['Genesis'], [4]);
+      expect(data.readChapters.containsKey(r'$*'), isFalse);
+    });
+
+    test('ignores a value that is not a chapter list', () {
+      final data = parse({
+        'Genesis': {'0': 1},
+        'Ruth': 'nope',
+        'Job': [1, 2],
+      });
+      expect(data.booksStarted, 1);
+      expect(data.readChapters['Job'], [1, 2]);
+    });
+
+    test('does not count a book the fold did not recognise', () {
+      // The grid draws 66 squares, so "… van 66" must not exceed them.
+      final data = parse({
+        'Genesis': [1],
+        'Nergensboek': [1, 2],
+      });
+      expect(data.booksStarted, 1);
+    });
   });
 }

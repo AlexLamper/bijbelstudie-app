@@ -14,17 +14,35 @@ class StudiesRepository {
 
   final ApiClient _apiClient;
 
-  /// The guided studies from `/studies` on the website. Static content, so the
-  /// server sends an ETag and Dio's 304 costs one empty round trip.
+  /// The whole catalogue: one study per bible book plus the authored theme,
+  /// person and passage studies - the same set the website browses.
+  ///
+  /// `/studies/catalog` also resolves the grouping metadata (`category`,
+  /// `kind`, `avgMinutes`) server-side, so the screen never has to derive it.
+  /// A server that predates that route still answers `/studies`, which carries
+  /// the authored studies only; falling back keeps an older backend usable
+  /// rather than showing an empty catalogue.
   Future<List<CuratedStudy>> getCuratedStudies() async {
     try {
-      final response = await _apiClient.dio.get('/studies');
-      final data = response.data as Map<String, dynamic>;
-      return (data['studies'] as List? ?? const [])
-          .map((s) => CuratedStudy.fromJson(s as Map<String, dynamic>))
-          .toList(growable: false);
+      return await _fetch('/studies/catalog');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        try {
+          return await _fetch('/studies');
+        } on DioException catch (inner) {
+          throw Exception('Fout bij ophalen studies: ${inner.message}');
+        }
+      }
       throw Exception('Fout bij ophalen studies: ${e.message}');
     }
+  }
+
+  Future<List<CuratedStudy>> _fetch(String path) async {
+    final response = await _apiClient.dio.get(path);
+    final data = response.data as Map<String, dynamic>;
+    return (data['studies'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(CuratedStudy.fromJson)
+        .toList(growable: false);
   }
 }

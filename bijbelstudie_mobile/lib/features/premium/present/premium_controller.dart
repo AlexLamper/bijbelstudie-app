@@ -33,6 +33,7 @@ class PremiumState {
     this.priceError,
     this.monthlyProduct,
     this.yearlyProduct,
+    this.priceDiagnostics,
   });
 
   final PurchaseStatus status;
@@ -50,6 +51,16 @@ class PremiumState {
   /// or, failing that, looked up by product id.
   final StoreProduct? monthlyProduct;
   final StoreProduct? yearlyProduct;
+
+  /// What the store actually answered, in plain technical terms.
+  ///
+  /// Everything that can still break here is configuration - a key missing
+  /// from the build, an offering with no packages, product ids that do not
+  /// match App Store Connect - and none of it is distinguishable from the
+  /// others once it has been flattened into "prijzen konden niet worden
+  /// geladen". This says which, so the fix is findable without a debugger
+  /// attached to a TestFlight build.
+  final String? priceDiagnostics;
 
   bool get isPro =>
       customerInfo?.entitlements.active.containsKey(kRcProEntitlement) ??
@@ -70,6 +81,7 @@ class PremiumState {
       priceError: priceError,
       monthlyProduct: monthlyProduct,
       yearlyProduct: yearlyProduct,
+      priceDiagnostics: priceDiagnostics,
     );
   }
 
@@ -83,6 +95,7 @@ class PremiumState {
     StoreProduct? monthlyProduct,
     StoreProduct? yearlyProduct,
     CustomerInfo? customerInfo,
+    String? priceDiagnostics,
   }) {
     return PremiumState(
       status: status,
@@ -93,6 +106,7 @@ class PremiumState {
       priceError: priceError,
       monthlyProduct: monthlyProduct,
       yearlyProduct: yearlyProduct,
+      priceDiagnostics: priceDiagnostics,
     );
   }
 }
@@ -147,6 +161,11 @@ class PremiumController extends Notifier<PremiumState> {
         priceError:
             'Deze build bevat geen winkelconfiguratie, dus prijzen kunnen niet '
             'worden opgehaald.',
+        priceDiagnostics:
+            'Geen RevenueCat SDK-sleutel in deze build '
+            '(${RevenueCatConfig.sdkKeySource()}). Bouw met '
+            '--dart-define=REVENUECAT_APPLE_KEY=appl_xxx, of gebruik een '
+            'TestFlight-build.',
       );
       return;
     }
@@ -180,6 +199,21 @@ class PremiumController extends Notifier<PremiumState> {
 
       final info = await _svc.getCustomerInfo();
       final found = monthly != null || yearly != null;
+
+      // Names the failure precisely: zero packages points at the offering,
+      // packages-without-a-match points at the ids, and neither route finding
+      // anything points at App Store Connect or the simulator.
+      final diagnostics = found
+          ? null
+          : packages.isEmpty
+                ? 'Geen aanbod en geen producten. De App Store gaf niets terug '
+                      'voor $kRcYearlyProductId / $kRcMonthlyProductId. '
+                      'Controleer de product-ids in App Store Connect, of test '
+                      'op een echt toestel - de simulator levert geen prijzen.'
+                : 'Aanbod bevat ${packages.length} pakket(ten) '
+                      '(${packages.map((p) => p.storeProduct.identifier).join(', ')}) '
+                      'maar geen jaarlijks of maandelijks abonnement.';
+
       state = state.withPrices(
         priceStatus: found ? PriceStatus.ready : PriceStatus.unavailable,
         priceError: found
@@ -190,6 +224,7 @@ class PremiumController extends Notifier<PremiumState> {
         monthlyProduct: monthly,
         yearlyProduct: yearly,
         customerInfo: info,
+        priceDiagnostics: diagnostics,
       );
       _log(
         'Prices: monthly=${monthly?.priceString ?? '(none)'} '
@@ -202,6 +237,7 @@ class PremiumController extends Notifier<PremiumState> {
       state = state.withPrices(
         priceStatus: PriceStatus.unavailable,
         priceError: 'Prijzen konden niet worden geladen. Controleer je verbinding.',
+        priceDiagnostics: '$e',
       );
     }
   }

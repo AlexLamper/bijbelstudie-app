@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/data/bible_books.dart';
+import '../../../core/notifications/reminder_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -27,6 +28,11 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
+
+    // Fire-and-forget: tops the daily reminder up with fresh copy from the
+    // server, once per session and only when the batch has gone stale. The
+    // result is never rendered - see reminderCopyRefreshProvider.
+    ref.watch(reminderCopyRefreshProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -160,6 +166,18 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
+              // The card renders today's verse, or — offline — the newest one
+              // in its local archive. It is left out entirely only when there
+              // is neither, which is why the archive is consulted here too.
+              if (data.dailyVerse != null || hasArchivedVerse) ...[
+                DailyVerseCard(
+                  verse: data.dailyVerse,
+                  onOpenChapter: (book, chapter) =>
+                      _openChapter(context, ref, book: book, chapter: chapter),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               _BookMapCard(
                 readChapters: data.readChapters,
                 booksStarted: data.booksStarted,
@@ -179,35 +197,7 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // The card renders today's verse, or — offline — the newest one
-              // in its local archive. It is left out entirely only when there
-              // is neither, which is why the archive is consulted here too.
-              if (data.dailyVerse != null || hasArchivedVerse) ...[
-                DailyVerseCard(
-                  verse: data.dailyVerse,
-                  onOpenChapter: (book, chapter) =>
-                      _openChapter(context, ref, book: book, chapter: chapter),
-                ),
-                const SizedBox(height: 16),
-              ],
-
               _WeeklyStatsCard(days: data.weekDays, total: data.weekTotal),
-              const SizedBox(height: 16),
-
-              if (data.recentNotes.isNotEmpty) ...[
-                _RecentNotesCard(
-                  notes: data.recentNotes,
-                  onOpenNote: (note) => _openChapter(
-                    context,
-                    ref,
-                    book: note.book,
-                    chapter: note.chapter,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              const _QuickLinksCard(),
             ],
           ),
         ),
@@ -216,7 +206,9 @@ class _DashboardBody extends ConsumerWidget {
   }
 }
 
-/// `rounded-2xl p-6` on `linear-gradient(135deg,#0D9488,#0F766E)`.
+/// Compact single-row card: cover icon, title + progress line, chevron.
+/// Kept short on purpose — this is the first thing on the dashboard and the
+/// site's tall hero block doesn't earn that much vertical space on a phone.
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.lastRead, required this.onContinue});
 
@@ -227,38 +219,54 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasProgress = lastRead != null;
     return BrandHeroCard(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      onTap: onContinue,
+      child: Row(
         children: [
-          Text(
-            hasProgress ? 'GA VERDER WAAR JE GEBLEVEN WAS' : 'BEGIN VANDAAG',
-            style: AppTheme.overline.copyWith(
-              color: Colors.white.withValues(alpha: 0.75),
-              letterSpacing: 1.4,
+          Icon(
+            hasProgress ? Icons.menu_book_outlined : Icons.auto_stories,
+            color: Colors.white,
+            size: 22,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasProgress
+                      ? 'GA VERDER WAAR JE GEBLEVEN WAS'
+                      : 'BEGIN MET LEZEN',
+                  style: AppTheme.overline.copyWith(
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasProgress ? lastRead!.book : 'Start je bijbelstudie',
+                  style: AppTheme.displayBase.copyWith(color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  hasProgress
+                      ? 'Hoofdstuk ${lastRead!.chapter} · ${lastRead!.version}'
+                      : 'Lees dag voor dag door de Bijbel',
+                  style: AppTheme.caption.copyWith(
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            hasProgress ? lastRead!.book : 'Start je bijbelstudie',
-            style: AppTheme.displayMedium.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            hasProgress
-                ? 'Hoofdstuk ${lastRead!.chapter} · ${lastRead!.version}'
-                : 'Lees dag voor dag door de Bijbel.',
-            style: AppTheme.bodyMuted.copyWith(
-              color: Colors.white.withValues(alpha: 0.75),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OnBrandButton(
-              label: hasProgress ? 'Doorgaan' : 'Begin met lezen',
-              onPressed: onContinue,
-            ),
+          const SizedBox(width: 8),
+          Icon(
+            Icons.chevron_right,
+            color: Colors.white.withValues(alpha: 0.85),
           ),
         ],
       ),
@@ -692,127 +700,3 @@ class _WeeklyStatsCard extends StatelessWidget {
   }
 }
 
-class _RecentNotesCard extends StatelessWidget {
-  const _RecentNotesCard({required this.notes, required this.onOpenNote});
-
-  final List<RecentNote> notes;
-  final void Function(RecentNote note) onOpenNote;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text('RECENTE NOTITIES', style: AppTheme.eyebrow),
-              ),
-              Icon(
-                Icons.sticky_note_2_outlined,
-                size: 14,
-                color: AppTheme.teal,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (final note in notes) ...[
-            InkWell(
-              onTap: () => onOpenNote(note),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.reference,
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.teal,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      note.text,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.inkFaint,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: () => context.go('/notes'),
-            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                'Alle notities bekijken →',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.teal,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickLinksCard extends StatelessWidget {
-  const _QuickLinksCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    const links = [
-      ('/study', 'Bijbelstudie', Icons.menu_book_outlined),
-      ('/notes', 'Mijn notities', Icons.sticky_note_2_outlined),
-      ('/resources', 'Hulpbronnen', Icons.local_library_outlined),
-    ];
-
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('SNEL NAAR', style: AppTheme.eyebrow),
-          const SizedBox(height: 10),
-          for (final (route, label, icon) in links)
-            InkWell(
-              onTap: () => context.go(route),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 15, color: AppTheme.teal),
-                    const SizedBox(width: 12),
-                    Text(
-                      label,
-                      style: AppTheme.bodyMuted.copyWith(
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}

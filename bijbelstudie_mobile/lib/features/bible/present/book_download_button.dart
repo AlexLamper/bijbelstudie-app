@@ -61,7 +61,7 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
     ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
       'surface': 'offline',
     });
-    context.push('/premium?source=app_study');
+    context.push('/pro-intro?source=app_study');
   }
 
   /// Whatever the download changed is on disk now, so anything showing the

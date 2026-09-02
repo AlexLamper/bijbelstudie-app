@@ -56,8 +56,15 @@ class PurchaseService {
     // worth selling - it collects a year of cash up front and removes eleven
     // future opportunities to churn - so it leads rather than trails.
     packages.sort((a, b) {
-      int rank(String id) => id == kRcYearlyProductId ? 0 : (id == kRcMonthlyProductId ? 1 : 99);
-      return rank(a.storeProduct.identifier).compareTo(rank(b.storeProduct.identifier));
+      int rank(Package pkg) {
+        if (pkg.storeProduct.identifier == kRcYearlyProductId) return 0;
+        if (pkg.packageType == PackageType.annual) return 1;
+        if (pkg.storeProduct.identifier == kRcMonthlyProductId) return 2;
+        if (pkg.packageType == PackageType.monthly) return 3;
+        return 99;
+      }
+
+      return rank(a).compareTo(rank(b));
     });
 
     return packages;
@@ -84,6 +91,8 @@ class PurchaseService {
       packages,
       packageId: kRcMonthlyPackageId,
       productId: kRcMonthlyProductId,
+      packageType: PackageType.monthly,
+      annual: false,
     );
   }
 
@@ -92,20 +101,48 @@ class PurchaseService {
       packages,
       packageId: kRcYearlyPackageId,
       productId: kRcYearlyProductId,
+      packageType: PackageType.annual,
+      annual: true,
     );
   }
 
+  /// Find the annual or monthly package, in order of how sure the match is.
+  ///
+  /// Matching only on the two hardcoded ids was too strict: an offering built
+  /// in the RevenueCat dashboard with custom package identifiers - or with the
+  /// product renamed - returns perfectly good packages that matched neither,
+  /// so the paywall rendered "-" while holding the prices it needed. The last
+  /// two rules read the package's own type and billing period instead, which
+  /// are set by the store rather than by our naming.
   Package? _findPackage(
     List<Package> packages, {
     required String packageId,
     required String productId,
+    required PackageType packageType,
+    required bool annual,
   }) {
-    for (final pkg in packages) {
-      if (pkg.identifier == packageId || pkg.storeProduct.identifier == productId) {
-        return pkg;
+    Package? firstWhere(bool Function(Package) test) {
+      for (final pkg in packages) {
+        if (test(pkg)) return pkg;
       }
+      return null;
     }
-    return null;
+
+    return firstWhere((pkg) => pkg.identifier == packageId) ??
+        firstWhere((pkg) => pkg.storeProduct.identifier == productId) ??
+        firstWhere((pkg) => pkg.packageType == packageType) ??
+        firstWhere((pkg) => _isPeriod(pkg.storeProduct.subscriptionPeriod, annual: annual));
+  }
+
+  /// Whether an ISO-8601 billing period is a year (`P1Y`, `P12M`) or a month
+  /// (`P1M`). Anything else - weekly, six-monthly, lifetime - matches neither,
+  /// so an unrelated package is never mistaken for one of these two.
+  static bool _isPeriod(String? period, {required bool annual}) {
+    if (period == null) return false;
+    final normalised = period.toUpperCase();
+    return annual
+        ? normalised == 'P1Y' || normalised == 'P12M'
+        : normalised == 'P1M';
   }
 
   /// Purchase a RevenueCat package from the current offering.

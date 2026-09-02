@@ -52,7 +52,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
         children: [
-          const SectionHeader(eyebrow: 'Lezen', title: 'Weergave'),
+          const SectionHeader(eyebrow: 'Uiterlijk', title: 'Thema'),
+          const SizedBox(height: 12),
+          // Applies on the spot: main.dart watches the same stored value and
+          // resolves AppTheme's brightness from it.
+          _ThemeModeSwitcher(
+            selected: settings.themeMode,
+            onChanged: controller.setThemeMode,
+          ),
+          const SizedBox(height: 24),
+          const SectionHeader(eyebrow: 'Lezen', title: 'Leesweergave'),
           const SizedBox(height: 12),
           _SamplePreview(settings: settings),
           const SizedBox(height: 16),
@@ -93,17 +102,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: const Text('Versnummers tonen'),
             value: settings.showVerseNumbers,
             onChanged: controller.setShowVerseNumbers,
-          ),
-
-          const SizedBox(height: 8),
-          // Applies on the spot: main.dart watches the same stored value and
-          // resolves AppTheme's brightness from it.
-          _OptionRow<ThemeMode>(
-            label: 'Thema',
-            values: ThemeModeLabelX.pickerOrder,
-            selected: settings.themeMode,
-            labelOf: (v) => v.label,
-            onChanged: controller.setThemeMode,
           ),
 
           const _ReminderSection(),
@@ -409,6 +407,28 @@ class _OptionRow<T> extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// A segmented Licht/Donker/Systeem switcher, shown at the top of Settings
+/// so the dark-mode toggle isn't buried among the reading-preference rows.
+class _ThemeModeSwitcher extends StatelessWidget {
+  const _ThemeModeSwitcher({required this.selected, required this.onChanged});
+
+  final ThemeMode selected;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<ThemeMode>(
+      segments: [
+        for (final mode in ThemeModeLabelX.pickerOrder)
+          ButtonSegment(value: mode, icon: Icon(mode.icon), label: Text(mode.label)),
+      ],
+      selected: {selected},
+      showSelectedIcon: false,
+      onSelectionChanged: (values) => onChanged(values.first),
     );
   }
 }

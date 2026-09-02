@@ -11,6 +11,12 @@ class User {
   final String? proSource;
   final DateTime? proExpiresAt;
 
+  /// Server-side admin flag, straight from `/api/v1/me` and the login
+  /// response (`serialiseUser` on the backend). It only decides whether the
+  /// admin entry point is *shown*: every `/api/v1/admin/*` call re-checks it
+  /// on the server, so a stale or forged `true` here buys nothing.
+  final bool isAdmin;
+
   User({
     required this.id,
     required this.name,
@@ -19,6 +25,7 @@ class User {
     this.isPro = false,
     this.proSource,
     this.proExpiresAt,
+    this.isAdmin = false,
   });
 
   /// True when Pro was bought outside the App Store, so the app must not offer
@@ -35,6 +42,7 @@ class User {
       isPro: json['isPro'] as bool? ?? false,
       proSource: json['proSource'] as String?,
       proExpiresAt: expires == null ? null : DateTime.tryParse(expires),
+      isAdmin: json['isAdmin'] as bool? ?? false,
     );
   }
 
@@ -47,6 +55,7 @@ class User {
       isPro: isPro ?? this.isPro,
       proSource: proSource ?? this.proSource,
       proExpiresAt: proExpiresAt ?? this.proExpiresAt,
+      isAdmin: isAdmin,
     );
   }
 }

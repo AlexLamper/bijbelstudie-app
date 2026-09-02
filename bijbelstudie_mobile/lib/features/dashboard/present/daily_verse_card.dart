@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
@@ -199,7 +200,11 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
                       _PhotoAction(
                         icon: Icons.more_horiz,
                         tooltip: 'Meer',
-                        onPressed: () => _showMore(book, chapter),
+                        onPressed: () => _showMore(
+                          book,
+                          chapter,
+                          verse?.verse ?? fallback?.verse,
+                        ),
                       ),
                     ],
                   ),
@@ -217,7 +222,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     return Share.share('"$text"\n\n$attribution', subject: reference);
   }
 
-  Future<void> _showMore(String book, int chapter) async {
+  Future<void> _showMore(String book, int chapter, int? verseNumber) async {
     final action = await showModalBottomSheet<_MoreAction>(
       context: context,
       builder: (context) => const _MoreSheet(),
@@ -226,19 +231,29 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
 
     switch (action) {
       case _MoreAction.readChapter:
-        widget.onOpenChapter(book, chapter);
+        _openChapterAtVerse(book, chapter, verseNumber);
       case _MoreAction.history:
         await showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           builder: (context) => _HistorySheet(
-            onOpenChapter: (book, chapter) {
+            onOpenChapter: (book, chapter, verse) {
               Navigator.of(context).pop();
-              widget.onOpenChapter(book, chapter);
+              _openChapterAtVerse(book, chapter, verse);
             },
           ),
         );
     }
+  }
+
+  /// Names the verse the reader should scroll to and highlight, then hands
+  /// the actual navigation to [widget.onOpenChapter] as before — that keeps
+  /// this card out of routing, which stays the dashboard's job.
+  void _openChapterAtVerse(String book, int chapter, int? verseNumber) {
+    if (verseNumber != null) {
+      ref.read(pendingVerseAnchorProvider.notifier).set(verseNumber);
+    }
+    widget.onOpenChapter(book, chapter);
   }
 }
 
@@ -330,7 +345,7 @@ class _MoreSheet extends StatelessWidget {
 class _HistorySheet extends ConsumerWidget {
   const _HistorySheet({required this.onOpenChapter});
 
-  final void Function(String book, int chapter) onOpenChapter;
+  final void Function(String book, int chapter, int? verse) onOpenChapter;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -371,7 +386,8 @@ class _HistorySheet extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final entry = memory.history[index];
                     return InkWell(
-                      onTap: () => onOpenChapter(entry.book, entry.chapter),
+                      onTap: () =>
+                          onOpenChapter(entry.book, entry.chapter, entry.verse),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

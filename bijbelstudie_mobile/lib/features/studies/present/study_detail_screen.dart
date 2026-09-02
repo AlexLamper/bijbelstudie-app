@@ -5,244 +5,91 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
-import '../../bible/domain/bible_models.dart';
-import '../../bible/present/bible_providers.dart';
-import '../../settings/data/reading_settings.dart';
+import '../../study/domain/lesson_models.dart';
 import '../data/study_models.dart';
-import '../data/study_plan_store.dart';
-import '../data/study_progress_repository.dart';
 import 'studies_providers.dart';
 import 'study_banner.dart';
+import 'study_settings_sheet.dart';
 
-/// `/studies/:id` - the screen that stands between a study card and the reader.
+/// The public face of a study: what it is about, what you will read, and one
+/// button to begin or carry on.
 ///
-/// The website has no equivalent: `app/studies/page.tsx` writes the study into
-/// `sessionStorage` and pushes straight to `/studie`, so pressing Start there
-/// means landing in a chapter with no sense of what the study is or how long it
-/// runs. This screen is where the study becomes concrete - what it covers,
-/// every lesson in order, and the three choices that shape how it is read
-/// (translation, commentary, cadence) - before the reader commits to it.
-///
-/// The chosen configuration and the lessons ticked off are kept by
-/// [studyPlansProvider] on the device; completed lessons are additionally sent
-/// to the existing `POST /api/v1/study-progress`, which is what the account's
-/// XP and the website's "Voltooid" badge already read.
-class StudyDetailScreen extends ConsumerStatefulWidget {
+/// The website splits this into two scrolling panes beside each other. A phone
+/// gets one scroll with the action pinned to the bottom, because the decision
+/// the screen exists to support - start this or not - must never be scrolled
+/// out of reach.
+class StudyDetailScreen extends ConsumerWidget {
   const StudyDetailScreen({super.key, required this.studyId});
 
   final String studyId;
 
   @override
-  ConsumerState<StudyDetailScreen> createState() => _StudyDetailScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final study = ref.watch(curatedStudyProvider(studyId));
 
-class _StudyDetailScreenState extends ConsumerState<StudyDetailScreen> {
-  /// Null until the reader touches a control; the stored plan, then the study's
-  /// own default, answer for it up to that point. Kept as local overrides so
-  /// the pickers respond instantly without a disk write per tap.
-  String? _versionId;
-  String? _commentaryId;
-  StudyCadence? _cadence;
-
-  StudyPlan? get _plan => ref.read(studyPlansProvider)[widget.studyId];
-
-  String _effectiveVersion(CuratedStudy study) =>
-      _versionId ?? _plan?.versionId ?? study.startVersion;
-
-  String _effectiveCommentary() =>
-      _commentaryId ??
-      _plan?.commentaryId ??
-      ref.read(readingSettingsProvider).lastCommentaryId;
-
-  StudyCadence _effectiveCadence() =>
-      _cadence ?? _plan?.cadence ?? StudyCadence.daily;
-
-  Future<void> _saveConfig(CuratedStudy study) {
-    return ref
-        .read(studyPlansProvider.notifier)
-        .saveConfig(
-          studyId: study.id,
-          versionId: _effectiveVersion(study),
-          commentaryId: _effectiveCommentary(),
-          cadence: _effectiveCadence(),
-        );
-  }
-
-  /// Opens [lesson] in the reader with the configuration this screen holds.
-  ///
-  /// This is what Start used to do from the card, minus the guesswork: the
-  /// translation is the one chosen here rather than the study's hardcoded
-  /// `startVersion`, and the commentary pane opens on the chosen source.
-  Future<void> _open(CuratedStudy study, StudyLesson lesson) async {
-    final version = _effectiveVersion(study);
-    final commentary = _effectiveCommentary();
-
-    await ref
-        .read(studyPlansProvider.notifier)
-        .start(
-          studyId: study.id,
-          versionId: version,
-          commentaryId: commentary,
-          cadence: _effectiveCadence(),
-        );
-    await ref
-        .read(readingSettingsProvider.notifier)
-        .setLastCommentary(commentary);
-
-    ref
-        .read(readerLocationProvider.notifier)
-        .openChapter(
-          versionId: version,
-          book: lesson.book,
-          chapter: lesson.chapter,
-        );
-
-    if (!mounted) return;
-    context.go('/study');
-  }
-
-  Future<void> _toggleLesson(
-    CuratedStudy study,
-    StudyLesson lesson,
-    bool done,
-  ) async {
-    await ref
-        .read(studyPlansProvider.notifier)
-        .setLessonDone(
-          studyId: study.id,
-          day: lesson.day,
-          done: done,
-          versionId: _effectiveVersion(study),
-          commentaryId: _effectiveCommentary(),
-          cadence: _effectiveCadence(),
-        );
-
-    // The server has no "undo": `POST /api/v1/study-progress` only records. A
-    // tick that is taken back stays taken back on this device, which is the
-    // copy this screen renders from.
-    if (!done) return;
-
-    final bounds = lesson.verseBounds;
-    await ref
-        .read(studyProgressRepositoryProvider)
-        .recordLesson(
-          studyId: study.id,
-          lessonDay: lesson.day,
-          book: lesson.book,
-          chapter: lesson.chapter,
-          verseStart: bounds?.$1,
-          verseEnd: bounds?.$2,
-        );
-    ref.invalidate(serverStudyLessonsProvider);
-  }
-
-  Future<void> _reset(CuratedStudy study) async {
-    await ref.read(studyPlansProvider.notifier).reset(study.id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Voortgang op dit apparaat gewist.')),
+    return Scaffold(
+      backgroundColor: AppTheme.paper,
+      appBar: AppBar(
+        title: Text(study.value?.title ?? 'Studie'),
+        actions: [
+          if (study.value != null)
+            IconButton(
+              tooltip: 'Studie-instellingen',
+              icon: const Icon(Icons.tune),
+              onPressed: () => _openSettings(context, ref, study.value!),
+            ),
+        ],
+      ),
+      body: study.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.all(16),
+          child: SkeletonCardColumn(count: 2),
+        ),
+        error: (error, _) => const AppEmptyState(
+          icon: Icons.wifi_off_outlined,
+          title: 'Studie niet geladen',
+          description: 'Controleer je verbinding en probeer het opnieuw.',
+        ),
+        data: (data) {
+          if (data == null) {
+            return const AppEmptyState(
+              icon: Icons.search_off,
+              title: 'Studie niet gevonden',
+              description: 'Deze studie bestaat niet meer.',
+            );
+          }
+          return _Body(study: data);
+        },
+      ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final study = ref.watch(curatedStudyProvider(widget.studyId));
-
-    // Both are read through `ref.read` by the effective-value helpers, which
-    // does not subscribe. Watching them here is what makes the pickers show the
-    // stored plan once SharedPreferences has answered, instead of sitting on
-    // the study's defaults for the life of the screen.
-    ref.watch(studyPlansProvider);
-    ref.watch(readingSettingsProvider);
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: Text(study.value?.title ?? 'Studie')),
-      body: study.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: SkeletonCardColumn(count: 2),
-        ),
-        error: (error, _) => AppEmptyState(
-          icon: Icons.wifi_off_outlined,
-          title: 'Studie niet geladen',
-          description: '$error',
-        ),
-        data: (data) => data == null
-            ? const AppEmptyState(
-                icon: Icons.search_off,
-                title: 'Studie niet gevonden',
-                description: 'Deze studie bestaat niet meer.',
-              )
-            : _Body(
-                study: data,
-                versionId: _effectiveVersion(data),
-                commentaryId: _effectiveCommentary(),
-                cadence: _effectiveCadence(),
-                onVersion: (id) {
-                  setState(() => _versionId = id);
-                  _saveConfig(data);
-                },
-                onCommentary: (id) {
-                  setState(() => _commentaryId = id);
-                  _saveConfig(data);
-                },
-                onCadence: (value) {
-                  setState(() => _cadence = value);
-                  _saveConfig(data);
-                },
-                onOpen: (lesson) => _open(data, lesson),
-                onToggle: (lesson, done) => _toggleLesson(data, lesson, done),
-                onReset: () => _reset(data),
-              ),
-      ),
+  Future<void> _openSettings(
+    BuildContext context,
+    WidgetRef ref,
+    CuratedStudy study,
+  ) async {
+    final enrollment = ref.read(studyEnrollmentProvider(study.id));
+    await showStudySettingsSheet(
+      context,
+      ref,
+      study: study,
+      enrollment: enrollment,
+      // Already enrolled, so this only saves - it never starts a lesson.
+      startAfterSave: false,
     );
   }
 }
 
 class _Body extends ConsumerWidget {
-  const _Body({
-    required this.study,
-    required this.versionId,
-    required this.commentaryId,
-    required this.cadence,
-    required this.onVersion,
-    required this.onCommentary,
-    required this.onCadence,
-    required this.onOpen,
-    required this.onToggle,
-    required this.onReset,
-  });
+  const _Body({required this.study});
 
   final CuratedStudy study;
-  final String versionId;
-  final String commentaryId;
-  final StudyCadence cadence;
-  final ValueChanged<String> onVersion;
-  final ValueChanged<String> onCommentary;
-  final ValueChanged<StudyCadence> onCadence;
-  final ValueChanged<StudyLesson> onOpen;
-  final void Function(StudyLesson lesson, bool done) onToggle;
-  final VoidCallback onReset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final plans = ref.watch(studyPlansProvider);
-    final serverLessons =
-        ref.watch(serverStudyLessonsProvider).value ??
-        const <String, Set<int>>{};
-    final completed = mergedCompletedDays(
-      studyId: study.id,
-      plans: plans,
-      serverLessons: serverLessons,
-    );
-
-    final total = study.lessonCount;
-    final done = completed.length;
-    final finished = total > 0 && done >= total;
-    final started = plans[study.id]?.started ?? done > 0;
-    final next = _nextLesson(completed);
+    final status = ref.watch(studyStatusProvider(study));
+    final enrollment = status.enrollment;
 
     return Column(
       children: [
@@ -260,418 +107,384 @@ class _Body extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 14),
-
               Row(
                 children: [
-                  SiteBadge.teal(study.type),
+                  SiteBadge.teal(_typeLabel(study.type)),
                   const SizedBox(width: 8),
-                  if (finished)
-                    SiteBadge.positive(
-                      'Voltooid',
-                      icon: Icons.check_circle,
-                    )
-                  else if (started)
-                    SiteBadge.neutral('$done van $total lessen'),
+                  if (status.completed)
+                    SiteBadge.positive('Voltooid', icon: Icons.check_circle)
+                  else if (status.started)
+                    SiteBadge.neutral('${status.done} van ${status.total} lessen'),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                study.title,
-                style: AppTheme.displayLarge.copyWith(color: scheme.onSurface),
-              ),
-              const SizedBox(height: 6),
-              Text(study.description, style: AppTheme.bodyLead),
-              const SizedBox(height: 16),
-
-              StatStrip(
-                items: [
-                  StatItem(
-                    value: '$total',
-                    label: total == 1 ? 'les' : 'lessen',
-                    icon: Icons.list_alt_outlined,
-                  ),
-                  StatItem(
-                    value: '${study.books.length}',
-                    label: study.books.length == 1
-                        ? 'bijbelboek'
-                        : 'bijbelboeken',
-                    icon: Icons.menu_book_outlined,
-                  ),
-                  StatItem(
-                    value: '${study.estimatedMinutes}',
-                    label: 'minuten totaal',
-                    icon: Icons.schedule,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 12),
+              Text(study.title, style: AppTheme.displayLarge),
+              const SizedBox(height: 18),
               const SectionHeader(
-                eyebrow: 'Wat je gaat doen',
-                title: 'Over deze studie',
+                eyebrow: 'Voor je begint',
+                title: 'Waar gaat deze studie over?',
               ),
               const SizedBox(height: 10),
+              // At most two paragraphs, as on the website: this is a decision
+              // aid, not the study itself.
+              for (final paragraph in _about(study))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(paragraph, style: AppTheme.bodyLead),
+                ),
+              const SizedBox(height: 8),
               AppCard(
-                radius: AppTheme.radiusMd,
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _AboutLine(
-                      icon: Icons.explore_outlined,
-                      text: study.typeSummary,
+                    _FactLine(
+                      icon: Icons.checklist,
+                      label: '${study.lessonCount} lessen',
                     ),
-                    const SizedBox(height: 10),
-                    _AboutLine(
-                      icon: Icons.menu_book_outlined,
-                      text: 'Je leest ${_booksSentence(study.books)}.',
+                    _FactLine(
+                      icon: Icons.schedule,
+                      label: '± ${formatStudyMinutes(study.estimatedMinutes)} totaal',
                     ),
-                    const SizedBox(height: 10),
-                    _AboutLine(
-                      icon: Icons.help_outline,
-                      text:
-                          'Elke les geeft je een bijbelgedeelte en een vraag om '
-                          'over door te denken. Je leest het gedeelte in de '
-                          'app, met de uitleg ernaast.',
-                    ),
-                    const SizedBox(height: 10),
-                    _AboutLine(
-                      icon: Icons.check_circle_outline,
-                      text:
-                          'Vink een les af als je klaar bent. Je voortgang '
-                          'blijft bewaard, ook als je de app sluit.',
-                    ),
+                    for (final entry in _readingPlan(study))
+                      _FactLine(
+                        icon: Icons.menu_book_outlined,
+                        label: entry,
+                        showRule: entry != _readingPlan(study).last,
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
-
-              const SectionHeader(
-                eyebrow: 'Stel in',
-                title: 'Hoe wil je deze studie doen?',
-                description:
-                    'Deze keuzes gelden voor deze studie en worden bewaard.',
-              ),
-              const SizedBox(height: 12),
-              _SourcePicker(
-                label: 'Vertaling',
-                sources: ref.watch(bibleVersionsProvider),
-                selectedId: versionId,
-                fallbackLabel: versionId,
-                onChanged: onVersion,
-              ),
-              const SizedBox(height: 14),
-              _SourcePicker(
-                label: 'Uitleg ernaast',
-                sources: ref.watch(commentarySourcesProvider),
-                selectedId: commentaryId,
-                fallbackLabel: commentaryId,
-                onChanged: onCommentary,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Hoe vaak kom je terug?',
-                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final value in StudyCadence.values)
-                    ChoiceChip(
-                      label: Text(value.label),
-                      selected: value == cadence,
-                      onSelected: (_) => onCadence(value),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _cadenceSummary(cadence, total - done),
-                style: AppTheme.caption,
-              ),
-              const SizedBox(height: 22),
-
+              const SizedBox(height: 20),
               SectionHeader(
                 eyebrow: 'Les voor les',
-                title: total == 1 ? '1 les' : '$total lessen',
-                description:
-                    'Tik een les aan om hem te lezen, of vink hem af als je '
-                    'klaar bent.',
+                title: 'De lessen',
+                description: '${status.done} van ${study.lessonCount} afgerond',
               ),
               const SizedBox(height: 10),
               RuleGrid(
                 children: [
                   for (final lesson in study.lessons)
                     _LessonTile(
+                      study: study,
                       lesson: lesson,
-                      done: completed.contains(lesson.day),
-                      isNext: next != null && next.day == lesson.day,
-                      onOpen: () => onOpen(lesson),
-                      onToggle: (value) => onToggle(lesson, value),
+                      done: status.completedDays.contains(lesson.day),
+                      isCurrent: !status.completed && lesson.day == status.resumeDay(study),
+                      enrolled: enrollment != null,
                     ),
                 ],
               ),
-
-              if (started) ...[
-                const SizedBox(height: 14),
-                Center(
-                  child: TextButton(
-                    onPressed: onReset,
-                    child: const Text('Voortgang wissen'),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
-
-        // The one action the whole screen builds towards, kept in reach no
-        // matter how far down the lesson list the reader has scrolled.
-        Container(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            border: Border(top: BorderSide(color: scheme.outline)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: SiteButton(
-                label: next == null
-                    ? 'Geen lessen beschikbaar'
-                    : finished
-                    ? 'Opnieuw lezen vanaf les ${study.lessons.first.day}'
-                    : started
-                    ? 'Verder met les ${next.day}: ${next.title}'
-                    : 'Start studie',
-                trailingIcon: Icons.arrow_forward,
-                onPressed: next == null ? null : () => onOpen(next),
-              ),
-            ),
-          ),
-        ),
+        _ActionBar(study: study, status: status),
       ],
     );
   }
 
-  StudyLesson? _nextLesson(Set<int> completed) {
+  static List<String> _about(CuratedStudy study) {
+    final paragraphs = study.about.isNotEmpty ? study.about : [study.description];
+    return paragraphs.where((p) => p.isNotEmpty).take(2).toList(growable: false);
+  }
+
+  /// `Markus 1-16`, one line per book. Contiguous chapters collapse to a range
+  /// and gaps stay listed, so the line is honest about what you actually read.
+  static List<String> _readingPlan(CuratedStudy study) {
+    final byBook = <String, List<int>>{};
     for (final lesson in study.lessons) {
-      if (!completed.contains(lesson.day)) return lesson;
+      if (lesson.book.isEmpty) continue;
+      (byBook[lesson.book] ??= []).add(lesson.chapter);
     }
-    return study.firstLesson;
+
+    final lines = <String>[];
+    for (final entry in byBook.entries) {
+      final chapters = entry.value.toSet().toList()..sort();
+      lines.add('${entry.key} ${_collapse(chapters)}');
+    }
+    return lines;
   }
-}
 
-String _booksSentence(List<String> books) {
-  if (books.isEmpty) return 'door de Bijbel';
-  if (books.length == 1) return 'in ${books.first}';
-  if (books.length == 2) return 'in ${books.first} en ${books.last}';
-  return 'in ${books.sublist(0, books.length - 1).join(', ')} en ${books.last}';
-}
-
-/// Turns a cadence into the date it lands on, which is the question behind
-/// "hoe vaak kom je terug" - a rhythm nobody can picture the end of is not a
-/// plan.
-String _cadenceSummary(StudyCadence cadence, int remaining) {
-  if (remaining <= 0) return 'Je hebt alle lessen van deze studie gedaan.';
-  final perWeek = cadence.lessonsPerWeek;
-  if (perWeek == null) {
-    return '${cadence.description} Nog $remaining '
-        '${remaining == 1 ? 'les' : 'lessen'} te gaan.';
+  static String _collapse(List<int> chapters) {
+    if (chapters.isEmpty) return '';
+    if (chapters.length == 1) return '${chapters.first}';
+    final contiguous = chapters.last - chapters.first == chapters.length - 1;
+    if (contiguous) return '${chapters.first}-${chapters.last}';
+    return chapters.join(', ');
   }
-  final days = (remaining / perWeek * 7).ceil();
-  final finish = DateTime.now().add(Duration(days: days));
-  return '${cadence.description} Klaar rond ${_formatDate(finish)}.';
+
+  static String _typeLabel(String type) => switch (type) {
+    'Boek' => 'Bijbelboek',
+    'Persoon' => 'Persoon',
+    'Gedeelte' => 'Gedeelte',
+    _ => 'Onderwerp',
+  };
 }
 
-const _months = [
-  'januari',
-  'februari',
-  'maart',
-  'april',
-  'mei',
-  'juni',
-  'juli',
-  'augustus',
-  'september',
-  'oktober',
-  'november',
-  'december',
-];
-
-String _formatDate(DateTime date) => '${date.day} ${_months[date.month - 1]}';
-
-class _AboutLine extends StatelessWidget {
-  const _AboutLine({required this.icon, required this.text});
+class _FactLine extends StatelessWidget {
+  const _FactLine({required this.icon, required this.label, this.showRule = true});
 
   final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 15, color: AppTheme.teal),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: AppTheme.caption)),
-      ],
-    );
-  }
-}
-
-/// A translation or commentary picker over the same providers the reader uses,
-/// so the study opens on a source that actually exists on the server rather
-/// than an id typed into a list here.
-class _SourcePicker extends StatelessWidget {
-  const _SourcePicker({
-    required this.label,
-    required this.sources,
-    required this.selectedId,
-    required this.fallbackLabel,
-    required this.onChanged,
-  });
-
   final String label;
-  final AsyncValue<List<BibleSource>> sources;
-  final String selectedId;
-  final String fallbackLabel;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final list = sources.value ?? const <BibleSource>[];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
-        const SizedBox(height: 8),
-        if (list.isEmpty)
-          // Offline or still loading: name what the study will use rather than
-          // showing an empty row the reader cannot act on.
-          _MutedChip(label: fallbackLabel)
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final source in list)
-                ChoiceChip(
-                  label: Text(source.name),
-                  selected: source.id == selectedId,
-                  onSelected: (_) => onChanged(source.id),
-                ),
-            ],
-          ),
-      ],
-    );
-  }
-}
-
-class _MutedChip extends StatelessWidget {
-  const _MutedChip({required this.label});
-
-  final String label;
+  final bool showRule;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: showRule
+          ? BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.rule)),
+            )
+          : null,
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: AppTheme.teal),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, style: AppTheme.bodyStrong)),
+        ],
       ),
-      child: Text(label, style: AppTheme.caption),
     );
   }
 }
 
-class _LessonTile extends StatelessWidget {
+/// One lesson. Expanding it reveals the focus question and the way in - or the
+/// reason there is no way in yet.
+class _LessonTile extends ConsumerStatefulWidget {
   const _LessonTile({
+    required this.study,
     required this.lesson,
     required this.done,
-    required this.isNext,
-    required this.onOpen,
-    required this.onToggle,
+    required this.isCurrent,
+    required this.enrolled,
   });
 
+  final CuratedStudy study;
   final StudyLesson lesson;
   final bool done;
-  final bool isNext;
-  final VoidCallback onOpen;
-  final ValueChanged<bool> onToggle;
+  final bool isCurrent;
+  final bool enrolled;
+
+  @override
+  ConsumerState<_LessonTile> createState() => _LessonTileState();
+}
+
+class _LessonTileState extends ConsumerState<_LessonTile> {
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final lesson = widget.lesson;
 
-    return RuleListTile(
-      showRule: false,
-      onTap: onOpen,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: done
-                  ? AppTheme.teal
-                  : AppTheme.teal.withValues(alpha: isNext ? 0.20 : 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: done
-                ? const Icon(Icons.check, size: 13, color: Colors.white)
-                : Text(
-                    '${lesson.day}',
-                    style: AppTheme.caption.copyWith(
-                      color: AppTheme.teal,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
+    return Column(
+      children: [
+        RuleListTile(
+          showRule: false,
+          onTap: () => setState(() => _open = !_open),
+          child: Row(
+            children: [
+              _DayDisc(day: lesson.day, done: widget.done, isCurrent: widget.isCurrent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            lesson.title,
+                            style: AppTheme.bodyStrong,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (widget.isCurrent) ...[
+                          const SizedBox(width: 6),
+                          SiteBadge.teal('Nu'),
+                        ],
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${lesson.reference} · ${widget.study.minutesPerLesson} min',
+                      style: AppTheme.caption.copyWith(color: AppTheme.teal),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                _open ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+                color: AppTheme.inkMuted,
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  lesson.title,
-                  style: AppTheme.bodyStrong.copyWith(
-                    fontSize: 13.5,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  lesson.reference,
-                  style: AppTheme.caption.copyWith(
-                    color: AppTheme.teal,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
                 if (lesson.focus.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(lesson.focus, style: AppTheme.caption),
+                  Text(lesson.focus, style: AppTheme.bodyMuted),
+                  const SizedBox(height: 10),
                 ],
+                if (widget.enrolled)
+                  SiteOutlineButton(
+                    label: widget.done ? 'Opnieuw doen' : 'Open deze les',
+                    icon: Icons.play_arrow,
+                    height: 40,
+                    expand: false,
+                    onPressed: () => context.push(
+                      '/studie/${widget.study.id}/${lesson.day}',
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      Icon(Icons.lock_outline, size: 14, color: AppTheme.inkMuted),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Start de studie om deze les te openen.',
+                          style: AppTheme.caption,
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Semantics(
-            label: 'Les ${lesson.day} afvinken',
-            child: Checkbox(
-              value: done,
-              visualDensity: VisualDensity.compact,
-              onChanged: (value) => onToggle(value ?? false),
-            ),
+        RuleLine(),
+      ],
+    );
+  }
+}
+
+class _DayDisc extends StatelessWidget {
+  const _DayDisc({required this.day, required this.done, required this.isCurrent});
+
+  final int day;
+  final bool done;
+  final bool isCurrent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: done ? AppTheme.teal : Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: done || isCurrent ? AppTheme.teal : AppTheme.rule,
+          width: isCurrent && !done ? 2 : 1,
+        ),
+      ),
+      child: done
+          ? const Icon(Icons.check, size: 14, color: Colors.white)
+          : Text('$day', style: AppTheme.metaLabel.copyWith(color: AppTheme.inkSoft)),
+    );
+  }
+}
+
+/// The pinned footer: how far along, and the one thing to do next.
+class _ActionBar extends ConsumerStatefulWidget {
+  const _ActionBar({required this.study, required this.status});
+
+  final CuratedStudy study;
+  final StudyStatus status;
+
+  @override
+  ConsumerState<_ActionBar> createState() => _ActionBarState();
+}
+
+class _ActionBarState extends ConsumerState<_ActionBar> {
+  bool _busy = false;
+
+  Future<void> _start() async {
+    final study = widget.study;
+    setState(() => _busy = true);
+    try {
+      final started = await showStudySettingsSheet(
+        context,
+        ref,
+        study: study,
+        enrollment: null,
+        startAfterSave: true,
+      );
+      if (!mounted || started == null) return;
+      context.push('/studie/${study.id}/${started.currentLessonDay}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.status;
+    final study = widget.study;
+    final started = status.started;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.paperRaised,
+        border: Border(top: BorderSide(color: AppTheme.rule)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      started
+                          ? 'Je bent bezig met deze studie'
+                          : 'Je bent nog niet begonnen',
+                      style: AppTheme.caption,
+                    ),
+                  ),
+                  Text(
+                    started ? '${status.progressPercent}%' : '${status.total} lessen',
+                    style: AppTheme.metaLabel,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (started) ...[
+                SiteProgressBar(value: status.progress),
+                const SizedBox(height: 10),
+              ],
+              SiteButton(
+                label: status.completed
+                    ? 'Studie opnieuw lezen'
+                    : started
+                    ? 'Verder met les ${status.resumeDay(study)}'
+                    : 'Start deze studie',
+                trailingIcon: Icons.arrow_forward,
+                loading: _busy,
+                onPressed: _busy
+                    ? null
+                    : () {
+                        if (started) {
+                          final step = status.enrollment?.resumeStep;
+                          final suffix = step == null ? '' : '?stap=${step.id}';
+                          context.push(
+                            '/studie/${study.id}/${status.resumeDay(study)}$suffix',
+                          );
+                          return;
+                        }
+                        _start();
+                      },
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

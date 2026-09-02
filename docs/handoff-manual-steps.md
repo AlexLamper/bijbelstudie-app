@@ -23,9 +23,9 @@ Last updated 2026-08-12.
 | CI trigger | every push to `main` builds and uploads to TestFlight; `workflow_dispatch` still works |
 | Distribution `.p12` | rebuilt from `distribution.pem` + `distribution_key.pem`, password `BijbelStudie2026`, saved as `apple-signing/BijbelStudie/BijbelStudie_distribution.p12` |
 | Provisioning profile | **regenerated** as `BijbelStudie App Store CI` (id `2XWYGY5WRY`) — see the warning below |
-| GitHub secrets | all set except `REVENUECAT_APPLE_KEY` |
+| GitHub secrets | all set, `REVENUECAT_APPLE_KEY` included (set 2026-08-12) |
 | GitHub variables | `APPLE_SERVICE_ID`, `APPLE_REDIRECT_URI` |
-| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories — **both are currently *Developer Rejected*, so neither is purchasable: see `subscriptions-developer-rejected.md`** |
+| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories — both are **approved by Apple** and purchasable |
 | Vercel env vars | `MOBILE_JWT_SECRET`, `APPLE_CLIENT_IDS`, `GEMINI_API_KEY`, `GOOGLE_TTS_API_KEY`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `REVENUECAT_PRO_ENTITLEMENT_ID` added to Production/Preview/Development and redeployed |
 
 > **Why the profile was regenerated.** The `BijbelStudie App Store` profile you
@@ -281,7 +281,7 @@ complains.
 | `APP_STORE_CONNECT_KEY_ID` | yes (`6KPH737U27`) |
 | `APP_STORE_CONNECT_ISSUER_ID` | yes |
 | `APP_STORE_CONNECT_API_KEY_P8` | yes |
-| `REVENUECAT_APPLE_KEY` | **no — Step 1** |
+| `REVENUECAT_APPLE_KEY` | yes (set 2026-08-12) |
 
 | Variable | Value |
 |---|---|

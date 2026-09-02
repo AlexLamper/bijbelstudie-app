@@ -24,6 +24,22 @@ import 'reader_chrome.dart';
 import 'reader_settings_sheet.dart';
 import 'source_picker_sheet.dart';
 
+/// Set by [DailyVerseCard] immediately before it navigates here, naming the
+/// verse this screen should scroll to and briefly highlight once its chapter
+/// has rendered - instead of always landing at the top of the chapter.
+///
+/// Consumed (reset to null) the moment it is acted on, so a later chapter
+/// change (next-chapter button, book picker) never re-triggers it.
+final pendingVerseAnchorProvider =
+    NotifierProvider<PendingVerseAnchor, int?>(PendingVerseAnchor.new);
+
+class PendingVerseAnchor extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void set(int? verse) => state = verse;
+}
+
 /// The reader. Everything else in the app exists to get someone here.
 class ReadScreen extends ConsumerStatefulWidget {
   const ReadScreen({super.key});
@@ -37,6 +53,26 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   Timer? _positionDebounce;
   String? _restoredFor;
   String? _recordedFor;
+
+  /// One [GlobalKey] per verse number in the chapter currently on screen, so
+  /// [_scrollToPendingVerse] can find its target's [BuildContext]. Cleared
+  /// whenever the chapter changes - verse numbers repeat between chapters and
+  /// a [GlobalKey] must never be attached to more than one live element.
+  final Map<int, GlobalKey> _verseKeys = {};
+  String? _verseKeysFor;
+
+  /// The verse [_scrollToPendingVerse] most recently landed on, while its
+  /// highlight is still fading. Null the rest of the time.
+  int? _pulsingVerse;
+  Timer? _pulseTimer;
+
+  GlobalKey _verseKey(String locationKey, int number) {
+    if (_verseKeysFor != locationKey) {
+      _verseKeys.clear();
+      _verseKeysFor = locationKey;
+    }
+    return _verseKeys.putIfAbsent(number, () => GlobalKey());
+  }
 
   /// Scrolled distance in one direction since the chrome last changed. The
   /// bars only move once it passes [_chromeDeadzone], so a few pixels of
@@ -64,6 +100,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   @override
   void dispose() {
     _positionDebounce?.cancel();
+    _pulseTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -216,6 +253,42 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     });
   }
 
+  /// Scrolls to the verse [pendingVerseAnchorProvider] names and briefly
+  /// highlights it, once the chapter it belongs to has rendered - whether the
+  /// chapter came from the sqflite cache or the network, since both arrive
+  /// through the same `chapterAsync.data` branch this is called from.
+  ///
+  /// Takes priority over [_restoreScrollIfNeeded]: an explicit verse target and
+  /// a remembered scroll fraction would otherwise fight over the same
+  /// controller, so this also marks the chapter as already restored.
+  void _scrollToPendingVerse(ReaderLocation location, ChapterContent chapter) {
+    final verseNumber = ref.read(pendingVerseAnchorProvider);
+    if (verseNumber == null) return;
+    if (!chapter.verses.any((v) => v.number == verseNumber)) return;
+
+    ref.read(pendingVerseAnchorProvider.notifier).set(null);
+    final key = '${location.versionId}/${location.book}/${location.chapter}';
+    _restoredFor = key;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final targetContext = _verseKeys[verseNumber]?.currentContext;
+      if (targetContext == null) return;
+      await Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.2,
+      );
+      if (!mounted) return;
+      setState(() => _pulsingVerse = verseNumber);
+      _pulseTimer?.cancel();
+      _pulseTimer = Timer(const Duration(milliseconds: 1300), () {
+        if (mounted) setState(() => _pulsingVerse = null);
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final location = ref.watch(readerLocationProvider);
@@ -279,12 +352,20 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                     error: (error, _) => _ReaderError(error: error),
                     data: (chapter) {
                       _recordChapterOpen(location);
-                      _restoreScrollIfNeeded(location, positions);
+                      if (ref.read(pendingVerseAnchorProvider) != null) {
+                        _scrollToPendingVerse(location, chapter);
+                      } else {
+                        _restoreScrollIfNeeded(location, positions);
+                      }
+                      final locationKey =
+                          '${location.versionId}/${location.book}/${location.chapter}';
                       return _ChapterBody(
                         chapter: chapter,
                         settings: settings,
                         scrollController: _scrollController,
                         onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
+                        verseKey: (number) => _verseKey(locationKey, number),
+                        pulsingVerse: _pulsingVerse,
                       );
                     },
                   ),
@@ -437,12 +518,20 @@ class _ChapterBody extends StatelessWidget {
     required this.settings,
     required this.scrollController,
     required this.onVerseLongPress,
+    required this.verseKey,
+    required this.pulsingVerse,
   });
 
   final ChapterContent chapter;
   final ReadingSettings settings;
   final ScrollController scrollController;
   final void Function(Verse verse) onVerseLongPress;
+
+  /// A stable [GlobalKey] for a verse number, used to scroll it into view.
+  final GlobalKey Function(int verseNumber) verseKey;
+
+  /// The verse [_scrollToPendingVerse] just landed on, or null.
+  final int? pulsingVerse;
 
   @override
   Widget build(BuildContext context) {
@@ -458,10 +547,12 @@ class _ChapterBody extends StatelessWidget {
         if (chapter.fromCache) ...[const _OfflineNotice(), const SizedBox(height: 16)],
         for (final verse in chapter.verses)
           _VerseRow(
+            key: verseKey(verse.number),
             verse: verse,
             fontSize: fontSize,
             settings: settings,
             onLongPress: () => onVerseLongPress(verse),
+            pulse: verse.number == pulsingVerse,
           ),
         const SizedBox(height: 28),
         const RuleLine(),
@@ -474,16 +565,23 @@ class _ChapterBody extends StatelessWidget {
 
 class _VerseRow extends ConsumerWidget {
   const _VerseRow({
+    super.key,
     required this.verse,
     required this.fontSize,
     required this.settings,
     required this.onLongPress,
+    this.pulse = false,
   });
 
   final Verse verse;
   final double fontSize;
   final ReadingSettings settings;
   final VoidCallback onLongPress;
+
+  /// True for one verse, right after the reader has scrolled to it from the
+  /// daily-verse card: draws a brief, fading tint so it also reads as the
+  /// target rather than just where the scroll happened to stop.
+  final bool pulse;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -492,46 +590,63 @@ class _VerseRow extends ConsumerWidget {
     final key = VerseKey(location.book, location.chapter, verse.number);
     final highlight = highlights[key];
 
+    Widget body = Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      decoration: highlight == null
+          ? null
+          : BoxDecoration(
+              color: highlight.swatch,
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            if (settings.showVerseNumbers)
+              TextSpan(
+                text: '${verse.number} ',
+                style: TextStyle(
+                  fontFamily: AppTheme.sansFontName,
+                  fontSize: fontSize * 0.62,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.inkMuted,
+                ),
+              ),
+            TextSpan(text: verse.text),
+          ],
+        ),
+        style: TextStyle(
+          fontFamily: settings.fontFamily.fontName,
+          fontSize: fontSize,
+          height: settings.lineHeight.factor,
+          letterSpacing: settings.letterSpacing.points,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
+    );
+
+    if (pulse) {
+      // Independent of the persisted highlight above: this is a transient
+      // "you are here" cue, not a saved marking, so it fades to nothing.
+      body = TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1, end: 0),
+        duration: const Duration(milliseconds: 1200),
+        curve: Curves.easeOut,
+        builder: (context, t, child) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppTheme.teal.withValues(alpha: 0.22 * t),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          ),
+          child: child,
+        ),
+        child: body,
+      );
+    }
+
     return Semantics(
       label: 'Vers ${verse.number}. ${verse.text}',
       button: true,
-      child: InkWell(
-        onLongPress: onLongPress,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-          decoration: highlight == null
-              ? null
-              : BoxDecoration(
-                  color: highlight.swatch,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-          child: Text.rich(
-            TextSpan(
-              children: [
-                if (settings.showVerseNumbers)
-                  TextSpan(
-                    text: '${verse.number} ',
-                    style: TextStyle(
-                      fontFamily: AppTheme.sansFontName,
-                      fontSize: fontSize * 0.62,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.inkMuted,
-                    ),
-                  ),
-                TextSpan(text: verse.text),
-              ],
-            ),
-            style: TextStyle(
-              fontFamily: settings.fontFamily.fontName,
-              fontSize: fontSize,
-              height: settings.lineHeight.factor,
-              letterSpacing: settings.letterSpacing.points,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
-          ),
-        ),
-      ),
+      child: InkWell(onLongPress: onLongPress, child: body),
     );
   }
 }

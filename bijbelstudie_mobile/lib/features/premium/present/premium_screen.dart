@@ -121,6 +121,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
               _PriceNotice(
                 message: premiumState.priceError ??
                     'Prijzen konden niet worden geladen.',
+                diagnostics: premiumState.priceDiagnostics,
                 onRetry: () =>
                     ref.read(premiumControllerProvider.notifier).loadPrices(),
               ),
@@ -225,9 +226,20 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 /// reads as a bug and leaves the reader with nothing to do about it. This says
 /// what happened and offers the one action that can fix a transient cause.
 class _PriceNotice extends StatelessWidget {
-  const _PriceNotice({required this.message, required this.onRetry});
+  const _PriceNotice({
+    required this.message,
+    required this.onRetry,
+    this.diagnostics,
+  });
 
   final String message;
+
+  /// The technical reason, folded away behind "Details". Everything that can
+  /// break here is configuration rather than anything the reader did, so the
+  /// person who can act on it needs to be able to read it off the screen -
+  /// but not at the cost of putting jargon in front of a customer.
+  final String? diagnostics;
+
   final VoidCallback onRetry;
 
   @override
@@ -246,6 +258,24 @@ class _PriceNotice extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(message, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
+          if (diagnostics != null) ...[
+            const SizedBox(height: 6),
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                title: Text('Details', style: AppTheme.metaLabel),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    diagnostics!,
+                    style: AppTheme.caption.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           SiteOutlineButton(
             label: 'Opnieuw proberen',

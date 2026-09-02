@@ -82,6 +82,9 @@ class ProfileModel {
   final bool isPro;
   final String? proSource;
   final DateTime? proExpiresAt;
+
+  /// Server-side admin flag. Shown-or-hidden only; see [User.isAdmin].
+  final bool isAdmin;
   final ReadingPreferences preferences;
 
   const ProfileModel({
@@ -92,6 +95,7 @@ class ProfileModel {
     required this.isPro,
     this.proSource,
     this.proExpiresAt,
+    this.isAdmin = false,
     this.preferences = const ReadingPreferences(),
   });
 
@@ -109,6 +113,7 @@ class ProfileModel {
       isPro: json['isPro'] as bool? ?? false,
       proSource: json['proSource'] as String?,
       proExpiresAt: expires == null ? null : DateTime.tryParse(expires),
+      isAdmin: json['isAdmin'] as bool? ?? false,
       preferences: ReadingPreferences.fromJson(
         json['preferences'] as Map<String, dynamic>?,
       ),

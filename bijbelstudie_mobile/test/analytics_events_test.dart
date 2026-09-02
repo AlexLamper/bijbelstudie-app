@@ -96,7 +96,9 @@ void main() {
 
   group('every tracked property value is one the server accepts', () {
     final surfaceLiteral = RegExp(r"'surface':\s*'([a-z_]+)'");
-    final sourceLiteral = RegExp(r"'/premium\?source=([a-z_]+)'");
+    // Both routes carry the same source values: /pro-intro is the funnel that
+    // leads into /premium, and it hands its source straight through.
+    final sourceLiteral = RegExp(r"'/(?:premium|pro-intro)\?source=([a-z_]+)'");
 
     test('surface values are in the allowlist', () {
       final found = <String, String>{};

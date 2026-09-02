@@ -20,6 +20,7 @@ import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_models.dar
 import 'package:bijbelstudie_mobile/features/dashboard/data/dashboard_repository.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_providers.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/present/dashboard_screen.dart';
+import 'package:bijbelstudie_mobile/features/studies/data/enrollment_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
 import 'package:bijbelstudie_mobile/features/study/data/context_repository.dart';
 import 'package:bijbelstudie_mobile/features/study/present/study_pane_controller.dart';
@@ -290,6 +291,10 @@ void main() {
     // done. There is no account here, so answer it locally rather than
     // leaving a real request pending past the end of the test.
     serverStudyLessonsProvider.overrideWith((ref) async => const <String, Set<int>>{}),
+    // Same for the enrollments the catalogue reads to decide what is started.
+    studyEnrollmentsProvider.overrideWith(
+      (ref) async => const <String, StudyEnrollment>{},
+    ),
     // The study screen's IndexedStack builds every tab, so the materials
     // pane's own fetches have to be answered locally too — otherwise these
     // renders reach the network, which is the thing this harness exists to
@@ -403,7 +408,14 @@ void main() {
 
     expectNoLayoutError(tester);
     expect(find.text('Alle'), findsOneWidget);
-    expect(find.text('De opstanding van Jezus'), findsOneWidget);
+    // The tabs, the topic grid and the kind pills all have to be there, or the
+    // catalogue is a flat list again.
+    expect(find.text('Ontdek'), findsOneWidget);
+    expect(find.text('Mijn studies'), findsOneWidget);
+    expect(find.text('Bijbelboeken'), findsOneWidget);
+    // The one fixture study is both the featured card and a row in the list,
+    // so its title legitimately renders twice.
+    expect(find.text('De opstanding van Jezus'), findsWidgets);
 
     await scrollThrough(tester);
   });

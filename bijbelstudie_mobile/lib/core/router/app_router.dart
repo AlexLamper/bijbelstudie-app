@@ -6,6 +6,9 @@ import '../config/preview_config.dart';
 import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 
+import '../../features/admin/present/admin_screen.dart';
+import '../../features/premium/present/paywall_funnel_screen.dart';
+import '../../features/study/present/lesson/lesson_screen.dart';
 import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
@@ -124,8 +127,14 @@ class MainScaffold extends ConsumerWidget {
 
   static int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    for (var i = 0; i < _items.length; i++) {
-      if (location.startsWith(_items[i].route)) return i;
+
+    // Longest route first, or `/studies` would match `/study` and light up the
+    // Bijbel tab instead of Studies.
+    final byLength = List<int>.generate(_items.length, (i) => i)
+      ..sort((a, b) => _items[b].route.length.compareTo(_items[a].route.length));
+    for (final i in byLength) {
+      final route = _items[i].route;
+      if (location == route || location.startsWith('$route/')) return i;
     }
     // Sections without their own tab still highlight where they belong.
     if (location.startsWith('/read') || location.startsWith('/commentary')) return 1;
@@ -269,12 +278,35 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/studies/:id',
         builder: (context, state) => StudyDetailScreen(studyId: state.pathParameters['id']!),
       ),
+      // The pre-sell: goal, then problem and proof, then what that means for
+      // this reader. Ends by replacing itself with /premium, so the price is
+      // still the one App Store-reviewed screen and backing out of it leaves
+      // rather than walking the pitch backwards.
+      GoRoute(
+        path: '/pro-intro',
+        builder: (context, state) =>
+            PaywallFunnelScreen(source: state.uri.queryParameters['source']),
+      ),
       GoRoute(
         path: '/premium',
         // ?source= records which surface sent the user to the paywall.
         builder: (context, state) => PremiumScreen(source: state.uri.queryParameters['source']),
       ),
+      // One lesson of a guided study, full screen and outside the tab shell:
+      // a lesson is a sitting, and a bottom bar inviting you elsewhere works
+      // against it. `?stap=` resumes on the step the reader left off on.
+      GoRoute(
+        path: '/studie/:studyId/:day',
+        builder: (context, state) => LessonScreen(
+          studyId: state.pathParameters['studyId']!,
+          day: int.tryParse(state.pathParameters['day'] ?? '') ?? 1,
+          initialStep: state.uri.queryParameters['stap'],
+        ),
+      ),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+      // Beheer. The screen hides itself for a non-admin and every call it
+      // makes is re-checked server-side, so the route needs no redirect guard.
+      GoRoute(path: '/admin', builder: (context, state) => const AdminScreen()),
       // `/home` was this app's post-login destination before the tab shell
       // landed and the target became `/dashboard`. App review 1.0(5) was
       // rejected because four call sites still pointed here and every one of

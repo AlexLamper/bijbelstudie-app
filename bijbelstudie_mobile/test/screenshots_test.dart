@@ -28,6 +28,7 @@ import 'package:bijbelstudie_mobile/features/premium/present/premium_screen.dart
 import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
+import 'package:bijbelstudie_mobile/features/studies/data/enrollment_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_providers.dart';
 import 'package:bijbelstudie_mobile/features/studies/present/studies_screen.dart';
 
@@ -434,6 +435,11 @@ void main() {
         // leaving a real request pending past the end of the test.
         serverStudyLessonsProvider.overrideWith(
           (ref) async => const <String, Set<int>>{},
+        ),
+        // Same for the enrollments the catalogue reads to decide what is
+        // started.
+        studyEnrollmentsProvider.overrideWith(
+          (ref) async => const <String, StudyEnrollment>{},
         ),
         premiumControllerProvider.overrideWith(_StubPremiumController.new),
       ],

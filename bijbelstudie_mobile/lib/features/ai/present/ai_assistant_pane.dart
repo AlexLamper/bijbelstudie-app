@@ -240,7 +240,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                           .track(AnalyticsEvents.paywallCtaClicked, {
                             'surface': 'ai_limit',
                           });
-                      context.push('/premium?source=app_ai');
+                      context.push('/pro-intro?source=app_ai');
                     },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),

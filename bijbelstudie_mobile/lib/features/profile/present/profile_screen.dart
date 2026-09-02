@@ -2,21 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../dashboard/data/dashboard_models.dart';
 import '../../dashboard/present/dashboard_providers.dart';
-import '../../feedback/present/feedback_sheet.dart';
+import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
+import '../domain/profile_stats.dart';
+import 'profile_activity_feed.dart';
+import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
+import 'profile_stats_provider.dart';
 
+/// Profiel: who you are, what you have read, and what you have done with it.
+///
+/// The plain navigation this screen used to list lives in the hamburger sheet
+/// now ([showProfileMenuSheet]); the screen itself carries the account's own
+/// numbers - streak, books, notities, badges - and the activity they produced.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -47,7 +53,8 @@ class ProfileScreen extends ConsumerWidget {
               : AppEmptyState(
                   icon: Icons.wifi_off_outlined,
                   title: 'Profiel niet geladen',
-                  description: 'Controleer je verbinding en probeer het opnieuw.',
+                  description:
+                      'Controleer je verbinding en probeer het opnieuw.',
                   action: SiteOutlineButton(
                     label: 'Opnieuw proberen',
                     expand: false,
@@ -74,129 +81,41 @@ class _ProfileBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
       children: [
-        const Eyebrow('Account'),
-        const SizedBox(height: 10),
-        _AccountHeader(profile: profile),
+        _HeaderBar(profile: profile),
+        const SizedBox(height: 14),
+        _ProfileHeader(profile: profile),
 
-        // The reading stats used to live on the Start tab, where they competed
-        // with the daily verse and the "verder lezen" card. They belong to the
-        // account, so this is their home now.
-        const SizedBox(height: 26),
-        const SectionHeader(title: 'Jouw voortgang'),
-        const SizedBox(height: 12),
-        const _ProgressSection(),
-
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Abonnement'),
-        const SizedBox(height: 12),
-        TourAnchor(
-          id: TourAnchorIds.profilePro,
-          child: _ProStatusCard(profile: profile),
+        const SizedBox(height: 22),
+        SiteButton(
+          label: 'Ontdek bijbelstudies',
+          icon: Icons.auto_stories_outlined,
+          onPressed: () => context.go('/studies'),
         ),
 
-        // The website's sidebar sections that have no tab of their own.
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Ontdekken'),
-        const SizedBox(height: 12),
-        RuleGrid(
-          children: [
-            RuleListTile(
-              onTap: () => context.go('/resources'),
-              child: const _NavRow(
-                icon: Icons.local_library_outlined,
-                label: 'Hulpbronnen',
-              ),
-            ),
-            RuleListTile(
-              showRule: false,
-              onTap: () => context.go('/search'),
-              child: const _NavRow(icon: Icons.search, label: 'Zoeken'),
-            ),
-          ],
-        ),
+        const SizedBox(height: 14),
+        const _QuickActions(),
 
         const SizedBox(height: 28),
-        const SectionHeader(title: 'Instellingen'),
+        const SectionHeader(title: 'Statistieken'),
         const SizedBox(height: 12),
-        RuleGrid(
-          children: [
-            RuleListTile(
-              showRule: false,
-              onTap: () => context.push('/settings'),
-              child: const _NavRow(icon: Icons.tune, label: 'Lezen en meldingen'),
-            ),
-          ],
-        ),
-
-        // "Feedback geven", "Privacybeleid" en "Gebruiksvoorwaarden" zijn geen
-        // instellingen — die staan hieronder onder Ondersteuning en Juridisch.
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Ondersteuning'),
-        const SizedBox(height: 12),
-        RuleGrid(
-          children: [
-            RuleListTile(
-              onTap: () => context.push('/tour'),
-              child: const _NavRow(
-                icon: Icons.explore_outlined,
-                label: 'Rondleiding opnieuw bekijken',
-              ),
-            ),
-            RuleListTile(
-              showRule: false,
-              onTap: () => showFeedbackSheet(context, ref),
-              child: const _NavRow(
-                icon: Icons.chat_bubble_outline,
-                label: 'Feedback geven',
-              ),
-            ),
-          ],
-        ),
+        const _StatsSection(),
 
         const SizedBox(height: 28),
-        const SectionHeader(title: 'Juridisch'),
+        const SectionHeader(title: 'Activiteit'),
         const SizedBox(height: 12),
-        RuleGrid(
-          children: [
-            RuleListTile(
-              onTap: () => _open(AppConfig.privacyPolicyUrl),
-              child: const _NavRow(icon: Icons.privacy_tip_outlined, label: 'Privacybeleid'),
-            ),
-            RuleListTile(
-              showRule: false,
-              onTap: () => _open(AppConfig.termsOfUseUrl),
-              child: const _NavRow(icon: Icons.description_outlined, label: 'Gebruiksvoorwaarden'),
-            ),
-          ],
+        ProfileActivityFeed(profile: profile),
+
+        const SizedBox(height: 20),
+        Text(
+          'De vertalingen en commentaren in deze app zijn publiek domein. De '
+          'grondtekst komt van STEPBible (TAHOT/TAGNT) en is beschikbaar onder '
+          'CC BY 4.0.',
+          style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
         ),
 
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Licenties'),
-        const SizedBox(height: 12),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'De vertalingen en commentaren in deze app zijn publiek domein. '
-                'De grondtekst komt van STEPBible (TAHOT/TAGNT) en is beschikbaar '
-                'onder CC BY 4.0.',
-                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Vertalingen die op de website beschikbaar zijn maar niet in de app '
-                '(NBG-vertaling 1951, NET Bible, King Comments) vallen onder licenties '
-                'die alleen voor www.bijbel-studie.com gelden.',
-                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         SiteOutlineButton(
           label: 'Uitloggen',
           icon: Icons.logout,
@@ -205,9 +124,9 @@ class _ProfileBody extends ConsumerWidget {
             if (context.mounted) context.go('/login');
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         // Guideline 5.1.1(v): deletion must be reachable without leaving the
-        // app. Two taps from the main screen, no "mail ons" link.
+        // app, so it stays on the screen itself rather than in the menu sheet.
         TextButton(
           onPressed: () => _confirmDelete(context, ref),
           style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
@@ -215,11 +134,6 @@ class _ProfileBody extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _open(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -256,247 +170,646 @@ class _ProfileBody extends ConsumerWidget {
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verwijderen mislukt. Probeer het opnieuw.')),
+        const SnackBar(
+          content: Text('Verwijderen mislukt. Probeer het opnieuw.'),
+        ),
       );
     }
   }
 }
 
-/// Avatar, name and email as one block, so the top of the screen reads as
-/// "this is you" instead of as the first row of a settings list.
-class _AccountHeader extends StatelessWidget {
-  const _AccountHeader({required this.profile});
+/// The top bar: the section label on the left, the two icons that lead
+/// somewhere real on the right.
+///
+/// A scan / QR button belongs here in the layout being followed, but this app
+/// has nothing to scan - no invite codes in the UI, no plan-sharing links - so
+/// it is left out rather than shipped as a dead control.
+class _HeaderBar extends ConsumerWidget {
+  const _HeaderBar({required this.profile});
 
   final ProfileModel profile;
 
   @override
-  Widget build(BuildContext context) {
-    final name = profile.name.trim().isEmpty ? 'Gebruiker' : profile.name.trim();
-    final initial = name.characters.first.toUpperCase();
-
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppTheme.tealTint,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.rule),
-          ),
-          child: Text(
-            initial,
-            style: AppTheme.displayTitle.copyWith(color: AppTheme.tealStrong),
-          ),
+        const Expanded(child: Eyebrow('Profiel')),
+        IconButton(
+          tooltip: 'Instellingen',
+          icon: const Icon(Icons.settings_outlined, size: 22),
+          color: AppTheme.inkSoft,
+          onPressed: () => context.push('/settings'),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: AppTheme.displaySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                profile.email,
-                style: AppTheme.bodyMuted,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+        IconButton(
+          tooltip: 'Menu',
+          icon: const Icon(Icons.menu, size: 22),
+          color: AppTheme.inkSoft,
+          onPressed: () => showProfileMenuSheet(context, ref, profile),
         ),
       ],
     );
   }
 }
 
-/// Streak, books and notes — the three numbers the Start tab used to carry —
-/// plus the 66-book canon shown as actual progress rather than as a fraction.
-class _ProgressSection extends ConsumerWidget {
-  const _ProgressSection();
+/// Name and status pills on the left, the avatar on the right.
+class _ProfileHeader extends ConsumerWidget {
+  const _ProfileHeader({required this.profile});
+
+  final ProfileModel profile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(dashboardProvider)
-        .when(
-          loading: () => const SkeletonCard(
-            height: 168,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
-                    Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
-                    Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
-                  ],
-                ),
-                SizedBox(height: 26),
-                Skeleton(height: 12, width: 150),
-                SizedBox(height: 12),
-                Skeleton(height: 6, radius: 999),
-              ],
-            ),
-          ),
-          error: (_, __) => AppCard(
-            child: Row(
-              children: [
-                Icon(Icons.wifi_off_outlined, size: 18, color: AppTheme.inkMuted),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Voortgang niet geladen.',
-                    style: AppTheme.bodyMuted,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => ref.invalidate(dashboardProvider),
-                  child: const Text('Opnieuw'),
-                ),
-              ],
-            ),
-          ),
-          data: (data) => _ProgressCard(data: data),
-        );
-  }
-}
+    final name = profile.name.trim().isEmpty
+        ? 'Gebruiker'
+        : profile.name.trim();
+    final stats = ref.watch(profileStatsProvider).value;
 
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard({required this.data});
-
-  final DashboardData data;
-
-  /// The whole Protestant canon — the denominator behind "… /66 boeken".
-  static const int _canonBooks = 66;
-
-  @override
-  Widget build(BuildContext context) {
-    final books = data.booksStarted.clamp(0, _canonBooks);
-    final chapters = data.readChapters.values.fold<int>(
-      0,
-      (sum, list) => sum + list.length,
-    );
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _Stat(
-                    value: '${data.streak}',
-                    label: 'dagen reeks',
-                    icon: Icons.local_fire_department_outlined,
-                    tint: AppTheme.flame,
-                  ),
-                ),
-                _divider(context),
-                Expanded(
-                  child: _Stat(
-                    value: '$books/$_canonBooks',
-                    label: 'boeken',
-                    icon: Icons.menu_book_outlined,
-                    tint: AppTheme.teal,
-                  ),
-                ),
-                _divider(context),
-                Expanded(
-                  child: _Stat(
-                    value: '${data.notesCount}',
-                    label: 'notities',
-                    icon: Icons.edit_note_outlined,
-                    tint: AppTheme.ai,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Text('Boeken geopend', style: AppTheme.metaLabel),
-              ),
-              Text(
-                '$books van $_canonBooks',
-                style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SiteProgressBar(value: books / _canonBooks),
-          const SizedBox(height: 8),
-          Text(
-            chapters == 0
-                ? 'Nog geen hoofdstukken gelezen.'
-                : '$chapters ${chapters == 1 ? 'hoofdstuk' : 'hoofdstukken'} gelezen',
-            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _divider(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    child: Container(width: 1, color: Theme.of(context).colorScheme.outline),
-  );
-}
-
-/// One column of [_ProgressCard]'s trio.
-class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.tint,
-  });
-
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color tint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Scales down rather than truncating: "12/66" is wide on a small phone.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 15, color: tint),
-              const SizedBox(width: 5),
               Text(
-                value,
-                style: AppTheme.statNumber.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
+                name,
+                style: AppTheme.displayMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                profile.email,
+                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              // The tour points at the Pro pill, so the anchor sits on the row
+              // that holds it rather than on a card that no longer exists.
+              TourAnchor(
+                id: TourAnchorIds.profilePro,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (profile.isPro)
+                      SiteBadge.positive(
+                        profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
+                        icon: Icons.workspace_premium_outlined,
+                      )
+                    else
+                      // Guideline 3.1.1: only a non-subscriber is offered the
+                      // purchase route.
+                      InkWell(
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.radiusPill,
+                        ),
+                        onTap: () =>
+                            context.push('/pro-intro?source=app_profile'),
+                        child: SiteBadge.teal(
+                          'Bekijk Pro',
+                          icon: Icons.workspace_premium_outlined,
+                        ),
+                      ),
+                    if (stats != null)
+                      SiteBadge.vermilion(
+                        '${stats.streak} ${stats.streak == 1 ? 'dag' : 'dagen'} reeks',
+                        icon: Icons.local_fire_department_outlined,
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
+        const SizedBox(width: 16),
+        _AvatarWithEdit(profile: profile),
+      ],
+    );
+  }
+}
+
+/// The avatar with its edit badge.
+///
+/// The badge carries a pencil rather than a camera on purpose: `PATCH /me`
+/// takes a name and reading preferences and there is no image-upload endpoint
+/// anywhere in `/api/v1`, so the control opens the profile edit that really
+/// exists instead of a picker that could never save anything.
+class _AvatarWithEdit extends ConsumerWidget {
+  const _AvatarWithEdit({required this.profile});
+
+  final ProfileModel profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: 92,
+      height: 92,
+      child: Stack(
+        children: [
+          ProfileAvatar(profile: profile, size: 84),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Material(
+              color: AppTheme.teal,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  width: 2,
+                ),
+              ),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => showProfileNameDialog(context, ref, profile),
+                child: const SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 15,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One row of three equal cards, each to a destination this app really has.
+///
+/// Bladwijzers and Notities both land on `/notes`, which is where all three of
+/// those lists live; there is no route parameter to preselect a tab.
+class _QuickActions extends ConsumerWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bookmarks = ref.watch(bookmarksProvider).value?.length;
+    final notes = ref.watch(profileStatsProvider).value?.notesCount;
+
+    // IntrinsicHeight, not `CrossAxisAlignment.stretch`: inside a ListView the
+    // Row has no bounded height to stretch into, and the three cards still have
+    // to end level even when one label wraps.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _QuickCard(
+              icon: Icons.bookmark_border,
+              label: 'Bladwijzers',
+              value: bookmarks?.toString(),
+              onTap: () => context.go('/notes'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _QuickCard(
+              icon: Icons.edit_note_outlined,
+              label: 'Notities',
+              value: notes?.toString(),
+              tint: AppTheme.ai,
+              onTap: () => context.go('/notes'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _QuickCard(
+              icon: Icons.local_library_outlined,
+              label: 'Hulpbronnen',
+              tint: AppTheme.positive,
+              onTap: () => context.go('/resources'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickCard extends StatelessWidget {
+  const _QuickCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.value,
+    this.tint,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  /// Null where there is no number to show - Hulpbronnen is a catalogue, not a
+  /// collection of the reader's own records.
+  final String? value;
+
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconChip(icon: icon, color: tint),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value ?? 'Bekijken',
+            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The metric cards and the badge shelf.
+class _StatsSection extends ConsumerWidget {
+  const _StatsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(profileStatsProvider);
+
+    return statsAsync.when(
+      loading: () => const _StatsSkeleton(),
+      error: (_, __) => AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_outlined, size: 18, color: AppTheme.inkMuted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Statistieken niet geladen.',
+                style: AppTheme.bodyMuted,
+              ),
+            ),
+            TextButton(
+              onPressed: () => ref.invalidate(dashboardProvider),
+              child: const Text('Opnieuw'),
+            ),
+          ],
+        ),
+      ),
+      data: (stats) => Column(
+        children: [
+          _MetricCard(
+            icon: Icons.local_fire_department_outlined,
+            tint: AppTheme.flame,
+            label: 'Leesreeks',
+            value: '${stats.streak}',
+            unit: stats.streak == 1 ? 'dag' : 'dagen',
+            footnote: stats.freezes == 0
+                ? 'Lees vandaag om je reeks vast te houden.'
+                : '${stats.freezes} ${stats.freezes == 1 ? 'vriezer' : 'vriezers'} in reserve',
+          ),
+          const SizedBox(height: 10),
+          _MetricCard(
+            icon: Icons.menu_book_outlined,
+            tint: AppTheme.teal,
+            label: 'Bijbelboeken',
+            value: '${stats.booksRead}',
+            unit: 'van ${ProfileStats.canonBooks}',
+            progress: stats.bookProgress,
+            footnote: stats.chaptersRead == 0
+                ? 'Nog geen hoofdstukken gelezen.'
+                : '${stats.chaptersRead} ${stats.chaptersRead == 1 ? 'hoofdstuk' : 'hoofdstukken'} gelezen',
+          ),
+          const SizedBox(height: 10),
+          _MetricCard(
+            icon: Icons.edit_note_outlined,
+            tint: AppTheme.ai,
+            label: 'Notities',
+            value: '${stats.notesCount}',
+            unit: stats.notesCount == 1 ? 'notitie' : 'notities',
+            footnote:
+                '${stats.highlightsCount} ${stats.highlightsCount == 1 ? 'markering' : 'markeringen'}',
+          ),
+          const SizedBox(height: 10),
+          const _BadgesCard(),
+        ],
+      ),
+    );
+  }
+}
+
+/// A full-width metric: status icon, label, number, and an optional track.
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.icon,
+    required this.tint,
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.footnote,
+    this.progress,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final String label;
+  final String value;
+  final String unit;
+  final String footnote;
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = this.progress;
+
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: tint),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: AppTheme.metaLabel),
+                    const SizedBox(height: 2),
+                    Text(
+                      footnote,
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.inkFaint,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    value,
+                    style: AppTheme.statNumber.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    unit,
+                    style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 14),
+            SiteProgressBar(value: progress, color: tint),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The badge shelf: how many are unlocked, then the shelf itself.
+class _BadgesCard extends ConsumerWidget {
+  const _BadgesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final badges = ref.watch(profileBadgesProvider);
+    final unlocked = badges.where((badge) => badge.unlocked).length;
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.ai.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.military_tech_outlined,
+                    size: 20,
+                    color: AppTheme.ai,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Badges', style: AppTheme.metaLabel),
+                      const SizedBox(height: 2),
+                      Text(
+                        badges.isEmpty
+                            ? 'Nog niets te tonen'
+                            : '$unlocked van ${badges.length} behaald',
+                        style: AppTheme.caption.copyWith(
+                          color: AppTheme.inkFaint,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '$unlocked',
+                  style: AppTheme.statNumber.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (badges.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Text(
+                'Zodra je voortgang is geladen, verschijnen je badges hier.',
+                style: AppTheme.bodyMuted,
+              ),
+            )
+          else
+            SizedBox(
+              height: 108,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(right: 16),
+                itemCount: badges.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) =>
+                    _BadgeTile(badge: badges[index]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One badge on the shelf, with the progress line underneath it.
+class _BadgeTile extends StatelessWidget {
+  const _BadgeTile({required this.badge});
+
+  final BadgeProgress badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = badge.definition.tone.color;
+    final earned = badge.unlocked;
+
+    return Tooltip(
+      message: badge.definition.description,
+      child: SizedBox(
+        width: 76,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: earned
+                    ? tint.withValues(alpha: 0.14)
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: earned ? tint.withValues(alpha: 0.4) : AppTheme.rule,
+                ),
+              ),
+              child: Icon(
+                badge.definition.icon,
+                size: 24,
+                color: earned ? tint : AppTheme.inkFaint,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              badge.definition.label,
+              style: AppTheme.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: earned ? null : AppTheme.inkMuted,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            SiteProgressBar(
+              value: badge.fraction,
+              height: 3,
+              color: earned ? tint : AppTheme.inkFaint,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              badge.unlocked ? 'Behaald' : badge.progressLabel,
+              style: AppTheme.caption.copyWith(
+                fontSize: 10,
+                color: AppTheme.inkFaint,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsSkeleton extends StatelessWidget {
+  const _StatsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          const SkeletonCard(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Skeleton.circle(40),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(height: 12, width: 110),
+                      SizedBox(height: 8),
+                      Skeleton(height: 9, width: 150),
+                    ],
+                  ),
+                ),
+                Skeleton(height: 24, width: 40),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        const SkeletonCard(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Skeleton.circle(40),
+                  SizedBox(width: 12),
+                  Expanded(child: Skeleton(height: 12, width: 100)),
+                ],
+              ),
+              SizedBox(height: 18),
+              Row(
+                children: [
+                  Skeleton.circle(52),
+                  SizedBox(width: 12),
+                  Skeleton.circle(52),
+                  SizedBox(width: 12),
+                  Skeleton.circle(52),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -511,154 +824,66 @@ class _ProfileSkeleton extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        const Skeleton(height: 10, width: 70),
-        const SizedBox(height: 14),
         const Row(
           children: [
-            Skeleton.circle(52),
-            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Skeleton(height: 20, width: 160),
-                  SizedBox(height: 9),
-                  Skeleton(height: 12, width: 200),
+                  Skeleton(height: 22, width: 170),
+                  SizedBox(height: 10),
+                  Skeleton(height: 12, width: 190),
+                  SizedBox(height: 14),
+                  Skeleton(height: 22, width: 130, radius: 999),
                 ],
               ),
             ),
+            SizedBox(width: 16),
+            Skeleton.circle(84),
           ],
         ),
-        const SizedBox(height: 26),
-        const Skeleton(height: 14, width: 120),
+        const SizedBox(height: 22),
+        const Skeleton(height: 48, radius: 12),
+        const SizedBox(height: 14),
+        const Row(
+          children: [
+            Expanded(
+              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: SkeletonCard(height: 104, child: SizedBox.shrink()),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        const Skeleton(height: 16, width: 120),
+        const SizedBox(height: 12),
+        const _StatsSkeleton(),
+        const SizedBox(height: 28),
+        const Skeleton(height: 16, width: 100),
         const SizedBox(height: 12),
         const SkeletonCard(
-          height: 168,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
-                  Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
-                  Expanded(child: Center(child: Skeleton(height: 30, width: 56))),
+                  Skeleton.circle(34),
+                  SizedBox(width: 10),
+                  Expanded(child: Skeleton(height: 12, width: 160)),
                 ],
               ),
-              SizedBox(height: 26),
-              Skeleton(height: 12, width: 150),
-              SizedBox(height: 12),
-              Skeleton(height: 6, radius: 999),
+              SizedBox(height: 14),
+              SkeletonText(lines: 3, lineHeight: 11),
             ],
           ),
         ),
-        const SizedBox(height: 28),
-        SkeletonCard(height: 150, child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Skeleton(height: 20, width: 70, radius: 20),
-            SizedBox(height: 14),
-            Skeleton(height: 16, width: 150),
-            SizedBox(height: 10),
-            SkeletonText(lines: 2, lineHeight: 11),
-          ],
-        )),
-        const SizedBox(height: 28),
-        for (var i = 0; i < 3; i++) ...[
-          const Skeleton(height: 14, width: 110),
-          const SizedBox(height: 12),
-          const SkeletonCard(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: SkeletonText(lines: 2, lineHeight: 12),
-          ),
-          const SizedBox(height: 24),
-        ],
       ],
     );
   }
-}
-
-class _ProStatusCard extends StatelessWidget {
-  const _ProStatusCard({required this.profile});
-
-  final ProfileModel profile;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!profile.isPro) {
-      return AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SiteBadge.neutral('Gratis'),
-            const SizedBox(height: 10),
-            Text('BijbelStudie Pro', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 6),
-            Text(
-              'Onbeperkt offline lezen, alle commentaren en de grondtekst.',
-              style: AppTheme.bodyMuted,
-            ),
-            const SizedBox(height: 14),
-            SiteButton(
-              label: 'Bekijk Pro',
-              onPressed: () => context.push('/premium?source=app_profile'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Guideline 3.1.1 multiplatform exception: a web subscriber keeps access
-    // and is never shown a purchase button.
-    final label = profile.isProFromWeb ? 'Actief via web' : 'Actief';
-    return AppCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SiteBadge.positive(label),
-                const SizedBox(height: 10),
-                Text('BijbelStudie Pro', style: Theme.of(context).textTheme.headlineMedium),
-                if (profile.proExpiresAt != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Verlengt op ${_formatDate(profile.proExpiresAt!)}',
-                    style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppTheme.inkSoft),
-        const SizedBox(width: 12),
-        Expanded(child: Text(label, style: Theme.of(context).textTheme.titleMedium)),
-        Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
-      ],
-    );
-  }
-}
-
-String _formatDate(DateTime date) {
-  const months = [
-    'januari', 'februari', 'maart', 'april', 'mei', 'juni',
-    'juli', 'augustus', 'september', 'oktober', 'november', 'december',
-  ];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

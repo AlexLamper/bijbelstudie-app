@@ -38,8 +38,8 @@ class Skeleton extends StatefulWidget {
 class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1350),
-  )..repeat();
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
 
   @override
   void dispose() {
@@ -49,17 +49,21 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final base = AppTheme.paperSunken;
-    final highlight = Color.alphaBlend(
-      Colors.white.withValues(alpha: 0.55),
+    // A slightly lighter (or, in dark mode, slightly less dim) tint of the
+    // base surface colour — the pulse breathes between the two, never a
+    // white-hot band and never travelling across the shape.
+    final tint = Color.alphaBlend(
+      (brightness == Brightness.dark ? Colors.white : Colors.black)
+          .withValues(alpha: brightness == Brightness.dark ? 0.08 : 0.035),
       base,
     );
 
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        // Sweeps a soft band of the highlight colour left-to-right.
-        final t = _controller.value;
+        final t = Curves.easeInOut.transform(_controller.value);
         return Container(
           width: widget.width,
           height: widget.height,
@@ -68,12 +72,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
                 ? null
                 : BorderRadius.circular(widget.radius),
             shape: widget.circle ? BoxShape.circle : BoxShape.rectangle,
-            gradient: LinearGradient(
-              begin: Alignment(-1.0 - 2 * (1 - t), 0),
-              end: Alignment(1.0 + 2 * t, 0),
-              colors: [base, highlight, base],
-              stops: const [0.35, 0.5, 0.65],
-            ),
+            color: Color.lerp(base, tint, t),
           ),
         );
       },

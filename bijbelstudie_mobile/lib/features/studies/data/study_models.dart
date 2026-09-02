@@ -64,6 +64,13 @@ class CuratedStudy {
     required this.startVersion,
     required this.image,
     required this.lessons,
+    this.about = const [],
+    this.outcomes = const [],
+    this.suggestedRhythm,
+    this.suggestedDepth,
+    this.category,
+    this.kind,
+    this.avgMinutes,
   });
 
   /// `Gedeelte` / `Persoon` / `Onderwerp` / `Boek` - the badge on the card.
@@ -79,7 +86,37 @@ class CuratedStudy {
   final String image;
   final List<StudyLesson> lessons;
 
+  /// The "waar gaat deze studie over?" paragraphs. The detail screen shows at
+  /// most the first two; empty for a generated book study, which falls back to
+  /// [description].
+  final List<String> about;
+
+  final List<String> outcomes;
+
+  /// What the study itself proposes in the start dialog, when it has an
+  /// opinion: `dagelijks` / `drie-per-week` / `wekelijks` / `eigen` / `vrij`.
+  final String? suggestedRhythm;
+
+  /// `kort` or `diep`.
+  final String? suggestedDepth;
+
+  /// `ot` / `nt` / `personen` / `themas`, resolved server-side by
+  /// `/api/v1/studies/catalog`. Null on the older `/api/v1/studies` response.
+  final String? category;
+
+  /// One word for what this is: a book genre (`Evangelie`) or `Persoon` /
+  /// `Gedeelte` / `Thema`.
+  final String? kind;
+
+  /// Mean minutes per lesson as the server measured it. Prefer this over
+  /// [estimatedMinutes]'s flat ten-minute assumption when it is present.
+  final int? avgMinutes;
+
   int get lessonCount => lessons.length;
+
+  /// Minutes per lesson: the server's average when the catalogue supplied one,
+  /// otherwise the flat estimate the older endpoint implies.
+  int get minutesPerLesson => avgMinutes ?? 10;
 
   /// The distinct books the lessons walk through, in lesson order. This is the
   /// single most concrete answer to "what am I going to read", and the website
@@ -107,7 +144,7 @@ class CuratedStudy {
   /// Roughly ten minutes of reading and reflection per lesson, which is what
   /// the lesson lengths on the website work out to. Shown as a total so the
   /// reader can judge the commitment before starting rather than after.
-  int get estimatedMinutes => lessonCount * 10;
+  int get estimatedMinutes => lessonCount * minutesPerLesson;
 
   /// Plain-language gloss of [type]. The badge alone says `Gedeelte`, which
   /// tells a first-time reader nothing about what the study is.
@@ -142,6 +179,29 @@ class CuratedStudy {
       lessons: (json['lessons'] as List? ?? const [])
           .map((l) => StudyLesson.fromJson(l as Map<String, dynamic>))
           .toList(growable: false),
+      about: _stringList(json['about']),
+      outcomes: _stringList(json['outcomes']),
+      suggestedRhythm: json['suggestedRhythm'] as String?,
+      suggestedDepth: json['suggestedDepth'] as String?,
+      category: json['category'] as String?,
+      kind: json['kind'] as String?,
+      avgMinutes: (json['avgMinutes'] as num?)?.toInt(),
     );
   }
+}
+
+/// Whatever the server sent, as a list of non-empty strings. `about` and
+/// `outcomes` are absent on generated studies and can arrive as a bare string.
+List<String> _stringList(Object? value) {
+  if (value is String) {
+    return value.trim().isEmpty ? const [] : [value.trim()];
+  }
+  if (value is List) {
+    return value
+        .whereType<String>()
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
+  }
+  return const [];
 }

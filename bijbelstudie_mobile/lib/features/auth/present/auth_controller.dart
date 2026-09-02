@@ -137,6 +137,7 @@ class AuthController extends AsyncNotifier<User?> {
         isPro: profile.isPro,
         proSource: profile.proSource,
         proExpiresAt: profile.proExpiresAt,
+        isAdmin: profile.isAdmin,
       );
       await _linkRevenueCat(user);
       // Self-heal accounts whose purchase webhook never landed: ask the server

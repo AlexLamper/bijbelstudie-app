@@ -201,8 +201,12 @@ class DashboardData {
   final LastRead? lastRead;
   final DailyVerse? dailyVerse;
 
-  /// How many of the 66 books have at least one chapter read.
-  int get booksStarted => readChapters.values.where((c) => c.isNotEmpty).length;
+  /// How many of the 66 books have at least one chapter read. Counted against
+  /// the canon rather than the map's own keys, so a spelling the fold did not
+  /// recognise cannot push the number past the 66 squares the grid draws.
+  int get booksStarted => BibleBooks.all
+      .where((book) => (readChapters[book] ?? const []).isNotEmpty)
+      .length;
 
   /// Folds `readChapters` keys onto their canonical Dutch spelling and merges
   /// the chapter lists behind keys that collapse together.
@@ -215,12 +219,18 @@ class DashboardData {
   static Map<String, List<int>> _canonicaliseProgress(Map<String, dynamic> raw) {
     final out = <String, List<int>>{};
     raw.forEach((book, chapters) {
-      final key = BibleBooks.toCanonical(book);
-      final nums = (chapters as List? ?? const [])
-          .map((c) => (c as num).toInt())
-          .where((n) => n >= 1);
+      // `$*` is the schema path of the server's `readChapters` Map and has been
+      // stored as a literal key on live accounts; a dotted key names a nested
+      // path rather than a book. Neither is a book, and both would take a
+      // square on the 66-book grid.
+      if (book.startsWith(r'$') || book.contains('.')) return;
+      // Anything but a list of numbers here is corruption, not progress. This
+      // used to be `chapters as List?`, which throws on such a value and took
+      // the whole dashboard down with it.
+      if (chapters is! List) return;
+      final nums = chapters.whereType<num>().map((c) => c.toInt()).where((n) => n >= 1);
       out.update(
-        key,
+        BibleBooks.toCanonical(book),
         (existing) => {...existing, ...nums}.toList()..sort(),
         ifAbsent: () => nums.toSet().toList()..sort(),
       );
