@@ -100,8 +100,15 @@ class _ProfileBody extends ConsumerWidget {
         ProfileActivityFeed(profile: profile),
 
         const SizedBox(height: 20),
+        // Provenance, not decoration: App Store review checks it on scripture
+        // apps (guideline 5.2), so a blanket "publiek domein" that is no longer
+        // true of everything shipped is worse than saying nothing. Two sources
+        // are licensed rather than public domain - the NBG-vertaling 1951 and
+        // KingComments - and both are named here for that reason.
         Text(
-          'De vertalingen en commentaren in deze app zijn publiek domein. De '
+          'De meeste vertalingen en commentaren in deze app zijn publiek '
+          'domein. De NBG-vertaling 1951 en KingComments (Ger de Koning) '
+          'worden met toestemming van de rechthebbenden aangeboden. De '
           'grondtekst komt van STEPBible (TAHOT/TAGNT) en is beschikbaar onder '
           'CC BY 4.0.',
           style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),

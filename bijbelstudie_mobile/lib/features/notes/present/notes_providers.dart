@@ -1,21 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/provider_cache.dart';
+
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 
 final notesListProvider = FutureProvider.autoDispose<List<StudyNote>>((ref) {
+  ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listNotes();
 });
 
 final highlightsListProvider = FutureProvider.autoDispose<List<StudyNote>>((ref) {
+  ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listHighlights();
 });
 
 final bookmarksProvider = FutureProvider.autoDispose<List<Bookmark>>((ref) {
+  ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listBookmarks();
 });
 
 final readingHistoryProvider = FutureProvider.autoDispose<List<ReadingPosition>>((ref) {
+  ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listReadingHistory();
 });
 

@@ -187,7 +187,10 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     required int chapter,
     required int? verseNumber,
   }) {
-    return Navigator.of(context).push<void>(
+    // The root navigator, not the shell's: a route pushed on the shell
+    // navigator is laid out inside MainScaffold's body, so it stops short of
+    // the bottom navigation bar instead of covering the screen.
+    return Navigator.of(context, rootNavigator: true).push<void>(
       PageRouteBuilder<void>(
         // Transparent underneath so the dashboard stays visible while the
         // photograph is still on its way up.

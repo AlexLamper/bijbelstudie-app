@@ -1,9 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/provider_cache.dart';
+
 import '../data/dashboard_models.dart';
 import '../data/dashboard_repository.dart';
 
 final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) {
+  ref.cacheFor();
   return ref.watch(dashboardRepositoryProvider).getDashboard();
 });
 

@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/provider_cache.dart';
+
 import '../data/enrollment_models.dart';
 import '../data/enrollment_repository.dart';
 import '../data/studies_repository.dart';
@@ -9,6 +11,7 @@ import '../data/study_progress_repository.dart';
 
 final _rawCuratedStudiesProvider =
     FutureProvider.autoDispose<List<CuratedStudy>>((ref) {
+      ref.cacheFor();
       return ref.watch(studiesRepositoryProvider).getCuratedStudies();
     });
 
@@ -67,6 +70,7 @@ final curatedStudyProvider = FutureProvider.autoDispose
 /// failing request cannot hold up a study that works from the device copy.
 final serverStudyLessonsProvider =
     FutureProvider.autoDispose<Map<String, Set<int>>>((ref) {
+      ref.cacheFor();
       return ref.watch(studyProgressRepositoryProvider).getCompletedLessons();
     });
 
@@ -107,6 +111,7 @@ bool isStudyFinished({
 /// they simply see no progress and no "Mijn studies".
 final studyEnrollmentsProvider =
     FutureProvider.autoDispose<Map<String, StudyEnrollment>>((ref) async {
+      ref.cacheFor();
       try {
         final enrollments = await ref.watch(enrollmentRepositoryProvider).list();
         return {for (final enrollment in enrollments) enrollment.studyId: enrollment};
