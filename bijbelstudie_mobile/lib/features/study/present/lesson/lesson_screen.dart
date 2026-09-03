@@ -15,6 +15,7 @@ import '../../data/lesson_repository.dart';
 import '../../domain/lesson_models.dart';
 import 'lesson_complete_card.dart';
 import 'lesson_providers.dart';
+import 'lesson_settings_sheet.dart';
 import 'lesson_steps.dart';
 import 'step_context.dart';
 import 'step_depth.dart';
@@ -57,6 +58,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   LessonCursor? _cursor;
   bool _busy = false;
 
+  /// The commentary the Verdieping step shows. Seeded from the payload, then
+  /// owned by the reader: it lives here rather than in the step so a pick
+  /// survives walking to another step and back.
+  String? _commentaryId;
+
   /// Latched the moment the background screen has something to show. Sticky on
   /// purpose: a rail that grows a step while the reader is walking it is odd,
   /// but one that loses a step under their feet is worse.
@@ -88,6 +94,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       reflectionText: state.reflectionText,
       summary: null,
     );
+    _commentaryId = lesson.commentaryId;
 
     // The website writes the cursor on open, not on first move, so "waar was
     // ik" is right even for a reader who opens a lesson and puts the phone
@@ -184,6 +191,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             widget.studyId,
             widget.day,
             completeStep: _serverStepFor(slots, cursor.slot),
+            reflectionText: cursor.reflectionText,
           );
 
       // The catalogue, the detail screen and the dashboard all read these.
@@ -265,7 +273,13 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       final images = ref
           .watch(geoImagesProvider(GeoRef(passage.book, passage.chapter)))
           .value;
-      final summary = ref.watch(bookSummaryProvider(passage.book)).value;
+      // Only where the introduction is actually shown - see
+      // [lessonShowsBookSummary]. Past lesson 1 the photographs have to carry
+      // the step on their own, and a chapter with none simply has no
+      // background step rather than one that opens onto a heading and air.
+      final summary = lessonShowsBookSummary(lesson.day)
+          ? ref.watch(bookSummaryProvider(passage.book)).value
+          : null;
       if ((images != null && images.isNotEmpty) ||
           (summary != null && summary.trim().isNotEmpty)) {
         _hasContext = true;
@@ -314,6 +328,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           onClose: () => _close(null),
           onTapTitle: null,
           onOpenAssistant: null,
+          onOpenSettings: null,
         ),
         Expanded(
           child: AppEmptyState(
@@ -365,6 +380,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             onClose: () => _close(lesson),
             onTapTitle: null,
             onOpenAssistant: _openAssistant,
+            // The lesson is over; there is nothing left to read differently.
+            onOpenSettings: null,
           ),
           Expanded(
             child: LessonCompleteCard(
@@ -387,6 +404,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           onClose: () => _close(lesson),
           onTapTitle: () => _openNavigator(lesson),
           onOpenAssistant: _openAssistant,
+          onOpenSettings: () => _openSettings(lesson),
         ),
         _StepRail(
           slots: slots,
@@ -437,10 +455,14 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           lesson: lesson,
           panel: cursor.depthPanel,
           translation: cursor.viewTranslation,
+          commentaryId: _commentaryId ?? lesson.commentaryId,
           onPanelChanged: (panel) {
             setState(() => _cursor = cursor.copyWith(depthPanel: panel));
             _bestEffort(depthPanel: panel);
           },
+          // The pane persists the choice itself; this only stops the payload's
+          // id from being re-applied over it on the next build.
+          onCommentaryChanged: (id) => setState(() => _commentaryId = id),
         );
       case StudyStep.reflection:
         return LessonReflectionStep(
@@ -454,6 +476,25 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       case StudyStep.done:
         return const SizedBox.shrink();
     }
+  }
+
+  /// Translation and type size, from any step.
+  ///
+  /// The translation chips on Het Woord stay where they are - they are useful
+  /// exactly where the passage is - but they were the only way to change it,
+  /// and they are invisible from the other four steps. Both surfaces write the
+  /// same lesson-scoped `viewTranslation`, so they cannot disagree.
+  Future<void> _openSettings(LessonPayload lesson) {
+    final cursor = _cursor!;
+    return showLessonSettingsSheet(
+      context,
+      lesson: lesson,
+      translation: cursor.viewTranslation,
+      onTranslationChanged: (id) {
+        setState(() => _cursor = _cursor!.copyWith(viewTranslation: id));
+        _bestEffort(viewTranslation: id);
+      },
+    );
   }
 
   /// The assistant, on every step and inline on none.
@@ -547,6 +588,7 @@ class _TopBar extends StatelessWidget {
     required this.onClose,
     required this.onTapTitle,
     required this.onOpenAssistant,
+    required this.onOpenSettings,
   });
 
   final String title;
@@ -556,6 +598,9 @@ class _TopBar extends StatelessWidget {
 
   /// Null only where there is no lesson to ask about.
   final VoidCallback? onOpenAssistant;
+
+  /// Null on the error bar, where there is no lesson to configure either.
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -606,17 +651,28 @@ class _TopBar extends StatelessWidget {
                   ),
                 ),
               ),
-              // Balances the close button so the title stays optically centred -
-              // by carrying the assistant, where there is a lesson behind it.
+              if (onOpenSettings != null)
+                IconButton(
+                  onPressed: onOpenSettings,
+                  icon: const Icon(Icons.tune),
+                  tooltip: 'Vertaling en weergave',
+                  color: AppTheme.ink,
+                ),
               if (onOpenAssistant != null)
                 IconButton(
                   onPressed: onOpenAssistant,
                   icon: const Icon(Icons.auto_awesome),
                   tooltip: 'Vraag de AI-assistent',
                   color: AppTheme.teal,
-                )
-              else
-                const SizedBox(width: 48),
+                ),
+              // Whatever the right-hand side did not fill, so the title stays
+              // optically centred against the close button on the left.
+              SizedBox(
+                width:
+                    48 -
+                    (onOpenSettings != null ? 24 : 0) -
+                    (onOpenAssistant != null ? 24 : 0),
+              ),
             ],
           ),
         ),

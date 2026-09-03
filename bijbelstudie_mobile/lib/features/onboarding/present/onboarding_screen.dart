@@ -66,7 +66,7 @@ const List<_OnboardingPageData> _pages = [
     accent: 'ontdekt',
     body:
         'Markeer verzen, schrijf je notities op en sla bladwijzers op. Alles '
-        'staat ook klaar op www.bijbel-studie.com.',
+        'staat ook klaar op www.bijbelstudie.io.',
     highlights: [
       'Notities, markeringen en bladwijzers',
       'Gesynchroniseerd met de website',

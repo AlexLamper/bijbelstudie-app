@@ -9,6 +9,22 @@ import '../../domain/lesson_models.dart';
 import '../../domain/summary_format.dart';
 import '../geo_image_view.dart';
 
+/// Whether this lesson's background screen carries the book's introduction.
+///
+/// Only the first one does. The introduction is a property of the *book*, not
+/// of the lesson, so `GET /summary` answers every lesson in a study with the
+/// same text - and a fourteen-lesson study showed the reader that same page of
+/// prose fourteen times, under a heading promising background. Reading it once
+/// is the point; re-reading it on every sitting is noise.
+///
+/// The photographs are not treated this way on purpose: they are a different
+/// set per chapter, so they stay useful for the whole study.
+///
+/// [LessonScreen] applies the same rule when it decides whether the background
+/// screen has anything on it at all, so a later lesson with no photographs
+/// simply has no background step rather than an empty one.
+bool lessonShowsBookSummary(int day) => day <= 1;
+
 /// The background screen: where this happened, and what the book is about.
 ///
 /// A step of its own rather than two more panels on Verdieping. Both halves are
@@ -26,7 +42,9 @@ class LessonContextStep extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final passage = lesson.passage;
-    final images = ref.watch(geoImagesProvider(GeoRef(passage.book, passage.chapter)));
+    final images = ref.watch(
+      geoImagesProvider(GeoRef(passage.book, passage.chapter)),
+    );
     final summary = ref.watch(bookSummaryProvider(passage.book));
 
     return ListView(
@@ -63,30 +81,34 @@ class LessonContextStep extends ConsumerWidget {
           },
         ),
 
-        summary.when(
-          loading: () => const SkeletonText(lines: 5, lineHeight: 13, gap: 10),
-          error: (_, _) => const SizedBox.shrink(),
-          data: (text) {
-            final paragraphs = formatSummary(text);
-            if (paragraphs.isEmpty) return const SizedBox.shrink();
+        if (!lessonShowsBookSummary(lesson.day))
+          const SizedBox.shrink()
+        else
+          summary.when(
+            loading: () =>
+                const SkeletonText(lines: 5, lineHeight: 13, gap: 10),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (text) {
+              final paragraphs = formatSummary(text);
+              if (paragraphs.isEmpty) return const SizedBox.shrink();
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeader(
-                  eyebrow: 'Algemene informatie',
-                  title: 'Over ${passage.book}',
-                ),
-                const SizedBox(height: 10),
-                for (final paragraph in paragraphs)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _SummaryText(paragraph: paragraph),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionHeader(
+                    eyebrow: 'Algemene informatie',
+                    title: 'Over ${passage.book}',
                   ),
-              ],
-            );
-          },
-        ),
+                  const SizedBox(height: 10),
+                  for (final paragraph in paragraphs)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _SummaryText(paragraph: paragraph),
+                    ),
+                ],
+              );
+            },
+          ),
       ],
     );
   }
@@ -256,26 +278,34 @@ class _PlaceLightboxState extends State<_PlaceLightbox> {
                     children: [
                       Text(
                         image.placeName,
-                        style: AppTheme.bodyStrong.copyWith(color: Colors.white),
+                        style: AppTheme.bodyStrong.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                       if (image.description != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           image.description!,
-                          style: AppTheme.caption.copyWith(color: Colors.white70),
+                          style: AppTheme.caption.copyWith(
+                            color: Colors.white70,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 6),
                       // CC attribution has to be displayed, not merely recorded.
                       Text(
                         '${image.credit} · ${image.license}',
-                        style: AppTheme.metaLabel.copyWith(color: Colors.white54),
+                        style: AppTheme.metaLabel.copyWith(
+                          color: Colors.white54,
+                        ),
                       ),
                       if (widget.images.length > 1) ...[
                         const SizedBox(height: 8),
                         Text(
                           '${_index + 1} / ${widget.images.length}',
-                          style: AppTheme.metaLabel.copyWith(color: Colors.white54),
+                          style: AppTheme.metaLabel.copyWith(
+                            color: Colors.white54,
+                          ),
                         ),
                       ],
                     ],
@@ -313,7 +343,10 @@ class _SummaryText extends StatelessWidget {
           Expanded(child: Text(paragraph.text, style: AppTheme.bodyMuted)),
         ],
       ),
-      SummaryParagraphKind.body => Text(paragraph.text, style: AppTheme.bodyLead),
+      SummaryParagraphKind.body => Text(
+        paragraph.text,
+        style: AppTheme.bodyLead,
+      ),
     };
   }
 }

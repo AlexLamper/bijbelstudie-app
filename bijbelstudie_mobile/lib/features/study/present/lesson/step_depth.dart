@@ -19,19 +19,25 @@ import '../../domain/lesson_models.dart';
 /// behind the icon in the top bar so it is available on every step instead of
 /// taking up room on this one.
 ///
-/// The commentary source is whatever the payload's `commentaryId` says: the
-/// server resolves it from the enrollment, then the account preference, then
-/// the default. Choosing one here would quietly override the reader.
+/// The payload's `commentaryId` - resolved server-side from the enrollment,
+/// then the account preference, then the default - is only the starting point.
+/// Once the reader picks a source in the pane it is their choice, not the
+/// payload's, for the rest of the lesson; the lesson screen holds that pick so
+/// it survives stepping away from Verdieping and back.
 class LessonDepthStep extends ConsumerWidget {
   const LessonDepthStep({
     super.key,
     required this.lesson,
     required this.panel,
     required this.translation,
+    required this.commentaryId,
     required this.onPanelChanged,
+    required this.onCommentaryChanged,
   });
 
   final LessonPayload lesson;
+
+  final String commentaryId;
 
   /// `original` for the grondtekst; anything else reads as the uitleg, which
   /// keeps the older stored values (`media`, `notes`) harmless.
@@ -39,6 +45,7 @@ class LessonDepthStep extends ConsumerWidget {
 
   final String translation;
   final ValueChanged<String> onPanelChanged;
+  final ValueChanged<String> onCommentaryChanged;
 
   static const _commentary = 'commentary';
   static const _original = 'original';
@@ -65,7 +72,10 @@ class LessonDepthStep extends ConsumerWidget {
             children: [
               const Eyebrow('Verdieping'),
               const SizedBox(height: 6),
-              Text('Uitleg bij ${passage.reference}', style: AppTheme.displaySmall),
+              Text(
+                'Uitleg bij ${passage.reference}',
+                style: AppTheme.displaySmall,
+              ),
               const SizedBox(height: 14),
               _PaneTabs(
                 active: showOriginal ? _original : _commentary,
@@ -82,7 +92,8 @@ class LessonDepthStep extends ConsumerWidget {
               ? OriginalTextPane(location: location)
               : CommentaryPane(
                   location: location,
-                  settings: settings.copyWith(lastCommentaryId: lesson.commentaryId),
+                  settings: settings.copyWith(lastCommentaryId: commentaryId),
+                  onSourceSelected: onCommentaryChanged,
                 ),
         ),
       ],
@@ -114,7 +125,9 @@ class _PaneTabs extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: pane.$1 == active ? AppTheme.tealTint : Colors.transparent,
+                  color: pane.$1 == active
+                      ? AppTheme.tealTint
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   border: Border.all(
                     color: pane.$1 == active ? AppTheme.teal : AppTheme.rule,
@@ -126,7 +139,9 @@ class _PaneTabs extends StatelessWidget {
                     Icon(
                       pane.$3,
                       size: 14,
-                      color: pane.$1 == active ? AppTheme.tealStrong : AppTheme.inkMuted,
+                      color: pane.$1 == active
+                          ? AppTheme.tealStrong
+                          : AppTheme.inkMuted,
                     ),
                     const SizedBox(width: 6),
                     Text(

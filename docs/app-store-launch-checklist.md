@@ -161,7 +161,7 @@ applies - do **not** paste a custom EULA into App Store Connect.
       and correct the ABONNEMENTEN lines if they are no longer EUR 9,99 / month
       and EUR 69,99 / year. A description naming a price the store does not
       charge is its own 3.1.2 problem.
-- [ ] Set **Privacy Policy URL** to `https://www.bijbel-studie.com/privacybeleid`
+- [ ] Set **Privacy Policy URL** to `https://www.bijbelstudie.io/privacybeleid`
       rather than the old `/privacy-policy`, which only answers through a 308.
 - [ ] Confirm **App Information → License Agreement** is still Apple's standard
       EULA.
@@ -214,8 +214,8 @@ Also apply for the **Small Business Program** if you have not: 15% instead of
 The login and register screens carry **"Meer over gegevensgebruik"**, which
 opens a dialog linking:
 
-* `https://www.bijbel-studie.com/privacybeleid` — 200
-* `https://www.bijbel-studie.com/algemene-voorwaarden` — 200
+* `https://www.bijbelstudie.io/privacybeleid` — 200
+* `https://www.bijbelstudie.io/algemene-voorwaarden` — 200
 
 `docs/app-review-1.0.5-rejection.md` still names the old `/privacy-policy` and
 `/terms-of-service` URLs. The doc is stale; the code is right.
@@ -231,7 +231,7 @@ terms review looks for.
 sentence a 5.1.1(v) reviewer would read.** It currently says:
 
 > Je kunt altijd je account laten verwijderen. Neem hiervoor contact op via
-> info@bijbel-studie.com of via de supportkanalen in de app.
+> info@bijbelstudie.io of via de supportkanalen in de app.
 
 In-app deletion *does* exist, in `Profiel → Account verwijderen`. Pointing at
 email instead reads like there is no in-app path. Worth changing to name the

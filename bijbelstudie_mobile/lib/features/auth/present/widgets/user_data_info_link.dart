@@ -39,7 +39,7 @@ Widget buildUserDataInfoLink(BuildContext context) {
                   'Je kunt je account op elk moment zelf verwijderen in de app, via '
                   'Profiel → Account verwijderen. Dat verwijdert je account en je '
                   'gegevens volgens ons privacybeleid. Lukt het niet, dan kun je ons '
-                  'bereiken via info@bijbel-studie.com.',
+                  'bereiken via info@bijbelstudie.io.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 18),

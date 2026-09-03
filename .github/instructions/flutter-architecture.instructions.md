@@ -6,7 +6,7 @@ applyTo: "bijbelstudie_mobile/**/*.dart"
 # Flutter Mobile App Architecture & Guidelines
 
 ## Architecture & Communication
-- **API First**: The mobile app is entirely independent and communicates *exclusively* with the Next.js API endpoints (`https://www.bijbel-studie.com/api/...`).
+- **API First**: The mobile app is entirely independent and communicates *exclusively* with the Next.js API endpoints (`https://www.bijbelstudie.io/api/...`).
 - **No Direct DB Access**: Never connect to MongoDB directly from the Flutter app. The Next.js backend is the single source of truth.
 - **Project Structure**: Strict Feature-First Clean Architecture. Use `lib/core/` for app-wide shared routing, theme, and API client (Dio setup). Use `lib/features/<feature>/` subdiving into `data/` (repositories, models, local storage), `domain/` (entities, use cases), and `present/` (UI screens, widgets, Riverpod providers).
 

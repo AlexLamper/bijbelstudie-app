@@ -78,8 +78,8 @@ class GeoImage {
 /// Wikimedia refuses a request with no User-Agent outright (403) and asks for a
 /// descriptive one by policy, so every image request from this app sends these.
 const Map<String, String> wikimediaImageHeaders = {
-  'User-Agent': 'BijbelStudie/1.0 (https://www.bijbel-studie.com; '
-      'contact@bijbel-studie.com)',
+  'User-Agent': 'BijbelStudie/1.0 (https://www.bijbelstudie.io; '
+      'info@bijbelstudie.io)',
 };
 
 /// The "Algemene info" tab: a public-domain introduction to the book plus

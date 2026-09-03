@@ -48,11 +48,17 @@ class LessonIntroStep extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.visibility_outlined, size: 15, color: AppTheme.tealStrong),
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 15,
+                      color: AppTheme.tealStrong,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Let hier op',
-                      style: AppTheme.bodyStrong.copyWith(color: AppTheme.tealStrong),
+                      style: AppTheme.bodyStrong.copyWith(
+                        color: AppTheme.tealStrong,
+                      ),
                     ),
                   ],
                 ),
@@ -88,7 +94,9 @@ class LessonWordStep extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final passage = lesson.passage;
     final chapter = ref.watch(
-      chapterContentProvider(ChapterRef(translation, passage.book, passage.chapter)),
+      chapterContentProvider(
+        ChapterRef(translation, passage.book, passage.chapter),
+      ),
     );
     final settings = ref.watch(readingSettingsProvider);
 
@@ -134,7 +142,8 @@ class LessonWordStep extends ConsumerWidget {
               return const AppEmptyState(
                 icon: Icons.menu_book_outlined,
                 title: 'Geen tekst',
-                description: 'Dit gedeelte is niet beschikbaar in deze vertaling.',
+                description:
+                    'Dit gedeelte is niet beschikbaar in deze vertaling.',
               );
             }
 
@@ -252,7 +261,8 @@ class LessonReflectionStep extends ConsumerStatefulWidget {
   final ValueChanged<String> onChanged;
 
   @override
-  ConsumerState<LessonReflectionStep> createState() => _LessonReflectionStepState();
+  ConsumerState<LessonReflectionStep> createState() =>
+      _LessonReflectionStepState();
 }
 
 class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
@@ -360,7 +370,9 @@ class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
                   const SizedBox(width: 4),
                   Text(
                     'Bewaard',
-                    style: AppTheme.metaLabel.copyWith(color: AppTheme.positive),
+                    style: AppTheme.metaLabel.copyWith(
+                      color: AppTheme.positive,
+                    ),
                   ),
                 ],
               ),

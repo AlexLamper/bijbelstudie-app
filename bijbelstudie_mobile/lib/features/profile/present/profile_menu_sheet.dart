@@ -7,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../admin/present/admin_providers.dart';
+import '../../auth/present/auth_controller.dart';
 import '../../feedback/present/feedback_sheet.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
@@ -127,12 +128,32 @@ Future<void> showProfileMenuSheet(
                   ),
                 ],
               ),
+              const SizedBox(height: 18),
+              RuleGrid(
+                children: [
+                  _MenuRow(
+                    icon: Icons.logout,
+                    label: 'Uitloggen',
+                    showRule: false,
+                    isDestructive: true,
+                    onTap: () => go(() => _logout(context, ref)),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       );
     },
   );
+}
+
+/// Signs out the same way the profile screen does: clear the session, then
+/// send the router to `/login`. `go` has already popped the sheet, so the
+/// redirect lands on a route that is still mounted.
+Future<void> _logout(BuildContext context, WidgetRef ref) async {
+  await ref.read(authControllerProvider.notifier).logout();
+  if (context.mounted) context.go('/login');
 }
 
 Future<void> _open(String url) async {
@@ -146,6 +167,7 @@ class _MenuRow extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.showRule = true,
+    this.isDestructive = false,
   });
 
   final IconData icon;
@@ -153,19 +175,31 @@ class _MenuRow extends StatelessWidget {
   final VoidCallback onTap;
   final bool showRule;
 
+  /// Marks the row as an action on the account rather than a destination:
+  /// it takes the destructive colour and drops the chevron, which would
+  /// promise a screen that never opens.
+  final bool isDestructive;
+
   @override
   Widget build(BuildContext context) {
+    final tint = isDestructive ? AppTheme.destructive : AppTheme.inkSoft;
     return RuleListTile(
       onTap: onTap,
       showRule: showRule,
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppTheme.inkSoft),
+          Icon(icon, size: 18, color: tint),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.titleMedium),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: isDestructive ? AppTheme.destructive : null,
+              ),
+            ),
           ),
-          Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
+          if (!isDestructive)
+            Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
         ],
       ),
     );

@@ -18,7 +18,9 @@ Future<void> showReaderSettingsSheet(BuildContext context, WidgetRef ref) {
     isScrollControlled: true,
     backgroundColor: Theme.of(context).cardColor,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppTheme.radiusLg),
+      ),
     ),
     builder: (_) => const _ReaderSettingsSheet(),
   );
@@ -29,9 +31,6 @@ class _ReaderSettingsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(readingSettingsProvider);
-    final controller = ref.read(readingSettingsProvider.notifier);
-
     return SafeArea(
       top: false,
       child: Column(
@@ -39,59 +38,89 @@ class _ReaderSettingsSheet extends ConsumerWidget {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Align(alignment: Alignment.centerLeft, child: Eyebrow('Weergave')),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Eyebrow('Weergave'),
+            ),
           ),
           const RuleLine(),
           Flexible(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               shrinkWrap: true,
-              children: [
-                _Preview(settings: settings),
-                const SizedBox(height: 20),
-                _ChipRow<ReaderFontSize>(
-                  label: 'Tekstgrootte',
-                  values: ReaderFontSize.values,
-                  selected: settings.fontSize,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setFontSize,
-                ),
-                const SizedBox(height: 14),
-                _ChipRow<ReaderFontFamily>(
-                  label: 'Lettertype',
-                  values: ReaderFontFamily.values,
-                  selected: settings.fontFamily,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setFontFamily,
-                ),
-                const SizedBox(height: 14),
-                _ChipRow<ReaderLineHeight>(
-                  label: 'Regelafstand',
-                  values: ReaderLineHeight.values,
-                  selected: settings.lineHeight,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setLineHeight,
-                ),
-                const SizedBox(height: 14),
-                _ChipRow<ReaderLetterSpacing>(
-                  label: 'Letterafstand',
-                  values: ReaderLetterSpacing.values,
-                  selected: settings.letterSpacing,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setLetterSpacing,
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Versnummers tonen'),
-                  value: settings.showVerseNumbers,
-                  onChanged: controller.setShowVerseNumbers,
-                ),
-              ],
+              children: const [ReaderTypographyControls()],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The typography controls themselves, without a sheet around them.
+///
+/// Split out so the study flow can offer the same controls from its own
+/// settings sheet. Reading a lesson is reading, and a reader who has sized the
+/// text once should not have to leave the lesson to do it again - but nor
+/// should the study flow grow a second, slightly different copy of these five
+/// controls that then drifts from this one.
+///
+/// Every change writes straight through [ReadingSettingsController], so
+/// whatever is behind the sheet reflows live and the choice is already
+/// persisted when the sheet closes.
+class ReaderTypographyControls extends ConsumerWidget {
+  const ReaderTypographyControls({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(readingSettingsProvider);
+    final controller = ref.read(readingSettingsProvider.notifier);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Preview(settings: settings),
+        const SizedBox(height: 20),
+        _ChipRow<ReaderFontSize>(
+          label: 'Tekstgrootte',
+          values: ReaderFontSize.values,
+          selected: settings.fontSize,
+          labelOf: (v) => v.label,
+          onChanged: controller.setFontSize,
+        ),
+        const SizedBox(height: 14),
+        _ChipRow<ReaderFontFamily>(
+          label: 'Lettertype',
+          values: ReaderFontFamily.values,
+          selected: settings.fontFamily,
+          labelOf: (v) => v.label,
+          onChanged: controller.setFontFamily,
+        ),
+        const SizedBox(height: 14),
+        _ChipRow<ReaderLineHeight>(
+          label: 'Regelafstand',
+          values: ReaderLineHeight.values,
+          selected: settings.lineHeight,
+          labelOf: (v) => v.label,
+          onChanged: controller.setLineHeight,
+        ),
+        const SizedBox(height: 14),
+        _ChipRow<ReaderLetterSpacing>(
+          label: 'Letterafstand',
+          values: ReaderLetterSpacing.values,
+          selected: settings.letterSpacing,
+          labelOf: (v) => v.label,
+          onChanged: controller.setLetterSpacing,
+        ),
+        const SizedBox(height: 4),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Versnummers tonen'),
+          value: settings.showVerseNumbers,
+          onChanged: controller.setShowVerseNumbers,
+        ),
+      ],
     );
   }
 }

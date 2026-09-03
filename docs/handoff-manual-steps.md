@@ -10,8 +10,8 @@ Last updated 2026-08-12.
 | Apple Team ID | `4K4D59MXKW` |
 | App Store Connect app id | `6800668187` ("BijbelStudie App") |
 | Repo | <https://github.com/AlexLamper/bijbelstudie-app> |
-| Backend | `https://www.bijbel-studie.com` |
-| Apple redirect URI | `https://www.bijbel-studie.com/api/v1/auth/apple/callback` |
+| Backend | `https://www.bijbelstudie.io` |
+| Apple redirect URI | `https://www.bijbelstudie.io/api/v1/auth/apple/callback` |
 
 ---
 
@@ -118,7 +118,7 @@ an empty paywall with `—` for both prices.
 ### 1.7 Webhook
 
 1. **Project settings → Integrations → + New → Webhooks**.
-2. **Webhook URL:** `https://www.bijbel-studie.com/api/mobile/revenuecat-webhook`
+2. **Webhook URL:** `https://www.bijbelstudie.io/api/mobile/revenuecat-webhook`
 3. **Authorization header value:** the value already stored in Vercel as
    `REVENUECAT_WEBHOOK_AUTHORIZATION`. Read it back with:
    ```bash
@@ -170,8 +170,8 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
       no Terms of Use (EULA) link. The description must keep, as plain-text
       clickable URLs, all three of:
       `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`,
-      `https://www.bijbel-studie.com/privacybeleid` and
-      `https://www.bijbel-studie.com/algemene-voorwaarden`, plus the name,
+      `https://www.bijbelstudie.io/privacybeleid` and
+      `https://www.bijbelstudie.io/algemene-voorwaarden`, plus the name,
       length and price of both subscriptions. Rewriting the description without
       them re-earns the same rejection.
 - [ ] **App Information → License Agreement.** Leave it on Apple's **standard**
@@ -182,8 +182,8 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 - [ ] **Subscription review screenshots.** Each of the two products needs one
       under **Review Information**, or it stays in *Missing Metadata* forever.
       A simulator shot of the paywall is fine.
-- [ ] **Support URL:** `https://www.bijbel-studie.com/contact`
-- [ ] **Privacy policy URL:** `https://www.bijbel-studie.com/privacybeleid`
+- [ ] **Support URL:** `https://www.bijbelstudie.io/contact`
+- [ ] **Privacy policy URL:** `https://www.bijbelstudie.io/privacybeleid`
       (the old `/privacy-policy` only resolves through a 308, and review does
       click these)
 - [ ] **Age rating:** 4+, nothing objectionable.
@@ -286,7 +286,7 @@ complains.
 | Variable | Value |
 |---|---|
 | `APPLE_SERVICE_ID` | `com.bijbel-studie.app.signin` |
-| `APPLE_REDIRECT_URI` | `https://www.bijbel-studie.com/api/v1/auth/apple/callback` |
+| `APPLE_REDIRECT_URI` | `https://www.bijbelstudie.io/api/v1/auth/apple/callback` |
 
 The build number is `github.run_number`, which only increases, so consecutive
 pushes cannot collide. The version name comes from `pubspec.yaml` unless you

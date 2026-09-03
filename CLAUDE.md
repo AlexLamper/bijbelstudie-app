@@ -1,6 +1,6 @@
 # BijbelStudie — Flutter iOS/Android app
 
-Flutter client for www.bijbel-studie.com. The Flutter project is
+Flutter client for www.bijbelstudie.io. The Flutter project is
 `bijbelstudie_mobile/`; the repo root only holds docs, screenshots and CI.
 The Next.js backend it talks to is a **separate repo** at `C:\Projects\bijbelstudie`
 — it is not here, so don't go looking for `/api/v1` handlers in this tree.

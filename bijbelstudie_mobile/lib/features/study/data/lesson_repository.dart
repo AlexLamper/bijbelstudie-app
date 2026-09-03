@@ -138,6 +138,7 @@ class LessonRepository {
     String studyId,
     int day, {
     required StudyStep completeStep,
+    String? reflectionText,
   }) async {
     LessonException? failure;
 
@@ -147,6 +148,14 @@ class LessonRepository {
           studyId,
           day,
           completeStep: completeStep,
+          // The reflection travels with the completing write rather than being
+          // assumed to have landed already. Its autosave is debounced and
+          // fire-and-forget, and the flush the step does on its way out races
+          // the step transition that disposes it - so a reader who types and
+          // taps straight on can reach here with nothing saved. The server
+          // promotes whatever text this document holds, so sending it here is
+          // what decides whether the note carries their words or is skipped.
+          reflectionText: reflectionText,
           complete: true,
           options: Options(receiveTimeout: const Duration(seconds: 60)),
         );

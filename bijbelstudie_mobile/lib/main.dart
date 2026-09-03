@@ -95,7 +95,7 @@ void main() async {
   if (PreviewConfig.enabled) {
     // Point image URLs at the live site so artwork resolves without a local
     // backend, then run with canned data and no auth.
-    AppConfig.setCustomApiBaseUrl('https://www.bijbel-studie.com/api/v1');
+    AppConfig.setCustomApiBaseUrl('https://www.bijbelstudie.io/api/v1');
     debugPrint('[Preview] Design-preview mode active - using canned data.');
     runApp(PreviewData.scope(const BijbelStudieApp()));
     return;

@@ -21,31 +21,31 @@ class LessonRef {
 }
 
 /// The lesson content: steps, passage, prose, commentary id.
-final lessonProvider = FutureProvider.autoDispose.family<LessonPayload, LessonRef>((
-  ref,
-  lesson,
-) {
-  return ref.watch(lessonRepositoryProvider).getLesson(lesson.studyId, lesson.day);
-});
+final lessonProvider = FutureProvider.autoDispose
+    .family<LessonPayload, LessonRef>((ref, lesson) {
+      return ref
+          .watch(lessonRepositoryProvider)
+          .getLesson(lesson.studyId, lesson.day);
+    });
 
 /// The reader's saved position in this lesson, loaded once when it opens.
 ///
 /// After that the shell owns the live copy: every write returns the updated
 /// state, so re-reading this provider mid-lesson would only race the writes.
-final lessonStateProvider = FutureProvider.autoDispose.family<LessonState, LessonRef>((
-  ref,
-  lesson,
-) {
-  return ref.watch(lessonRepositoryProvider).getState(lesson.studyId, lesson.day);
-});
+final lessonStateProvider = FutureProvider.autoDispose
+    .family<LessonState, LessonRef>((ref, lesson) {
+      return ref
+          .watch(lessonRepositoryProvider)
+          .getState(lesson.studyId, lesson.day);
+    });
 
 /// The quiz for this lesson, or the reason there is none.
-final lessonQuizProvider = FutureProvider.autoDispose.family<LessonQuiz, LessonRef>((
-  ref,
-  lesson,
-) {
-  return ref.watch(lessonRepositoryProvider).getQuiz(lesson.studyId, lesson.day);
-});
+final lessonQuizProvider = FutureProvider.autoDispose
+    .family<LessonQuiz, LessonRef>((ref, lesson) {
+      return ref
+          .watch(lessonRepositoryProvider)
+          .getQuiz(lesson.studyId, lesson.day);
+    });
 
 /// One entry in the lesson's rail.
 ///

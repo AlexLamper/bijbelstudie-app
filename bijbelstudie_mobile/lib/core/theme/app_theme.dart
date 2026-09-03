@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Design tokens copied 1:1 from www.bijbel-studie.com (`app/globals.css`).
+/// Design tokens copied 1:1 from www.bijbelstudie.io (`app/globals.css`).
 ///
 /// The site is a shadcn/Tailwind "Slate & Teal" system: a light grey page,
 /// white cards with a 1px grey border and generous corner radii, Inter for

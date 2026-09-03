@@ -109,7 +109,7 @@ class PreviewData {
   static final ProfileModel profile = ProfileModel(
     id: 'preview-user',
     name: 'Preview Gebruiker',
-    email: 'preview@bijbel-studie.com',
+    email: 'preview@bijbelstudie.io',
     isPro: true,
     proSource: 'apple',
     proExpiresAt: DateTime.now().add(const Duration(days: 300)),

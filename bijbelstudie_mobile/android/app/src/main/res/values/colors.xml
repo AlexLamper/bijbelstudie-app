@@ -2,6 +2,6 @@
 <resources>
     <!-- The logo mark's own ground, from public/images/logo.svg. -->
     <color name="ic_launcher_background">#262626</color>
-    <!-- Matches the paper background on www.bijbel-studie.com -->
+    <!-- Matches the paper background on www.bijbelstudie.io -->
     <color name="paper">#FAF9F6</color>
 </resources>

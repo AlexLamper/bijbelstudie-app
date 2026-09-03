@@ -1,6 +1,6 @@
 # BijbelStudie — iOS app
 
-Native **Flutter** app for [www.bijbel-studie.com](https://www.bijbel-studie.com),
+Native **Flutter** app for [www.bijbelstudie.io](https://www.bijbelstudie.io),
 structurally cloned from an already-shipping Flutter app of ours and adapted to
 a Bible-reading domain.
 

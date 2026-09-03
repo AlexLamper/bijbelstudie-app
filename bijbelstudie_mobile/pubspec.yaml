@@ -78,7 +78,7 @@ flutter:
     - assets/images/
     - assets/images/daytext/
   fonts:
-    # Body / UI face used on www.bijbel-studie.com (--font-sans).
+    # Body / UI face used on www.bijbelstudie.io (--font-sans).
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf
@@ -89,7 +89,7 @@ flutter:
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
-    # Serif reading face used on www.bijbel-studie.com (--font-lora), offered
+    # Serif reading face used on www.bijbelstudie.io (--font-lora), offered
     # as the "serif" option in the reader's font preference.
     - family: Lora
       fonts:
@@ -144,7 +144,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/app_icon.png"
-  # The mark's own ground, from public/images/logo.svg on www.bijbel-studie.com.
+  # The mark's own ground, from public/images/logo.svg on www.bijbelstudie.io.
   # A white background here would hide the white cross entirely.
   adaptive_icon_background: "#262626"
   adaptive_icon_foreground: "assets/images/app_icon.png"

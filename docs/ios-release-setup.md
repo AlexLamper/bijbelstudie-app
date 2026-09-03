@@ -153,7 +153,7 @@ GitHub repository → **Settings → Secrets and variables → Actions**.
 | Variable name | Value |
 |---|---|
 | `APPLE_SERVICE_ID` | `com.bijbel-studie.app.signin` |
-| `APPLE_REDIRECT_URI` | `https://www.bijbel-studie.com/api/v1/auth/apple/callback` |
+| `APPLE_REDIRECT_URI` | `https://www.bijbelstudie.io/api/v1/auth/apple/callback` |
 
 The build step fails fast with a named message if any of these is missing, so a
 misconfigured secret costs you one minute rather than a failed upload.
@@ -166,7 +166,7 @@ binary is `--dart-define`, which the workflow supplies from the secret above.
 
 ## Step 6 — Backend environment (Vercel)
 
-The app talks to `https://www.bijbel-studie.com/api/v1`. That surface needs:
+The app talks to `https://www.bijbelstudie.io/api/v1`. That surface needs:
 
 | Env var | Purpose |
 |---|---|

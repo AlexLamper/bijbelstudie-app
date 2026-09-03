@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch background uses the paper colour (#faf9f6) from www.bijbel-studie.com -->
+<!-- Launch background uses the paper colour (#faf9f6) from www.bijbelstudie.io -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/paper" />
 

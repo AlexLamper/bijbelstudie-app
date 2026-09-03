@@ -87,13 +87,6 @@ class _ProfileBody extends ConsumerWidget {
         _ProfileHeader(profile: profile),
 
         const SizedBox(height: 22),
-        SiteButton(
-          label: 'Ontdek bijbelstudies',
-          icon: Icons.auto_stories_outlined,
-          onPressed: () => context.go('/studies'),
-        ),
-
-        const SizedBox(height: 14),
         const _QuickActions(),
 
         const SizedBox(height: 28),

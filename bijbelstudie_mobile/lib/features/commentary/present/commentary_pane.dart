@@ -19,10 +19,16 @@ class CommentaryPane extends ConsumerWidget {
     super.key,
     required this.location,
     required this.settings,
+    this.onSourceSelected,
   });
 
   final ReaderLocation location;
   final ReadingSettings settings;
+
+  /// Fired after the choice is persisted, for callers that pin the source
+  /// themselves - the lesson seeds it from the payload, so it has to hear
+  /// about a pick to stop re-applying that seed.
+  final ValueChanged<String>? onSourceSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,8 +48,10 @@ class CommentaryPane extends ConsumerWidget {
             selectedId: sources.any((s) => s.id == commentaryId)
                 ? commentaryId
                 : sources.first.id,
-            onSelected: (value) =>
-                ref.read(readingSettingsProvider.notifier).setLastCommentary(value),
+            onSelected: (value) {
+              ref.read(readingSettingsProvider.notifier).setLastCommentary(value);
+              onSourceSelected?.call(value);
+            },
           ),
         Expanded(
           child: chapterAsync.when(

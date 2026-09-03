@@ -72,7 +72,7 @@ and currency.
    The identifier must be exactly `pro` (`kRcProEntitlement`).
 4. App Store Connect → In-App Purchase key (or App-Specific Shared Secret) →
    paste into RevenueCat so receipt validation works.
-5. Webhook → `https://www.bijbel-studie.com/api/mobile/revenuecat-webhook`,
+5. Webhook → `https://www.bijbelstudie.io/api/mobile/revenuecat-webhook`,
    with the Authorization header value set to `REVENUECAT_WEBHOOK_AUTHORIZATION`
    from the web environment. That route already refuses to run if neither the
    auth header nor a signing secret is configured, so a missing value fails

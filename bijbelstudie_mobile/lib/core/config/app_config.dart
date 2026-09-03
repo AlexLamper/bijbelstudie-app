@@ -5,14 +5,14 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   // Production API endpoints
   static const String _productionBaseUrl =
-      'https://www.bijbel-studie.com/api/v1';
+      'https://www.bijbelstudie.io/api/v1';
 
   // Development API endpoints (localhost).
   // Android emulator: pass --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
   static const String _developmentBaseUrl = 'http://localhost:3000/api/v1';
 
   // Optional dart-define overrides:
-  // --dart-define=API_BASE_URL=https://www.bijbel-studie.com/api/v1
+  // --dart-define=API_BASE_URL=https://www.bijbelstudie.io/api/v1
   static const String _apiBaseUrlFromDefine = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
@@ -29,7 +29,7 @@ class AppConfig {
   // Override per environment via dart-define if needed.
   static const String privacyPolicyUrl = String.fromEnvironment(
     'PRIVACY_POLICY_URL',
-    defaultValue: 'https://www.bijbel-studie.com/privacybeleid',
+    defaultValue: 'https://www.bijbelstudie.io/privacybeleid',
   );
   /// The subscription EULA, linked from the paywall. Apple's standard EULA is
   /// used deliberately: it is the one Apple explicitly accepts and it already
@@ -45,7 +45,7 @@ class AppConfig {
   /// signup screen links Dutch terms.
   static const String termsOfServiceUrl = String.fromEnvironment(
     'TERMS_OF_SERVICE_URL',
-    defaultValue: 'https://www.bijbel-studie.com/algemene-voorwaarden',
+    defaultValue: 'https://www.bijbelstudie.io/algemene-voorwaarden',
   );
 
   /// Get the appropriate API base URL based on build mode

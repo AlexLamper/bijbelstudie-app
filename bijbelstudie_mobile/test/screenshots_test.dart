@@ -297,7 +297,7 @@ void main() {
   final proProfile = ProfileModel(
     id: 'u1',
     name: 'Alex Lamper',
-    email: 'alex@bijbel-studie.com',
+    email: 'alex@bijbelstudie.io',
     isPro: true,
     proSource: 'apple',
     proExpiresAt: DateTime(2027, 3, 1),
@@ -306,7 +306,7 @@ void main() {
   final freeProfile = ProfileModel(
     id: 'u1',
     name: 'Alex Lamper',
-    email: 'alex@bijbel-studie.com',
+    email: 'alex@bijbelstudie.io',
     isPro: false,
   );
 

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// ---------------------------------------------------------------------------
-/// Building blocks copied from www.bijbel-studie.com.
+/// Building blocks copied from www.bijbelstudie.io.
 ///
 /// The site is a shadcn/Tailwind system: white cards on a light grey page,
 /// `border border-gray-200`, `rounded-xl` / `rounded-2xl`, Inter with bold

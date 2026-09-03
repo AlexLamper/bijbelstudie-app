@@ -18,7 +18,7 @@ import '../data/dashboard_models.dart';
 import 'daily_verse_card.dart';
 import 'dashboard_providers.dart';
 
-/// `/dashboard` on www.bijbel-studie.com, folded into one column.
+/// `/dashboard` on www.bijbelstudie.io, folded into one column.
 ///
 /// The website lays this out as a wide main column plus a 280px sidebar; on a
 /// phone the two stack in the order the site prioritises them — hero, stats,

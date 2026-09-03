@@ -1,6 +1,6 @@
 /// The 66 Dutch book names and their chapter counts, copied from
 /// `lib/data/bible-chapter-counts.ts` and `app/dashboard/page.tsx` on
-/// www.bijbel-studie.com.
+/// www.bijbelstudie.io.
 ///
 /// The dashboard heat map needs a denominator per book before any chapter has
 /// been fetched, so this table is bundled rather than requested. It is fixed
@@ -57,7 +57,7 @@ class BibleBooks {
   /// English book names the third-party BijbelAPI.com "daytext" feed (and any
   /// other English-keyed source) can hand back, mapped to the exact Dutch
   /// strings in [oldTestament] / [newTestament]. Mirrors `CANONICAL_NL` in
-  /// `lib/book-mapping.ts` on www.bijbel-studie.com, but keyed to *this*
+  /// `lib/book-mapping.ts` on www.bijbelstudie.io, but keyed to *this*
   /// app's canonical Dutch spellings rather than the website's.
   static const Map<String, String> _englishToDutch = {
     'Genesis': 'Genesis',

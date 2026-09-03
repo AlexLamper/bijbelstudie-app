@@ -8,12 +8,12 @@ class AppleSignInConfig {
   );
 
   // Redirect URI configured on the Apple Services ID, e.g.
-  // https://www.bijbel-studie.com/api/v1/auth/apple/callback
+  // https://www.bijbelstudie.io/api/v1/auth/apple/callback
   // Pass via: --dart-define=APPLE_REDIRECT_URI=...
   static const String redirectUriRaw = String.fromEnvironment(
     'APPLE_REDIRECT_URI',
     // Safe default for this app; can still be overridden per environment.
-    defaultValue: 'https://www.bijbel-studie.com/api/v1/auth/apple/callback',
+    defaultValue: 'https://www.bijbelstudie.io/api/v1/auth/apple/callback',
   );
 
   static Uri? get redirectUri {

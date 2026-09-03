@@ -17,7 +17,7 @@ import 'geo_image_view.dart';
 import '../domain/summary_format.dart';
 import 'study_pane_controller.dart';
 
-/// `/studie` on www.bijbel-studie.com.
+/// `/studie` on www.bijbelstudie.io.
 ///
 /// The website shows the chapter and the study materials side by side on a
 /// wide screen and a two-button pane switcher below `lg`. A phone is always
@@ -64,14 +64,29 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
             ),
           ),
           Expanded(
-            // IndexedStack so switching panes does not lose the reader's
-            // scroll offset or an in-flight AI answer.
-            child: IndexedStack(
-              index: showMaterials ? 1 : 0,
-              children: [
-                const ReadScreen(),
-                if (restored) const StudyMaterialsPane() else const AppLoader(),
-              ],
+            // The switcher above has already cleared the status bar, so the
+            // panes below it must not clear it a second time. [ReadScreen] is
+            // also a screen in its own right at `/read`, where its own
+            // SafeArea is exactly right; nested here it measured the full
+            // inset again and opened an empty band of scaffold background
+            // under the switcher. Consuming the top padding at this boundary
+            // fixes it for every pane at once and leaves the standalone
+            // reader untouched.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              // IndexedStack so switching panes does not lose the reader's
+              // scroll offset or an in-flight AI answer.
+              child: IndexedStack(
+                index: showMaterials ? 1 : 0,
+                children: [
+                  const ReadScreen(),
+                  if (restored)
+                    const StudyMaterialsPane()
+                  else
+                    const AppLoader(),
+                ],
+              ),
             ),
           ),
         ],

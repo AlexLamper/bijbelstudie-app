@@ -34,9 +34,13 @@ class LessonCompleteCard extends ConsumerWidget {
     final alreadyCounted = lesson.outline
         .where((entry) => entry.completed)
         .any((entry) => entry.day == lesson.day);
-    final done = lesson.outline.where((entry) => entry.completed).length +
+    final done =
+        lesson.outline.where((entry) => entry.completed).length +
         (alreadyCounted ? 0 : 1);
-    final remaining = (lesson.lessonsTotal - done).clamp(0, lesson.lessonsTotal);
+    final remaining = (lesson.lessonsTotal - done).clamp(
+      0,
+      lesson.lessonsTotal,
+    );
 
     final next = summary.nextLessonDay ?? lesson.nextLessonDay;
     final nextEntry = next == null
@@ -107,10 +111,7 @@ class LessonCompleteCard extends ConsumerWidget {
                       value: '$quizScore/$quizTotal',
                       label: quizScoreLabel(quizScore!, quizTotal!),
                     )
-                  : _Stat(
-                      value: lesson.passage.reference,
-                      label: 'Gelezen',
-                    ),
+                  : _Stat(value: lesson.passage.reference, label: 'Gelezen'),
             ),
           ],
         ),
@@ -127,7 +128,9 @@ class LessonCompleteCard extends ConsumerWidget {
             Expanded(
               child: _Stat(
                 value: '$done/${lesson.lessonsTotal}',
-                label: remaining == 0 ? 'Alle lessen af' : 'Nog $remaining te gaan',
+                label: remaining == 0
+                    ? 'Alle lessen af'
+                    : 'Nog $remaining te gaan',
               ),
             ),
           ],
@@ -148,12 +151,18 @@ class LessonCompleteCard extends ConsumerWidget {
             onTap: () => context.go('/notes'),
             child: Row(
               children: [
-                Icon(Icons.edit_note_outlined, size: 16, color: AppTheme.tealStrong),
+                Icon(
+                  Icons.edit_note_outlined,
+                  size: 16,
+                  color: AppTheme.tealStrong,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Je reflectie is bewaard als notitie',
-                    style: AppTheme.bodyStrong.copyWith(color: AppTheme.tealStrong),
+                    style: AppTheme.bodyStrong.copyWith(
+                      color: AppTheme.tealStrong,
+                    ),
                   ),
                 ),
                 Icon(Icons.chevron_right, size: 18, color: AppTheme.tealStrong),

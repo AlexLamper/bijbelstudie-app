@@ -18,7 +18,11 @@ import 'lesson_providers.dart';
 /// usually a passage nobody has written questions for yet, which is not the
 /// reader's problem.
 class LessonQuizStep extends ConsumerStatefulWidget {
-  const LessonQuizStep({super.key, required this.lesson, required this.lessonRef});
+  const LessonQuizStep({
+    super.key,
+    required this.lesson,
+    required this.lessonRef,
+  });
 
   final LessonPayload lesson;
   final LessonRef lessonRef;
@@ -43,11 +47,7 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     _seeded = true;
     _answers.addAll(quiz.savedAnswers);
     if (quiz.isGraded) {
-      _result = QuizResult(
-        score: quiz.savedScore!,
-        total: quiz.savedTotal!,
-
-      );
+      _result = QuizResult(score: quiz.savedScore!, total: quiz.savedTotal!);
       _index = quiz.questions.length;
       return;
     }
@@ -61,7 +61,11 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     _index = quiz.questions.length;
   }
 
-  Future<void> _pick(LessonQuiz quiz, QuizQuestion question, String answerId) async {
+  Future<void> _pick(
+    LessonQuiz quiz,
+    QuizQuestion question,
+    String answerId,
+  ) async {
     setState(() => _answers[question.id] = answerId);
 
     final repository = ref.read(lessonRepositoryProvider);
@@ -70,7 +74,9 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     // Save on every tap so a half-finished quiz survives leaving the lesson.
     unawaited(
       repository
-          .saveQuizAnswers(lessonRef.studyId, lessonRef.day, {question.id: answerId})
+          .saveQuizAnswers(lessonRef.studyId, lessonRef.day, {
+            question.id: answerId,
+          })
           .then((_) {}, onError: (_, _) {}),
     );
 
@@ -99,7 +105,9 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     } on LessonException catch (e) {
       if (!mounted) return;
       setState(() => _grading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -121,7 +129,8 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
         if (result != null) return _scoreCard(quiz, result);
         if (_grading) return const Center(child: AppLoader());
 
-        final question = quiz.questions[_index.clamp(0, quiz.questions.length - 1)];
+        final question =
+            quiz.questions[_index.clamp(0, quiz.questions.length - 1)];
         return _questionCard(quiz, question);
       },
     );
@@ -168,7 +177,9 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
             child: _AnswerRow(
               label: answer.text,
               selected: picked == answer.id,
-              onTap: picked != null ? null : () => _pick(quiz, question, answer.id),
+              onTap: picked != null
+                  ? null
+                  : () => _pick(quiz, question, answer.id),
             ),
           ),
       ],
@@ -236,7 +247,11 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
 }
 
 class _AnswerRow extends StatelessWidget {
-  const _AnswerRow({required this.label, required this.selected, required this.onTap});
+  const _AnswerRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
