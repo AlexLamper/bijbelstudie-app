@@ -7,13 +7,14 @@ import '../../../../core/ui/skeleton.dart';
 import '../../data/context_repository.dart';
 import '../../domain/lesson_models.dart';
 import '../../domain/summary_format.dart';
+import '../geo_image_view.dart';
 
 /// The background screen: where this happened, and what the book is about.
 ///
 /// A step of its own rather than two more panels on Verdieping. Both halves are
-/// context rather than exposition - nice to have looked at, not something to
-/// read *while* working through the uitleg - so they get their own stop on the
-/// rail where there is room for a photograph to actually be a photograph.
+/// context rather than exposition - what you want in hand *before* the uitleg,
+/// not something to read while working through it - so they get their own stop
+/// on the rail, ahead of Verdieping.
 ///
 /// The shell only puts this on the rail when there is something to show, so
 /// neither half needs to justify an empty screen.
@@ -37,7 +38,8 @@ class LessonContextStep extends ConsumerWidget {
         const SizedBox(height: 16),
 
         images.when(
-          loading: () => const SkeletonCard(height: 180, child: SkeletonText(lines: 2)),
+          loading: () =>
+              const SkeletonCard(height: 126, child: SkeletonText(lines: 2)),
           // Context is a bonus; a failure to fetch it says nothing worth
           // interrupting the lesson for.
           error: (_, _) => const SizedBox.shrink(),
@@ -46,21 +48,16 @@ class LessonContextStep extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final image in list)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _PlaceCard(image: image),
-                  ),
-                if (list.any((image) => image.fromBook))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      'Deze plaatsen horen bij ${passage.book}, niet per se bij '
-                      'dit hoofdstuk.',
-                      style: AppTheme.caption,
-                    ),
-                  ),
+                _PlaceStrip(images: list),
                 const SizedBox(height: 8),
+                Text(
+                  list.any((image) => image.fromBook)
+                      ? 'Deze plaatsen horen bij ${passage.book}, niet per se bij '
+                            'dit hoofdstuk. Tik op een foto voor een grote weergave.'
+                      : 'Tik op een foto voor een grote weergave.',
+                  style: AppTheme.caption,
+                ),
+                const SizedBox(height: 20),
               ],
             );
           },
@@ -95,67 +92,194 @@ class LessonContextStep extends ConsumerWidget {
   }
 }
 
-class _PlaceCard extends StatelessWidget {
-  const _PlaceCard({required this.image});
+/// The photographs, as a row of small tiles rather than a stack of full-width
+/// cards.
+///
+/// A 16:9 card per place turned three photographs into three screens of
+/// scrolling before the book's introduction - the part of this step actually
+/// worth reading - came into view at all. Tiles put several places side by
+/// side, keep the introduction near the top, and the photograph at full size is
+/// one tap away in [_PlaceLightbox], where it can be looked at properly.
+class _PlaceStrip extends StatelessWidget {
+  const _PlaceStrip({required this.images});
 
-  final GeoImage image;
+  final List<GeoImage> images;
+
+  static const double _tile = 104;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // AppCard does not clip its tappable branch, and this card is not
-          // tappable - but the rounding is applied here anyway so the image
-          // cannot sit proud of the corners either way.
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppTheme.radiusLg),
-            ),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                image.url,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return ColoredBox(color: AppTheme.paperSunken);
-                },
-                errorBuilder: (_, _, _) => ColoredBox(
-                  color: AppTheme.paperSunken,
-                  child: Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      size: 20,
-                      color: AppTheme.inkFaint,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
+    return SizedBox(
+      height: _tile + 22,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: images.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final image = images[index];
+          return SizedBox(
+            width: _tile,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(image.placeName, style: AppTheme.bodyStrong),
-                if (image.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    image.description!,
-                    style: AppTheme.caption,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                Semantics(
+                  button: true,
+                  label: 'Foto van ${image.placeName}, vergroten',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    onTap: () => _openLightbox(context, index),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      child: SizedBox(
+                        width: _tile,
+                        height: _tile,
+                        // Asked for at 2x the drawn size so the tile stays
+                        // sharp on a retina screen without pulling the 5000px
+                        // original for a 104pt box.
+                        child: GeoImageView(
+                          image: image,
+                          width: (_tile * 2).round(),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-                const SizedBox(height: 6),
-                // CC attribution has to be displayed, not merely recorded.
+                ),
+                const SizedBox(height: 5),
                 Text(
-                  '${image.credit} · ${image.license}',
+                  image.placeName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTheme.metaLabel,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openLightbox(BuildContext context, int index) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.black87,
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, _, _) =>
+            _PlaceLightbox(images: images, initialIndex: index),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+}
+
+/// The photographs at full size: one per page, pinchable, with the caption and
+/// the CC credit under them.
+class _PlaceLightbox extends StatefulWidget {
+  const _PlaceLightbox({required this.images, required this.initialIndex});
+
+  final List<GeoImage> images;
+  final int initialIndex;
+
+  @override
+  State<_PlaceLightbox> createState() => _PlaceLightboxState();
+}
+
+class _PlaceLightboxState extends State<_PlaceLightbox> {
+  late final PageController _pages = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.images[_index];
+    final width =
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .clamp(320.0, 1280.0)
+            .round();
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          // Tapping the backdrop closes, as the website's lightbox does; the
+          // photograph keeps its own gestures for panning and zooming.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.close),
+                    color: Colors.white,
+                    tooltip: 'Sluiten',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pages,
+                    itemCount: widget.images.length,
+                    onPageChanged: (value) => setState(() => _index = value),
+                    itemBuilder: (context, index) => InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: GeoImageView(
+                        image: widget.images[index],
+                        width: width,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        image.placeName,
+                        style: AppTheme.bodyStrong.copyWith(color: Colors.white),
+                      ),
+                      if (image.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          image.description!,
+                          style: AppTheme.caption.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      // CC attribution has to be displayed, not merely recorded.
+                      Text(
+                        '${image.credit} · ${image.license}',
+                        style: AppTheme.metaLabel.copyWith(color: Colors.white54),
+                      ),
+                      if (widget.images.length > 1) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_index + 1} / ${widget.images.length}',
+                          style: AppTheme.metaLabel.copyWith(color: Colors.white54),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),

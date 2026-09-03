@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -118,20 +117,31 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// opening, short enough that the whole thing stays a few kilobytes of JSON.
   static const int maxDays = 60;
 
-  /// True once a write has run, so the asynchronous first read cannot replay a
-  /// stale snapshot over a like the reader has just watched take effect.
-  bool _written = false;
+  /// The first read from disk. Every mutator awaits it before touching state.
+  ///
+  /// This used to be a fire-and-forget read with a `_written` flag that made it
+  /// bail out if a write had got in first - and a write always did. The card
+  /// calls [remember] from its first post-frame callback, which lands well
+  /// before `SharedPreferences.getInstance()` resolves, so the read returned
+  /// early on every single launch. State was then "today's verse and nothing
+  /// else", and [_persistHistory] wrote exactly that back over the stored
+  /// archive. Every previous day was destroyed on startup, which is why
+  /// "Voorgaande dagen" was always empty no matter how long the app had been
+  /// used.
+  ///
+  /// Waiting is the whole fix: the read is quick, the writes it gates are not
+  /// user-visible, and a mutation can no longer be built on a blank history.
+  late Future<void> _ready;
 
   @override
   DailyVerseMemory build() {
-    unawaited(_load());
+    _ready = _load();
     return const DailyVerseMemory();
   }
 
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (_written) return;
       state = DailyVerseMemory(
         history: _decode(prefs.getString(_kHistory)),
         liked: (prefs.getStringList(_kLiked) ?? const <String>[]).toSet(),
@@ -139,7 +149,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
       );
     } catch (_) {
       // No preferences plugin: an empty archive, and likes that live only for
-      // this session. Still "loaded" — nothing more is coming.
+      // this session. Still "loaded" - nothing more is coming.
       state = state.copyWith(loaded: true);
     }
   }
@@ -164,6 +174,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// Called from the card whenever `/dashboard` hands over a daily verse, so
   /// the archive fills itself simply by opening the app on consecutive days.
   Future<void> remember(DailyVerse verse, {required String version}) async {
+    await _ready;
     final today = dayKey(DateTime.now());
     final existing = state.history;
     if (existing.isNotEmpty &&
@@ -182,22 +193,24 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
       version: version,
     );
 
-    final next = [
-      entry,
-      ...existing.where((e) => e.date != today),
-    ].take(maxDays).toList(growable: false);
+    // Newest first, and sorted by day rather than by arrival: an entry
+    // recovered from an older install, or a day whose key sorts before one
+    // already stored, still lands in the right place in the list.
+    final next =
+        <DailyVerseEntry>[entry, ...existing.where((e) => e.date != today)]
+          ..sort((a, b) => b.date.compareTo(a.date));
 
-    _written = true;
-    state = state.copyWith(history: next, loaded: true);
-    await _persistHistory(next);
+    final capped = next.take(maxDays).toList(growable: false);
+    state = state.copyWith(history: capped, loaded: true);
+    await _persistHistory(capped);
   }
 
   Future<void> toggleLike(String reference) async {
     if (reference.isEmpty) return;
+    await _ready;
     final next = {...state.liked};
     if (!next.remove(reference)) next.add(reference);
 
-    _written = true;
     state = state.copyWith(liked: next, loaded: true);
     try {
       final prefs = await SharedPreferences.getInstance();

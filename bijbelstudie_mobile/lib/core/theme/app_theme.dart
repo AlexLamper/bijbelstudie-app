@@ -314,14 +314,28 @@ class AppTheme {
 
   static LinearGradient get accentGradient => brandGradient;
 
-  /// Status bar / nav bar styling matching the page background.
+  /// Status bar / nav bar styling.
+  ///
+  /// Both bars are transparent, and the app paints under them: a screen's own
+  /// header and footer extend into the insets and add the system padding
+  /// themselves. `systemNavigationBarColor: paper` used to sit here instead,
+  /// which meant the strip behind Android's gesture bar was painted the page
+  /// background while the bottom bar directly above it was `paperRaised` - a
+  /// band of the wrong colour under every screen. The status bar had the same
+  /// problem at the top wherever a header was not the scaffold's colour.
+  ///
+  /// `systemNavigationBarContrastEnforced: false` matters as much as the
+  /// colour: left on, Android paints its own translucent scrim over a
+  /// transparent nav bar and the band comes straight back.
   static SystemUiOverlayStyle get overlayStyle => SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     // The icon brightness is the brightness of the *icons*, so it is the
     // opposite of the surface they sit on.
     statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-    systemNavigationBarColor: paper,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarContrastEnforced: false,
     systemNavigationBarIconBrightness: isDark
         ? Brightness.light
         : Brightness.dark,

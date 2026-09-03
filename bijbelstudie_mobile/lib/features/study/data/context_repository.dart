@@ -9,22 +9,19 @@ final contextRepositoryProvider = Provider((ref) {
 
 class GeoImage {
   const GeoImage({
-    required this.url,
+    required this.fileUrl,
     required this.placeName,
     required this.credit,
     required this.license,
-    this.fullUrl,
     this.description,
     this.fromBook = false,
   });
 
-  /// What to render: the endpoint's 640px `thumbnailUrl` when it sent one,
-  /// which is the right size for a phone card, otherwise the file itself.
-  final String url;
-
-  /// The full `upload.wikimedia.org` file behind [url]. Kept so a thumbnail
-  /// that does not resolve has something to fall back to instead of a grey box.
-  final String? fullUrl;
+  /// The original `upload.wikimedia.org` file. Always resolvable, but routinely
+  /// a 3-10 MB, 5000px photograph, so it is only ever rendered through
+  /// [sizedUrl] - see there for why the endpoint's own `thumbnailUrl` is not
+  /// used at all.
+  final String fileUrl;
 
   final String placeName;
 
@@ -38,14 +35,37 @@ class GeoImage {
   /// chapter itself names no place - see [ContextRepository.getGeoImages].
   final bool fromBook;
 
+  /// A copy of the photograph resized to [width] px, via Wikimedia's own
+  /// `Special:FilePath`.
+  ///
+  /// The endpoint sends a `thumbnailUrl` built by substituting a width into
+  /// Wikimedia's `thumb/` URL pattern, and that URL does not load: for most
+  /// files upload.wikimedia.org answers an arbitrary width with
+  /// `400 Use thumbnail sizes listed on https://w.wiki/GHai`. Rendering it is
+  /// why this step showed nothing but broken-image boxes. `Special:FilePath`
+  /// is the documented resize entry point and accepts any width, so the
+  /// thumbnail is derived from [fileUrl] here instead of trusting the pattern.
+  ///
+  /// Falls back to [fileUrl] for anything not hosted on Wikimedia, which
+  /// costs bandwidth but always renders.
+  String sizedUrl(int width) {
+    final uri = Uri.tryParse(fileUrl);
+    if (uri == null || !uri.host.endsWith('wikimedia.org')) return fileUrl;
+    final name = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+    if (name.isEmpty) return fileUrl;
+    // The segment is already percent-encoded in the source URL and must stay
+    // that way: several of these filenames are Arabic or Hebrew.
+    return 'https://commons.wikimedia.org/wiki/Special:FilePath/$name'
+        '?width=$width';
+  }
+
   static GeoImage? fromJson(Map<String, dynamic> json, {bool fromBook = false}) {
+    // `url` is the file itself; `thumbnailUrl` is deliberately ignored - see
+    // [sizedUrl].
     final file = json['url'] as String?;
-    final thumbnail = json['thumbnailUrl'] as String?;
-    final url = (thumbnail?.isNotEmpty ?? false) ? thumbnail! : file;
-    if (url == null || url.isEmpty) return null;
+    if (file == null || file.isEmpty) return null;
     return GeoImage(
-      url: url,
-      fullUrl: (file?.isNotEmpty ?? false) ? file : null,
+      fileUrl: file,
       placeName: json['placeName'] as String? ?? '',
       credit: json['credit'] as String? ?? '',
       license: json['license'] as String? ?? '',
@@ -54,6 +74,13 @@ class GeoImage {
     );
   }
 }
+
+/// Wikimedia refuses a request with no User-Agent outright (403) and asks for a
+/// descriptive one by policy, so every image request from this app sends these.
+const Map<String, String> wikimediaImageHeaders = {
+  'User-Agent': 'BijbelStudie/1.0 (https://www.bijbel-studie.com; '
+      'contact@bijbel-studie.com)',
+};
 
 /// The "Algemene info" tab: a public-domain introduction to the book plus
 /// photographs of the places it names.

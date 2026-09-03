@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -127,7 +129,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final verseNumber = verse?.verse ?? fallback?.verse;
     final photo = dailyVersePhoto(DateTime.now());
 
-    // Tapping the photo opens the same card as a modal. The action buttons on
+    // Tapping the photo opens the same card full screen. The action buttons on
     // top of it keep their own taps: a tap recognizer nested inside this one
     // is the deeper entry in the gesture arena and wins it.
     return GestureDetector(
@@ -143,28 +145,39 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
       ),
       child: SizedBox(
         height: _cardHeight,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          child: _VerseFace(
-            photo: photo,
-            text: text,
-            reference: reference,
-            version: version,
-            liked: liked,
-            expanded: false,
-            onLike: () =>
-                ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
-            onShare: () => _share(text, reference, version),
-            onMore: () => _showMore(book, chapter, verseNumber),
+        child: Hero(
+          tag: dailyVerseHeroTag,
+          flightShuttleBuilder: dailyVerseFlightShuttle,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            child: _VerseFace(
+              photo: photo,
+              text: text,
+              reference: reference,
+              version: version,
+              liked: liked,
+              expanded: false,
+              onLike: () =>
+                  ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
+              onShare: () => _share(text, reference, version),
+              onMore: () => _showMore(book, chapter, verseNumber),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Opens the card as a modal over the dashboard: the same photograph, the
-  /// same reference and the same actions, only larger and with the verse in
-  /// full rather than clipped at six lines.
+  /// Opens the card full screen: the same photograph, the same reference and
+  /// the same actions, edge to edge and with the verse in full rather than
+  /// clipped at six lines.
+  ///
+  /// A route rather than a dialog, so the photograph can fly from the card's
+  /// place on the dashboard to the whole screen as one continuous movement
+  /// ([Hero], with [dailyVerseFlightShuttle] rounding the corners off along the
+  /// way). A dialog cannot do that: it is inset by its own padding, so it can
+  /// never reach the corners, and it appears with a scale-and-fade of its own
+  /// that has nothing to do with where the card was.
   Future<void> _openExpanded({
     required String photo,
     required String text,
@@ -174,23 +187,35 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     required int chapter,
     required int? verseNumber,
   }) {
-    return showDialog<void>(
-      context: context,
-      // Dismissible by tapping outside; the close button is in the card.
-      barrierColor: Colors.black.withValues(alpha: 0.62),
-      builder: (dialogContext) => _ExpandedVerseDialog(
-        photo: photo,
-        text: text,
-        reference: reference,
-        version: version,
-        onShare: () => _share(text, reference, version),
-        onReadChapter: () {
-          Navigator.of(dialogContext).pop();
-          _openChapterAtVerse(book, chapter, verseNumber);
-        },
-        onHistory: () => _showHistorySheet(
-          dialogContext,
-          beforeOpen: () => Navigator.of(dialogContext).pop(),
+    return Navigator.of(context).push<void>(
+      PageRouteBuilder<void>(
+        // Transparent underneath so the dashboard stays visible while the
+        // photograph is still on its way up.
+        opaque: false,
+        barrierColor: Colors.transparent,
+        transitionDuration: const Duration(milliseconds: 340),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (routeContext, _, _) => _ExpandedVerseScreen(
+          photo: photo,
+          text: text,
+          reference: reference,
+          version: version,
+          onShare: () => _share(text, reference, version),
+          onReadChapter: () {
+            Navigator.of(routeContext).pop();
+            _openChapterAtVerse(book, chapter, verseNumber);
+          },
+          onHistory: () => _showHistorySheet(
+            routeContext,
+            beforeOpen: () => Navigator.of(routeContext).pop(),
+          ),
+        ),
+        // Only the chrome around the photograph fades; the photograph itself
+        // is carried by the hero flight, so fading it too would read as a
+        // dissolve laid over a movement.
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
         ),
       ),
     );
@@ -304,8 +329,11 @@ class _VerseFace extends StatelessWidget {
         const _PhotoScrim(),
 
         Padding(
+          // Full screen means under the notch and under the home indicator, so
+          // the text insets by the system padding on top of its own.
           padding: expanded
-              ? const EdgeInsets.fromLTRB(22, 16, 22, 10)
+              ? EdgeInsets.fromLTRB(22, 16, 22, 10) +
+                    MediaQuery.paddingOf(context)
               : const EdgeInsets.fromLTRB(20, 18, 20, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,13 +507,46 @@ class _VerseActions extends StatelessWidget {
   }
 }
 
-/// The card again, as a modal over the dashboard.
+/// The tag that links the card on the dashboard to the full-screen version.
+const String dailyVerseHeroTag = 'daily-verse-card';
+
+/// Rounds the card's corners off as it grows into the screen, and back on the
+/// way down.
+///
+/// Without this the hero would jump to square corners the instant the flight
+/// starts - the default shuttle renders the destination subtree throughout -
+/// which is exactly the seam this transition is meant not to have.
+Widget dailyVerseFlightShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection direction,
+  BuildContext fromContext,
+  BuildContext toContext,
+) {
+  final pushing = direction == HeroFlightDirection.push;
+  final hero = (pushing ? toContext : fromContext).widget as Hero;
+
+  return AnimatedBuilder(
+    animation: animation,
+    builder: (context, _) {
+      final t = pushing ? animation.value : 1 - animation.value;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(
+          lerpDouble(AppTheme.radiusLg, 0, Curves.easeOut.transform(t))!,
+        ),
+        child: hero.child,
+      );
+    },
+  );
+}
+
+/// The card again, filling the screen.
 ///
 /// A [ConsumerWidget] rather than a snapshot of the card's state: it sits on
 /// its own route, so the heart only follows [dailyVerseStoreProvider] if it
 /// watches the store itself.
-class _ExpandedVerseDialog extends ConsumerWidget {
-  const _ExpandedVerseDialog({
+class _ExpandedVerseScreen extends ConsumerStatefulWidget {
+  const _ExpandedVerseScreen({
     required this.photo,
     required this.text,
     required this.reference,
@@ -504,39 +565,66 @@ class _ExpandedVerseDialog extends ConsumerWidget {
   final VoidCallback onHistory;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final liked = ref.watch(dailyVerseStoreProvider).isLiked(reference);
+  ConsumerState<_ExpandedVerseScreen> createState() =>
+      _ExpandedVerseScreenState();
+}
 
-    // Tall enough to read like an opened card, never taller than the screen —
-    // a SizedBox cannot outgrow the constraints the dialog hands it, so a
-    // short screen simply gets a shorter card and the verse scrolls.
-    final height = (MediaQuery.sizeOf(context).height * 0.74)
-        .clamp(320.0, 680.0)
-        .toDouble();
+class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
+  /// How far the reader has dragged the photograph down, in logical pixels.
+  double _drag = 0;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 36),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: SizedBox(
-          height: height,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+  /// Past this, letting go closes rather than springs back.
+  static const double _dismissAt = 120;
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() => _drag = (_drag + details.delta.dy).clamp(0.0, 400.0));
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final flung = details.velocity.pixelsPerSecond.dy > 700;
+    if (flung || _drag > _dismissAt) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() => _drag = 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final liked = ref.watch(dailyVerseStoreProvider).isLiked(widget.reference);
+
+    // The drag both moves the photograph and thins the black behind it, so
+    // pulling down reveals the dashboard rather than sliding a black sheet
+    // over it.
+    final progress = (_drag / (_dismissAt * 2)).clamp(0.0, 1.0);
+
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: 1 - progress),
+      // Edge to edge on purpose: no insets, no rounded corners, no visible
+      // route beneath. SafeArea lives inside _VerseFace, where it can pad the
+      // text without letting the photograph stop short of the notch.
+      body: GestureDetector(
+        onVerticalDragUpdate: _onDragUpdate,
+        onVerticalDragEnd: _onDragEnd,
+        child: Transform.translate(
+          offset: Offset(0, _drag),
+          child: Hero(
+            tag: dailyVerseHeroTag,
+            flightShuttleBuilder: dailyVerseFlightShuttle,
             child: _VerseFace(
-              photo: photo,
-              text: text,
-              reference: reference,
-              version: version,
+              photo: widget.photo,
+              text: widget.text,
+              reference: widget.reference,
+              version: widget.version,
               liked: liked,
               expanded: true,
-              onLike: () =>
-                  ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
-              onShare: onShare,
-              onReadChapter: onReadChapter,
-              onHistory: onHistory,
-              onClose: () => Navigator.of(context).pop(),
+              onLike: () => ref
+                  .read(dailyVerseStoreProvider.notifier)
+                  .toggleLike(widget.reference),
+              onShare: widget.onShare,
+              onReadChapter: widget.onReadChapter,
+              onHistory: widget.onHistory,
+              onClose: () => Navigator.of(context).maybePop(),
             ),
           ),
         ),

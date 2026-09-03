@@ -12,8 +12,8 @@ import 'commentary_body.dart';
 
 /// The Commentaar tab of the study page, locked to whatever the reader shows.
 ///
-/// Its source picker is the site's commentary `<select>`; the choice is
-/// persisted so reopening the app keeps the same commentator.
+/// Its source picker stands in for the site's commentary `<select>`; the choice
+/// is persisted so reopening the app keeps the same commentator.
 class CommentaryPane extends ConsumerWidget {
   const CommentaryPane({
     super.key,
@@ -37,23 +37,13 @@ class CommentaryPane extends ConsumerWidget {
     return Column(
       children: [
         if (sources.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: DropdownButtonFormField<String>(
-              value: sources.any((s) => s.id == commentaryId)
-                  ? commentaryId
-                  : sources.first.id,
-              isExpanded: true,
-              decoration: const InputDecoration(isDense: true),
-              items: [
-                for (final source in sources)
-                  DropdownMenuItem(value: source.id, child: Text(source.name)),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                ref.read(readingSettingsProvider.notifier).setLastCommentary(value);
-              },
-            ),
+          _SourceBar(
+            sources: sources,
+            selectedId: sources.any((s) => s.id == commentaryId)
+                ? commentaryId
+                : sources.first.id,
+            onSelected: (value) =>
+                ref.read(readingSettingsProvider.notifier).setLastCommentary(value),
           ),
         Expanded(
           child: chapterAsync.when(
@@ -117,6 +107,171 @@ class CommentaryPane extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Which commentator is being read, and the way to change it.
+///
+/// Was a `DropdownButtonFormField`: a Material outlined form field, with its
+/// own border, its own floating-label metrics and a grey pop-up menu, sitting
+/// on top of a page built out of rules and flat paper. It read as a control
+/// borrowed from another app. This is the picker the reader already knows from
+/// the Bijbel tab instead - a quiet line naming the current source, and a sheet
+/// to change it - so the commentary pane reads as one surface again.
+class _SourceBar extends StatelessWidget {
+  const _SourceBar({
+    required this.sources,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  final List<BibleSource> sources;
+  final String selectedId;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = sources.firstWhere(
+      (source) => source.id == selectedId,
+      orElse: () => sources.first,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          label: 'Commentaar: ${current.name}. Kies een andere bron',
+          child: InkWell(
+            // One source is not a choice; the line then only says whose
+            // commentary this is.
+            onTap: sources.length < 2
+                ? null
+                : () => _openSheet(context, current.id),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.menu_book_outlined,
+                    size: 16,
+                    color: AppTheme.inkMuted,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      current.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.bodyStrong.copyWith(fontSize: 14),
+                    ),
+                  ),
+                  if (sources.length > 1) ...[
+                    Text('Wissel', style: AppTheme.metaLabel),
+                    const SizedBox(width: 2),
+                    Icon(Icons.expand_more, size: 18, color: AppTheme.inkMuted),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        const RuleLine(),
+      ],
+    );
+  }
+
+  Future<void> _openSheet(BuildContext context, String currentId) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusLg),
+        ),
+      ),
+      builder: (sheetContext) =>
+          _SourceSheet(sources: sources, selectedId: currentId),
+    );
+    if (picked != null && picked != currentId) onSelected(picked);
+  }
+}
+
+/// The source list, in the same sheet the translation picker uses.
+class _SourceSheet extends StatelessWidget {
+  const _SourceSheet({required this.sources, required this.selectedId});
+
+  final List<BibleSource> sources;
+  final String selectedId;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Eyebrow('Commentaar'),
+              ),
+            ),
+            const RuleLine(),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 12),
+                children: [
+                  for (final source in sources)
+                    RuleListTile(
+                      onTap: () => Navigator.of(context).pop(source.id),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  source.name,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                if (source.attribution.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    source.attribution,
+                                    style: AppTheme.bodyMuted.copyWith(
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (source.id == selectedId)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(
+                                Icons.check,
+                                size: 18,
+                                color: AppTheme.teal,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -179,19 +179,19 @@ class _DashboardBody extends ConsumerWidget {
                 const SizedBox(height: 16),
               ],
 
-              _BookMapCard(
-                readChapters: data.readChapters,
-                booksStarted: data.booksStarted,
-                onOpenBook: (book) =>
-                    _openChapter(context, ref, book: book, chapter: 1),
-              ),
-              const SizedBox(height: 16),
-
               // Opens the study itself, not the chapter it happens to start
               // in: a recommendation is an invitation to the study's own
               // screen, where it can be read about and started.
               _RecommendedStudiesCard(
                 onOpen: (study) => context.push('/studies/${study.id}'),
+              ),
+              const SizedBox(height: 16),
+
+              _BookMapCard(
+                readChapters: data.readChapters,
+                booksStarted: data.booksStarted,
+                onOpenBook: (book) =>
+                    _openChapter(context, ref, book: book, chapter: 1),
               ),
               const SizedBox(height: 16),
 

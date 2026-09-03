@@ -78,10 +78,12 @@ class LessonRepository {
     String? depthPanel,
     String? reflectionText,
     bool? complete,
+    Options? options,
   }) async {
     try {
       final response = await _apiClient.dio.patch(
         '/study-lesson-state',
+        options: options,
         data: {
           'studyId': studyId,
           'lessonDay': day,
@@ -108,6 +110,75 @@ class LessonRepository {
     } on DioException catch (e) {
       throw _translate(e, 'Je voortgang kon niet worden opgeslagen.');
     }
+  }
+
+  /// The completing write, with the retries the plain [patch] does not do.
+  ///
+  /// `complete: true` is by far the heaviest request this app makes: on the
+  /// server it claims the ledger row, grants XP, counts every completed lesson
+  /// in the study, copies the reflection into a real note - reading the passage
+  /// text to do it - and rolls the enrollment on. On a cold serverless start
+  /// that comfortably outruns the client's 15s receive timeout, and the reader
+  /// then sees "Je voortgang kon niet worden opgeslagen." for a lesson the
+  /// server did in fact record. The same is true of any 5xx thrown *after* the
+  /// ledger row was claimed.
+  ///
+  /// So this branch does three things the others do not:
+  ///
+  /// 1. Allows the request 60s rather than 15.
+  /// 2. Retries once on a transient failure. Safe because the server dedupes:
+  ///    `recordLessonCompletion` claims the row with an upsert and answers a
+  ///    second attempt with `recorded: false, reason: ALREADY_RECORDED`.
+  /// 3. If it still fails, re-reads the lesson state. `completedAt` set there
+  ///    means the work landed and only the response was lost, which is a
+  ///    success the reader must not be shown an error for.
+  ///
+  /// Only when all three come up empty does this throw.
+  Future<LessonPatchResult> complete(
+    String studyId,
+    int day, {
+    required StudyStep completeStep,
+  }) async {
+    LessonException? failure;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await patch(
+          studyId,
+          day,
+          completeStep: completeStep,
+          complete: true,
+          options: Options(receiveTimeout: const Duration(seconds: 60)),
+        );
+      } on LessonException catch (e) {
+        // A dead session or a study this account never started will not fix
+        // itself on a second try, and the screen has a real answer for both.
+        if (e.isUnauthorized || e.needsEnrollment) rethrow;
+        failure = e;
+      }
+    }
+
+    // Last word: did it land anyway?
+    try {
+      final state = await getState(studyId, day);
+      if (state.isCompleted) {
+        return LessonPatchResult(
+          state: state,
+          // Nothing to celebrate with - the response that carried the XP is
+          // the one that was lost - but the lesson is finished, which is what
+          // the summary card needs to know.
+          completion: const CompletionSummary(
+            recorded: false,
+            studyCompleted: false,
+            reason: 'ALREADY_RECORDED',
+          ),
+        );
+      }
+    } on LessonException {
+      // The verification read failed too; fall through to the original error.
+    }
+
+    throw failure ?? const LessonException('Je voortgang kon niet worden opgeslagen.');
   }
 
   /// The five quiz questions for this lesson, or why there are none.

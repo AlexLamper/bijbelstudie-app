@@ -78,7 +78,12 @@ class LessonSlot {
 }
 
 /// The rail the reader walks: the server's steps in the server's order, with
-/// the background screen inserted directly after Verdieping.
+/// the background screen inserted directly *before* Verdieping.
+///
+/// Background comes first because it is orientation, not exposition: where this
+/// happened and what the book is about is what you want in hand *before* the
+/// uitleg, not after it. Reading the commentary and only then being shown the
+/// place it describes puts the two in the wrong order.
 ///
 /// [withContext] is the shell's answer to "is there anything to put on it" - a
 /// photograph or a book introduction. Without one the slot is left out entirely
@@ -89,10 +94,10 @@ List<LessonSlot> lessonSlots(
 }) {
   final slots = <LessonSlot>[];
   for (final step in steps) {
-    slots.add(LessonSlot.of(step));
     if (withContext && step == StudyStep.depth) {
       slots.add(const LessonSlot.context());
     }
+    slots.add(LessonSlot.of(step));
   }
   return List.unmodifiable(slots);
 }

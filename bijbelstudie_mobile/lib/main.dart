@@ -85,7 +85,11 @@ Future<void> _initReminders() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Paper-coloured system chrome, matching --paper on www.bijbel-studie.com.
+  // Draw behind the status bar and the navigation bar. Without this Android
+  // reserves both strips and fills them with a colour of its own, which is
+  // what put a mismatched band above every header and below every bottom bar.
+  // Each screen's header and footer now paint into the inset themselves.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(AppTheme.overlayStyle);
 
   if (PreviewConfig.enabled) {

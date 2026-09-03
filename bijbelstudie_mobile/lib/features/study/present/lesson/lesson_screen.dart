@@ -32,7 +32,7 @@ import 'step_quiz.dart';
 /// intro simply opens on Het Woord.
 ///
 /// The one screen the client adds is [LessonSlot.context] - the images and the
-/// book's background - inserted after Verdieping when there is something to put
+/// book's background - inserted before Verdieping when there is something to put
 /// on it. It exists in the rail, the counter and the Vorige/Volgende walk only;
 /// every write names the nearest step the server actually knows.
 class LessonScreen extends ConsumerStatefulWidget {
@@ -71,11 +71,14 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
     final steps = lesson.steps;
     final fromUrl = StudyStep.tryFromId(widget.initialStep);
-    final step = [
-      if (fromUrl != null && steps.contains(fromUrl)) fromUrl,
-      if (state.currentStep != null && steps.contains(state.currentStep)) state.currentStep!,
-      if (steps.isNotEmpty) steps.first,
-    ].firstOrNull ?? StudyStep.word;
+    final step =
+        [
+          if (fromUrl != null && steps.contains(fromUrl)) fromUrl,
+          if (state.currentStep != null && steps.contains(state.currentStep))
+            state.currentStep!,
+          if (steps.isNotEmpty) steps.first,
+        ].firstOrNull ??
+        StudyStep.word;
 
     _cursor = LessonCursor(
       slot: LessonSlot.of(step),
@@ -136,12 +139,14 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
     if (!isLast) {
       final next = slots[index + 1];
-      setState(() => _cursor = cursor.copyWith(
-        slot: next,
-        completed: {...cursor.completed, cursor.slot},
-      ));
-      // Only the steps the server defined are reported: leaving Verdieping for
-      // the background screen completes Verdieping and says nothing more.
+      setState(
+        () => _cursor = cursor.copyWith(
+          slot: next,
+          completed: {...cursor.completed, cursor.slot},
+        ),
+      );
+      // Only the steps the server defined are reported: leaving Het Woord for
+      // the background screen completes Het Woord and says nothing more.
       _bestEffort(
         completeStep: cursor.slot.serverStep,
         currentStep: next.serverStep,
@@ -173,12 +178,13 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     final cursor = _cursor!;
     setState(() => _busy = true);
     try {
-      final result = await ref.read(lessonRepositoryProvider).patch(
-        widget.studyId,
-        widget.day,
-        completeStep: _serverStepFor(slots, cursor.slot),
-        complete: true,
-      );
+      final result = await ref
+          .read(lessonRepositoryProvider)
+          .complete(
+            widget.studyId,
+            widget.day,
+            completeStep: _serverStepFor(slots, cursor.slot),
+          );
 
       // The catalogue, the detail screen and the dashboard all read these.
       ref.invalidate(serverStudyLessonsProvider);
@@ -189,14 +195,17 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         _busy = false;
         _cursor = cursor.copyWith(
           completed: {...cursor.completed, cursor.slot},
-          summary: result.completion ??
+          summary:
+              result.completion ??
               const CompletionSummary(recorded: true, studyCompleted: false),
         );
       });
     } on LessonException catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -265,24 +274,32 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.paper,
-      body: SafeArea(
-        child: lessonAsync.when(
-          loading: () => const Padding(
+      // No SafeArea here on purpose: [_TopBar] and [_Footer] paint their own
+      // `paperRaised` full-bleed into the status-bar and home-indicator insets
+      // and add the system padding inside themselves. Wrapping the body
+      // instead left a strip of scaffold `paper` above the bar and below the
+      // footer - two bands of the wrong colour framing every lesson. The
+      // skeleton has no bar of its own, so that branch keeps a SafeArea.
+      body: lessonAsync.when(
+        loading: () => const SafeArea(
+          child: Padding(
             padding: EdgeInsets.all(16),
             child: SkeletonCardColumn(count: 3),
           ),
-          error: (error, _) => _error(error),
-          data: (data) {
-            final cursor = _cursor;
-            if (cursor == null) {
-              return const Padding(
+        ),
+        error: (error, _) => _error(error),
+        data: (data) {
+          final cursor = _cursor;
+          if (cursor == null) {
+            return const SafeArea(
+              child: Padding(
                 padding: EdgeInsets.all(16),
                 child: SkeletonCardColumn(count: 3),
-              );
-            }
-            return _shell(data, cursor);
-          },
-        ),
+              ),
+            );
+          }
+          return _shell(data, cursor);
+        },
       ),
     );
   }
@@ -300,7 +317,9 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         ),
         Expanded(
           child: AppEmptyState(
-            icon: needsEnrollment ? Icons.lock_outline : Icons.wifi_off_outlined,
+            icon: needsEnrollment
+                ? Icons.lock_outline
+                : Icons.wifi_off_outlined,
             title: needsEnrollment ? 'Nog niet gestart' : 'Les niet geladen',
             description: error is LessonException
                 ? error.message
@@ -341,7 +360,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         children: [
           _TopBar(
             title: lesson.title,
-            subtitle: '${lesson.studyTitle} · les ${lesson.day} van ${lesson.lessonsTotal}',
+            subtitle:
+                '${lesson.studyTitle} · les ${lesson.day} van ${lesson.lessonsTotal}',
             onClose: () => _close(lesson),
             onTapTitle: null,
             onOpenAssistant: _openAssistant,
@@ -426,7 +446,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         return LessonReflectionStep(
           lesson: lesson,
           initialText: cursor.reflectionText,
-          onChanged: (text) => _cursor = _cursor!.copyWith(reflectionText: text),
+          onChanged: (text) =>
+              _cursor = _cursor!.copyWith(reflectionText: text),
         );
       case StudyStep.quiz:
         return LessonQuizStep(lesson: lesson, lessonRef: _ref);
@@ -452,8 +473,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         // The composer must stay above the keyboard, so the sheet gives back
         // exactly the height the keyboard took.
         final media = MediaQuery.of(sheetContext);
-        final height =
-            (media.size.height - media.viewInsets.bottom) * 0.92;
+        final height = (media.size.height - media.viewInsets.bottom) * 0.92;
         return Padding(
           padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
           child: SizedBox(
@@ -540,59 +560,66 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.paperRaised,
         border: Border(bottom: BorderSide(color: AppTheme.rule)),
       ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.close),
-            tooltip: 'Les sluiten',
-            color: AppTheme.ink,
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: onTapTitle,
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    Text(
-                      title,
-                      style: AppTheme.bodyStrong,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
+      // Inside the decoration, so the bar's colour runs to the top of the
+      // screen and the controls still clear the status bar.
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+                tooltip: 'Les sluiten',
+                color: AppTheme.ink,
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: onTapTitle,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      children: [
+                        Text(
+                          title,
+                          style: AppTheme.bodyStrong,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            style: AppTheme.metaLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                      ],
                     ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: AppTheme.metaLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              // Balances the close button so the title stays optically centred -
+              // by carrying the assistant, where there is a lesson behind it.
+              if (onOpenAssistant != null)
+                IconButton(
+                  onPressed: onOpenAssistant,
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'Vraag de AI-assistent',
+                  color: AppTheme.teal,
+                )
+              else
+                const SizedBox(width: 48),
+            ],
           ),
-          // Balances the close button so the title stays optically centred -
-          // by carrying the assistant, where there is a lesson behind it.
-          if (onOpenAssistant != null)
-            IconButton(
-              onPressed: onOpenAssistant,
-              icon: const Icon(Icons.auto_awesome),
-              tooltip: 'Vraag de AI-assistent',
-              color: AppTheme.teal,
-            )
-          else
-            const SizedBox(width: 48),
-        ],
+        ),
       ),
     );
   }
@@ -638,7 +665,9 @@ class _StepRail extends StatelessWidget {
                     Text(
                       slot.label,
                       style: AppTheme.overline.copyWith(
-                        color: slot == current ? AppTheme.tealStrong : AppTheme.inkFaint,
+                        color: slot == current
+                            ? AppTheme.tealStrong
+                            : AppTheme.inkFaint,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.clip,

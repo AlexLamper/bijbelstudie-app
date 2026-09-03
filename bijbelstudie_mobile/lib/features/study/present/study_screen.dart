@@ -13,6 +13,7 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/context_repository.dart';
+import 'geo_image_view.dart';
 import '../domain/summary_format.dart';
 import 'study_pane_controller.dart';
 
@@ -48,35 +49,32 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            TourAnchor(
-              id: TourAnchorIds.studyPaneSwitcher,
-              child: _PaneSwitcher(
-                showMaterials: showMaterials,
-                onChanged: (value) => value
-                    ? ref.read(studyPaneProvider.notifier).showMaterials()
-                    : ref.read(studyPaneProvider.notifier).showReader(),
-              ),
+      // [_PaneSwitcher] paints its own `surface` full-bleed under the status
+      // bar and adds the inset itself, so wrapping the body would only put a
+      // strip of scaffold background above it.
+      body: Column(
+        children: [
+          TourAnchor(
+            id: TourAnchorIds.studyPaneSwitcher,
+            child: _PaneSwitcher(
+              showMaterials: showMaterials,
+              onChanged: (value) => value
+                  ? ref.read(studyPaneProvider.notifier).showMaterials()
+                  : ref.read(studyPaneProvider.notifier).showReader(),
             ),
-            Expanded(
-              // IndexedStack so switching panes does not lose the reader's
-              // scroll offset or an in-flight AI answer.
-              child: IndexedStack(
-                index: showMaterials ? 1 : 0,
-                children: [
-                  const ReadScreen(),
-                  if (restored)
-                    const StudyMaterialsPane()
-                  else
-                    const AppLoader(),
-                ],
-              ),
+          ),
+          Expanded(
+            // IndexedStack so switching panes does not lose the reader's
+            // scroll offset or an in-flight AI answer.
+            child: IndexedStack(
+              index: showMaterials ? 1 : 0,
+              children: [
+                const ReadScreen(),
+                if (restored) const StudyMaterialsPane() else const AppLoader(),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -157,21 +155,26 @@ class _PaneSwitcher extends StatelessWidget {
         color: scheme.surface,
         border: Border(bottom: BorderSide(color: scheme.outline)),
       ),
-      child: Row(
-        children: [
-          button(
-            label: 'Bijbel',
-            icon: Icons.menu_book_outlined,
-            active: !showMaterials,
-            onTap: () => onChanged(false),
-          ),
-          button(
-            label: 'Studie',
-            icon: Icons.chat_bubble_outline,
-            active: showMaterials,
-            onTap: () => onChanged(true),
-          ),
-        ],
+      // Inside the decoration: the switcher's colour reaches the top of the
+      // screen, and its buttons still sit below the status bar.
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            button(
+              label: 'Bijbel',
+              icon: Icons.menu_book_outlined,
+              active: !showMaterials,
+              onTap: () => onChanged(false),
+            ),
+            button(
+              label: 'Studie',
+              icon: Icons.chat_bubble_outline,
+              active: showMaterials,
+              onTap: () => onChanged(true),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -202,7 +205,9 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
     // moves the tabs (see the listen in build).
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
-      ref.read(studyPaneProvider.notifier).setMaterialsTab(_tabController.index);
+      ref
+          .read(studyPaneProvider.notifier)
+          .setMaterialsTab(_tabController.index);
     });
   }
 
@@ -237,7 +242,9 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
               controller: _tabController,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
-              labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
+              labelStyle: AppTheme.caption.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
               tabs: [
                 const Tab(height: 42, text: 'Commentaar'),
                 Tab(
@@ -305,7 +312,10 @@ class _GeneralInfoPane extends ConsumerWidget {
           children: [
             Icon(Icons.menu_book_outlined, size: 15, color: AppTheme.teal),
             const SizedBox(width: 8),
-            Text(book, style: AppTheme.bodyStrong.copyWith(color: scheme.onSurface)),
+            Text(
+              book,
+              style: AppTheme.bodyStrong.copyWith(color: scheme.onSurface),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -327,18 +337,13 @@ class _GeneralInfoPane extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(AppTheme.radiusSm),
-                              child: Image.network(
-                                image.url,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusSm,
+                              ),
+                              child: SizedBox(
                                 width: 160,
                                 height: 100,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 160,
-                                  height: 100,
-                                  color: AppTheme.teal.withValues(alpha: 0.08),
-                                ),
+                                child: GeoImageView(image: image, width: 320),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -435,8 +440,12 @@ class _SummaryBody extends StatelessWidget {
               // but not when it opens the section.
               top: i == 0
                   ? 0
-                  : (paragraphs[i].kind == SummaryParagraphKind.heading ? 26 : 16),
-              bottom: paragraphs[i].kind == SummaryParagraphKind.heading ? 2 : 0,
+                  : (paragraphs[i].kind == SummaryParagraphKind.heading
+                        ? 26
+                        : 16),
+              bottom: paragraphs[i].kind == SummaryParagraphKind.heading
+                  ? 2
+                  : 0,
             ),
             child: _SummaryParagraphText(
               paragraph: paragraphs[i],
@@ -449,7 +458,10 @@ class _SummaryBody extends StatelessWidget {
 }
 
 class _SummaryParagraphText extends StatelessWidget {
-  const _SummaryParagraphText({required this.paragraph, required this.bodyStyle});
+  const _SummaryParagraphText({
+    required this.paragraph,
+    required this.bodyStyle,
+  });
 
   final SummaryParagraph paragraph;
   final TextStyle bodyStyle;
@@ -496,10 +508,7 @@ class _SummaryParagraphText extends StatelessWidget {
       spans.add(
         TextSpan(
           text: match.group(0),
-          style: TextStyle(
-            color: AppTheme.teal,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: AppTheme.teal, fontWeight: FontWeight.w600),
         ),
       );
       index = match.end;
@@ -542,10 +551,9 @@ class _ChapterNotesPane extends ConsumerWidget {
         description: 'Controleer je verbinding en probeer het opnieuw.',
       ),
       data: (all) {
-        final mine = all
-            .where((n) => n.book == book && n.chapter == chapter)
-            .toList()
-          ..sort((a, b) => (a.verse ?? 0).compareTo(b.verse ?? 0));
+        final mine =
+            all.where((n) => n.book == book && n.chapter == chapter).toList()
+              ..sort((a, b) => (a.verse ?? 0).compareTo(b.verse ?? 0));
 
         if (mine.isEmpty) {
           return AppEmptyState(
@@ -593,7 +601,9 @@ class _ChapterNotesPane extends ConsumerWidget {
                     const SizedBox(height: 6),
                     Text(
                       note.noteText,
-                      style: AppTheme.bodyMuted.copyWith(color: scheme.onSurface),
+                      style: AppTheme.bodyMuted.copyWith(
+                        color: scheme.onSurface,
+                      ),
                     ),
                   ],
                 ],
