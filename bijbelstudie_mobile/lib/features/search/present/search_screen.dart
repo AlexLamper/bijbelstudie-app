@@ -9,6 +9,7 @@ import '../../../core/ui/skeleton.dart';
 import '../../bible/data/bible_repository.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 
 /// Server-side search with a local history.
 ///
@@ -185,6 +186,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final hit = results.hits[index];
         return RuleListTile(
           onTap: () {
+            ref.read(pendingVerseAnchorProvider.notifier).set(hit.verse);
             ref
                 .read(readerLocationProvider.notifier)
                 .openChapter(book: hit.book, chapter: hit.chapter);

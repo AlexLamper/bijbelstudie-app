@@ -178,7 +178,7 @@ class _StudySettingsSheetState extends ConsumerState<_StudySettingsSheet> {
                 'De studie begint in ${widget.study.startVersion}.',
                 style: AppTheme.caption,
               ),
-              data: (sources) => _TranslationPicker(
+              data: (sources) => TranslationPicker(
                 sources: sources,
                 selected: _translation,
                 onChanged: (id) => setState(() => _translation = id),
@@ -313,8 +313,12 @@ class _WeekdayPicker extends StatelessWidget {
   }
 }
 
-class _TranslationPicker extends StatefulWidget {
-  const _TranslationPicker({
+/// The Dutch-first, "overige vertalingen" collapsible picker used everywhere a
+/// reader chooses a Bible translation: the study startup/settings sheet here,
+/// and the study-wide translation section of [showLessonSettingsSheet].
+class TranslationPicker extends StatefulWidget {
+  const TranslationPicker({
+    super.key,
     required this.sources,
     required this.selected,
     required this.onChanged,
@@ -325,10 +329,10 @@ class _TranslationPicker extends StatefulWidget {
   final ValueChanged<String> onChanged;
 
   @override
-  State<_TranslationPicker> createState() => _TranslationPickerState();
+  State<TranslationPicker> createState() => _TranslationPickerState();
 }
 
-class _TranslationPickerState extends State<_TranslationPicker> {
+class _TranslationPickerState extends State<TranslationPicker> {
   late bool _otherExpanded;
 
   @override

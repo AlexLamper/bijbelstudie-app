@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
+import '../../../bible/present/bible_providers.dart';
 import '../../../bible/present/reader_settings_sheet.dart';
+import '../../../studies/present/study_settings_sheet.dart';
 import '../../domain/lesson_models.dart';
 
 /// The settings a reader can change without leaving the lesson.
@@ -15,9 +17,14 @@ import '../../domain/lesson_models.dart';
 /// reader bar and on Instellingen, both of which are behind the X. A reader
 /// who wanted larger text had to abandon the lesson to get it.
 ///
-/// Two sections, and the split between them is real rather than cosmetic:
+/// Three sections, and the split between them is real rather than cosmetic:
 ///
-///  * **Vertaling** is scoped to this lesson. It writes `viewTranslation`,
+///  * **Studievertaling** changes the enrollment itself - the same setting the
+///    startup sheet ([showStudySettingsSheet]) collects, reusing its
+///    [TranslationPicker] and writing through the same
+///    [EnrollmentRepository.updateSettings] call, so a reader who picked the
+///    wrong translation at the start is never stuck with it.
+///  * **Vertaling** is scoped to this lesson only. It writes `viewTranslation`,
 ///    which the server stores per lesson, and deliberately does not touch the
 ///    enrollment's own translation - picking up NBG51 to compare one passage
 ///    must not silently re-set the whole study.
@@ -29,6 +36,8 @@ Future<void> showLessonSettingsSheet(
   required LessonPayload lesson,
   required String translation,
   required ValueChanged<String> onTranslationChanged,
+  required String studyTranslation,
+  required ValueChanged<String> onStudyTranslationChanged,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -43,6 +52,8 @@ Future<void> showLessonSettingsSheet(
       lesson: lesson,
       translation: translation,
       onTranslationChanged: onTranslationChanged,
+      studyTranslation: studyTranslation,
+      onStudyTranslationChanged: onStudyTranslationChanged,
     ),
   );
 }
@@ -52,11 +63,15 @@ class _LessonSettingsSheet extends ConsumerStatefulWidget {
     required this.lesson,
     required this.translation,
     required this.onTranslationChanged,
+    required this.studyTranslation,
+    required this.onStudyTranslationChanged,
   });
 
   final LessonPayload lesson;
   final String translation;
   final ValueChanged<String> onTranslationChanged;
+  final String studyTranslation;
+  final ValueChanged<String> onStudyTranslationChanged;
 
   @override
   ConsumerState<_LessonSettingsSheet> createState() =>
@@ -70,10 +85,19 @@ class _LessonSettingsSheetState extends ConsumerState<_LessonSettingsSheet> {
   /// part of its subtree, which it never does.
   late String _translation = widget.translation;
 
+  /// Same reasoning as [_translation], for the study-wide pick.
+  late String _studyTranslation = widget.studyTranslation;
+
   void _select(String id) {
     if (id == _translation) return;
     setState(() => _translation = id);
     widget.onTranslationChanged(id);
+  }
+
+  void _selectStudy(String id) {
+    if (id == _studyTranslation) return;
+    setState(() => _studyTranslation = id);
+    widget.onStudyTranslationChanged(id);
   }
 
   @override
@@ -107,6 +131,36 @@ class _LessonSettingsSheetState extends ConsumerState<_LessonSettingsSheet> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 shrinkWrap: true,
                 children: [
+                  Text('Studievertaling', style: AppTheme.bodyStrong),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Geldt voor de hele studie, vanaf nu.',
+                    style: AppTheme.caption,
+                  ),
+                  const SizedBox(height: 10),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final versions = ref.watch(bibleVersionsProvider);
+                      return versions.when(
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: AppLoader(size: 20),
+                        ),
+                        error: (_, _) => Text(
+                          'De vertalingen konden niet worden geladen.',
+                          style: AppTheme.caption,
+                        ),
+                        data: (sources) => TranslationPicker(
+                          sources: sources,
+                          selected: _studyTranslation,
+                          onChanged: _selectStudy,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const RuleLine(),
+                  const SizedBox(height: 20),
                   if (translations.isNotEmpty) ...[
                     Text('Vertaling', style: AppTheme.bodyStrong),
                     const SizedBox(height: 4),

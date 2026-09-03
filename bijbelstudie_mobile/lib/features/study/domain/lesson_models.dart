@@ -173,9 +173,15 @@ class LessonContent {
     final intro = json['intro'];
     final depth = json['depth'];
     return LessonContent(
-      intro: intro is Map<String, dynamic> ? LessonIntro.fromJson(intro) : null,
-      readingCue: json['readingCue'] as String?,
-      depth: depth is Map<String, dynamic> ? LessonDepth.fromJson(depth) : null,
+      // `intro` and `depth` are hand-authored prose blocks - a shape mistake
+      // in one lesson's `watchFor` or `terms` must not blank the whole
+      // lesson, so a bad block is dropped rather than left to throw out of
+      // this constructor. The step list still comes from the server's own
+      // `steps` array, so dropping `intro` here simply loses that one step,
+      // exactly as it would for a study with no authored intro at all.
+      intro: intro is Map<String, dynamic> ? _tryParse(LessonIntro.fromJson, intro) : null,
+      readingCue: _safeString(json['readingCue']),
+      depth: depth is Map<String, dynamic> ? _tryParse(LessonDepth.fromJson, depth) : null,
       reflection: LessonReflection.fromJson(
         (json['reflection'] as Map<String, dynamic>?) ?? const {},
       ),
@@ -186,22 +192,46 @@ class LessonContent {
   }
 }
 
+/// Runs a sub-block parser, swallowing a shape mismatch rather than letting it
+/// take the whole [LessonPayload] parse down. Used only for optional,
+/// hand-authored blocks - never for server-computed fields, where a mismatch
+/// is a real bug that should surface as an error.
+T? _tryParse<T>(T Function(Map<String, dynamic>) parse, Map<String, dynamic> json) {
+  try {
+    return parse(json);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// A `String?` cast that tolerates the field being the wrong JSON type
+/// instead of throwing - authored content is hand-edited and occasionally
+/// gets the shape wrong.
+String? _safeString(Object? value) => value is String ? value : null;
+
+/// A `List<String>` cast that never throws: anything that isn't a list of
+/// strings degrades to an empty list.
+List<String> _safeStringList(Object? value) {
+  if (value is! List) return const [];
+  return value.whereType<String>().toList(growable: false);
+}
+
 class LessonIntro {
-  const LessonIntro({required this.headline, required this.body, this.watchFor});
+  const LessonIntro({required this.headline, required this.body, this.watchFor = const []});
 
   final String headline;
   final List<String> body;
 
-  /// The "Let hier op" aside.
-  final String? watchFor;
+  /// The "Let hier op" aside - one or more short pointers to watch for while
+  /// reading. The API sends this as a string array (`watchFor?: string[]`
+  /// in `lib/data/study-lessons/types.ts`), never a single string.
+  final List<String> watchFor;
 
   factory LessonIntro.fromJson(Map<String, dynamic> json) {
     return LessonIntro(
-      headline: json['headline'] as String? ?? '',
-      body: (json['body'] as List? ?? const [])
-          .whereType<String>()
-          .toList(growable: false),
-      watchFor: json['watchFor'] as String?,
+      headline: _safeString(json['headline']) ?? '',
+      body: _safeStringList(json['body']),
+      watchFor: _safeStringList(json['watchFor']),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../config/app_config.dart';
 import '../theme/app_theme.dart';
+import 'skeleton.dart';
 
 class ServerImage extends StatelessWidget {
   final String imagePath;
@@ -128,7 +129,7 @@ class ServerImage extends StatelessWidget {
       return SvgPicture.network(
         url,
         fit: fit,
-        placeholderBuilder: (_) => Container(color: AppTheme.paperSunken),
+        placeholderBuilder: (_) => _loadingPlaceholder(),
         errorBuilder: (_, __, ___) => _fallback(),
       );
     }
@@ -138,7 +139,27 @@ class ServerImage extends StatelessWidget {
       fit: fit,
       filterQuality: FilterQuality.low,
       gaplessPlayback: true,
+      // Same box as the finished image, so the card does not reflow once the
+      // download completes - only its content changes.
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return _loadingPlaceholder();
+      },
       errorBuilder: (context, error, stackTrace) => _fallback(),
+    );
+  }
+
+  /// Fills whatever box the image will occupy once it lands. [LayoutBuilder]
+  /// reads that box from the constraints [Image.network]/[SvgPicture.network]
+  /// are already laid out in, so the skeleton never has to guess a size and
+  /// nothing shifts when the real picture replaces it.
+  Widget _loadingPlaceholder() {
+    return LayoutBuilder(
+      builder: (context, constraints) => Skeleton(
+        width: constraints.hasBoundedWidth ? constraints.maxWidth : null,
+        height: constraints.hasBoundedHeight ? constraints.maxHeight : 120,
+        radius: 0,
+      ),
     );
   }
 }

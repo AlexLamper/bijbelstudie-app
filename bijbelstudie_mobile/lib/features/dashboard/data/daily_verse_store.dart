@@ -142,6 +142,9 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // The read outlives the provider when the app (or a test) tears down
+      // mid-launch; writing state then throws rather than being ignored.
+      if (!ref.mounted) return;
       state = DailyVerseMemory(
         history: _decode(prefs.getString(_kHistory)),
         liked: (prefs.getStringList(_kLiked) ?? const <String>[]).toSet(),
@@ -150,6 +153,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     } catch (_) {
       // No preferences plugin: an empty archive, and likes that live only for
       // this session. Still "loaded" - nothing more is coming.
+      if (!ref.mounted) return;
       state = state.copyWith(loaded: true);
     }
   }
@@ -205,6 +209,37 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     await _persistHistory(capped);
   }
 
+  /// Folds the server's archive into the device's.
+  ///
+  /// `GET /daytext/history` is the shared record of every day the feed was
+  /// fetched, so this is what makes "Voorgaande dagen" show more than the days
+  /// this particular install happened to be opened - a reinstall, a new phone
+  /// or a fresh build no longer starts from nothing.
+  ///
+  /// The device copy wins on a clash: it was written from the verse the reader
+  /// actually saw, including the translation label they were reading in.
+  Future<void> mergeServer(List<DailyVerseEntry> entries) async {
+    if (entries.isEmpty) return;
+    await _ready;
+
+    final byDate = <String, DailyVerseEntry>{
+      for (final entry in entries) entry.date: entry,
+      for (final entry in state.history) entry.date: entry,
+    };
+
+    final merged = byDate.values.toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final capped = merged.take(maxDays).toList(growable: false);
+
+    // Nothing new: leave state alone rather than handing every listener a new
+    // list to rebuild on.
+    final before = state.history.map((e) => e.date).join(',');
+    if (before == capped.map((e) => e.date).join(',')) return;
+
+    state = state.copyWith(history: capped, loaded: true);
+    await _persistHistory(capped);
+  }
+
   Future<void> toggleLike(String reference) async {
     if (reference.isEmpty) return;
     await _ready;
@@ -238,4 +273,24 @@ String dayKey(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '${date.year}-$month-$day';
+}
+
+/// The short label for a translation id, as it is printed after a reference.
+///
+/// Hand-mapped for the translations the app ships; anything the server starts
+/// serving falls back to its id in capitals, which is wrong-looking but never
+/// blank.
+String versionAbbreviation(String versionId) {
+  return switch (versionId) {
+    'statenvertaling' => 'SV',
+    'nbg51' => 'NBG51',
+    'canisiusbijbel' => 'CANIS',
+    'heilige_schrift_1917' => 'HS1917',
+    'kjv' => 'KJV',
+    'asv' => 'ASV',
+    'web' => 'WEB',
+    'geneva' => 'GNV',
+    'coverdale' => 'CVDL',
+    _ => versionId.replaceAll('_', '').toUpperCase(),
+  };
 }

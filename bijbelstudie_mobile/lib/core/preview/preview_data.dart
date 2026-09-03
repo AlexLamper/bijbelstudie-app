@@ -5,6 +5,7 @@ import '../db/content_cache.dart';
 import '../../features/bible/domain/bible_models.dart';
 import '../../features/bible/present/bible_providers.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
+import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
 import '../../features/notes/domain/note_models.dart';
@@ -287,4 +288,8 @@ class _PreviewDashboardRepository implements DashboardRepository {
 
   @override
   Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
+
+  @override
+  Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>
+      const [];
 }

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.dart';
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
@@ -155,6 +156,10 @@ class _StubDashboardRepository implements DashboardRepository {
 
   @override
   Future<DailyVerse?> getDailyVerse() async => _dashboard.dailyVerse;
+
+  @override
+  Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>
+      const [];
 }
 
 /// A paywall that shows real prices instead of the `—` placeholder the empty

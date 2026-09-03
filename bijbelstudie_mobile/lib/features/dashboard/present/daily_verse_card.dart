@@ -9,6 +9,7 @@ import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
+import '../data/dashboard_repository.dart';
 import '../data/dashboard_models.dart';
 import 'dashboard_providers.dart';
 
@@ -46,11 +47,33 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   static const double _cardHeight = 330;
 
   bool _remembered = false;
+  bool _syncedArchive = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _rememberToday();
+    _syncArchive();
+  }
+
+  /// Pulls the shared archive down once per card mount and folds it into the
+  /// device's copy.
+  ///
+  /// Without this the archive only ever holds the days this install was opened,
+  /// so a new phone or a reinstall shows "Voorgaande dagen" as empty however
+  /// long the account has existed. Failures are silent by design - the sheet
+  /// falls back to whatever the device recorded itself.
+  void _syncArchive() {
+    if (_syncedArchive) return;
+    _syncedArchive = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final entries = await ref
+          .read(dashboardRepositoryProvider)
+          .getDayTextHistory();
+      if (!mounted) return;
+      await ref.read(dailyVerseStoreProvider.notifier).mergeServer(entries);
+    });
   }
 
   @override
@@ -558,7 +581,15 @@ Widget dailyVerseFlightShuttle(
         borderRadius: BorderRadius.circular(
           lerpDouble(AppTheme.radiusLg, 0, Curves.easeOut.transform(t))!,
         ),
-        child: hero.child,
+        // The shuttle is built in the Navigator's overlay, outside both
+        // routes, so it inherits no Material and no DefaultTextStyle. Without
+        // one, every Text in the card falls back to Flutter's "missing style"
+        // default - yellow double underlines - for the length of the flight.
+        // Transparency, so this adds a text style and nothing else.
+        child: Material(
+          type: MaterialType.transparency,
+          child: hero.child,
+        ),
       );
     },
   );
@@ -856,24 +887,4 @@ String dailyVersePhoto(DateTime date) {
       .difference(DateTime.utc(1970))
       .inDays;
   return _photos[days % _photos.length];
-}
-
-/// The short label for a translation id, as it is printed after a reference.
-///
-/// Hand-mapped for the translations the app ships; anything the server starts
-/// serving falls back to its id in capitals, which is wrong-looking but never
-/// blank.
-String versionAbbreviation(String versionId) {
-  return switch (versionId) {
-    'statenvertaling' => 'SV',
-    'nbg51' => 'NBG51',
-    'canisiusbijbel' => 'CANIS',
-    'heilige_schrift_1917' => 'HS1917',
-    'kjv' => 'KJV',
-    'asv' => 'ASV',
-    'web' => 'WEB',
-    'geneva' => 'GNV',
-    'coverdale' => 'CVDL',
-    _ => versionId.replaceAll('_', '').toUpperCase(),
-  };
 }

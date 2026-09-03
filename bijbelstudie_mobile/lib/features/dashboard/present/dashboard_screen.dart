@@ -13,6 +13,7 @@ import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
 import '../../studies/present/study_banner.dart';
+import '../../study/present/study_pane_controller.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
 import 'daily_verse_card.dart';
@@ -84,6 +85,10 @@ class _DashboardBody extends ConsumerWidget {
     ref
         .read(readerLocationProvider.notifier)
         .openChapter(versionId: version, book: book, chapter: chapter);
+    // The split screen remembers which half the reader left it on, so someone
+    // who was last in "Studie" would land there instead of on the verse they
+    // just asked to read. Naming a chapter is a request to read it.
+    ref.read(studyPaneProvider.notifier).showReader();
     context.go('/study');
   }
 

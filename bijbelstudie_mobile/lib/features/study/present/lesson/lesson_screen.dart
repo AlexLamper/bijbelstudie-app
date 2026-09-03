@@ -8,7 +8,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../../core/ui/skeleton.dart';
 import '../../../ai/present/ai_assistant_pane.dart';
+import '../../../settings/data/reading_settings.dart';
 import '../../../studies/data/enrollment_models.dart';
+import '../../../studies/data/enrollment_repository.dart';
 import '../../../studies/present/studies_providers.dart';
 import '../../data/context_repository.dart';
 import '../../data/lesson_repository.dart';
@@ -486,6 +488,10 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   /// same lesson-scoped `viewTranslation`, so they cannot disagree.
   Future<void> _openSettings(LessonPayload lesson) {
     final cursor = _cursor!;
+    final enrollment = ref.read(studyEnrollmentProvider(widget.studyId));
+    final studyTranslation =
+        enrollment?.translation ??
+        ref.read(readingSettingsProvider).lastVersionId;
     return showLessonSettingsSheet(
       context,
       lesson: lesson,
@@ -494,7 +500,51 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         setState(() => _cursor = _cursor!.copyWith(viewTranslation: id));
         _bestEffort(viewTranslation: id);
       },
+      studyTranslation: studyTranslation,
+      onStudyTranslationChanged: (id) {
+        // Reflects immediately in the passage already on screen, exactly like
+        // the lesson-scoped chips - a reader who just fixed their translation
+        // should not have to leave and reopen the lesson to see it.
+        setState(() => _cursor = _cursor!.copyWith(viewTranslation: id));
+        _bestEffort(viewTranslation: id);
+        unawaited(_updateStudyTranslation(id));
+      },
     );
+  }
+
+  /// Changes the enrollment's own translation - the same setting the startup
+  /// sheet collects - so a reader stuck reading the wrong one is never forced
+  /// back out to the study detail screen to fix it.
+  ///
+  /// Writes through the same call the startup/settings sheet uses
+  /// ([EnrollmentRepository.updateSettings]), carrying the enrollment's other
+  /// settings forward unchanged, and mirrors [readingSettingsProvider] exactly
+  /// like [showStudySettingsSheet] does - it is the reader's translation now,
+  /// not just this study's.
+  Future<void> _updateStudyTranslation(String translationId) async {
+    final enrollment = ref.read(studyEnrollmentProvider(widget.studyId));
+    if (enrollment == null || enrollment.translation == translationId) return;
+
+    try {
+      await ref
+          .read(enrollmentRepositoryProvider)
+          .updateSettings(
+            widget.studyId,
+            EnrollmentSettings(
+              rhythm: enrollment.rhythm,
+              depth: enrollment.depth,
+              translation: translationId,
+              reminderDays: enrollment.reminderDays,
+            ),
+          );
+      ref.invalidate(studyEnrollmentsProvider);
+      await ref
+          .read(readingSettingsProvider.notifier)
+          .setLastVersion(translationId);
+    } on EnrollmentException catch (_) {
+      // Best-effort, same as the lesson-scoped writes above: losing this
+      // costs a re-tap of the picker, not worth an error state mid-lesson.
+    }
   }
 
   /// The assistant, on every step and inline on none.

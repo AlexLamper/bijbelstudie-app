@@ -229,7 +229,6 @@ class _DemoStep extends StatelessWidget {
   static const _questions = [
     'Wat betekent dit gedeelte?',
     'Wat is de context?',
-    'Hoe verhoudt het zich tot andere teksten?',
     'Wat zeggen vertrouwde uitleggers?',
   ];
 

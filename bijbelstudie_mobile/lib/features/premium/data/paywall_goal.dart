@@ -104,15 +104,9 @@ final studyGoalProvider = NotifierProvider<StudyGoalController, StudyGoal?>(
 class StudyGoalController extends Notifier<StudyGoal?> {
   @override
   StudyGoal? build() {
-    _restore();
+    // Always start unselected: the funnel is meant to ask fresh each time,
+    // not preselect whatever was tapped on a previous visit.
     return null;
-  }
-
-  Future<void> _restore() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = StudyGoal.fromId(prefs.getString(_kGoalKey));
-    // Never overwrite a choice the reader made while this was loading.
-    if (stored != null && state == null) state = stored;
   }
 
   Future<void> select(StudyGoal goal) async {

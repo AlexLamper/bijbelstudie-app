@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/skeleton.dart';
 import '../data/context_repository.dart';
 
 /// A Wikimedia photograph, asked for at a given pixel width.
@@ -35,7 +36,14 @@ class GeoImageView extends StatelessWidget {
       headers: wikimediaImageHeaders,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
-        return ColoredBox(color: AppTheme.paperSunken);
+        // Same box the photograph will land in, so nothing reflows.
+        return LayoutBuilder(
+          builder: (context, constraints) => Skeleton(
+            width: constraints.hasBoundedWidth ? constraints.maxWidth : null,
+            height: constraints.hasBoundedHeight ? constraints.maxHeight : 120,
+            radius: 0,
+          ),
+        );
       },
       errorBuilder: (_, _, _) => Image.network(
         image.fileUrl,

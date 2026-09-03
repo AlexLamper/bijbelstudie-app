@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:go_router/go_router.dart';
 
+import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.dart';
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/router/app_router.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
@@ -66,6 +67,10 @@ class _StubDashboardRepository implements DashboardRepository {
 
   @override
   Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
+
+  @override
+  Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>
+      const [];
 }
 
 /// Fails with the full error text (including the offending widget chain)

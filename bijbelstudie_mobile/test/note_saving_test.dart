@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.dart';
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
@@ -99,6 +100,10 @@ class _StubDashboardRepository implements DashboardRepository {
 
   @override
   Future<DailyVerse?> getDailyVerse() async => null;
+
+  @override
+  Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>
+      const [];
 }
 
 void main() {

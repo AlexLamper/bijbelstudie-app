@@ -38,7 +38,7 @@ class LessonIntroStep extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 14),
             child: Text(paragraph, style: AppTheme.bodyLead),
           ),
-        if (intro.watchFor != null) ...[
+        if (intro.watchFor.isNotEmpty) ...[
           const SizedBox(height: 6),
           AppCard(
             color: AppTheme.tealTint,
@@ -63,7 +63,11 @@ class LessonIntroStep extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(intro.watchFor!, style: AppTheme.bodyMuted),
+                for (final point in intro.watchFor)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('•  $point', style: AppTheme.bodyMuted),
+                  ),
               ],
             ),
           ),
