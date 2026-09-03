@@ -362,6 +362,13 @@ class _VerseFace extends StatelessWidget {
                               color: Colors.white,
                               fontSize: expanded ? 17 : 15,
                               fontWeight: FontWeight.w700,
+                              shadows: const [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 3,
+                                  color: Color(0x59000000),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -399,6 +406,20 @@ class _VerseFace extends StatelessWidget {
                         height: 1.5,
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
+                        // Does most of the work the scrim would otherwise have
+                        // to do with brute darkness: it separates the letters
+                        // from whatever is directly behind them, so the
+                        // photograph can stay visible. The website has carried
+                        // this on the verse since it shipped; this card never
+                        // did, which is the whole reason its text read as
+                        // less crisp than the same verse in a browser.
+                        shadows: const [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 3,
+                            color: Color(0x59000000),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -638,6 +659,13 @@ class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
 /// A flat layer plus a top-and-bottom gradient: the flat part is what
 /// guarantees contrast over a bright sky, the gradient is what keeps the
 /// eyebrow and the action row legible over a light patch at either edge.
+///
+/// The two compose, so what the reader sees is the product of both: roughly
+/// 71% dark at the eyebrow, 58% across the middle where the verse sits, and
+/// 75% behind the action row. That middle figure is the one that matters and
+/// the one that moved - it was 48%, which held up over the darker photographs
+/// and left the serif text washy over the bright ones. Going further starts
+/// costing the photograph, which is half of what the card is for.
 class _PhotoScrim extends StatelessWidget {
   const _PhotoScrim();
 
@@ -645,14 +673,14 @@ class _PhotoScrim extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.34),
+        color: Colors.black.withValues(alpha: 0.42),
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.46),
-            Colors.black.withValues(alpha: 0.22),
-            Colors.black.withValues(alpha: 0.52),
+            Colors.black.withValues(alpha: 0.50),
+            Colors.black.withValues(alpha: 0.28),
+            Colors.black.withValues(alpha: 0.56),
           ],
           stops: const [0, 0.45, 1],
         ),
