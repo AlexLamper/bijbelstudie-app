@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/preview_config.dart';
+import '../../../core/notifications/notification_scheduler.dart';
+import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -219,6 +221,18 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
               book: location.book,
               chapter: location.chapter,
             ),
+      );
+
+      // A recorded chapter read is a "completion" for retention purposes
+      // (RETENTION_PLAN §2) - mirror it locally and re-derive the ladder so a
+      // reminder for today is cancelled.
+      unawaited(
+        ref.read(retentionStoreProvider.notifier).markCompleted().then(
+          (_) {
+            if (mounted) ref.invalidate(notificationRecomputeProvider);
+          },
+          onError: (_) {},
+        ),
       );
     });
   }

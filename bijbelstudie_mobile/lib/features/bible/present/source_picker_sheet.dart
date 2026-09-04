@@ -214,56 +214,42 @@ class _VersionSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A single sunken fill against the raised sheet, with the app's shared
+    // input border/radius/focus ring from `inputDecorationTheme`. No wrapper
+    // Container: that used to stack a second (card-coloured) themed fill and a
+    // themed outline border inside this box.
+    final hasText = controller.text.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppTheme.paperSunken,
-          border: Border.all(color: AppTheme.rule),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        autocorrect: false,
+        cursorColor: AppTheme.ink,
+        cursorWidth: 1.4,
+        style: TextStyle(
+          fontFamily: AppTheme.sansFontName,
+          fontSize: 15,
+          color: AppTheme.ink,
         ),
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-            Icon(Icons.search, size: 18, color: AppTheme.inkMuted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                onChanged: onChanged,
-                textInputAction: TextInputAction.search,
-                autocorrect: false,
-                cursorColor: AppTheme.ink,
-                cursorWidth: 1.4,
-                style: TextStyle(
-                  fontFamily: AppTheme.sansFontName,
-                  fontSize: 15,
-                  color: AppTheme.ink,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: 'Zoek een vertaling',
-                  hintStyle: TextStyle(
-                    fontFamily: AppTheme.sansFontName,
-                    fontSize: 15,
-                    color: AppTheme.inkMuted,
-                  ),
-                ),
-              ),
-            ),
-            if (controller.text.isNotEmpty)
-              IconButton(
-                icon: Icon(Icons.close, size: 18, color: AppTheme.inkMuted),
-                tooltip: 'Wissen',
-                onPressed: () {
-                  controller.clear();
-                  onChanged('');
-                },
-              ),
-            const SizedBox(width: 4),
-          ],
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: AppTheme.paperSunken,
+          hintText: 'Zoek een vertaling',
+          prefixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: hasText
+              ? IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Wissen',
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                )
+              : null,
         ),
       ),
     );

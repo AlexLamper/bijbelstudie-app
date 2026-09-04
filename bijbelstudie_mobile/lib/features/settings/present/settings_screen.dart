@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/content_cache.dart';
-import '../../../core/notifications/reminder_service.dart';
+import '../../../core/notifications/notification_scheduler.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
 import '../../notes/data/notes_repository.dart';
+import '../../studies/present/studies_providers.dart';
+import '../data/notification_prefs.dart';
 import '../data/reading_settings.dart';
 import 'theme_mode_provider.dart';
 
@@ -104,7 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: controller.setShowVerseNumbers,
           ),
 
-          const _ReminderSection(),
+          const _NotificationsSection(),
 
           const SizedBox(height: 24),
           const SectionHeader(eyebrow: 'Offline', title: 'Opgeslagen tekst'),
@@ -195,59 +198,180 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-/// Derives the reminder's on-screen state from what the OS actually reports,
-/// not from [ReadingSettings.dailyReminderMinutes] alone.
-///
-/// A stored time with nothing genuinely pending means Part 1's manifest fix
-/// was missing on a previous run, or Android dropped the alarm (reinstall,
-/// force-stop) - `main.dart` re-applies the stored reminder for the same
-/// reason on every launch; this catches whatever slips past that during a
-/// running session, by trying the same fix again before the tile has to
-/// decide what to show.
-final _reminderStatusProvider = FutureProvider<ReminderStatus>((ref) async {
-  final service = ref.watch(reminderServiceProvider);
-  final minutes = ref.watch(
-    readingSettingsProvider.select((s) => s.dailyReminderMinutes),
-  );
-
-  var status = await service.currentStatus();
-  if (minutes != null && status.available && status.permitted && !status.pending) {
-    await service.scheduleDaily(hour: minutes ~/ 60, minute: minutes % 60);
-    status = await service.currentStatus();
-  }
-  return status;
+/// OS-truth notification state for the master row - never taken from the stored
+/// pref alone, so the switch cannot claim "on" after the OS revoked permission.
+/// Extended from the old 1001..1014 check to any managed pending id.
+final _notifStatusProvider = FutureProvider<ReminderStatus>((ref) async {
+  return ref.watch(notificationServiceProvider).currentStatus();
 });
 
-class _ReminderSection extends ConsumerWidget {
-  const _ReminderSection();
+String _fmtMinutes(int minutes) =>
+    '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
+    '${(minutes % 60).toString().padLeft(2, '0')}';
+
+/// The full notifications block (`RETENTION_PLAN.md` §6): a master switch, the
+/// study-reminder time, per-type toggles, quiet hours, and a one-tap
+/// "sla vandaag over". Full opt-out is a single tap on the master row - no
+/// confirmation nag.
+class _NotificationsSection extends ConsumerWidget {
+  const _NotificationsSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ReminderService no-ops everything on web; currentStatus() would report
-    // this too, but skip the round trip entirely.
     if (kIsWeb) return const SizedBox.shrink();
 
-    final statusAsync = ref.watch(_reminderStatusProvider);
-    final settings = ref.watch(readingSettingsProvider);
+    final statusAsync = ref.watch(_notifStatusProvider);
+    final prefs = ref.watch(notificationPrefsProvider);
+    final prefsCtl = ref.read(notificationPrefsProvider.notifier);
 
     return statusAsync.when(
-      // Resolving the real state is a platform-channel round trip. Showing
-      // the stored time before that lands would be exactly the unverified
-      // claim this rewrite exists to remove, so show nothing meanwhile.
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
       data: (status) {
-        // No notifications implementation on this platform at all: a tile
-        // the user could never make work either way.
         if (!status.available) return const SizedBox.shrink();
+        final master = prefs.masterEnabled && status.permitted;
+
+        final enrollments =
+            ref.watch(studyEnrollmentsProvider).value ?? const {};
+        final hasWeekGoal = enrollments.values.any((e) =>
+            e.isActive &&
+            !e.isCompleted &&
+            cadenceFrom(rhythm: e.rhythm, reminderDays: e.reminderDays).model ==
+                RetentionModel.weekGoal);
+
+        void bump() => ref.invalidate(notificationRecomputeProvider);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
-            const SectionHeader(eyebrow: 'Herinnering', title: 'Dagelijks lezen'),
-            const SizedBox(height: 8),
-            _ReminderTile(settings: settings, active: status.isActive),
+            const SectionHeader(eyebrow: 'Meldingen', title: 'Herinneringen'),
+            const SizedBox(height: 4),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Herinneringen'),
+              subtitle: Text(
+                status.permitted
+                    ? 'Hooguit één per dag, op jouw moment.'
+                    : 'Zet meldingen aan in de systeeminstellingen.',
+                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+              ),
+              value: master,
+              onChanged: (on) async {
+                if (on) {
+                  final granted = await ref
+                      .read(notificationServiceProvider)
+                      .requestPermission();
+                  await prefsCtl.setMasterEnabled(granted);
+                  if (!granted && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Meldingen staan uit. Zet ze aan in de systeeminstellingen.'),
+                    ));
+                  }
+                } else {
+                  await prefsCtl.setMasterEnabled(false);
+                  await ref
+                      .read(notificationServiceProvider)
+                      .cancelAllManaged();
+                }
+                ref.invalidate(_notifStatusProvider);
+                bump();
+              },
+            ),
+            if (master) ...[
+              _NotifTimeRow(
+                title: 'Studieherinnering',
+                enabled: prefs.studyReminderEnabled,
+                minutes: prefs.studyReminderMinutes,
+                onToggle: (v) async {
+                  await prefsCtl.setStudyReminder(enabled: v);
+                  bump();
+                },
+                onPickTime: (m) async {
+                  await prefsCtl.setStudyReminder(minutes: m, enabled: true);
+                  bump();
+                },
+              ),
+              _NotifToggleRow(
+                title: 'Reeks bijna kwijt',
+                value: prefs.streakAtRiskEnabled,
+                onChanged: (v) async {
+                  await prefsCtl.setType('streakAtRisk', v);
+                  bump();
+                },
+              ),
+              _NotifToggleRow(
+                title: 'Onafgemaakte les',
+                value: prefs.lessonHalfwayEnabled,
+                onChanged: (v) async {
+                  await prefsCtl.setType('lessonHalfway', v);
+                  bump();
+                },
+              ),
+              if (hasWeekGoal)
+                _NotifToggleRow(
+                  title: 'Weekdoel',
+                  value: prefs.weeklyGoalEnabled,
+                  onChanged: (v) async {
+                    await prefsCtl.setType('weeklyGoal', v);
+                    bump();
+                  },
+                ),
+              _NotifToggleRow(
+                title: 'Mijlpalen',
+                value: prefs.milestonesEnabled,
+                onChanged: (v) async {
+                  await prefsCtl.setType('milestone', v);
+                  bump();
+                },
+              ),
+              _NotifToggleRow(
+                title: 'Weer welkom (afwezigheid)',
+                value: prefs.dormantEnabled,
+                onChanged: (v) async {
+                  await prefsCtl.setType('dormant', v);
+                  bump();
+                },
+              ),
+              _NotifTimeRow(
+                title: 'Vers van de dag',
+                enabled: prefs.dailyVerseEnabled,
+                minutes: prefs.dailyVerseMinutes,
+                onToggle: (v) async {
+                  await prefsCtl.setDailyVerse(enabled: v);
+                  bump();
+                },
+                onPickTime: (m) async {
+                  await prefsCtl.setDailyVerse(minutes: m, enabled: true);
+                  bump();
+                },
+              ),
+              _QuietHoursRow(
+                startMinutes: prefs.quietStartMinutes,
+                endMinutes: prefs.quietEndMinutes,
+                onChanged: (s, e) async {
+                  await prefsCtl.setQuietHours(startMinutes: s, endMinutes: e);
+                  bump();
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: TextButton(
+                  onPressed: () async {
+                    if (prefs.snoozedNow) {
+                      await prefsCtl.clearSnooze();
+                    } else {
+                      await prefsCtl.snoozeToday();
+                    }
+                    bump();
+                  },
+                  child: Text(prefs.snoozedNow
+                      ? 'Meldingen weer aanzetten voor vandaag'
+                      : 'Sla vandaag over'),
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -255,84 +379,117 @@ class _ReminderSection extends ConsumerWidget {
   }
 }
 
-class _ReminderTile extends ConsumerWidget {
-  const _ReminderTile({required this.settings, required this.active});
+class _NotifToggleRow extends StatelessWidget {
+  const _NotifToggleRow({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
 
-  final ReadingSettings settings;
-
-  /// Whether the OS confirms this reminder is both permitted and actually
-  /// scheduled - never taken from [settings] directly, see
-  /// [_reminderStatusProvider].
-  final bool active;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final time = active ? settings.dailyReminderTime : null;
-
-    return RuleGrid(
-      children: [
-        RuleListTile(
-          showRule: false,
-          onTap: () => _pick(context, ref),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Herinnering', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 2),
-                    Text(
-                      time == null
-                          ? 'Uit'
-                          : 'Elke dag om ${time.hour.toString().padLeft(2, '0')}:'
-                                '${time.minute.toString().padLeft(2, '0')}',
-                      style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              if (time != null)
-                TextButton(
-                  onPressed: () async {
-                    await ref.read(reminderServiceProvider).cancelDaily();
-                    await ref.read(readingSettingsProvider.notifier).setDailyReminder(null);
-                    ref.invalidate(_reminderStatusProvider);
-                  },
-                  child: const Text('Uitzetten'),
-                ),
-              Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted),
-            ],
-          ),
-        ),
-      ],
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(title),
+      value: value,
+      onChanged: onChanged,
     );
   }
+}
 
-  Future<void> _pick(BuildContext context, WidgetRef ref) async {
+class _NotifTimeRow extends StatelessWidget {
+  const _NotifTimeRow({
+    required this.title,
+    required this.enabled,
+    required this.minutes,
+    required this.onToggle,
+    required this.onPickTime,
+  });
+
+  final String title;
+  final bool enabled;
+  final int minutes;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<int> onPickTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(title),
+      subtitle: Text(
+        enabled ? 'Elke keer om ${_fmtMinutes(minutes)}' : 'Uit',
+        style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+      ),
+      value: enabled,
+      onChanged: onToggle,
+      secondary: enabled
+          ? TextButton(
+              onPressed: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime:
+                      TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60),
+                );
+                if (picked != null) onPickTime(picked.hour * 60 + picked.minute);
+              },
+              child: Text(_fmtMinutes(minutes)),
+            )
+          : null,
+    );
+  }
+}
+
+class _QuietHoursRow extends StatelessWidget {
+  const _QuietHoursRow({
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.onChanged,
+  });
+
+  final int startMinutes;
+  final int endMinutes;
+  final void Function(int? start, int? end) onChanged;
+
+  Future<void> _pick(BuildContext context, {required bool isStart}) async {
+    final current = isStart ? startMinutes : endMinutes;
     final picked = await showTimePicker(
       context: context,
-      initialTime: settings.dailyReminderTime ?? const TimeOfDay(hour: 8, minute: 0),
+      initialTime: TimeOfDay(hour: current ~/ 60, minute: current % 60),
     );
     if (picked == null) return;
+    final m = picked.hour * 60 + picked.minute;
+    onChanged(isStart ? m : null, isStart ? null : m);
+  }
 
-    final service = ref.read(reminderServiceProvider);
-    final granted = await service.requestPermission();
-    if (!granted) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Meldingen staan uit. Zet ze aan in de systeeminstellingen.'),
-        ),
-      );
-      return;
-    }
-
-    await service.scheduleDaily(hour: picked.hour, minute: picked.minute);
-    await ref
-        .read(readingSettingsProvider.notifier)
-        .setDailyReminder(picked.hour * 60 + picked.minute);
-    ref.invalidate(_reminderStatusProvider);
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text('Stille uren',
+                style: Theme.of(context).textTheme.titleMedium),
+          ),
+          TextButton(
+            onPressed: () => _pick(context, isStart: true),
+            child: Text(_fmtMinutes(startMinutes)),
+          ),
+          Text('–', style: AppTheme.bodyMuted),
+          TextButton(
+            onPressed: () => _pick(context, isStart: false),
+            child: Text(_fmtMinutes(endMinutes)),
+          ),
+        ],
+      ),
+    );
   }
 }
 

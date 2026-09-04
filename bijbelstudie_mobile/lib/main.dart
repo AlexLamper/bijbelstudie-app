@@ -4,9 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'core/notifications/reminder_copy.dart';
-import 'core/notifications/reminder_service.dart';
+import 'core/app_lifecycle.dart';
+import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/config/app_config.dart';
@@ -15,7 +14,6 @@ import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
 import 'features/feedback/present/review_prompt_host.dart';
 import 'features/onboarding/present/tour_overlay.dart';
-import 'features/settings/data/reading_settings.dart';
 import 'features/settings/present/theme_mode_provider.dart';
 
 Future<void> _initRevenueCat() async {
@@ -66,21 +64,20 @@ Future<void> _initRevenueCat() async {
 /// open the app for two weeks therefore stops being reminded - which is the
 /// behaviour we want anyway: a nudge nobody has acted on in a fortnight should
 /// go quiet rather than repeat forever.
-Future<void> _initReminders() async {
+/// Brings the notification service up before anything schedules:
+///
+/// - sets `tz.local` from the real IANA zone (the old code initialised the
+///   zone database but never set `tz.local`, so an 08:00 reminder fired at
+///   08:00 **UTC** — `RETENTION_PLAN.md` §1);
+/// - registers the new Android channels and deletes the legacy
+///   `daily_reading` channel.
+///
+/// The actual (re)scheduling of the ladder is done by `notificationRecompute`,
+/// which runs from `appLifecycleProvider` the moment the app tree builds and on
+/// every foreground thereafter.
+Future<void> _initNotifications() async {
   if (kIsWeb) return;
-  // Cache-only: a cold start must not wait on a network call. The batch is
-  // refreshed from the server once the app is running and signed in.
-  final service = ReminderService(
-    FlutterLocalNotificationsPlugin(),
-    const ReminderCopySource.cacheOnly(),
-  );
-  await service.initialise();
-
-  final prefs = await SharedPreferences.getInstance();
-  final minutes = prefs.getInt(kDailyReminderMinutesKey);
-  if (minutes != null) {
-    await service.scheduleDaily(hour: minutes ~/ 60, minute: minutes % 60);
-  }
+  await NotificationService(FlutterLocalNotificationsPlugin()).initialise();
 }
 
 void main() async {
@@ -113,13 +110,13 @@ void main() async {
   }
 
   try {
-    await _initReminders();
+    await _initNotifications();
   } catch (e, st) {
     // A notifications hiccup must never stop the app from starting either;
     // the settings tile re-checks the real state itself and will not claim
     // the reminder is on if this failed.
     assert(() {
-      debugPrint('[Reminders][Main] init failed: $e\n$st');
+      debugPrint('[Notifications][Main] init failed: $e\n$st');
       return true;
     }());
   }
@@ -135,6 +132,11 @@ class BijbelStudieApp extends ConsumerWidget {
     // it is what turns a dead refresh token into an actual sign-out instead
     // of tokens quietly vanishing while the app keeps acting logged in.
     ref.watch(sessionExpiryWiringProvider);
+
+    // Registers the lifecycle observer: re-runs the notification scheduler on
+    // every foreground and arms the "on close" one-shots on background.
+    ref.watch(appLifecycleProvider);
+
     final routerConfig = ref.watch(routerProvider);
 
     // Dark mode, resolved before anything below this line builds.

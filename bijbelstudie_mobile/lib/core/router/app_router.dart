@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/preview_config.dart';
+import '../notifications/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 
@@ -235,7 +236,7 @@ Page<void> _diveInPage(GoRouterState state, Widget child) {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
+  final router = GoRouter(
     // Design-preview mode skips splash/onboarding/login and lands on the
     // dashboard so the styling can be reviewed straight away.
     initialLocation: PreviewConfig.enabled ? '/dashboard' : '/',
@@ -340,6 +341,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     // being unresponsive.
     errorBuilder: (context, state) => _RouteNotFound(location: state.uri.path),
   );
+  // Let a tapped notification deep-link through this router (and flush a route
+  // a cold-start tap left pending).
+  NotificationService.attachRouter(router);
+  return router;
 });
 
 /// Wires [ApiClient.onSessionExpired] to actually sign the user out.

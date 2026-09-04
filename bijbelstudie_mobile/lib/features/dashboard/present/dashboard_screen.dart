@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/data/bible_books.dart';
-import '../../../core/notifications/reminder_refresh.dart';
+import '../../../core/notifications/notification_scheduler.dart';
+import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -16,8 +17,10 @@ import '../../studies/present/study_banner.dart';
 import '../../study/present/study_pane_controller.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
+import 'continue_study_card.dart';
 import 'daily_verse_card.dart';
 import 'dashboard_providers.dart';
+import 'widgets/streak_ring.dart';
 
 /// `/dashboard` on www.bijbelstudie.io, folded into one column.
 ///
@@ -31,10 +34,19 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
 
-    // Fire-and-forget: tops the daily reminder up with fresh copy from the
-    // server, once per session and only when the batch has gone stale. The
-    // result is never rendered - see reminderCopyRefreshProvider.
-    ref.watch(reminderCopyRefreshProvider);
+    // Fire-and-forget: re-derives the whole notification ladder from cached
+    // state on every dashboard build (like the old copy-refresh did). The
+    // result is never rendered.
+    ref.watch(notificationRecomputeProvider);
+
+    // The server streak is authoritative; feed it to the local mirror so a
+    // later "streak broke" guess can be corrected (RETENTION_PLAN §2).
+    ref.listen(dashboardProvider, (_, next) {
+      final data = next.value;
+      if (data != null) {
+        ref.read(retentionStoreProvider.notifier).reconcileServerStreak(data.streak);
+      }
+    });
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -134,17 +146,14 @@ class _DashboardBody extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (data.streak > 0) ...[
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: SiteBadge(
-                    '${data.streak} ${data.streak == 1 ? 'dag' : 'dagen'}',
-                    icon: Icons.local_fire_department,
-                    foreground: AppTheme.flame,
-                  ),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: HomeStreakIndicator(
+                  serverStreak: data.streak,
+                  freezes: data.freezes,
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -170,6 +179,12 @@ class _DashboardBody extends ConsumerWidget {
                   },
                 ),
               ),
+
+              // "Waar je gebleven was" + the quiet "nog niet gedaan" chip.
+              // Both render nothing when there is no study under way / nothing
+              // to nudge, so the layout is unchanged for a fresh account.
+              const NotDoneTodayChip(),
+              const ContinueStudyCard(),
               const SizedBox(height: 16),
 
               // The card renders today's verse, or — offline — the newest one

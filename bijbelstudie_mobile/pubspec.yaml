@@ -60,6 +60,7 @@ dependencies:
   timezone: ^0.10.0
   uuid: ^4.5.1
   in_app_review: ^2.0.10
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/notifications/reminder_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
@@ -11,6 +10,7 @@ import '../../auth/present/auth_controller.dart';
 import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
+import '../../settings/data/notification_prefs.dart';
 import '../../settings/data/reading_settings.dart';
 import '../../settings/present/theme_mode_provider.dart';
 import '../data/onboarding_storage.dart';
@@ -444,10 +444,10 @@ const _reminderPresets = [
   _ReminderPreset('20:00', 20, 0),
 ];
 
-/// Step 3 - the daily reading reminder. Picking a preset requests the OS
-/// permission and schedules the notification right away (the same path
-/// Instellingen uses), rather than deferring it to "Aan de slag": a denied
-/// permission has to surface here, while the wizard can still explain why.
+/// Step 3 - the study reminder. It now only *collects* the preferred time and
+/// writes the intent into [NotificationPrefs]; it does **not** ask the OS for
+/// permission (`RETENTION_PLAN.md` §4.6). The permission prompt is earned after
+/// the reader finishes their first lesson, where it has context.
 class _ReminderStep extends ConsumerStatefulWidget {
   const _ReminderStep();
 
@@ -460,22 +460,16 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
 
   Future<void> _setReminder(int hour, int minute) async {
     setState(() => _busy = true);
-    final service = ref.read(reminderServiceProvider);
-    final granted = await service.requestPermission();
-    if (!granted) {
-      if (mounted) setState(() => _busy = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Meldingen staan uit. Zet ze aan in de systeeminstellingen.'),
-        ),
-      );
-      return;
-    }
-    await service.scheduleDaily(hour: hour, minute: minute);
+    final minutes = hour * 60 + minute;
+    // Kept for the picker's own selected-state (it watches this value).
+    await ref.read(readingSettingsProvider.notifier).setDailyReminder(minutes);
+    await ref.read(notificationPrefsProvider.notifier).setStudyReminder(
+          enabled: true,
+          minutes: minutes,
+        );
     await ref
-        .read(readingSettingsProvider.notifier)
-        .setDailyReminder(hour * 60 + minute);
+        .read(notificationPrefsProvider.notifier)
+        .setPendingPermissionRequest(true);
     if (mounted) setState(() => _busy = false);
   }
 
@@ -490,8 +484,13 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
 
   Future<void> _turnOff() async {
     setState(() => _busy = true);
-    await ref.read(reminderServiceProvider).cancelDaily();
     await ref.read(readingSettingsProvider.notifier).setDailyReminder(null);
+    await ref
+        .read(notificationPrefsProvider.notifier)
+        .setStudyReminder(enabled: false);
+    await ref
+        .read(notificationPrefsProvider.notifier)
+        .setPendingPermissionRequest(false);
     if (mounted) setState(() => _busy = false);
   }
 
@@ -508,11 +507,12 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
         children: [
           const Eyebrow('Herinnering'),
           const SizedBox(height: 16),
-          Text('Wil je een dagelijkse herinnering?', style: AppTheme.displayLarge),
+          Text('Wanneer komt het jou uit?', style: AppTheme.displayLarge),
           const SizedBox(height: 12),
           Text(
-            'Een korte melding op een vast moment helpt om het lezen vast te '
-            'houden. Je kunt dit altijd wijzigen of uitzetten bij Instellingen.',
+            'Kies vast een moment dat je schikt. We vragen je pas later om '
+            'meldingen aan te zetten — als je je eerste les hebt gedaan. Je kunt '
+            'dit altijd wijzigen of uitzetten bij Instellingen.',
             style: AppTheme.bodyLead,
           ),
           const SizedBox(height: 28),

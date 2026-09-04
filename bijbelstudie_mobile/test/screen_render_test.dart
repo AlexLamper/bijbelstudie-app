@@ -517,7 +517,7 @@ void main() {
     await tester.tap(find.text('Volgende'));
     await tester.pumpAndSettle();
     expectNoLayoutError(tester);
-    expect(find.text('Wil je een dagelijkse herinnering?'), findsOneWidget);
+    expect(find.text('Wanneer komt het jou uit?'), findsOneWidget);
     expect(find.text('07:00'), findsOneWidget);
     // Last step: the button reads "Aan de slag", not "Volgende". Not tapped
     // - finishing writes to secure storage, which has no test double here.
