@@ -291,44 +291,6 @@ class AppCard extends StatelessWidget {
   }
 }
 
-/// The teal hero panel — `rounded-2xl p-6` filled with
-/// `linear-gradient(135deg,#0D9488,#0F766E)`. Used for "Ga verder waar je
-/// gebleven was" on the dashboard and for every primary call to action.
-class BrandHeroCard extends StatelessWidget {
-  const BrandHeroCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(20),
-    this.onTap,
-  });
-
-  final Widget child;
-  final EdgeInsets padding;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        gradient: AppTheme.brandGradient,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      ),
-      child: child,
-    );
-    if (onTap == null) return content;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        child: content,
-      ),
-    );
-  }
-}
-
 /// White card whose children are separated by 1px rules — the site's list
 /// card (`bg-white rounded-2xl border divide-y divide-border`).
 class RuleGrid extends StatelessWidget {

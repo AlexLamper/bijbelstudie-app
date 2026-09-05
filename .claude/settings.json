@@ -37,7 +37,17 @@
       "Bash(flutter analyze:*)",
       "Bash(flutter test:*)",
       "Bash(flutter pub get:*)",
-      "Bash(dart format:*)"
+      "Bash(dart format:*)",
+      "Bash(dart analyze:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter --version)",
+      "Bash(flutter pub deps:*)",
+      "Bash(flutter pub outdated:*)",
+      "Bash(git blame:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git stash list:*)"
     ]
   }
 }

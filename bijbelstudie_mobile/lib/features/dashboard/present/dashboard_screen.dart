@@ -152,6 +152,7 @@ class _DashboardBody extends ConsumerWidget {
                 child: HomeStreakIndicator(
                   serverStreak: data.streak,
                   freezes: data.freezes,
+                  weekDays: data.weekDays,
                 ),
               ),
             ],
@@ -163,11 +164,15 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // The quiet "nog niet gedaan" chip, then "Waar je gebleven was"
+              // - a study lesson in progress, or else the last Bible chapter
+              // read. The chip renders nothing when there is nothing to nudge.
+              const NotDoneTodayChip(),
               TourAnchor(
                 id: TourAnchorIds.dashboardHero,
-                child: _HeroCard(
+                child: ContinueStudyCard(
                   lastRead: data.lastRead,
-                  onContinue: () {
+                  onContinueReading: () {
                     final last = data.lastRead;
                     _openChapter(
                       context,
@@ -179,12 +184,6 @@ class _DashboardBody extends ConsumerWidget {
                   },
                 ),
               ),
-
-              // "Waar je gebleven was" + the quiet "nog niet gedaan" chip.
-              // Both render nothing when there is no study under way / nothing
-              // to nudge, so the layout is unchanged for a fresh account.
-              const NotDoneTodayChip(),
-              const ContinueStudyCard(),
               const SizedBox(height: 16),
 
               // The card renders today's verse, or — offline — the newest one
@@ -220,74 +219,6 @@ class _DashboardBody extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Compact single-row card: cover icon, title + progress line, chevron.
-/// Kept short on purpose — this is the first thing on the dashboard and the
-/// site's tall hero block doesn't earn that much vertical space on a phone.
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.lastRead, required this.onContinue});
-
-  final LastRead? lastRead;
-  final VoidCallback onContinue;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasProgress = lastRead != null;
-    return BrandHeroCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      onTap: onContinue,
-      child: Row(
-        children: [
-          Icon(
-            hasProgress ? Icons.menu_book_outlined : Icons.auto_stories,
-            color: Colors.white,
-            size: 22,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasProgress
-                      ? 'GA VERDER WAAR JE GEBLEVEN WAS'
-                      : 'BEGIN MET LEZEN',
-                  style: AppTheme.overline.copyWith(
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hasProgress ? lastRead!.book : 'Start je bijbelstudie',
-                  style: AppTheme.displayBase.copyWith(color: Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  hasProgress
-                      ? 'Hoofdstuk ${lastRead!.chapter} · ${lastRead!.version}'
-                      : 'Lees dag voor dag door de Bijbel',
-                  style: AppTheme.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(
-            Icons.chevron_right,
-            color: Colors.white.withValues(alpha: 0.85),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -495,22 +426,20 @@ class _TestamentGrid extends StatelessWidget {
   }
 }
 
-/// "Aanbevolen studies" — the lead recommendation as a hero with its own
-/// banner, then two compact rows under it.
-///
-/// A study is a picture and a promise, not a line of text: the old plain list
-/// of type-pill + title sold none of them. Both shapes here lean on
-/// [StudyBanner], the same 16:6 artwork (with its painted fallback) that the
-/// studies tab and the detail screen use, so a recommendation looks the same
-/// wherever the reader meets it.
+/// "Aanbevolen studies" — up to four compact rows, each a picture and a
+/// promise rather than a line of text: the old plain list of type-pill +
+/// title sold none of them. Every row leans on [StudyBanner], the same 16:6
+/// artwork (with its painted fallback) that the studies tab and the detail
+/// screen use, so a recommendation looks the same wherever the reader meets
+/// it.
 class _RecommendedStudiesCard extends ConsumerWidget {
   const _RecommendedStudiesCard({required this.onOpen});
 
   final void Function(CuratedStudy study) onOpen;
 
-  /// One hero plus two rows. Any more and the dashboard turns into the studies
-  /// tab, which is what "Bekijk alle" is for.
-  static const int _maxItems = 3;
+  /// Four small rows. Any more and the dashboard turns into the studies tab,
+  /// which is what "Bekijk alle" is for.
+  static const int _maxItems = 4;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -563,20 +492,13 @@ class _RecommendedStudiesCard extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  dim(
-                    shown.first,
-                    _StudyHero(
-                      study: shown.first,
-                      onTap: () => onOpen(shown.first),
-                    ),
-                  ),
-                  for (final study in shown.skip(1)) ...[
-                    const RuleLine(),
+                  for (var i = 0; i < shown.length; i++) ...[
+                    if (i > 0) const RuleLine(),
                     dim(
-                      study,
+                      shown[i],
                       _RecommendedStudyRow(
-                        study: study,
-                        onTap: () => onOpen(study),
+                        study: shown[i],
+                        onTap: () => onOpen(shown[i]),
                       ),
                     ),
                   ],
@@ -590,87 +512,7 @@ class _RecommendedStudiesCard extends ConsumerWidget {
   }
 }
 
-/// The lead recommendation: banner, type badge, title, pitch and the two facts
-/// that help a reader choose — how many lessons, and how long each one takes.
-class _StudyHero extends StatelessWidget {
-  const _StudyHero({required this.study, required this.onTap});
-
-  final CuratedStudy study;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              child: AspectRatio(
-                aspectRatio: 16 / 6,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    StudyBanner(study: study),
-                    Positioned(
-                      left: 10,
-                      top: 10,
-                      child: _StudyTypePill(type: study.type),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              study.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTheme.displayTitle.copyWith(color: scheme.onSurface),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              study.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTheme.caption,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${study.lessonCount} lessen · ±${study.minutesPerLesson} min',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.metaLabel,
-                  ),
-                ),
-                Text(
-                  'Bekijk studie',
-                  style: AppTheme.caption.copyWith(
-                    color: AppTheme.teal,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                Icon(Icons.arrow_forward, size: 13, color: AppTheme.teal),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A runner-up: the same banner as a square thumbnail, title and lesson count.
+/// One recommended study: banner thumbnail, title and lesson count.
 class _RecommendedStudyRow extends StatelessWidget {
   const _RecommendedStudyRow({required this.study, required this.onTap});
 
@@ -729,35 +571,8 @@ class _RecommendedStudyRow extends StatelessWidget {
   }
 }
 
-/// The `Gedeelte` / `Persoon` / `Boek` badge, on the banner rather than beside
-/// the title — it is a label for the picture, not for the sentence.
-class _StudyTypePill extends StatelessWidget {
-  const _StudyTypePill({required this.type});
-
-  final String type;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.teal.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        type.toUpperCase(),
-        style: AppTheme.overline.copyWith(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// The recommendation card while the catalogue is still loading: the hero
-/// banner and two rows, in the shape they will land in.
+/// The recommendation card while the catalogue is still loading: four rows,
+/// in the shape they will land in.
 class _RecommendedStudiesSkeleton extends StatelessWidget {
   const _RecommendedStudiesSkeleton();
 
@@ -766,13 +581,7 @@ class _RecommendedStudiesSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Skeleton(height: 96, radius: AppTheme.radiusMd),
-        const SizedBox(height: 10),
-        const Skeleton(height: 13, width: 180),
-        const SizedBox(height: 8),
-        const SkeletonText(lines: 2, lineHeight: 10),
-        const SizedBox(height: 18),
-        for (var i = 0; i < 2; i++) ...[
+        for (var i = 0; i < 4; i++) ...[
           if (i > 0) const SizedBox(height: 14),
           Row(
             children: [

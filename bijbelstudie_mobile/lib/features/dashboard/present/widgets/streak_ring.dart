@@ -9,16 +9,31 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../studies/data/study_models.dart';
 import '../../../studies/data/study_plan_store.dart';
 import '../../../studies/present/studies_providers.dart';
+import '../../data/dashboard_models.dart';
+import '../streak_detail_sheet.dart';
 
 /// The header re-entry indicator (`RETENTION_PLAN.md` §3.1). Daily-streak
 /// readers get a 7-segment week ring around a streak count; week-goal readers
 /// get a `count / target` progress ring. A `free`-rhythm reader, or one with no
 /// data yet, sees nothing here (the old bare "N dagen" pill is gone).
+///
+/// Tapping it opens [showStreakDetailSheet], which explains whichever of the
+/// two this reader is actually looking at — plain rings alone don't say what
+/// they mean.
 class HomeStreakIndicator extends ConsumerWidget {
-  const HomeStreakIndicator({super.key, required this.serverStreak, required this.freezes});
+  const HomeStreakIndicator({
+    super.key,
+    required this.serverStreak,
+    required this.freezes,
+    required this.weekDays,
+  });
 
   final int serverStreak;
   final int freezes;
+
+  /// The same 7-day activity strip the "Deze week" card renders, reused here
+  /// so the detail sheet doesn't need a second source of truth for it.
+  final List<WeekDay> weekDays;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,17 +43,41 @@ class HomeStreakIndicator extends ConsumerWidget {
       final store = ref.watch(retentionStoreProvider);
       final done = ref.read(retentionStoreProvider.notifier).completionsThisWeek;
       final _ = store; // rebuild on change
-      return WeeklyGoalRing(done: done, target: cadence.weekGoalTarget);
+      return _Tappable(
+        tooltip: 'Bekijk je weekdoel',
+        hint: 'Open uitleg over je weekdoel en weekoverzicht',
+        onTap: () => showStreakDetailSheet(
+          context,
+          cadence: cadence,
+          streak: serverStreak,
+          freezes: freezes,
+          completionsThisWeek: done,
+          weekDays: weekDays,
+        ),
+        child: WeeklyGoalRing(done: done, target: cadence.weekGoalTarget),
+      );
     }
 
     if (serverStreak <= 0) return const SizedBox.shrink();
 
     ref.watch(retentionStoreProvider);
     final thisWeek = ref.read(retentionStoreProvider.notifier).completionsThisWeek;
-    return StreakRing(
-      streak: serverStreak,
-      segmentsFilled: thisWeek.clamp(0, 7),
-      hasFreeze: freezes > 0,
+    return _Tappable(
+      tooltip: 'Bekijk je leesreeks',
+      hint: 'Open uitleg over je leesreeks en weekoverzicht',
+      onTap: () => showStreakDetailSheet(
+        context,
+        cadence: cadence,
+        streak: serverStreak,
+        freezes: freezes,
+        completionsThisWeek: thisWeek,
+        weekDays: weekDays,
+      ),
+      child: StreakRing(
+        streak: serverStreak,
+        segmentsFilled: thisWeek.clamp(0, 7),
+        hasFreeze: freezes > 0,
+      ),
     );
   }
 
@@ -63,6 +102,46 @@ class HomeStreakIndicator extends ConsumerWidget {
       return cadenceFrom(localCadence: plan.cadence, startedAt: plan.startedAt);
     }
     return const CadenceInfo(model: RetentionModel.dailyStreak, remind: false);
+  }
+}
+
+/// The ripple, tooltip and semantics that make [HomeStreakIndicator] read as
+/// tappable. [child] keeps its own descriptive `Semantics` label (the streak
+/// count, or the week fraction); this only adds the "button" role and a hint
+/// for what tapping does, merged onto that same node.
+class _Tappable extends StatelessWidget {
+  const _Tappable({
+    required this.child,
+    required this.onTap,
+    required this.tooltip,
+    required this.hint,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+  final String tooltip;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: MergeSemantics(
+        child: Semantics(
+          button: true,
+          hint: hint,
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

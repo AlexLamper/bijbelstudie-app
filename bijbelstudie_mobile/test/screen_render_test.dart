@@ -404,7 +404,7 @@ void main() {
     await pumpAtPhoneSize(tester, const DashboardScreen());
 
     expectNoLayoutError(tester);
-    expect(find.text('GA VERDER WAAR JE GEBLEVEN WAS'), findsOneWidget);
+    expect(find.text('Waar je gebleven was'), findsOneWidget);
     expect(find.text('Genesis'), findsWidgets);
     // The stat strip moved to the profile screen; the photo card took its
     // place as the first thing under the hero that carries a heading.

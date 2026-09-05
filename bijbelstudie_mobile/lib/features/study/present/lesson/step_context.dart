@@ -63,11 +63,16 @@ class LessonContextStep extends ConsumerWidget {
           error: (_, _) => const SizedBox.shrink(),
           data: (list) {
             if (list.isEmpty) return const SizedBox.shrink();
+            // The strip is sized for a row above the book's introduction; once
+            // that introduction is gone (every lesson but the first, see
+            // [lessonShowsBookSummary]) nothing else fills this screen, so the
+            // photographs get the gallery treatment instead.
+            final hasIntro = lessonShowsBookSummary(lesson.day);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PlaceStrip(images: list),
-                const SizedBox(height: 8),
+                hasIntro ? _PlaceStrip(images: list) : _PlaceGallery(images: list),
+                SizedBox(height: hasIntro ? 8 : 14),
                 Text(
                   list.any((image) => image.fromBook)
                       ? 'Deze plaatsen horen bij ${passage.book}, niet per se bij '
@@ -75,7 +80,7 @@ class LessonContextStep extends ConsumerWidget {
                       : 'Tik op een foto voor een grote weergave.',
                   style: AppTheme.caption,
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: hasIntro ? 20 : 4),
               ],
             );
           },
@@ -150,7 +155,7 @@ class _PlaceStrip extends StatelessWidget {
                   label: 'Foto van ${image.placeName}, vergroten',
                   child: InkWell(
                     borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    onTap: () => _openLightbox(context, index),
+                    onTap: () => _openPlaceLightbox(context, images, index),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       child: SizedBox(
@@ -183,17 +188,151 @@ class _PlaceStrip extends StatelessWidget {
     );
   }
 
-  void _openLightbox(BuildContext context, int index) {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        barrierColor: Colors.black87,
-        transitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (_, _, _) =>
-            _PlaceLightbox(images: images, initialIndex: index),
-        transitionsBuilder: (_, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
-      ),
+}
+
+/// Opens [_PlaceLightbox] over [images] at [index]. Shared by [_PlaceStrip]'s
+/// tiles and [_PlaceGallery]'s cards - one lightbox, however the thumbnails
+/// upstream are laid out.
+void _openPlaceLightbox(BuildContext context, List<GeoImage> images, int index) {
+  Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, _, _) =>
+          _PlaceLightbox(images: images, initialIndex: index),
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}
+
+/// The photographs for a background step with no book introduction: a strip
+/// of small tiles would leave the rest of the screen empty, so the
+/// photographs become the point instead - one hero card, or a hero plus a
+/// mosaic of the rest, edge to edge within the page's own margins.
+///
+/// Layout depends only on the count: a single photograph gets one large
+/// card; two stack full-width so both get the same weight; three or more put
+/// the first photograph on top as the hero and tile the remainder two per
+/// row underneath.
+class _PlaceGallery extends StatelessWidget {
+  const _PlaceGallery({required this.images});
+
+  final List<GeoImage> images;
+
+  static const double _gap = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (images.length) {
+      case 1:
+        return _GalleryTile(images: images, index: 0, aspectRatio: 4 / 3);
+
+      case 2:
+        return Column(
+          children: [
+            _GalleryTile(images: images, index: 0, aspectRatio: 16 / 10),
+            const SizedBox(height: _gap),
+            _GalleryTile(images: images, index: 1, aspectRatio: 16 / 10),
+          ],
+        );
+
+      default:
+        // Three or more: the first photograph is the hero, the rest tile two
+        // per row beneath it.
+        final rest = images.length - 1;
+        return Column(
+          children: [
+            _GalleryTile(images: images, index: 0, aspectRatio: 16 / 9),
+            const SizedBox(height: _gap),
+            for (var row = 0; row * 2 < rest; row++)
+              Padding(
+                padding: EdgeInsets.only(top: row == 0 ? 0 : _gap),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _GalleryTile(
+                        images: images,
+                        index: 1 + row * 2,
+                        aspectRatio: 1,
+                      ),
+                    ),
+                    if (row * 2 + 1 < rest) ...[
+                      const SizedBox(width: _gap),
+                      Expanded(
+                        child: _GalleryTile(
+                          images: images,
+                          index: 2 + row * 2,
+                          aspectRatio: 1,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        );
+    }
+  }
+}
+
+/// One card in [_PlaceGallery]: a rounded, near-full-width photograph at a
+/// fixed aspect ratio - so a portrait or panoramic source is cropped with
+/// [BoxFit.cover] rather than stretched - with its place name underneath and
+/// the same tap-to-zoom as [_PlaceStrip]'s tiles.
+class _GalleryTile extends StatelessWidget {
+  const _GalleryTile({
+    required this.images,
+    required this.index,
+    required this.aspectRatio,
+  });
+
+  final List<GeoImage> images;
+  final int index;
+  final double aspectRatio;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = images[index];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          button: true,
+          label: 'Foto van ${image.placeName}, vergroten',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            onTap: () => _openPlaceLightbox(context, images, index),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+              child: AspectRatio(
+                aspectRatio: aspectRatio,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => GeoImageView(
+                    image: image,
+                    // Asked for at 2x the drawn width so the photograph
+                    // stays sharp on a retina screen at whatever size this
+                    // card lands at - a hero and a mosaic tile differ a lot.
+                    width: constraints.hasBoundedWidth
+                        ? (constraints.maxWidth * 2).round()
+                        : 1200,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          image.placeName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTheme.metaLabel,
+        ),
+      ],
     );
   }
 }
