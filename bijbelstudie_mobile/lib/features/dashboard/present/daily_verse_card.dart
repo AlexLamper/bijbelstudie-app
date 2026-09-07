@@ -495,11 +495,7 @@ class _VerseActions extends StatelessWidget {
     final icons = Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _PhotoAction(
-          icon: liked ? Icons.favorite : Icons.favorite_border,
-          tooltip: liked ? 'Verwijder uit favorieten' : 'Favoriet',
-          onPressed: onLike,
-        ),
+        _AnimatedHeartButton(liked: liked, onPressed: onLike),
         _PhotoAction(
           icon: Icons.ios_share,
           tooltip: 'Delen',
@@ -745,6 +741,135 @@ class _PhotoAction extends StatelessWidget {
       splashRadius: 22,
       style: IconButton.styleFrom(
         highlightColor: Colors.white.withValues(alpha: 0.18),
+      ),
+    );
+  }
+}
+
+/// The favourite button on the photo, with a small "pop" when a verse is
+/// liked.
+///
+/// Behaves like a [_PhotoAction] otherwise — same size, splash and tooltip —
+/// but on the transition to liked it plays a one-shot scale overshoot, swaps
+/// the outline heart for the filled one, fades the colour to [AppTheme.flame]
+/// and sends a single accent ring outward. Unliking just settles the colour
+/// and fill back without the ring. When the platform asks for reduced motion
+/// ([MediaQuery.disableAnimationsOf]) every part of this collapses to an
+/// instant state change.
+class _AnimatedHeartButton extends StatefulWidget {
+  const _AnimatedHeartButton({required this.liked, required this.onPressed});
+
+  final bool liked;
+  final VoidCallback onPressed;
+
+  @override
+  State<_AnimatedHeartButton> createState() => _AnimatedHeartButtonState();
+}
+
+class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
+    with SingleTickerProviderStateMixin {
+  /// Idle at 0; a fresh like runs it once to 1 and leaves it there. Drives
+  /// both the scale overshoot and the ring.
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  );
+
+  /// 1.0 → 1.24 on the way up, then eased back through a slight overshoot.
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.0,
+        end: 1.24,
+      ).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 40,
+    ),
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.24,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 60,
+    ),
+  ]).animate(_pop);
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void didUpdateWidget(covariant _AnimatedHeartButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.liked && !oldWidget.liked && !_reduceMotion) {
+      _pop.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: widget.onPressed,
+      tooltip: widget.liked ? 'Verwijder uit favorieten' : 'Favoriet',
+      color: Colors.white,
+      splashRadius: 22,
+      style: IconButton.styleFrom(
+        highlightColor: Colors.white.withValues(alpha: 0.18),
+      ),
+      icon: AnimatedBuilder(
+        animation: _pop,
+        builder: (context, child) {
+          final popping = _pop.isAnimating;
+          return SizedBox(
+            width: 22,
+            height: 22,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                if (popping) _ring(_pop.value),
+                Transform.scale(
+                  scale: popping ? _scale.value : 1.0,
+                  child: child,
+                ),
+              ],
+            ),
+          );
+        },
+        // Colour and fill follow the liked state both ways; the 1ms duration
+        // under reduced motion turns the tween into an instant swap.
+        child: TweenAnimationBuilder<double>(
+          duration: Duration(milliseconds: _reduceMotion ? 1 : 220),
+          curve: Curves.easeOut,
+          tween: Tween(begin: 0, end: widget.liked ? 1.0 : 0.0),
+          builder: (context, t, _) => Icon(
+            t > 0.5 ? Icons.favorite : Icons.favorite_border,
+            size: 22,
+            color: Color.lerp(Colors.white, AppTheme.flame, t),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A single expanding, fading circle in the accent colour — one clean pulse
+  /// rather than a particle burst, which only reads as noise at this size.
+  Widget _ring(double t) {
+    final eased = Curves.easeOut.transform(t);
+    return IgnorePointer(
+      child: Opacity(
+        opacity: (1 - eased) * 0.6,
+        child: Container(
+          width: 22 + eased * 26,
+          height: 22 + eased * 26,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.flame, width: 2),
+          ),
+        ),
       ),
     );
   }

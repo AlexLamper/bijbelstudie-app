@@ -4,9 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/config/preview_config.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/tree_state.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 
 final studyProgressRepositoryProvider = Provider((ref) {
-  return StudyProgressRepository(ref.watch(apiClientProvider));
+  return StudyProgressRepository(
+    ref.watch(apiClientProvider),
+    onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+  );
 });
 
 /// `GET`/`POST /api/v1/study-progress` - the account's record of which curated
@@ -20,9 +25,13 @@ final studyProgressRepositoryProvider = Provider((ref) {
 /// the study still has to work, so a failure resolves to "the server knows
 /// nothing" rather than an error the screen has to render.
 class StudyProgressRepository {
-  StudyProgressRepository(this._apiClient);
+  StudyProgressRepository(this._apiClient, {XpSink? onXp}) : _onXp = onXp;
 
   final ApiClient _apiClient;
+
+  /// Forwards the `xp` a finished lesson earned to the Levensboom. See [XpSink].
+  /// Private so the test fakes that `implements` this class need not declare it.
+  final XpSink? _onXp;
 
   /// Completed lesson days per study id, from the endpoint's `lessonsByStudy`.
   Future<Map<String, Set<int>>> getCompletedLessons() async {
@@ -62,7 +71,7 @@ class StudyProgressRepository {
     if (PreviewConfig.enabled) return false;
 
     try {
-      await _apiClient.dio.post(
+      final response = await _apiClient.dio.post(
         '/study-progress',
         data: {
           'source': 'curated',
@@ -74,6 +83,9 @@ class StudyProgressRepository {
           if (verseEnd != null) 'verseEnd': verseEnd,
         },
       );
+      // Null when the lesson was already recorded - the POST is idempotent, so
+      // a lesson ticked twice must not pay twice or animate twice.
+      _onXp?.call((response.data as Map?)?['xp']);
       return true;
     } catch (_) {
       return false;

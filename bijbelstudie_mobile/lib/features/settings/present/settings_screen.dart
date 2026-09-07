@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/notification_prefs.dart';
@@ -108,6 +109,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const _NotificationsSection(),
+
+          const _LevensboomSection(),
 
           const SizedBox(height: 24),
           const SectionHeader(eyebrow: 'Offline', title: 'Opgeslagen tekst'),
@@ -375,6 +378,48 @@ class _NotificationsSection extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The two Levensboom controls, mirroring the website's Instellingen section.
+///
+/// Turning the tree off is purely visual - XP, levels and badges keep accruing
+/// - which the copy has to say out loud, or the toggle reads as "stop counting
+/// my progress".
+class _LevensboomSection extends ConsumerWidget {
+  const _LevensboomSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tree = ref.watch(treeStateProvider).value;
+    final notifier = ref.read(treeStateProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        const SectionHeader(eyebrow: 'Profiel', title: 'Levensboom'),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Boom tonen'),
+          subtitle: const Text('Je XP, niveau en badges lopen door'),
+          value: !(tree?.disabled ?? false),
+          onChanged: tree == null
+              ? null
+              : (value) => notifier.setPrefs(disabled: !value),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Minder beweging'),
+          subtitle: const Text('Geen wiegen, deeltjes of groei-animatie'),
+          value: tree?.reducedMotion ?? false,
+          onChanged: tree == null
+              ? null
+              : (value) => notifier.setPrefs(reducedMotion: value),
+        ),
+      ],
     );
   }
 }

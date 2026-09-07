@@ -8,6 +8,8 @@ import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
+import '../../features/levensboom/domain/tree_state.dart';
+import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/notes/domain/note_models.dart';
 import '../../features/notes/present/notes_providers.dart';
 import '../../features/profile/data/profile_model.dart';
@@ -227,6 +229,38 @@ class PreviewData {
     badges: const ['firstlesson', 'completed1'],
   );
 
+  /// A Levensboom worth looking at: level 12, so the canopy, the blossom, the
+  /// first three vruchten and the bird are all unlocked, and healthy, so it is
+  /// the tree a reader who keeps up sees. `lastSeenLevel` matches the level on
+  /// purpose - otherwise the celebration dialog would fire over every preview
+  /// and every screenshot of Profiel.
+  static final TreeState treeState = TreeState.fromJson(const {
+    'xp': 6800,
+    'level': 12,
+    'xpIntoLevel': 200,
+    'xpForNextLevel': 1200,
+    'progressPercentage': 17,
+    'streak': 12,
+    'freezes': 2,
+    'badges': ['firstlesson', 'completed1'],
+    'levensboom': {
+      'seed': '65f0c1a2b3c4d5e6f7a8b9c0',
+      'health': 1,
+      'wilting': false,
+      'daysSinceActive': 0,
+      'lastSeenLevel': 12,
+      'traitsUnlocked': ['canopy', 'blossom', 'fruit', 'bird'],
+      'reducedMotion': false,
+      'disabled': false,
+    },
+    'xpTable': [
+      {'event': 'chapter_read', 'value': 5, 'label': 'Hoofdstuk gelezen'},
+      {'event': 'study_lesson', 'value': 25, 'label': 'Les afgerond'},
+      {'event': 'note_written', 'value': 8, 'label': 'Aantekening gemaakt'},
+      {'event': 'streak_day', 'value': 3, 'label': 'Dagelijkse reeks'},
+    ],
+  });
+
   /// Wraps the app in a ProviderScope whose network-backed providers are
   /// replaced by the canned values above.
   static Widget scope(Widget child) {
@@ -254,10 +288,24 @@ class PreviewData {
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => const <Bookmark>[]),
         readingHistoryProvider.overrideWith((ref) async => history),
+        // Without this the Levensboom on Profiel sits on its loading skeleton
+        // forever - and a skeleton shimmers on a repeating controller, which is
+        // what makes `pumpAndSettle` in the widget tests never return.
+        treeStateProvider.overrideWith(PreviewTreeNotifier.new),
       ],
       child: child,
     );
   }
+}
+
+/// Serves [PreviewData.treeState] instead of calling `/gamification`.
+///
+/// Public because the screenshot and render harnesses override the provider
+/// with it too - a store screenshot of Profiel has to show the tree, and it has
+/// to be the same tree every run.
+class PreviewTreeNotifier extends TreeStateNotifier {
+  @override
+  Future<TreeState> build() async => PreviewData.treeState;
 }
 
 /// Stands in for the real repository so nothing the reader does can reach the

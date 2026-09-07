@@ -5,10 +5,16 @@ import 'package:uuid/uuid.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/db/content_cache.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/tree_state.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../domain/note_models.dart';
 
 final notesRepositoryProvider = Provider((ref) {
-  return NotesRepository(ref.watch(apiClientProvider), ref.watch(contentCacheProvider));
+  return NotesRepository(
+    ref.watch(apiClientProvider),
+    ref.watch(contentCacheProvider),
+    onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+  );
 });
 
 const _uuid = Uuid();
@@ -54,10 +60,14 @@ String _rejectionMessage(DioException e, String action) {
 /// `POST /api/v1/sync` on the next successful call. Because the id travels with
 /// the record, replaying it is an upsert, never a duplicate.
 class NotesRepository {
-  NotesRepository(this._apiClient, this._cache);
+  NotesRepository(this._apiClient, this._cache, {XpSink? onXp}) : _onXp = onXp;
 
   final ApiClient _apiClient;
   final ContentCache? _cache;
+
+  /// Forwards the `xp` a new note earned to the Levensboom. See [XpSink].
+  /// Private so the test fakes that `implements` this class need not declare it.
+  final XpSink? _onXp;
 
   Future<List<StudyNote>> listNotes() => _listNotes('/notes', kind: 'note');
 
@@ -88,7 +98,11 @@ class NotesRepository {
         path,
         data: {'id': note.id, 'data': note.toRequestData()},
       );
-      final item = (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>;
+      final data = response.data as Map<String, dynamic>;
+      final item = data['item'] as Map<String, dynamic>;
+      // Null for a highlight, an edit, a stub, or the fourth note of the day -
+      // the guardrails live server-side in lib/noteXp.ts.
+      _onXp?.call(data['xp']);
       unawaitedFlush();
       return StudyNote.fromSyncRecord(item);
     } on DioException catch (e) {

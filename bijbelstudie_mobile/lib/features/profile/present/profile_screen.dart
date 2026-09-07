@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/present/levensboom_avatar.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
@@ -84,6 +85,8 @@ class _ProfileBody extends ConsumerWidget {
       children: [
         _HeaderBar(profile: profile),
         const SizedBox(height: 14),
+        // The Levensboom is the picture in this header - see [LevensboomAvatar],
+        // which also owns the level-up celebration.
         _ProfileHeader(profile: profile),
 
         const SizedBox(height: 22),
@@ -296,6 +299,9 @@ class _ProfileHeader extends ConsumerWidget {
 
 /// The avatar with its edit badge.
 ///
+/// The picture itself is the Levensboom, which falls back to the initials
+/// avatar while the tree loads or when the reader has switched it off.
+///
 /// The badge carries a pencil rather than a camera on purpose: `PATCH /me`
 /// takes a name and reading preferences and there is no image-upload endpoint
 /// anywhere in `/api/v1`, so the control opens the profile edit that really
@@ -312,7 +318,10 @@ class _AvatarWithEdit extends ConsumerWidget {
       height: 92,
       child: Stack(
         children: [
-          ProfileAvatar(profile: profile, size: 84),
+          LevensboomAvatar(
+            size: 84,
+            fallback: ProfileAvatar(profile: profile, size: 84),
+          ),
           Positioned(
             right: 0,
             bottom: 0,

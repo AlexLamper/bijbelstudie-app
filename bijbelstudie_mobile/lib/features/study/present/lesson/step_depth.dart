@@ -66,17 +66,27 @@ class LessonDepthStep extends ConsumerWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Eyebrow('Verdieping'),
-              const SizedBox(height: 6),
-              Text(
-                'Uitleg bij ${passage.reference}',
-                style: AppTheme.displaySmall,
+              // Eyebrow and title share a line: the step is short on vertical
+              // room and the label carries no weight of its own.
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Uitleg bij ${passage.reference}',
+                      style: AppTheme.displaySmall.copyWith(fontSize: 18),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Eyebrow('Verdieping', compact: true),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _PaneTabs(
                 active: showOriginal ? _original : _commentary,
                 onChanged: onPanelChanged,
@@ -84,7 +94,7 @@ class LessonDepthStep extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         // Each pane scrolls on its own and fills the step, rather than being a
         // fixed-height box inside a longer page.
         Expanded(
@@ -122,7 +132,7 @@ class _PaneTabs extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               onTap: () => onChanged(pane.$1),
               child: Container(
-                height: 40,
+                height: 32,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: pane.$1 == active
