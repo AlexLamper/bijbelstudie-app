@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/present/levensboom_hero.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
@@ -85,6 +86,11 @@ class _ProfileBody extends ConsumerWidget {
         _HeaderBar(profile: profile),
         const SizedBox(height: 14),
         _ProfileHeader(profile: profile),
+
+        const SizedBox(height: 20),
+        // Levensboom. Renders nothing when the reader has switched it off, and
+        // it is the surface the level-up celebration fires from.
+        const LevensboomHero(),
 
         const SizedBox(height: 22),
         const _QuickActions(),

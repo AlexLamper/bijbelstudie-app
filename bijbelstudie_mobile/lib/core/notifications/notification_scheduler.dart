@@ -5,6 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
+import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/settings/data/notification_prefs.dart';
 import '../../features/studies/data/enrollment_models.dart';
 import '../../features/studies/data/study_models.dart';
@@ -475,6 +476,42 @@ class NotificationScheduler {
           ));
           break; // only the next unreached threshold is armed
         }
+      }
+    }
+
+    // ── treeWilting (TREE_FEATURE_PLAN.md §5.6) ──────────────────────────
+    //
+    // Exactly two days away, and only then: the Levensboom drops to 0.75 health
+    // on day two and only *looks* wilted from day three, so this arrives while
+    // there is still nothing to feel bad about. The server's own
+    // `daysSinceActive` is used when the tree happens to be loaded; otherwise
+    // the local completion log stands in, so the nudge still works offline and
+    // without waking a provider nobody is watching.
+    if (prefs.enabledFor('treeWilting') && !prefs.snoozedNow) {
+      final tree = ref.exists(treeStateProvider)
+          ? ref.read(treeStateProvider).value
+          : null;
+      final lastDone = ref.read(retentionStoreProvider).lastCompletionDay;
+      final daysAway = tree?.daysSinceActive ??
+          (lastDone == null
+              ? null
+              : retentionDayGap(lastDone, retentionDayKey(now)));
+
+      if (daysAway == 2 &&
+          !(tree?.disabled ?? false) &&
+          !store.sentTypeToday(NotifType.treeWilting)) {
+        final fire = service.clampToWaking(
+          service.nextInstanceOf(10, 30),
+          quiet,
+          NotifType.treeWilting,
+        );
+        candidates.add(Candidate(
+          type: NotifType.treeWilting,
+          when: fire,
+          deepLink: '/profile/boom',
+          variant: pickVariant(NotifType.treeWilting,
+              rotation: now.day, tokens: tokens),
+        ));
       }
     }
 

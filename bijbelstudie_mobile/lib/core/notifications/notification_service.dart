@@ -26,6 +26,11 @@ enum NotifType {
   milestone,
   dormant,
   dailyVerse,
+  /// "Je boom mist wat licht" — fired at exactly two days away, before the
+  /// Levensboom visibly wilts (TREE_FEATURE_PLAN.md §5.6). No channel of its
+  /// own and no toggle of its own: it is a win-back nudge and rides the ones
+  /// `dormant` already has.
+  treeWilting,
 }
 
 extension NotifTypeX on NotifType {
@@ -39,6 +44,7 @@ extension NotifTypeX on NotifType {
     NotifType.milestone => 'milestone',
     NotifType.dormant => 'dormant',
     NotifType.dailyVerse => 'dailyVerse',
+    NotifType.treeWilting => 'treeWilting',
   };
 
   /// Android channel this type is delivered on (§4.2).
@@ -50,7 +56,7 @@ extension NotifTypeX on NotifType {
     NotifType.lessonHalfway => 'progress',
     NotifType.milestone => 'milestones',
     NotifType.dailyVerse => 'daily_verse',
-    NotifType.dormant => 'winback',
+    NotifType.dormant || NotifType.treeWilting => 'winback',
   };
 
   /// Types that count against the "≤ 1 engagement notification per day" cap
@@ -69,6 +75,9 @@ extension NotifTypeX on NotifType {
     NotifType.studyReminder => 60,
     NotifType.weeklyGoal => 50,
     NotifType.dormant => 40,
+    // Below dormant: if the reader is far enough gone for the win-back ladder,
+    // that is the message to send, not a note about their tree.
+    NotifType.treeWilting => 30,
     NotifType.dailyVerse => 10,
   };
 
@@ -89,6 +98,7 @@ extension NotifTypeX on NotifType {
     NotifType.weeklyGoal => const [1203],
     NotifType.dormant => const [1210, 1211, 1212, 1213],
     NotifType.milestone => const [1300],
+    NotifType.treeWilting => const [1220],
   };
 }
 

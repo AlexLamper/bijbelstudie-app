@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/levensboom/present/levensboom_providers.dart';
 import 'notifications/notification_scheduler.dart';
 import 'notifications/retention_store.dart';
 
@@ -21,6 +22,10 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
       case AppLifecycleState.resumed:
         _ref.read(retentionStoreProvider.notifier).markOpened();
         _recompute();
+        // The tree wilts with time, not with what the app did, so a session
+        // resumed the next morning has to re-read it or the reader sees
+        // yesterday's health until they navigate somewhere that refetches.
+        _refreshTree();
       case AppLifecycleState.paused:
         // Arm the dormant ladder and tomorrow's at-risk/lost before we lose
         // the chance to run.
@@ -35,6 +40,13 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
   void _recompute() {
     // Fire-and-forget; a scheduler hiccup must never surface to the user.
     Future(() => NotificationScheduler.recompute(_ref)).catchError((_) {});
+  }
+
+  void _refreshTree() {
+    // Only when something is already listening: waking a disposed provider on
+    // every foreground would add a request for a screen nobody is looking at.
+    if (!_ref.exists(treeStateProvider)) return;
+    Future(() => _ref.read(treeStateProvider.notifier).refresh()).catchError((_) {});
   }
 }
 

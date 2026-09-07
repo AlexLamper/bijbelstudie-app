@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.dart';
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
+import 'package:bijbelstudie_mobile/features/levensboom/present/levensboom_providers.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
 import 'package:bijbelstudie_mobile/features/bible/present/bible_providers.dart';
@@ -447,11 +448,24 @@ void main() {
           (ref) async => const <String, StudyEnrollment>{},
         ),
         premiumControllerProvider.overrideWith(_StubPremiumController.new),
+        // Profiel leads with the Levensboom. Canned, so the screenshot shows a
+        // real tree instead of a loading skeleton, and the same one every run.
+        treeStateProvider.overrideWith(PreviewTreeNotifier.new),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: RepaintBoundary(key: _captureKey, child: child),
+        // Animations off for the whole harness. A store screenshot has to be
+        // the same pixels every run, and the Levensboom on Profiel sways and
+        // drifts motes on a perpetually repeating controller - which is also
+        // what makes
+        // `pumpAndSettle` below never return while it is on screen.
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: RepaintBoundary(key: _captureKey, child: child),
+          ),
+        ),
       ),
     );
   }

@@ -3,17 +3,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/tree_state.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import 'daily_verse_store.dart';
 import 'dashboard_models.dart';
 
 final dashboardRepositoryProvider = Provider((ref) {
-  return DashboardRepository(ref.watch(apiClientProvider));
+  return DashboardRepository(
+    ref.watch(apiClientProvider),
+    // Read lazily inside the callback, so this provider does not depend on the
+    // tree - the dashboard has to work whether or not anything is watching it.
+    onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+  );
 });
 
 class DashboardRepository {
-  DashboardRepository(this._apiClient);
+  DashboardRepository(this._apiClient, {XpSink? onXp}) : _onXp = onXp;
 
   final ApiClient _apiClient;
+
+  /// Forwards the `xp` a call earned to the Levensboom, so the tree animates
+  /// without a second request. See [XpSink].
+  ///
+  /// Private on purpose: `preview_data.dart` and the widget tests `implements`
+  /// this class, and a public field would oblige every one of those fakes to
+  /// declare a member they have no use for.
+  final XpSink? _onXp;
 
   /// One request for the whole tab. The website makes six; on a phone that is
   /// six round trips before anything renders.
@@ -36,7 +51,7 @@ class DashboardRepository {
     String? commentary,
   }) async {
     try {
-      await _apiClient.dio.post(
+      final response = await _apiClient.dio.post(
         '/last-read',
         data: {
           'book': book,
@@ -45,6 +60,8 @@ class DashboardRepository {
           if (commentary != null) 'commentary': commentary,
         },
       );
+      // Null on a chapter already marked read, which is the common case.
+      _onXp?.call((response.data as Map?)?['xp']);
     } catch (_) {
       // best effort
     }
@@ -75,7 +92,9 @@ class DashboardRepository {
   Future<StreakResult?> bumpStreak() async {
     try {
       final response = await _apiClient.dio.post('/streak');
-      return StreakResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      _onXp?.call(data['xp']);
+      return StreakResult.fromJson(data);
     } catch (_) {
       return null;
     }

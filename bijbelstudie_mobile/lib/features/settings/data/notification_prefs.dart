@@ -69,7 +69,10 @@ class NotificationPrefs {
       'lessonHalfway' => lessonHalfwayEnabled,
       'weeklyGoal' => weeklyGoalEnabled,
       'milestone' => milestonesEnabled,
-      'dormant' => dormantEnabled,
+      // The Levensboom nudge is a win-back message with a friendlier subject,
+      // so it rides the "we hebben je gemist" toggle rather than adding a
+      // switch nobody would know to look for.
+      'dormant' || 'treeWilting' => dormantEnabled,
       'dailyVerse' => dailyVerseEnabled,
       _ => false,
     };

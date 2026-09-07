@@ -13,6 +13,7 @@ import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.da
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/router/app_router.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
+import 'package:bijbelstudie_mobile/features/levensboom/present/levensboom_providers.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
 import 'package:bijbelstudie_mobile/features/bible/present/bible_providers.dart';
@@ -284,6 +285,9 @@ void main() {
       ),
     ),
     profileProvider.overrideWith((ref) async => profile),
+    // Profiel leads with the Levensboom; canned so it renders a tree rather
+    // than a skeleton that shimmers forever under `pumpAndSettle`.
+    treeStateProvider.overrideWith(PreviewTreeNotifier.new),
     notesListProvider.overrideWith((ref) async => notes),
     highlightsListProvider.overrideWith((ref) async => highlights),
     bookmarksProvider.overrideWith((ref) async => bookmarks),

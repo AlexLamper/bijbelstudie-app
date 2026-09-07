@@ -184,6 +184,21 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('ms8', 'Nieuw zegel verdiend',
         'Er staat een nieuwe mijlpaal op je profiel.'),
   ],
+  // Fired once, at exactly two days away — before the tree visibly wilts, never
+  // after. No variant says the tree could die, because it cannot: health floors
+  // at 0.3 server-side (lib/levensboom/health.ts) precisely so this copy never
+  // has to threaten. The server pool in `lib/notificationCopy.ts` overrides
+  // these when `GET /notifications/copy?type=tree_wilting` has been fetched.
+  NotifType.treeWilting: [
+    VariantTemplate('tw1', 'Je boom mist wat licht',
+        'Twee dagen zonder lezen. Een paar verzen en hij staat er weer fris bij.'),
+    VariantTemplate('tw2', 'Je boom wacht op je',
+        'Eén kort stuk laat hem weer opveren.'),
+    VariantTemplate('tw3', 'Even water geven',
+        'Je boom hangt wat slap. Tien minuten lezen is genoeg.'),
+    VariantTemplate('tw4', 'Terug naar {study}',
+        'Je boom veert op zodra je weer leest. Geen haast.'),
+  ],
   NotifType.dormant: [
     VariantTemplate('dm1', 'Een paar dagen niet langs geweest',
         'Je {study} ligt klaar bij {lesson}. Kom gerust weer even.'),

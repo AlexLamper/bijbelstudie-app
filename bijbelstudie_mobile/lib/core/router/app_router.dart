@@ -22,6 +22,7 @@ import '../../features/bible/present/read_screen.dart';
 import '../../features/bible/present/reader_chrome.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
+import '../../features/levensboom/present/levensboom_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
@@ -272,6 +273,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/studies', builder: (context, state) => const StudiesScreen()),
           GoRoute(path: '/notes', builder: (context, state) => const NotesScreen()),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+          // Levensboom. Nested under Profiel rather than given a tab of its
+          // own: it is one account's own thing to look at, not a section.
+          GoRoute(
+            path: '/profile/boom',
+            builder: (context, state) => const LevensboomScreen(),
+          ),
           // Reachable from the dashboard and Profiel rather than the tab bar.
           GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
           // Groepen is out for the MVP. The route stays as a redirect so any
