@@ -75,17 +75,45 @@ class AuthRepository {
     await _localStorage.clear();
   }
 
+  /// Turns a failed auth call into something a reader can act on.
+  ///
+  /// `errorV1` defaults `message` to the error code, so a route that passes no
+  /// copy answers `{"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"}` — and
+  /// that raw code was shown verbatim on the login screen. It is not Dutch, it
+  /// is not a sentence, and it tells the user nothing about whether to retry.
+  /// A message equal to the code is therefore dropped in favour of our own
+  /// wording; a real Dutch message from the server still wins.
+  static String authErrorMessage(
+    Map<dynamic, dynamic> body,
+    String fallbackMessage,
+  ) {
+    final code = body['error'] is String ? body['error'] as String : null;
+    final raw = body['message'] is String ? body['message'] as String : null;
+    if (raw != null && raw.isNotEmpty && raw != code) return raw;
+
+    switch (code) {
+      case 'INTERNAL_ERROR':
+        return '$fallbackMessage door een storing. Probeer het zo opnieuw.';
+      case 'UNAUTHORIZED':
+      case 'INVALID_TOKEN':
+        return '$fallbackMessage: de inloggegevens werden niet geaccepteerd.';
+      case 'RATE_LIMITED':
+        return 'Te veel pogingen. Wacht even en probeer het opnieuw.';
+      case null:
+        return fallbackMessage;
+      default:
+        return fallbackMessage;
+    }
+  }
+
   Future<User?> _post(String path, Map<String, dynamic> data, String fallbackMessage) async {
     try {
       final response = await _apiClient.dio.post(path, data: data);
       return _processAuthResponse(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       final body = e.response?.data;
-      if (body is Map && body['message'] is String) {
-        throw Exception(body['message']);
-      }
-      if (body is Map && body['error'] is String) {
-        throw Exception(body['error']);
+      if (body is Map) {
+        throw Exception(authErrorMessage(body, fallbackMessage));
       }
       throw Exception('$fallbackMessage: ${e.message}');
     }

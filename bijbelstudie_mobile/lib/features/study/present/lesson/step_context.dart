@@ -399,13 +399,38 @@ class _PlaceLightboxState extends State<_PlaceLightbox> {
                     controller: _pages,
                     itemCount: widget.images.length,
                     onPageChanged: (value) => setState(() => _index = value),
-                    itemBuilder: (context, index) => InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 4,
-                      child: GeoImageView(
-                        image: widget.images[index],
-                        width: width,
-                        fit: BoxFit.contain,
+                    // The page fills the screen, so without this the letterbox
+                    // beside the photograph would swallow the backdrop tap.
+                    itemBuilder: (context, index) => GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.of(context).pop(),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Center(
+                          // Loose constraints let the image size itself to its
+                          // own aspect ratio, so the absorbing box is the
+                          // photograph and not the letterbox around it.
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth,
+                              maxHeight: constraints.maxHeight,
+                            ),
+                            child: GestureDetector(
+                              // The photograph keeps its own gestures: this
+                              // absorbs the tap so zooming and panning still
+                              // work and tapping the image does not close.
+                              onTap: () {},
+                              child: InteractiveViewer(
+                                minScale: 1,
+                                maxScale: 4,
+                                child: GeoImageView(
+                                  image: widget.images[index],
+                                  width: width,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

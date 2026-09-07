@@ -325,4 +325,35 @@ void main() {
     await _pumpPastSignIn(tester);
     expect(find.text('SETUP'), findsOneWidget);
   });
+
+  group('server error copy', () {
+    // `errorV1` defaults `message` to the error code, so a 500 arrives as
+    // {"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"} - which the login
+    // screen used to print verbatim.
+    test('never shows a bare error code to the reader', () {
+      final message = AuthRepository.authErrorMessage(
+        const {'error': 'INTERNAL_ERROR', 'message': 'INTERNAL_ERROR'},
+        'Google-login mislukt',
+      );
+      expect(message, isNot(contains('INTERNAL_ERROR')));
+      expect(message, contains('Google-login mislukt'));
+    });
+
+    test('keeps a real Dutch message from the server', () {
+      expect(
+        AuthRepository.authErrorMessage(
+          const {'error': 'NO_EMAIL', 'message': 'Google gaf geen e-mailadres terug.'},
+          'Google-login mislukt',
+        ),
+        'Google gaf geen e-mailadres terug.',
+      );
+    });
+
+    test('falls back when the body carries no code at all', () {
+      expect(
+        AuthRepository.authErrorMessage(const {}, 'Inloggen mislukt'),
+        'Inloggen mislukt',
+      );
+    });
+  });
 }
