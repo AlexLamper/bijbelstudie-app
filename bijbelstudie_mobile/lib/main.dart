@@ -99,8 +99,18 @@ void main() async {
     return;
   }
 
+  // Both inits are bounded, not just guarded. A `try` only survives a plugin
+  // that *fails*; a platform channel that never answers (a store client that
+  // cannot reach the device's account, a notification channel registration
+  // waiting on a locked keystore) leaves `main` awaiting forever, `runApp` is
+  // never called, and the launch screen stays up with no Flutter behind it —
+  // the app "not getting past loading". Neither of these is worth the app not
+  // starting: RevenueCat re-links on the next entitlement check and the
+  // notification scheduler re-runs on the first foreground.
+  const initBudget = Duration(seconds: 8);
+
   try {
-    await _initRevenueCat();
+    await _initRevenueCat().timeout(initBudget);
   } catch (e, st) {
     // A RevenueCat outage must never stop the app from starting: the reader
     // works without an entitlement check.
@@ -111,7 +121,7 @@ void main() async {
   }
 
   try {
-    await _initNotifications();
+    await _initNotifications().timeout(initBudget);
   } catch (e, st) {
     // A notifications hiccup must never stop the app from starting either;
     // the settings tile re-checks the real state itself and will not claim
