@@ -21,7 +21,7 @@ class AppConfig {
   /// Build against it with:
   ///   flutter run --dart-define=ENV=staging
   static const String _stagingBaseUrl =
-      'https://bijbelstudie-git-staging-alexlampers-projects.vercel.app/api/v1';
+      'https://bijbelstudie-git-staging-dev-f81e211e.vercel.app/api/v1';
 
   /// `--dart-define=ENV=staging` (or `production`, or unset for the default).
   /// A named target beats pasting a URL: it is the difference between a

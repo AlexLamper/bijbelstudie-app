@@ -719,12 +719,20 @@ class AppTheme {
         backgroundColor: card,
         selectedColor: ring,
         side: BorderSide(color: line),
+        // The label colour is state-driven: RawChip resolves it through
+        // `WidgetStateProperty.resolveAs`, so a selected chip gets the
+        // on-teal colour instead of near-black text on the teal fill.
         labelStyle: TextStyle(
           fontFamily: sansFontName,
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: fg,
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? colorScheme.onSecondary
+                : fg,
+          ),
         ),
+        checkmarkColor: colorScheme.onSecondary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusPill),
         ),

@@ -161,43 +161,73 @@ class StreakRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    // A streak of 0 renders as a muted, intentional "not started" state rather
+    // than an empty ring. (HomeStreakIndicator hides it entirely today, but the
+    // widget stays safe if shown directly, e.g. in previews.)
+    final isDormant = streak <= 0;
+    final accent = isDormant ? AppTheme.flame.withValues(alpha: 0.45) : AppTheme.flame;
+
     return Semantics(
-      label: 'Reeks van $streak dagen',
+      label: hasFreeze
+          ? 'Reeks van $streak dagen, met een vrije dag'
+          : 'Reeks van $streak dagen',
       child: SizedBox(
         width: size,
         height: size,
         child: Stack(
           alignment: Alignment.center,
           children: [
+            // Faint flame-tinted disc: gives the indicator a subtle chip
+            // presence in the header and lifts the centre number off the
+            // surface without reading as a button.
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.flame.withValues(alpha: isDormant ? 0.05 : 0.10),
+              ),
+            ),
             CustomPaint(
               size: Size(size, size),
               painter: _SegmentRingPainter(
                 filled: segmentsFilled.clamp(0, 7),
                 total: 7,
-                track: scheme.outline,
-                fill: AppTheme.flame,
+                // Unfilled segments read as "flame, dimmed" so the ring is one
+                // cohesive component instead of grey noise around orange.
+                track: AppTheme.flame.withValues(alpha: 0.16),
+                fill: accent,
               ),
             ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$streak',
-                  style: AppTheme.bodyStrong.copyWith(
-                    fontSize: size * 0.34,
-                    height: 1,
-                    color: scheme.onSurface,
+            // Centre: the day count in flame, with a small flame (or snowflake,
+            // when a freeze is banked) glyph beneath it. The count is fitted so
+            // 1-, 2- and 3-digit values stay centred and never touch the ring.
+            SizedBox(
+              width: size * 0.58,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '$streak',
+                      style: AppTheme.bodyStrong.copyWith(
+                        fontSize: size * 0.36,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                        color: accent,
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            if (hasFreeze)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Icon(Icons.ac_unit, size: size * 0.28, color: AppTheme.teal),
+                  SizedBox(height: size * 0.02),
+                  Icon(
+                    hasFreeze ? Icons.ac_unit : Icons.local_fire_department,
+                    size: size * 0.22,
+                    color: hasFreeze ? AppTheme.teal : accent,
+                  ),
+                ],
               ),
+            ),
           ],
         ),
       ),
