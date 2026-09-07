@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bijbelstudie_mobile/features/levensboom/domain/chime.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/palette.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/rng.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/traits.dart';
@@ -203,6 +206,45 @@ void main() {
       expect(wilted.leaf, isNot(healthy.leaf));
       expect(buildPalette(Season.autumn, DayPhase.day).blossom, isNull);
       expect(buildPalette(Season.spring, DayPhase.night).night, isTrue);
+    });
+  });
+
+  group('level-up chime', () {
+    test('is a well-formed mono 16-bit WAV, and is built once', () {
+      final wav = levelUpChimeWav();
+      expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
+      expect(String.fromCharCodes(wav.sublist(8, 12)), 'WAVE');
+      expect(String.fromCharCodes(wav.sublist(36, 40)), 'data');
+
+      final header = ByteData.sublistView(wav);
+      expect(header.getUint16(22, Endian.little), 1, reason: 'mono');
+      expect(header.getUint32(24, Endian.little), 44100);
+      expect(header.getUint16(34, Endian.little), 16, reason: 'bit depth');
+      // The declared data size has to match what is actually there, or a
+      // player reads past the end and clicks.
+      expect(header.getUint32(40, Endian.little), wav.length - 44);
+
+      // Cached, so a run of level-ups does not re-synthesise 1.7s of audio.
+      expect(identical(levelUpChimeWav(), wav), isTrue);
+    });
+
+    test('stays well under full scale - a chime, not an alert', () {
+      final wav = levelUpChimeWav();
+      final samples = ByteData.sublistView(wav, 44);
+      var peak = 0;
+      for (var i = 0; i + 1 < samples.lengthInBytes; i += 2) {
+        final value = samples.getInt16(i, Endian.little).abs();
+        if (value > peak) peak = value;
+      }
+      expect(peak, greaterThan(1000), reason: 'audible');
+      expect(peak, lessThan(32767 ~/ 2), reason: 'never loud enough to startle');
+    });
+  });
+
+  group('palette carries the season', () {
+    test('so the renderer can draw the seasonal events without a clock', () {
+      expect(buildPalette(Season.winter, DayPhase.day).season, Season.winter);
+      expect(buildPalette(Season.spring, DayPhase.night).season, Season.spring);
     });
   });
 

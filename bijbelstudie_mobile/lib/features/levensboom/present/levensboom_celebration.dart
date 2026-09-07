@@ -1,9 +1,11 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../domain/chime.dart';
 import '../domain/palette.dart';
 import '../domain/traits.dart';
 import '../domain/tree_generator.dart';
@@ -27,6 +29,7 @@ Future<void> showLevensboomCelebration(
     // Gentle, once. `mediumImpact` is the heaviest thing this app does, and it
     // is reserved for exactly this.
     await HapticFeedback.mediumImpact();
+    await _playChime();
   }
 
   if (!context.mounted) return;
@@ -41,6 +44,29 @@ Future<void> showLevensboomCelebration(
   );
 
   await ref.read(treeStateProvider.notifier).markSeen(level);
+}
+
+/// Plays the chime, respecting the silent switch.
+///
+/// `AudioContextConfig(respectSilence: true)` is the point of doing this by
+/// hand: the default session category keeps playing with the ringer off, which
+/// is right for a podcast and wrong for a decorative chime on a Bible app.
+/// Everything here fails silently - audio is decoration, and a device with no
+/// audio route must not break the celebration that triggered it.
+Future<void> _playChime() async {
+  try {
+    final player = AudioPlayer();
+    await player.setAudioContext(
+      AudioContextConfig(respectSilence: true, focus: AudioContextConfigFocus.mixWithOthers)
+          .build(),
+    );
+    await player.play(BytesSource(levelUpChimeWav()), volume: 0.9);
+    // Nothing else holds a reference, so release the platform player when the
+    // sound ends rather than leaking one per level-up.
+    player.onPlayerComplete.first.then((_) => player.dispose()).catchError((_) {});
+  } catch (_) {
+    /* decoration only */
+  }
 }
 
 class _CelebrationDialog extends StatefulWidget {
@@ -59,10 +85,17 @@ class _CelebrationDialog extends StatefulWidget {
 }
 
 class _CelebrationDialogState extends State<_CelebrationDialog>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _grow = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1200),
+  );
+
+  /// Slower than the growth, so the push is still settling when the new wood
+  /// has finished arriving.
+  late final AnimationController _push = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
   );
 
   /// Where the previous level's silhouette ended, so what the reader watches
@@ -77,12 +110,16 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
   @override
   void initState() {
     super.initState();
-    if (!widget.reducedMotion) _grow.forward();
+    if (!widget.reducedMotion) {
+      _grow.forward();
+      _push.forward();
+    }
   }
 
   @override
   void dispose() {
     _grow.dispose();
+    _push.dispose();
     super.dispose();
   }
 
@@ -113,15 +150,33 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
           SizedBox(
             height: 240,
             width: double.infinity,
-            child: AnimatedBuilder(
-              animation: _grow,
-              builder: (context, _) => TreeView(
-                seed: widget.seed,
-                level: widget.level,
-                frac: 0,
-                reveal: still ? 1 : _from + (1 - _from) * Curves.easeOutCubic.transform(_grow.value),
-                reducedMotion: still,
-                palette: palette,
+            child: ClipRect(
+              child: AnimatedBuilder(
+                animation: _push,
+                builder: (context, child) => Transform.scale(
+                  // The slow camera push: the tree eases in and scales up a
+                  // hair, so the sequence reads as moving toward the tree
+                  // rather than as a dialog appearing over it.
+                  scale: still ? 1 : 1 + 0.08 * Curves.easeOutCubic.transform(_push.value),
+                  child: child,
+                ),
+                child: AnimatedBuilder(
+                  animation: _grow,
+                  builder: (context, _) => TreeView(
+                    seed: widget.seed,
+                    level: widget.level,
+                    frac: 0,
+                    reveal: still
+                        ? 1
+                        : _from + (1 - _from) * Curves.easeOutCubic.transform(_grow.value),
+                    reducedMotion: still,
+                    palette: palette,
+                    celebration: !still,
+                    // The newest fruit is the last on the tree, and the scene
+                    // lists them in unlock order.
+                    bloomFruit: fruit == null ? null : fruitCount(widget.level) - 1,
+                  ),
+                ),
               ),
             ),
           ),

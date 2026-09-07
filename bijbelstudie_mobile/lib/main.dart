@@ -12,6 +12,7 @@ import 'core/config/app_config.dart';
 import 'core/config/preview_config.dart';
 import 'core/config/revenuecat_config.dart';
 import 'core/preview/preview_data.dart';
+import 'core/ui/environment_badge.dart';
 import 'features/feedback/present/review_prompt_host.dart';
 import 'features/onboarding/present/tour_overlay.dart';
 import 'features/settings/present/theme_mode_provider.dart';
@@ -178,9 +179,14 @@ class BijbelStudieApp extends ConsumerWidget {
       // The rating prompt sits outside the tour host on purpose: it renders
       // nothing until its gate opens, and it refuses to open while the tour is
       // running, so the two can never fight over the same window.
-      builder: (context, child) => ReviewPromptHost(
-        enabled: !PreviewConfig.enabled,
-        child: TourHost(child: child ?? const SizedBox.shrink()),
+      // The environment badge wraps the lot, so it is visible over the tour
+      // spotlight too - "which build is this?" is exactly the question you ask
+      // while something else is on screen. Renders nothing on a live build.
+      builder: (context, child) => EnvironmentBadge(
+        child: ReviewPromptHost(
+          enabled: !PreviewConfig.enabled,
+          child: TourHost(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }

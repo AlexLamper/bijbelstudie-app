@@ -29,6 +29,8 @@ class TreeView extends StatefulWidget {
     this.reveal = 1,
     this.reducedMotion = false,
     this.palette,
+    this.celebration = false,
+    this.bloomFruit,
   });
 
   final String seed;
@@ -47,6 +49,12 @@ class TreeView extends StatefulWidget {
 
   /// Overrides the device clock. Only the celebration uses it (night).
   final TreePalette? palette;
+
+  /// Adds the rising column of light motes the level-up sequence calls for.
+  final bool celebration;
+
+  /// Index of a fruit to swell with a soft bloom, when a level-up unlocked one.
+  final int? bloomFruit;
 
   @override
   State<TreeView> createState() => _TreeViewState();
@@ -136,6 +144,9 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
               reveal: widget.reveal,
               timeMs: _still ? 0 : _clock.value * _period.inMilliseconds,
               still: _still,
+              level: widget.level,
+              celebration: widget.celebration,
+              bloomFruit: widget.bloomFruit,
             ),
             size: Size.infinite,
           );
@@ -164,10 +175,27 @@ class _Decor {
       for (var i = 0; i < 60; i++)
         (x: rand() * 100, y: rand() * 62, r: 0.15 + rand() * 0.3, phase: rand()),
     ];
+    // Autumn's falling leaves and the level-25 blossom storm are the same
+    // handful of drifters wearing different colours.
+    drifters = [
+      for (var i = 0; i < 14; i++)
+        (
+          x: rand() * 100,
+          y: rand() * 100,
+          size: 0.7 + rand() * 0.9,
+          speed: 0.5 + rand() * 1.1,
+          drift: 0.6 + rand() * 1.6,
+          phase: rand(),
+        ),
+    ];
   }
 
   late final List<({double x, double y, double r, double speed, double phase})> motes;
   late final List<({double x, double y, double r, double phase})> stars;
+  late final List<
+    ({double x, double y, double size, double speed, double drift, double phase})
+  >
+  drifters;
 }
 
 /// The recorded branch layer plus the key it was recorded for.
@@ -192,6 +220,9 @@ class _TreePainter extends CustomPainter {
     required this.reveal,
     required this.timeMs,
     required this.still,
+    required this.level,
+    required this.celebration,
+    required this.bloomFruit,
   });
 
   final TreeScene scene;
@@ -201,6 +232,12 @@ class _TreePainter extends CustomPainter {
   final double reveal;
   final double timeMs;
   final bool still;
+  final int level;
+  final bool celebration;
+  final int? bloomFruit;
+
+  /// The `seasons` trait (docs/levensboom-spec.md §6) arrives here.
+  static const int _seasonsTraitLevel = 25;
 
   /// How much of a branch at [depth] is grown, for the celebration sequence.
   double _revealAt(int depth) {
@@ -446,10 +483,54 @@ class _TreePainter extends CustomPainter {
     final shinePaint = Paint()..color = palette.light.withValues(alpha: 0.5);
     for (final fruit in scene.fruits) {
       final centre = Offset(originX + fruit.x * scale, originY + fruit.y * scale);
-      final size = math.max(1.4, fruit.size * leafScale * 1.15);
+      // The fruit a level-up just unlocked swells and carries a soft bloom, so
+      // the eye is told which one is new.
+      final blooming = bloomFruit != null && fruit.index == bloomFruit;
+      final swell = blooming && !still
+          ? 1 + 0.28 * (0.5 + 0.5 * math.sin(timeMs * 0.0026))
+          : 1.0;
+      final size = math.max(1.4, fruit.size * leafScale * 1.15) * swell;
+
+      if (blooming) {
+        canvas.drawCircle(
+          centre,
+          size * 4.5,
+          Paint()
+            ..shader = ui.Gradient.radial(centre, size * 4.5, [
+              palette.light.withValues(alpha: 0.53),
+              palette.light.withValues(alpha: 0),
+            ]),
+        );
+      }
+
       canvas.drawCircle(centre, size, fruitPaint);
       // One highlight dot: enough to read as round rather than as a sticker.
       canvas.drawCircle(centre.translate(-size * 0.3, -size * 0.3), size * 0.3, shinePaint);
+    }
+
+    // Snow on the branches (level 25+, winter). Drawn inside the swaying
+    // transform so the load rides with the tree.
+    if (level >= _seasonsTraitLevel && palette.season == Season.winter) {
+      final snow = Paint()..color = const Color(0xE6F2F6FA);
+      for (final branch in scene.branches) {
+        if (branch.depth < scene.maxDepth - 2) continue;
+        if (_revealAt(branch.depth) <= 0) continue;
+        final n = _normal(branch.x1 - branch.cx, branch.y1 - branch.cy);
+        // Only the upward-facing side carries snow.
+        final side = n.dy < 0 ? 1.0 : -1.0;
+        final w = math.max(0.7, branch.w0 * scale * 0.75);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(
+              originX + branch.cx * scale + n.dx * side * w,
+              originY + branch.cy * scale + n.dy * side * w,
+            ),
+            width: w * 3,
+            height: w * 1.4,
+          ),
+          snow,
+        );
+      }
     }
 
     final bird = scene.bird;
@@ -493,6 +574,64 @@ class _TreePainter extends CustomPainter {
       }
     }
 
+    // Drifting petals and falling leaves. Autumn drops the occasional leaf for
+    // everyone; the blossom storm is the level-25 `seasons` trait and only
+    // blows in spring. Both are the same drifters, so a season change costs a
+    // colour and nothing else.
+    final hasSeasons = level >= _seasonsTraitLevel;
+    final blossom = palette.blossom;
+    final drifterColor = palette.season == Season.autumn
+        ? palette.leafAlt
+        : (hasSeasons && palette.season == Season.spring && blossom != null)
+        ? blossom
+        : null;
+    if (drifterColor != null) {
+      // Three at a time in autumn - "occasional" is the point, and a constant
+      // fall reads as the tree dying rather than as the season.
+      final shown = palette.season == Season.autumn ? 3 : decor.drifters.length;
+      final drifterPaint = Paint()..color = drifterColor.withValues(alpha: 0.75);
+      for (var i = 0; i < shown; i++) {
+        final d = decor.drifters[i];
+        final fall = still ? 0.0 : (timeMs * 0.0055 * d.speed) % 130;
+        final y = ((d.y + fall) % 130 + 130) % 130 - 15;
+        if (y > 100 || y < 0) continue;
+        final swayX =
+            still ? 0.0 : math.sin(timeMs * 0.0012 + d.phase * 6.283) * d.drift * 3;
+        canvas.save();
+        canvas.translate((d.x + swayX) / 100 * size.width, y / 100 * size.height);
+        canvas.rotate(still ? 0 : timeMs * 0.0016 + d.phase * 6.283);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: d.size * 2 * scale,
+            height: d.size * scale,
+          ),
+          drifterPaint,
+        );
+        canvas.restore();
+      }
+    }
+
+    // The level-up column of light.
+    if (celebration && !still) {
+      final columnX = originX + kTrunkX * scale;
+      final groundY = originY + kGroundY * scale;
+      final column = Paint();
+      for (var i = 0; i < 22; i++) {
+        final phase = (i / 22 + timeMs * 0.00022) % 1;
+        final y = groundY - phase * (groundY - originY);
+        final spread = (1 - phase) * 9 * scale;
+        canvas.drawCircle(
+          Offset(columnX + math.sin(timeMs * 0.0015 + i) * spread, y),
+          math.max(0.7, 0.7 * scale),
+          column
+            ..color = palette.light.withValues(
+              alpha: (0.5 * math.sin(phase * math.pi)).clamp(0.0, 1.0),
+            ),
+        );
+      }
+    }
+
     // Pollen in the sunbeam. Cheap, and most of what makes a still image read
     // as a living scene.
     final paint = Paint();
@@ -518,7 +657,9 @@ class _TreePainter extends CustomPainter {
       old.timeMs != timeMs ||
       old.scene != scene ||
       old.reveal != reveal ||
-      old.palette != palette;
+      old.palette != palette ||
+      old.celebration != celebration ||
+      old.bloomFruit != bloomFruit;
 }
 
 double _lerp(double a, double b, double t) => a + (b - a) * t;

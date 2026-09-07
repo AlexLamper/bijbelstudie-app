@@ -16,6 +16,7 @@ enum DayPhase { dawn, day, dusk, night }
 
 class TreePalette {
   const TreePalette({
+    required this.season,
     required this.skyTop,
     required this.skyBottom,
     required this.glow,
@@ -29,6 +30,10 @@ class TreePalette {
     required this.ground,
     required this.night,
   });
+
+  /// Carried through so a renderer can draw the seasonal events of the
+  /// `seasons` trait without re-deriving the month it already resolved.
+  final Season season;
 
   final Color skyTop, skyBottom, glow, light, bark, barkLit, leaf, leafAlt;
   final Color? blossom;
@@ -128,6 +133,7 @@ TreePalette buildPalette(Season season, DayPhase timeOfDay, {double health = 1})
   Color wilt(Color c) => _mix(c, _wiltMix, (1 - health) * 0.4);
 
   return TreePalette(
+    season: season,
     skyTop: sky[0],
     skyBottom: sky[1],
     glow: sky[2],
