@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/groups_repository.dart';
+import '../../levensboom/present/tree_view.dart';
 
 /// `/groepen/[id]` — the group's wall, its roster, and the invite code.
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -221,18 +222,39 @@ class _GroupHeader extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final member = detail.members[index];
+                final card = member.levensboom;
                 return Chip(
                   visualDensity: VisualDensity.compact,
-                  avatar: CircleAvatar(
-                    backgroundColor: AppTheme.teal.withValues(alpha: 0.12),
-                    child: Text(
-                      member.name.isEmpty ? '?' : member.name[0].toUpperCase(),
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.teal,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  // The member's own tree, when they show one; initials
+                  // otherwise. Same face as everywhere else in the product.
+                  avatar: card != null && !card.disabled
+                      ? ClipOval(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: TreeView(
+                              seed: card.seed,
+                              level: card.level,
+                              frac: 0.5,
+                              health: card.health,
+                              species: card.avatar.species,
+                              scene: card.avatar.scene,
+                              animal: card.avatar.animal,
+                              framing: TreeFraming.portrait,
+                              still: true,
+                            ),
+                          ),
+                        )
+                      : CircleAvatar(
+                          backgroundColor: AppTheme.teal.withValues(alpha: 0.12),
+                          child: Text(
+                            member.name.isEmpty ? '?' : member.name[0].toUpperCase(),
+                            style: AppTheme.caption.copyWith(
+                              color: AppTheme.teal,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                   label: Text(member.isSelf ? 'Jij' : member.name),
                 );
               },

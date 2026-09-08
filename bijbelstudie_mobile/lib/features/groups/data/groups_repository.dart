@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/public_tree_card.dart';
 
 final groupsRepositoryProvider = Provider((ref) {
   return GroupsRepository(ref.watch(apiClientProvider));
@@ -59,6 +60,7 @@ class GroupMember {
     required this.role,
     required this.isSelf,
     this.image,
+    this.levensboom,
   });
 
   final String userId;
@@ -66,6 +68,10 @@ class GroupMember {
   final String role;
   final bool isSelf;
   final String? image;
+
+  /// The member's Levensboom, enough to draw it. Null when switched off or
+  /// when the server predates the card.
+  final PublicTreeCard? levensboom;
 
   bool get isLeader => role == 'leader';
 
@@ -76,6 +82,7 @@ class GroupMember {
       role: json['role'] as String? ?? 'member',
       isSelf: json['isSelf'] as bool? ?? false,
       image: json['image'] as String?,
+      levensboom: PublicTreeCard.fromJson(json['levensboom']),
     );
   }
 }
