@@ -132,7 +132,8 @@ Color _mix(Color a, Color b, double amount) =>
 Season seasonForMonth(int month) {
   if (month == 12 || month <= 2) return Season.winter;
   if (month <= 5) return Season.spring;
-  if (month <= 8) return Season.summer;
+  // September is still green in the Netherlands; autumn colours from October.
+  if (month <= 9) return Season.summer;
   return Season.autumn;
 }
 
