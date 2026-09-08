@@ -103,7 +103,7 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
         action: pro
             ? SnackBarAction(
                 label: 'Bekijk Pro',
-                onPressed: () => context.push('/premium?source=levensboom'),
+                onPressed: () => context.push('/premium?source=app_levensboom'),
               )
             : null,
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/provider_cache.dart';
@@ -61,7 +63,10 @@ class TreeStateNotifier extends AsyncNotifier<TreeState> {
     final current = state.value;
     if (current == null) return;
     state = AsyncData(current.applyGrant(grant));
-    if (grant.levelledUp) Future(refresh).catchError((_) {});
+    // A plain unawaited call, not `Future(...)`: that would schedule a Timer,
+    // and a Timer left pending when a screen is torn down is a test failure
+    // (and a wasted wake-up) for nothing.
+    if (grant.levelledUp) unawaited(refresh());
   }
 
   /// Called when the celebration for [level] has been shown.
