@@ -151,7 +151,7 @@ class ReadingSettings {
     this.fontFamily = ReaderFontFamily.sans,
     this.letterSpacing = ReaderLetterSpacing.normal,
     this.showVerseNumbers = true,
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light,
     this.dailyReminderMinutes,
     this.lastVersionId = 'statenvertaling',
     this.lastCommentaryId = 'matthew_henry_nl',
@@ -291,7 +291,9 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
       themeMode: switch (prefs.getString(_kThemeMode)) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
+        // Light unless the reader chose otherwise: "follow the device" is an
+        // explicit choice, never the fallback.
+        _ => ThemeMode.light,
       },
       dailyReminderMinutes: prefs.getInt(_kReminder),
       lastVersionId: prefs.getString(_kLastVersion) ?? 'statenvertaling',

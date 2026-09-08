@@ -149,7 +149,7 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Mijn levensboom'),
+        title: const Text('Mijn voortgang'),
         actions: [
           if (tree != null)
             IconButton(
@@ -179,7 +179,6 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
   Widget _body(TreeState tree) {
     final draw = _preview ?? tree.avatar;
     final kind = _kindOf(_tab);
-    final needsIntro = !tree.introSeen && !tree.planted;
 
     return CustomScrollView(
       slivers: [
@@ -207,36 +206,6 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
                     SiteButton(
                       label: 'Boom weer tonen',
                       onPressed: () => ref.read(treeStateProvider.notifier).setPrefs(disabled: false),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (needsIntro)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Je levensboom is vernieuwd', style: AppTheme.metaLabel),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Je boom begint klein en groeit mee met alles wat je leest en '
-                      'bestudeert. Kies hier je boomsoort, de omgeving en wie er bij '
-                      'je boom woont — nieuwe keuzes ontgrendel je met je voortgang.',
-                      style: AppTheme.bodyMuted,
-                    ),
-                    const SizedBox(height: 12),
-                    SiteButton(
-                      label: 'Kies je boomsoort',
-                      expand: false,
-                      onPressed: () {
-                        ref.read(treeStateProvider.notifier).markIntroSeen();
-                        _selectTab(_StudioTab.species);
-                      },
                     ),
                   ],
                 ),
@@ -349,7 +318,7 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
                   right: 12,
                   top: 10,
                   child: _Pill(
-                    text: '${tree.daysSinceActive} dagen niet gelezen',
+                    text: '${tree.daysSinceActive} ${tree.daysSinceActive == 1 ? 'dag' : 'dagen'} niet gelezen',
                     background: Colors.black.withValues(alpha: 0.45),
                   ),
                 ),

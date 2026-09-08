@@ -205,10 +205,12 @@ class StreakRing extends StatelessWidget {
     // "Boom verbergen" means no tree anywhere (TREE_FEATURE_PLAN §10), header
     // included — the streak itself still has to be readable, so it falls back
     // to a plain count pill.
+    final days = streak == 1 ? 'dag' : 'dagen';
+
     if (tree?.disabled == true) {
       return _CountPill(
         label: '$streak',
-        semanticsLabel: 'Reeks van $streak dagen',
+        semanticsLabel: 'Reeks van $streak $days',
         dormant: isDormant,
         size: size,
       );
@@ -220,8 +222,8 @@ class StreakRing extends StatelessWidget {
       hasFreeze: hasFreeze,
       badge: '$streak',
       semanticsLabel: hasFreeze
-          ? 'Je boom — reeks van $streak dagen, met een vrije dag'
-          : 'Je boom — reeks van $streak dagen',
+          ? 'Je boom — reeks van $streak $days, met een vrije dag'
+          : 'Je boom — reeks van $streak $days',
       size: size,
     );
   }
@@ -250,10 +252,12 @@ class WeeklyGoalRing extends StatelessWidget {
   Widget build(BuildContext context) {
     // See StreakRing: with the tree switched off the week fraction still has to
     // be readable.
+    final lessons = target == 1 ? 'les' : 'lessen';
+
     if (tree?.disabled == true) {
       return _CountPill(
         label: '$done/$target',
-        semanticsLabel: '$done van $target lessen deze week',
+        semanticsLabel: '$done van $target $lessons deze week',
         dormant: done <= 0,
         size: size,
       );
@@ -263,7 +267,7 @@ class WeeklyGoalRing extends StatelessWidget {
       tree: tree,
       dormant: done <= 0,
       badge: '$done/$target',
-      semanticsLabel: 'Je boom — $done van $target lessen deze week',
+      semanticsLabel: 'Je boom — $done van $target $lessons deze week',
       size: size,
     );
   }

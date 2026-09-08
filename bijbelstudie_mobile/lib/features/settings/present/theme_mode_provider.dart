@@ -27,8 +27,8 @@ extension ThemeModeLabelX on ThemeMode {
     ThemeMode.system => Icons.brightness_auto_outlined,
   };
 
-  /// The order the two explicit choices are offered in, with "follow the
-  /// device" last — it is the default, so it reads as the fallback.
+  /// The order the choices are offered in. Light comes first because it is
+  /// what a reader who never chose gets; "follow the device" is last.
   static const List<ThemeMode> pickerOrder = [
     ThemeMode.light,
     ThemeMode.dark,

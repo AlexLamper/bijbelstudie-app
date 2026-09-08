@@ -444,7 +444,7 @@ class _LevensboomSection extends ConsumerWidget {
     final notifier = ref.read(treeStateProvider.notifier);
 
     return _SettingsGroup(
-      title: 'Levensboom',
+      title: 'Voortgang',
       children: [
         _SettingsRow(
           label: 'Boom tonen',

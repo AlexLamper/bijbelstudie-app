@@ -1,152 +1,97 @@
-# BijbelStudie — iOS app
+# BijbelStudie - de app
 
-Native **Flutter** app for [www.bijbelstudie.io](https://www.bijbelstudie.io),
-structurally cloned from an already-shipping Flutter app of ours and adapted to
-a Bible-reading domain.
+<p>
+  <a href="https://apps.apple.com/us/app/bijbelstudie-lees-leer/id6800668187">
+    <img src="https://img.shields.io/badge/App_Store-Download-0D9488?style=for-the-badge&logo=apple&logoColor=white" alt="Download in de App Store" />
+  </a>
+  <a href="https://www.bijbelstudie.io">
+    <img src="https://img.shields.io/badge/Website-bijbelstudie.io-1F2937?style=for-the-badge" alt="Website" />
+  </a>
+  <img src="https://img.shields.io/github/issues/AlexLamper/bijbelstudie-app?style=for-the-badge&logo=github" alt="Issues" />
+  <a href="https://www.instagram.com/bijbelstudie_edu/">
+    <img src="https://img.shields.io/badge/Volg%20@bijbelstudie__edu-E4405F?logo=instagram&logoColor=white&style=for-the-badge" alt="Volg op Instagram" />
+  </a>
+</p>
 
-```
-.
-├─ .github/
-│  ├─ workflows/ios-release.yml            manual TestFlight pipeline
-│  └─ instructions/flutter-architecture.instructions.md
-├─ bijbelstudie_mobile/                    the Flutter app
-│  ├─ lib/
-│  │  ├─ core/{api,config,data,db,notifications,preview,router,theme,ui}/
-│  │  ├─ features/
-│  │  │  ├─ ai/          {data,present}      AI-assistent tab
-│  │  │  ├─ auth/        {data,domain,present}
-│  │  │  ├─ bible/       {data,domain,present}
-│  │  │  ├─ commentary/  {data,present}
-│  │  │  ├─ dashboard/   {data,present}      the /dashboard tab
-│  │  │  ├─ feedback/    {present}
-│  │  │  ├─ groups/      {data,present}      /groepen
-│  │  │  ├─ notes/       {data,domain,present}
-│  │  │  ├─ onboarding/  {data,present}
-│  │  │  ├─ premium/     {data,present}
-│  │  │  ├─ profile/     {data,present}
-│  │  │  ├─ resources/   {data,present}      /hulpbronnen
-│  │  │  ├─ search/      {present}
-│  │  │  ├─ settings/    {data,present}
-│  │  │  ├─ studies/     {data,present}      /studies + leesplannen
-│  │  │  └─ study/       {data,present}      /studie — the split view
-│  │  └─ main.dart
-│  ├─ assets/{fonts,images}/
-│  ├─ android/  ios/  test/
-│  ├─ analysis_options.yaml
-│  └─ pubspec.yaml
-├─ docs/ios-release-setup.md
-└─ README.md
-```
+<p>
+  <img src="screenshots/6.5/01-dashboard.png" alt="Startscherm" width="19%" />
+  <img src="screenshots/6.5/02-lezen.png" alt="Lezen" width="19%" />
+  <img src="screenshots/6.5/03-commentaar.png" alt="Commentaar naast de tekst" width="19%" />
+  <img src="screenshots/6.5/04-studies.png" alt="Begeleide studies" width="19%" />
+  <img src="screenshots/6.5/06-profiel.png" alt="Voortgang" width="19%" />
+</p>
 
-Feature-first clean architecture: `data/` = repositories, models and local
-storage; `domain/` = entities; `present/` = screens and Riverpod providers.
+## Over de app
 
----
+*BijbelStudie* is de iPhone- en iPad-app van [bijbelstudie.io](https://www.bijbelstudie.io), een Nederlands bijbelstudie-platform. Het lost een simpel probleem op: de Bijbel lezen is makkelijk, hem *begrijpen* niet. Wie op de bank een moeilijk hoofdstuk opslaat, heeft meestal geen uitleg bij de hand en geen idee waar te beginnen.
 
-## The backend
+De app zet die hulp naast de tekst, op het apparaat dat je toch al bij je hebt. Je leest een hoofdstuk, ziet er klassiek commentaar bij, kunt de grondtekst erbij pakken en stelt je vraag als je vastloopt. Begeleide studies nemen je in korte lessen door een bijbelboek of thema heen, en je voortgang groeit mee met alles wat je leest, leert en opschrijft.
 
-The app talks to `/api/v1/*` on the existing Next.js site
-(`C:\Projects\bijbelstudie`). That surface was added alongside the website's
-cookie routes, which are untouched — one database, one content store, two
-clients.
+Voor beginners én voor wie de Bijbel al jaren leest.
 
-| | Website | App |
+## Wat kun je ermee
+
+- **Lezen met uitleg ernaast** - Open een hoofdstuk en lees, met commentaar in een tweede paneel dat meescrollt met de tekst. Eerder gelezen hoofdstukken blijven beschikbaar zonder verbinding.
+- **Begeleide studies en leesplannen** - Stap voor stap door een bijbelboek of thema, in lessen die je in één zitting afmaakt. Een leesplan houdt bij waar je bent.
+- **Grondtekst** - Zie het oorspronkelijke Hebreeuws en Grieks bij het vers dat je leest, ook zonder de taal te kennen.
+- **Notities** - Schrijf je gedachten op bij een vers en vind ze later terug, op je telefoon en op de website.
+- **Vragen stellen** - Een AI-assistent die antwoordt vanuit de tekst die je open hebt, voor wanneer je vastloopt.
+- **Voorlezen** - Laat een hoofdstuk voorlezen terwijl je onderweg bent.
+- **Achtergrond bij elk boek** - Wie schreef het, wanneer, waar speelt het zich af: een korte inleiding met kaarten bij ieder bijbelboek.
+- **Dagvers met herinnering** - Elke dag een vers om bij stil te staan, met een melding op het moment dat jij kiest.
+- **Voortgang** - Je reeks, je niveau en een boom die groeit met elke les, elk hoofdstuk en elke notitie. Van kiem tot eeuwenoude boom, in de omgeving die jij kiest.
+- **Groepen** - Studeer samen: deel notities en gesprekken met een kring, gezin of vriendengroep.
+- **Hulpbronnen en zoeken** - Een bibliotheek met achtergrondmateriaal en zoeken door de hele Bijbel.
+
+## Web en app samen
+
+De app en de website delen één account. Wat je op je telefoon leest, telt op de website mee en andersom: dezelfde studies, dezelfde notities, dezelfde reeks, dezelfde boom. Inloggen kan met Apple, Google of e-mail.
+
+Je kunt beginnen waar je wilt. Een hoofdstuk in de trein op je telefoon, de les 's avonds op een groot scherm afmaken.
+
+## Gratis en Pro
+
+Lezen, studies volgen, notities maken en je voortgang bijhouden is gratis. **BijbelStudie Pro** voegt onder meer extra commentaren, meer ruimte voor de AI-assistent en extra omgevingen en boomsoorten voor je voortgang toe. Pro sluit je in de app af via je Apple-account en beheer je in de App Store.
+
+## Screenshots
+
+| Start | Lezen | Commentaar | Studies |
+|---|---|---|---|
+| <img src="screenshots/6.5/01-dashboard.png" alt="Startscherm" width="180" /> | <img src="screenshots/6.5/02-lezen.png" alt="Lezen" width="180" /> | <img src="screenshots/6.5/03-commentaar.png" alt="Commentaar" width="180" /> | <img src="screenshots/6.5/04-studies.png" alt="Studies" width="180" /> |
+
+| Notities | Voortgang | Pro |
 |---|---|---|
-| Auth | NextAuth session cookie | `Authorization: Bearer <jwt>` |
-| Routes | `/api/*` | `/api/v1/*` |
-| Payments | Stripe | RevenueCat / StoreKit |
+| <img src="screenshots/6.5/05-notities.png" alt="Notities" width="180" /> | <img src="screenshots/6.5/06-profiel.png" alt="Voortgang" width="180" /> | <img src="screenshots/6.5/07-pro.png" alt="Pro" width="180" /> |
 
-`lib/apiAuth.ts` resolves a caller from either, so route logic can be shared.
+iPad-schermen staan in [`screenshots/13-ipad`](screenshots/13-ipad).
 
-### The `/api/v1` surface
+## Download
 
-| Route | Serves |
-|---|---|
-| `auth/*`, `me`, `account` | login, refresh, profile, deletion |
-| `bibles/*`, `commentaries/*`, `original/*`, `search` | content, behind the licensing gate |
-| `notes`, `highlights`, `bookmarks`, `reading-history`, `sync` | user data |
-| `dashboard` | the whole Start tab in one request |
-| `streak`, `last-read`, `daytext` | reading progress and the verse of the day |
-| `plans`, `plans/enrollment`, `plans/progress` | leesplannen |
-| `studies`, `resources` | curated studies and the Hulpbronnen library |
-| `groups/*` | groepen, their roster and their messages |
-| `ai/chat` | the AI-assistent tab (Gemini, same caps as the site) |
-| `tts` | voorlezen (Google Cloud TTS, proxied so the key stays server-side) |
-| `summary`, `geo/images` | the "Algemene info" tab |
-| `preferences`, `feedback` | settings shared with the website, in-app feedback |
-| `sync-premium` | reconciles Pro with RevenueCat after a restore |
+De app is beschikbaar voor iPhone en iPad:
 
-`dashboard` exists because the website assembles that screen from six parallel
-`fetch` calls; on a phone that is six round trips before anything renders.
+<a href="https://apps.apple.com/us/app/bijbelstudie-lees-leer/id6800668187">
+  <img src="https://img.shields.io/badge/Download_in_de-App_Store-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download in de App Store" />
+</a>
 
----
+Liever op een groot scherm? Alles uit de app staat ook op [www.bijbelstudie.io](https://www.bijbelstudie.io).
 
-## Content licensing — read this before adding a source
+## Gebouwd met
 
-Three sources on the website may **not** ship in the app:
+<p>
+  <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/RevenueCat-F25A5A?style=for-the-badge&logo=revenuecat&logoColor=white" alt="RevenueCat" />
+</p>
 
-| Source | Why |
-|---|---|
-| `nbg51` | NBG-vertaling 1951 licence covers `www.bijbel-studie.com` only |
-| `net` | NET Bible: whole-text electronic distribution needs written permission and "cannot be bundled with anything sold" |
-| `kingcomments_nl` | © Stichting Titus / Uitgeverij Daniël; they ship their own App Store app |
+De app praat met dezelfde API als de website ([AlexLamper/BijbelStudie](https://github.com/AlexLamper/BijbelStudie)). Ontwikkelaarsdocumentatie staat in [`CLAUDE.md`](CLAUDE.md) en de map [`docs/`](docs).
 
-Plus `hsv`, `basisbijbel`, `schlachter` and `afri`, which are copyrighted or
-uncleared.
+## Contact
 
-The gate is **server-side**, in `lib/mobileLicensing.ts`. Every `/api/v1`
-content route calls `assertMobileAllowed()` before touching the filesystem, and
-a blocked id returns **451 Unavailable For Legal Reasons** regardless of how the
-request is spelled. The app cannot receive blocked text even if someone crafts
-the request by hand.
+Voor vragen of feedback:
 
-`tests/v1ContentRoutes.test.ts` asserts this on every content route. If that
-test does not pass, the app is not ready to build.
-
-Getting permission for one of these is a one-line change to the allowlist.
-
-STEPBible originals are CC BY 4.0 and the attribution is rendered in the
-Grondtekst tab — that is a licence condition, not a footnote.
+- Open een [issue op GitHub](https://github.com/AlexLamper/bijbelstudie-app/issues)
+- E-mail: [info@bijbelstudie.io](mailto:info@bijbelstudie.io)
+- GitHub: [@AlexLamper](https://github.com/AlexLamper)
 
 ---
 
-## Running it
-
-```bash
-cd bijbelstudie_mobile
-flutter pub get
-flutter analyze
-flutter test
-
-# Against a local backend (npm run dev in C:\Projects\bijbelstudie):
-flutter run                                     # iOS simulator / desktop
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1   # Android emulator
-
-# Against production:
-flutter run --dart-define=USE_PRODUCTION_API=true
-
-# Design preview — canned data, no login, no backend:
-flutter run -d chrome --dart-define=PREVIEW=true
-```
-
-### Build-time configuration
-
-Nothing secret is hardcoded. Everything below is a `--dart-define`:
-
-| Define | Needed for |
-|---|---|
-| `REVENUECAT_APPLE_KEY` / `REVENUECAT_GOOGLE_KEY` | purchases. Both default to `''` |
-| `APPLE_SERVICE_ID`, `APPLE_REDIRECT_URI` | Sign in with Apple web fallback |
-| `GOOGLE_WEB_CLIENT_ID` | Google Sign-In on Android and web (iOS reads Info.plist) |
-| `API_BASE_URL`, `USE_PRODUCTION_API` | which backend to talk to |
-| `PRIVACY_POLICY_URL`, `TERMS_OF_USE_URL` | legal links |
-
----
-
-## Releasing
-
-`docs/ios-release-setup.md`. The workflow is manual
-(`workflow_dispatch`) and needs the secrets listed there.
-
-**iOS cannot be built or verified from Windows.** The pipeline is proven after
-the first green Actions run, not before.
+Bedankt voor het verkennen van *BijbelStudie* - we hopen dat het je bijbelstudie-ervaring verrijkt.

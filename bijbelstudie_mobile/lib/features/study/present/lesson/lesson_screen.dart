@@ -809,7 +809,7 @@ class _TopBar extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             children: [
               IconButton(
@@ -860,14 +860,13 @@ class _TopBar extends StatelessWidget {
                   tooltip: 'Vraag de AI-assistent',
                   color: AppTheme.teal,
                 ),
-              // Whatever the right-hand side did not fill, so the title stays
-              // optically centred against the close button on the left.
-              SizedBox(
-                width:
-                    48 -
-                    (onOpenSettings != null ? 24 : 0) -
-                    (onOpenAssistant != null ? 24 : 0),
-              ),
+              // With nothing on the right, the close button alone would pull
+              // the title off centre, so its width is made up here. With a
+              // button there the two sides already match, and a spacer would
+              // only push that button in from the edge the content under the
+              // bar is aligned to.
+              if (onOpenSettings == null && onOpenAssistant == null)
+                const SizedBox(width: 48),
             ],
           ),
         ),

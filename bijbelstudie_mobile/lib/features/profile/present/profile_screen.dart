@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../levensboom/present/levensboom_avatar.dart';
@@ -179,8 +180,11 @@ class _ProfileBody extends ConsumerWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Account verwijderen'),
         content: const Text(
-          'Je account, notities, markeringen, bladwijzers en leesgeschiedenis worden '
-          'definitief verwijderd. Dit kan niet ongedaan worden gemaakt.\n\n'
+          'Je account, voortgang, notities, markeringen, bladwijzers en '
+          'leesgeschiedenis worden definitief verwijderd. Dit kan niet ongedaan '
+          'worden gemaakt.\n\n'
+          'Log je daarna opnieuw in met Google of Apple, dan krijg je een nieuw, '
+          'leeg account. Je oude voortgang komt niet terug.\n\n'
           'Heb je een abonnement via de App Store? Zeg dat apart op in je '
           'Apple ID-instellingen - Apple staat niet toe dat een app dat voor je doet.',
         ),
@@ -202,16 +206,26 @@ class _ProfileBody extends ConsumerWidget {
 
     try {
       await ref.read(profileRepositoryProvider).deleteAccount();
-      await ref.read(authControllerProvider.notifier).logout();
-      if (context.mounted) context.go('/login');
-    } catch (_) {
+    } catch (e) {
       if (!context.mounted) return;
+      // The server says why when it refuses (a protected admin account, a
+      // rate limit); a bare "mislukt" hid that and read as a broken button.
+      final body = e is DioException ? e.response?.data : null;
+      final message = body is Map
+          ? AuthRepository.authErrorMessage(body, 'Verwijderen mislukt')
+          : 'Verwijderen mislukt. Probeer het opnieuw.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verwijderen mislukt. Probeer het opnieuw.'),
-        ),
+        SnackBar(content: Text(message)),
       );
+      return;
     }
+    // The account is gone. Signing out is best-effort from here: the server
+    // already revoked every token, so a failing sign-out call must not keep
+    // the screen on an account that no longer exists.
+    try {
+      await ref.read(authControllerProvider.notifier).logout();
+    } catch (_) {}
+    if (context.mounted) context.go('/login');
   }
 }
 

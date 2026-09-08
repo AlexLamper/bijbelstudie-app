@@ -353,39 +353,66 @@ class StatItem {
 /// and a row of vertical space on every tile for what is, on a phone, three
 /// numbers the reader mostly skims.
 class StatStrip extends StatelessWidget {
-  const StatStrip({super.key, required this.items, this.stacked = false});
+  const StatStrip({
+    super.key,
+    required this.items,
+    this.stacked = false,
+    this.header,
+  });
 
   final List<StatItem> items;
 
   /// Retained for source compatibility; the strip only has the one layout.
   final bool stacked;
 
+  /// Shown full-width above the columns, set off from them by a rule: the one
+  /// line the figures are about, when it is too long to be a figure itself.
+  final Widget? header;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // `stretch` needs a bounded cross axis; inside a ListView the Row's
+    // height is unbounded, so the intrinsic pass is what makes the rule
+    // between columns match the tallest column instead of asking for
+    // infinity.
+    final columns = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) ...[
+              const SizedBox(width: 8),
+              Container(width: 1, color: scheme.outline),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: _StatColumn(item: items[i])),
+          ],
+        ],
+      ),
+    );
+
     return AppCard(
       radius: AppTheme.radiusMd,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-      // `stretch` needs a bounded cross axis; inside a ListView the Row's
-      // height is unbounded, so the intrinsic pass is what makes the rule
-      // between columns match the tallest column instead of asking for
-      // infinity.
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0) ...[
-                const SizedBox(width: 8),
-                Container(width: 1, color: scheme.outline),
-                const SizedBox(width: 8),
+      child: header == null
+          ? columns
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // The strip's own 6px is what the columns want; the header
+                // sits at the 16px inset every other card's content uses.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+                  child: header,
+                ),
+                Container(height: 1, color: scheme.outline),
+                const SizedBox(height: 14),
+                columns,
               ],
-              Expanded(child: _StatColumn(item: items[i])),
-            ],
-          ],
-        ),
-      ),
+            ),
     );
   }
 }

@@ -28,7 +28,9 @@ Future<void> showProfileMenuSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
+    enableDrag: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (sheetContext) {
       // Navigating has to outlive the sheet: pop first, then use the screen's
@@ -38,16 +40,44 @@ Future<void> showProfileMenuSheet(
         action();
       }
 
-      return SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      // A plain scroll view swallowed the downward drag, so the sheet could
+      // only be closed by finding the barrier above it. The draggable sheet
+      // takes the drag itself once the list is at the top, and pulling it
+      // down to minChildSize dismisses it; the close button is for whoever
+      // does not discover that.
+      //
+      // The builder's own context is deliberately unnamed: the row callbacks
+      // must keep capturing the screen's `context`, not the sheet's.
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        builder: (_, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          // useSafeArea only insets the top; the home indicator is ours.
+          padding: EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            24 + MediaQuery.paddingOf(sheetContext).bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Eyebrow('Menu'),
-              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Expanded(child: Eyebrow('Menu')),
+                  IconButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close, size: 20),
+                    tooltip: 'Sluiten',
+                    color: AppTheme.inkMuted,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               RuleGrid(
                 children: [
                   _MenuRow(

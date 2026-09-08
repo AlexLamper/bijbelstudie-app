@@ -10,6 +10,8 @@ import '../data/auth_repository.dart';
 import '../../../core/api/api_client.dart';
 import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
+import '../../levensboom/data/levensboom_repository.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../profile/data/profile_repository.dart';
 
@@ -112,6 +114,11 @@ class AuthController extends AsyncNotifier<User?> {
     }
     await _linkRevenueCat(user);
     state = AsyncValue.data(user);
+    // The tree is per account. Whatever was loaded before this sign-in
+    // belonged to someone else (or to this address before it was deleted and
+    // re-created), so it is fetched again rather than shown as if it were
+    // this reader's.
+    ref.invalidate(treeStateProvider);
     unawaited(_flushPendingAfterSignIn());
   }
 
@@ -339,6 +346,8 @@ class AuthController extends AsyncNotifier<User?> {
     state = const AsyncValue.loading();
     final repository = ref.read(authRepositoryProvider);
     await repository.logout();
+    // Per-account state that lives on the device goes with the session.
+    await LevensboomRepository.clearCache();
 
     if (GoogleSignInConfig.isAvailable) {
       // Never fatal: a user who cannot sign out is far worse than a Google

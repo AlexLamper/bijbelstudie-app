@@ -1,17 +1,25 @@
+import 'dart:async';
+
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
 import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
+import 'package:bijbelstudie_mobile/features/levensboom/domain/tree_state.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/present/levensboom_providers.dart';
 import 'package:bijbelstudie_mobile/features/study/domain/lesson_models.dart';
 import 'package:bijbelstudie_mobile/features/study/present/lesson/lesson_complete_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// The end of a lesson: the tree that grew, what was earned, and the way on.
 ///
 /// Pumped in both themes because every colour on it is a theme token, and on a
 /// phone-tall surface so the whole card - down to the buttons - is laid out.
 void main() {
+  // The card reads the retention store for the streak; without a store to
+  // load it stays empty, and the streak falls back to the tree state's.
+  setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
   LessonPayload lesson({bool last = false}) {
     return LessonPayload.fromJson({
       'study': {'id': 'opstanding', 'title': 'De opstanding', 'lessonsTotal': 4},
@@ -51,6 +59,7 @@ void main() {
     bool last = false,
     int? quizScore,
     int? quizTotal,
+    TreeStateNotifier Function()? tree,
   }) async {
     tester.view.physicalSize = const Size(420, 1700);
     tester.view.devicePixelRatio = 1.0;
@@ -58,7 +67,9 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [treeStateProvider.overrideWith(PreviewTreeNotifier.new)],
+        overrides: [
+          treeStateProvider.overrideWith(tree ?? PreviewTreeNotifier.new),
+        ],
         child: MaterialApp(
           theme: theme ?? AppTheme.lightTheme,
           home: Scaffold(
@@ -104,6 +115,8 @@ void main() {
       expect(find.text('+25 XP'), findsOneWidget);
       expect(find.text('Les 2 van 4 afgerond'), findsOneWidget);
       expect(find.text('Het lege graf'), findsOneWidget);
+      // The passage heads the figures at heading size rather than being one.
+      expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
       expect(find.text('4/5'), findsOneWidget);
       expect(find.text('15 min'), findsOneWidget);
       expect(find.text('Voortgang in deze studie'), findsOneWidget);
@@ -111,6 +124,9 @@ void main() {
       expect(find.text('Aan het meer'), findsOneWidget);
       expect(find.text('Verder met les 3'), findsOneWidget);
       expect(find.text('Overzicht'), findsOneWidget);
+      // The streak, in the dashboard's mark: the preview tree state's 12.
+      expect(find.text('12'), findsOneWidget);
+      expect(find.text('dagen op rij'), findsOneWidget);
     });
   }
 
@@ -131,8 +147,10 @@ void main() {
     expect(find.text('Telde al mee'), findsOneWidget);
     expect(find.text('Je boom groeide'), findsNothing);
     expect(find.textContaining('XP verdiend'), findsNothing);
-    // Without a quiz score the second figure is what was read.
-    expect(find.text('Gelezen'), findsOneWidget);
+    // Without a quiz score the strip has two figures; what was read still
+    // heads it.
+    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+    expect(find.text('Gelezen'), findsNothing);
   });
 
   testWidgets('a level-up names the new level', (tester) async {
@@ -173,4 +191,57 @@ void main() {
     expect(find.text('Terug naar de studie'), findsOneWidget);
     expect(find.textContaining('Verder met les'), findsNothing);
   });
+  testWidgets('with the tree switched off the streak is a plain count', (tester) async {
+    await pump(
+      tester,
+      tree: _DisabledTreeNotifier.new,
+      summary: const CompletionSummary(
+        recorded: true,
+        studyCompleted: false,
+        xpAwarded: 25,
+        nextLessonDay: 3,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Je boom groeide'), findsNothing);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('dagen op rij'), findsOneWidget);
+    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+    expect(find.text('Verder met les 3'), findsOneWidget);
+  });
+
+  testWidgets('without a tree state the card still stands', (tester) async {
+    await pump(
+      tester,
+      tree: _NoTreeNotifier.new,
+      summary: const CompletionSummary(
+        recorded: true,
+        studyCompleted: false,
+        xpAwarded: 25,
+        nextLessonDay: 3,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Je boom groeide'), findsNothing);
+    // No tree and an empty retention store: no streak to show.
+    expect(find.text('dagen op rij'), findsNothing);
+    expect(find.text('Les 2 van 4 afgerond'), findsOneWidget);
+    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+    expect(find.text('Verder met les 3'), findsOneWidget);
+  });
+}
+
+/// The preview tree with "Boom verbergen" on.
+class _DisabledTreeNotifier extends TreeStateNotifier {
+  @override
+  Future<TreeState> build() async =>
+      PreviewData.treeState.copyWith(disabled: true);
+}
+
+/// A fetch that never lands: the card before the first gamification response.
+class _NoTreeNotifier extends TreeStateNotifier {
+  @override
+  Future<TreeState> build() => Completer<TreeState>().future;
 }

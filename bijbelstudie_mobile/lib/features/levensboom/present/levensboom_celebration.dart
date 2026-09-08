@@ -287,7 +287,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
                             Navigator.of(context).pop();
                             context.push('/profile/boom');
                           },
-                          child: const Text('Bekijk in je levensboom →'),
+                          child: const Text('Bekijk je voortgang →'),
                         ),
                       ],
                     ),

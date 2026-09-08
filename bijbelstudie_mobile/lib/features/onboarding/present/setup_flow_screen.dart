@@ -462,30 +462,35 @@ class _PlantStep extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Eyebrow('Levensboom'),
+          const Eyebrow('Voortgang'),
           const SizedBox(height: 16),
           Text('Plant je boom', style: AppTheme.displayLarge),
           const SizedBox(height: 12),
           Text(
-            'Je levensboom groeit mee met alles wat je leest en bestudeert. '
+            'Je voortgang groeit mee met alles wat je leest en bestudeert. '
             'Kies waarmee hij begint; meer soorten ontgrendel je onderweg.',
             style: AppTheme.bodyLead,
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              for (var i = 0; i < _options.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                Expanded(
-                  child: _PlantCard(
-                    species: _options[i],
-                    seed: seed,
-                    selected: selected == _options[i],
-                    onTap: () => ref.read(plantChoiceProvider.notifier).set(_options[i]),
+          // Both cards take the taller card's height: a blurb that wraps to
+          // one more line must not make one card stand out from the other.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < _options.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Expanded(
+                    child: _PlantCard(
+                      species: _options[i],
+                      seed: seed,
+                      selected: selected == _options[i],
+                      onTap: () => ref.read(plantChoiceProvider.notifier).set(_options[i]),
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -512,6 +517,13 @@ class _PlantCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  static const _borderWidth = 2.0;
+
+  /// The image sits inside the border, so its corners follow the border's
+  /// inner edge. The tree painter fills its whole box; without this clip its
+  /// square corners would be painted over the rounded border.
+  static const _imageRadius = Radius.circular(AppTheme.radiusLg - _borderWidth);
+
   @override
   Widget build(BuildContext context) {
     final item = catalogItem(ItemKind.species, kSpeciesIds[species]!);
@@ -527,19 +539,25 @@ class _PlantCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? AppTheme.tealTint : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            border: Border.all(color: selected ? AppTheme.teal : AppTheme.rule, width: 2),
+            border: Border.all(
+              color: selected ? AppTheme.teal : AppTheme.rule,
+              width: _borderWidth,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: TreeView(
-                  seed: seed,
-                  level: 7,
-                  frac: 0.6,
-                  species: species,
-                  still: true,
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: _imageRadius),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: TreeView(
+                    seed: seed,
+                    level: 7,
+                    frac: 0.6,
+                    species: species,
+                    still: true,
+                  ),
                 ),
               ),
               Padding(

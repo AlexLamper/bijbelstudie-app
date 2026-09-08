@@ -68,6 +68,18 @@ class LevensboomRepository {
 
   Future<void> cache(TreeState state) => _cache(state);
 
+  /// Forgets the cached tree. Runs on sign-out, so whoever signs in next -
+  /// a different account, or the same address re-created after a deletion -
+  /// never opens on the previous reader's tree.
+  static Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+    } catch (_) {
+      // Nothing cached, or no preferences plugin: nothing to forget.
+    }
+  }
+
   Future<void> _cache(TreeState state) async {
     try {
       final prefs = await SharedPreferences.getInstance();
