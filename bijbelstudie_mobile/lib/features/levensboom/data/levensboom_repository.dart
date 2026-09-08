@@ -17,7 +17,9 @@ class LevensboomWrite {
   /// The fresh `levensboom` block, on success.
   final Map<String, dynamic>? tree;
 
-  /// `ITEM_LOCKED`, `INVALID_ITEM`, `NETWORK`, ... on failure.
+  /// On failure: the server's code (`ITEM_LOCKED`, `INVALID_ITEM`, ...),
+  /// `HTTP_<status>` for an answer without a JSON error body, or `NETWORK`
+  /// when the host was never reached at all.
   final String? error;
 
   /// The rule, in Dutch ("Niveau 8"), when the server refused a locked pick.
@@ -103,14 +105,18 @@ class LevensboomRepository {
       }
       return const LevensboomWrite.failed('MALFORMED', null);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      if (data is Map) {
-        return LevensboomWrite.failed(
-          data['error'] as String? ?? 'HTTP_${e.response?.statusCode}',
-          data['label'] as String?,
-        );
+      final response = e.response;
+      // No response at all: connection refused, DNS, timeout. In a debug build
+      // that is a local dev server that is not running.
+      if (response == null) return const LevensboomWrite.failed('NETWORK', null);
+      final data = response.data;
+      if (data is Map && data['error'] is String) {
+        return LevensboomWrite.failed(data['error'] as String, data['label'] as String?);
       }
-      return const LevensboomWrite.failed('NETWORK', null);
+      // A status without a JSON error body: the HTML not-found page of a
+      // deployment that predates this route, an empty 405, a redirect. That
+      // used to be folded into NETWORK, which hid the one thing worth knowing.
+      return LevensboomWrite.failed('HTTP_${response.statusCode}', null);
     } catch (_) {
       return const LevensboomWrite.failed('NETWORK', null);
     }

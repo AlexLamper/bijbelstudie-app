@@ -30,6 +30,25 @@ class SaveOutcome {
   final String? label;
 
   bool get locked => error == 'ITEM_LOCKED';
+
+  /// The server answered, but has no `PATCH /levensboom`: a website
+  /// deployment older than this app (404), or one whose route lacks the
+  /// method (405).
+  bool get routeMissing => error == 'HTTP_404' || error == 'HTTP_405';
+
+  /// The host was never reached.
+  bool get offline => error == 'NETWORK';
+
+  /// What the reader is told when the save [failed] and no rule [label]
+  /// applies. Generic on purpose for everything else: a 500 or a refused
+  /// token is nothing they can act on from here.
+  String get message {
+    if (routeMissing) {
+      return 'De server kent deze functie nog niet. Werk de website bij en probeer het opnieuw.';
+    }
+    if (offline) return 'Geen verbinding. Probeer het later opnieuw.';
+    return 'Opslaan is niet gelukt. Probeer het nog eens.';
+  }
 }
 
 class TreeStateNotifier extends AsyncNotifier<TreeState> {

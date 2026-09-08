@@ -127,9 +127,7 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
         .setAvatar(tree.chosen.withItem(item.kind, item.id));
     if (!mounted || !outcome.failed) return;
     _notice(
-      outcome.label != null
-          ? '${item.name}: ${outcome.label} nodig.'
-          : 'Opslaan is niet gelukt. Probeer het nog eens.',
+      outcome.label != null ? '${item.name}: ${outcome.label} nodig.' : outcome.message,
       pro: outcome.locked && item.unlock is ProUnlock,
     );
   }
