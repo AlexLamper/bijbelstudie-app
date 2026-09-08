@@ -521,11 +521,22 @@ void main() {
     await tester.tap(find.text('Volgende'));
     await tester.pumpAndSettle();
     expectNoLayoutError(tester);
+    // The Levensboom step: the two free species, the eik preselected.
+    expect(find.text('Plant je boom'), findsOneWidget);
+    expect(find.text('Eik'), findsOneWidget);
+    expect(find.text('Olijfboom'), findsOneWidget);
+    await tester.tap(find.text('Olijfboom'));
+    await tester.pumpAndSettle();
+    expectNoLayoutError(tester);
+
+    await tester.tap(find.text('Volgende'));
+    await tester.pumpAndSettle();
+    expectNoLayoutError(tester);
     expect(find.text('Wanneer komt het jou uit?'), findsOneWidget);
     expect(find.text('07:00'), findsOneWidget);
-    // Last step: the button reads "Aan de slag", not "Volgende". Not tapped
-    // - finishing writes to secure storage, which has no test double here.
-    expect(find.text('Aan de slag'), findsOneWidget);
+    // Last step: the button plants the tree and starts. Not tapped - finishing
+    // writes to secure storage, which has no test double here.
+    expect(find.text('Planten en aan de slag'), findsOneWidget);
   });
 
   testWidgets('a translation dropped from the app falls back instead of dead-ending',

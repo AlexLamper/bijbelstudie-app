@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/db/content_cache.dart';
 import '../../../core/notifications/notification_scheduler.dart';
@@ -10,6 +12,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
 import '../../levensboom/present/levensboom_providers.dart';
+import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/notification_prefs.dart';
@@ -382,7 +385,7 @@ class _NotificationsSection extends ConsumerWidget {
   }
 }
 
-/// The two Levensboom controls, mirroring the website's Instellingen section.
+/// The Levensboom controls, mirroring the website's Instellingen section.
 ///
 /// Turning the tree off is purely visual - XP, levels and badges keep accruing
 /// - which the copy has to say out loud, or the toggle reads as "stop counting
@@ -419,6 +422,43 @@ class _LevensboomSection extends ConsumerWidget {
               ? null
               : (value) => notifier.setPrefs(reducedMotion: value),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Openbaar profiel'),
+          subtitle: const Text(
+            'Een pagina op de website met je boom, je voornaam, je niveau en je '
+            'badges. Nooit je e-mail, reeks of leesgeschiedenis.',
+          ),
+          value: tree?.publicProfile ?? false,
+          onChanged: tree == null ? null : (value) => notifier.setPublicProfile(value),
+        ),
+        if (tree != null && tree.publicProfile)
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: publicProfileUrl(tree.seed)));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Link gekopieerd.'), behavior: SnackBarBehavior.floating),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.link, size: 16),
+                label: const Text('Kopieer link'),
+              ),
+              TextButton.icon(
+                // The page lives on the website; it opens in the browser, like
+                // every other external link in the app.
+                onPressed: () {
+                  final uri = Uri.tryParse(publicProfileUrl(tree.seed));
+                  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Bekijken'),
+              ),
+            ],
+          ),
       ],
     );
   }

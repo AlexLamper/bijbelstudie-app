@@ -164,7 +164,8 @@ class _Tappable extends StatelessWidget {
   }
 }
 
-/// The daily-streak variant: a tree grown by the streak length.
+/// The daily-streak variant: the reader's own tree - level, species, scene -
+/// with the streak count in the badge.
 ///
 /// Kept under its original name because it is still the header's streak mark
 /// and every call site and test refers to it by this name; only what it draws
@@ -214,9 +215,7 @@ class StreakRing extends StatelessWidget {
     }
 
     return MiniTree(
-      seed: tree?.seed ?? _fallbackSeed,
-      growth: growthForStreak(streak),
-      health: tree?.health ?? 1,
+      tree: tree,
       dormant: isDormant,
       hasFreeze: hasFreeze,
       badge: '$streak',
@@ -261,9 +260,7 @@ class WeeklyGoalRing extends StatelessWidget {
     }
 
     return MiniTree(
-      seed: tree?.seed ?? _fallbackSeed,
-      growth: growthForGoal(done, target),
-      health: tree?.health ?? 1,
+      tree: tree,
       dormant: done <= 0,
       badge: '$done/$target',
       semanticsLabel: 'Je boom — $done van $target lessen deze week',
@@ -338,7 +335,6 @@ class _CountPill extends StatelessWidget {
 /// previews and tests. Constant rather than random so the header does not
 /// reshuffle its tree between frames; the account's real seed replaces it as
 /// soon as the fetch resolves.
-const String _fallbackSeed = 'levensboom';
 
 /// Studies helper reused by the continue card.
 int firstUndoneDayFor(CuratedStudy study, Set<int> completedDays) {

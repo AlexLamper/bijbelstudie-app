@@ -496,5 +496,68 @@ void main() {
       expect(XpGrant.fromJson(null), isNull);
       expect(XpGrant.fromJson({'awarded': 5, 'xp': 10, 'level': 1})?.awarded, 5);
     });
+
+    test('parses the studio block and keeps chosen apart from what is drawn', () {
+      final state = TreeState.fromJson({
+        'xp': 2800,
+        'level': 8,
+        'badges': ['completed1'],
+        'streak': 3,
+        'levensboom': {
+          'seed': seed,
+          'chosen': {'species': 'ceder', 'scene': 'hof', 'animal': 'schaap', 'ring': 'goud'},
+          'avatar': {'species': 'eik', 'scene': 'waterbeken', 'animal': 'schaap', 'ring': 'teal'},
+          'unlocked': ['species:eik', 'species:olijf', 'species:vijg', 'species:palm', 'animal:schaap'],
+          'nextUnlock': {'kind': 'species', 'id': 'amandel', 'name': 'Amandelboom', 'level': 12},
+          'longestStreak': 14,
+          'planted': true,
+          'introSeen': false,
+          'publicProfile': true,
+          'seenItems': ['species:vijg'],
+        },
+      });
+
+      expect(state.chosen.species, TreeSpecies.ceder);
+      expect(state.avatar.species, TreeSpecies.eik);
+      expect(state.avatar.animal, TreeAnimal.schaap);
+      expect(state.unlocked, contains('species:palm'));
+      expect(state.isProUnlocked, isFalse);
+      expect(state.nextUnlock?.id, 'amandel');
+      expect(state.stage.stage, TreeStage.volwassenBoom);
+      expect(state.longestStreak, 14);
+      expect(state.planted, isTrue);
+      expect(state.publicProfile, isTrue);
+      expect(state.seenItems, {'species:vijg'});
+
+      // The cache round-trips every studio field.
+      final again = TreeState.fromJson(state.toJson());
+      expect(again.chosen, state.chosen);
+      expect(again.avatar, state.avatar);
+      expect(again.unlocked, state.unlocked);
+      expect(again.seenItems, state.seenItems);
+
+      // A PATCH answer replaces the block and nothing else.
+      final merged = state.mergeTree({
+        ...((state.toJson()['levensboom'] as Map).cast<String, dynamic>()),
+        'avatar': {'species': 'palm', 'scene': 'waterbeken', 'animal': 'schaap', 'ring': 'teal'},
+        'chosen': {'species': 'palm', 'scene': 'waterbeken', 'animal': 'schaap', 'ring': 'teal'},
+      });
+      expect(merged.avatar.species, TreeSpecies.palm);
+      expect(merged.xp, 2800);
+      expect(merged.badges, ['completed1']);
+    });
+
+    test('derives the unlocks itself for a server without the studio block', () {
+      final state = TreeState.fromJson({
+        'xp': 4500,
+        'level': 10,
+        'badges': ['completed5', 'premium'],
+        'streak': 7,
+        'levensboom': {'seed': seed},
+      });
+      expect(state.unlocked, containsAll(['species:palm', 'scene:stadsmuur', 'scene:woestijn', 'ring:goud']));
+      expect(state.unlocked, isNot(contains('species:amandel')));
+      expect(state.avatar, AvatarChoice.defaults);
+    });
   });
 }

@@ -5,6 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
+import '../../features/levensboom/data/tree_image.dart';
 import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/settings/data/notification_prefs.dart';
 import '../../features/studies/data/enrollment_models.dart';
@@ -152,6 +153,7 @@ class Candidate {
     required this.deepLink,
     this.slot = 0,
     this.immediate = false,
+    this.images,
   });
 
   final NotifType type;
@@ -159,6 +161,10 @@ class Candidate {
   final RenderedVariant variant;
   final String deepLink;
   final int slot;
+
+  /// The reader's tree, rendered for this notification (treeWilting shows it
+  /// as it will look on day three). Null for everything else.
+  final TreeImageFiles? images;
 
   /// `showNow` instead of `zonedSchedule` (weeklyGoal "met").
   final bool immediate;
@@ -511,6 +517,11 @@ class NotificationScheduler {
           deepLink: '/profile/boom',
           variant: pickVariant(NotifType.treeWilting,
               rotation: now.day, tokens: tokens),
+          // The picture is the nudge: the tree as it will look tomorrow, so the
+          // reader sees what one short read keeps.
+          images: tree == null
+              ? null
+              : await renderTreeImages(tree: tree, name: 'wilting', healthOverride: 0.5),
         ));
       }
     }
@@ -555,13 +566,14 @@ class NotificationScheduler {
 
     for (final c in kept) {
       if (c.immediate) {
-        await service.showNow(c.type, c.variant, deepLink: c.deepLink, slot: c.slot);
+        await service.showNow(c.type, c.variant,
+            deepLink: c.deepLink, slot: c.slot, images: c.images);
       } else {
         final tzWhen = c.when is tz.TZDateTime
             ? c.when as tz.TZDateTime
             : tz.TZDateTime.from(c.when, tz.local);
         await service.scheduleOneShot(c.type, tzWhen, c.variant,
-            deepLink: c.deepLink, slot: c.slot);
+            deepLink: c.deepLink, slot: c.slot, images: c.images);
       }
       // Optimistic cap bookkeeping: a capped one-shot firing today counts as
       // spent, so no second capped type is added today even across restarts. A
@@ -628,7 +640,11 @@ class NotificationScheduler {
     await store.markMilestone(id);
     if (!foregrounded) {
       final service = ref.read(notificationServiceProvider);
-      await service.showNow(NotifType.milestone, variant, deepLink: '/dashboard');
+      // A milestone carries the grown tree - the thing the streak or badge
+      // just did something for.
+      final tree = ref.exists(treeStateProvider) ? ref.read(treeStateProvider).value : null;
+      final images = tree == null ? null : await renderTreeImages(tree: tree, name: 'milestone');
+      await service.showNow(NotifType.milestone, variant, deepLink: '/dashboard', images: images);
     }
     return variant;
   }
