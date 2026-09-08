@@ -483,6 +483,7 @@ class _SummaryParagraphText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     switch (paragraph.kind) {
       case SummaryParagraphKind.heading:
         // A teal rule down the left, as on the website, so a section title is

@@ -136,6 +136,7 @@ class _PlaceStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return SizedBox(
       height: _tile + 22,
       child: ListView.separated(
@@ -295,6 +296,7 @@ class _GalleryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final image = images[index];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,6 +493,7 @@ class _SummaryText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return switch (paragraph.kind) {
       SummaryParagraphKind.heading => Text(
         paragraph.text,

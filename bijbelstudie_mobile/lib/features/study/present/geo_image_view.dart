@@ -30,6 +30,7 @@ class GeoImageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Image.network(
       image.sizedUrl(width),
       fit: fit,

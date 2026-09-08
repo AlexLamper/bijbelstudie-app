@@ -23,6 +23,7 @@ class LessonIntroStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final intro = lesson.content.intro;
     if (intro == null) return const SizedBox.shrink();
 
@@ -178,6 +179,7 @@ class _VerseText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return RichText(
       text: TextSpan(
         style: TextStyle(

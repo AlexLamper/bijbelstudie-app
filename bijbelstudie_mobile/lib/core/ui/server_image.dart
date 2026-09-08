@@ -122,6 +122,7 @@ class ServerImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final url = _buildFullUrl();
     if (url.isEmpty) return _fallback();
 

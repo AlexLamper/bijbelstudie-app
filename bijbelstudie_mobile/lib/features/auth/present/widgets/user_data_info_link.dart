@@ -90,6 +90,7 @@ class _LegalLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: TextButton(

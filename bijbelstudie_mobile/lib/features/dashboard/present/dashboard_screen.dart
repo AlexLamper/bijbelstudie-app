@@ -387,6 +387,7 @@ class _TestamentGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -578,6 +579,7 @@ class _RecommendedStudiesSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

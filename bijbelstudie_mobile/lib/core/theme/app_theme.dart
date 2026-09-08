@@ -70,6 +70,22 @@ class AppTheme {
     return true;
   }
 
+  /// Makes [context] depend on the ambient [Theme], so a widget whose build
+  /// reads only these static tokens is still rebuilt after a theme switch.
+  ///
+  /// main.dart rekeys `MaterialApp.router` on the brightness to throw the old
+  /// subtree away, but go_router's Navigator carries a GlobalKey, so the
+  /// framework reparents that Navigator - and every route in it - into the new
+  /// MaterialApp instead of destroying it. On reactivation only elements with
+  /// inherited dependencies get `didChangeDependencies()`; a const-constructed
+  /// widget whose build reads nothing but `AppTheme.ink` and friends has none,
+  /// its parent hands it the identical const instance again, and it keeps
+  /// painting the old palette until the route is recreated. Call this first
+  /// thing in such a build.
+  static void dependOn(BuildContext context) {
+    Theme.of(context);
+  }
+
   static Color _c(Color light, Color dark) =>
       _brightness == Brightness.dark ? dark : light;
 

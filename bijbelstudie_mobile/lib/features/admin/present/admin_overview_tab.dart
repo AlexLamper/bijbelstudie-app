@@ -447,6 +447,7 @@ class _DegradedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return AppCard(
       radius: AppTheme.radiusMd,
       color: AppTheme.flameTint,

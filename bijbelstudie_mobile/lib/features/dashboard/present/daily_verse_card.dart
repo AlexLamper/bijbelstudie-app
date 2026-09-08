@@ -492,6 +492,7 @@ class _VerseActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final icons = Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -882,6 +883,7 @@ class _MoreSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,

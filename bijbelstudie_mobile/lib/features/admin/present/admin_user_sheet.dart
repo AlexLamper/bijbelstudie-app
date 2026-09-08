@@ -28,6 +28,7 @@ class AdminAccountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return RuleListTile(
       showRule: showRule,
       onTap: () => showAdminUserSheet(context, account),

@@ -56,6 +56,28 @@ extension BadgeToneX on BadgeTone {
     BadgeTone.ai => AppTheme.ai,
     BadgeTone.positive => AppTheme.positive,
   };
+
+  /// The wash behind the icon on an earned medallion - the theme's own tint
+  /// for the tone, so it is right in both brightnesses.
+  Color get tint => switch (this) {
+    BadgeTone.flame => AppTheme.flameTint,
+    BadgeTone.teal => AppTheme.tealTint,
+    BadgeTone.ai => AppTheme.aiTint,
+    BadgeTone.positive => AppTheme.positiveTint,
+  };
+}
+
+extension BadgeTrackX on BadgeTrack {
+  /// The noun behind a count on this track, in the number of [n]: "1 dag",
+  /// "4 dagen". Empty for a server award, which has no count.
+  String unit(int n) => switch (this) {
+    BadgeTrack.streak => n == 1 ? 'dag' : 'dagen',
+    BadgeTrack.books => n == 1 ? 'boek' : 'boeken',
+    BadgeTrack.chapters => n == 1 ? 'hoofdstuk' : 'hoofdstukken',
+    BadgeTrack.notes => n == 1 ? 'notitie' : 'notities',
+    BadgeTrack.highlights => n == 1 ? 'vers' : 'verzen',
+    BadgeTrack.awarded => '',
+  };
 }
 
 /// One milestone in [BadgeCatalog].
@@ -107,6 +129,14 @@ class BadgeProgress {
   /// "3 / 7" while it runs, the description once it is earned.
   String get progressLabel =>
       unlocked ? definition.description : '$value / ${definition.target}';
+
+  /// What is still missing, as a sentence: "Nog 4 dagen". Null once the badge
+  /// is earned, and for a server award the app has no count for.
+  String? get remainingLabel {
+    if (unlocked || definition.track == BadgeTrack.awarded) return null;
+    final left = (definition.target - value).clamp(0, definition.target);
+    return 'Nog $left ${definition.track.unit(left)}';
+  }
 }
 
 /// The milestones the app can prove from its own data, plus a reading of the

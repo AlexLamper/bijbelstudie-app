@@ -154,6 +154,7 @@ class _PriceBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final perMonth = PriceFraming.effectivePerMonth(yearlyProduct);
     final billedLabel = '${yearlyProduct.priceString} per jaar, in één keer gefactureerd';
     final monthly = monthlyProduct;

@@ -670,6 +670,7 @@ class _OfflineNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     // Deliberately a quiet note, not an error: reading from cache is the
     // feature working, not failing.
     return Row(

@@ -150,6 +150,7 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       height: height,
       constraints: BoxConstraints(minWidth: height),

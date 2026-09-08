@@ -259,6 +259,7 @@ class _AnswerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Material(
       color: selected ? AppTheme.tealTint : AppTheme.paperRaised,
       borderRadius: BorderRadius.circular(AppTheme.radiusSm),
@@ -310,6 +311,7 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     // An unmarked question says nothing about right or wrong - the grader did
     // not recognise it, so claiming either way would be a guess.
     final marked = grade != null && grade!.known;
@@ -389,6 +391,7 @@ class _ReviewLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

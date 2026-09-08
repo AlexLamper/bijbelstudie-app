@@ -112,6 +112,7 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
       child: Row(
@@ -155,6 +156,7 @@ class _GoalStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       children: [
@@ -190,6 +192,7 @@ class _GoalTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Material(
       color: selected ? AppTheme.tealTint : AppTheme.paperRaised,
       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -242,6 +245,7 @@ class _DemoStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       children: [
@@ -341,6 +345,7 @@ class _BenefitsStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     // A reader who skipped the question still gets a coherent screen.
     final resolved = goal ?? StudyGoal.understandBible;
 
@@ -411,6 +416,7 @@ class _Assurance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Row(
       children: [
         Icon(icon, size: 15, color: AppTheme.inkMuted),

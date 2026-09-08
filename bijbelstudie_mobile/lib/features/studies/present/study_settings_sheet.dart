@@ -231,6 +231,7 @@ class _ChoiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(

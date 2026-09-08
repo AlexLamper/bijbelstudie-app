@@ -124,6 +124,7 @@ class _PaneTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Row(
       children: [
         for (final pane in _panes) ...[

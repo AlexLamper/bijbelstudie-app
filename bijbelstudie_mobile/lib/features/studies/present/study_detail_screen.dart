@@ -248,6 +248,7 @@ class _FactLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: showRule
@@ -390,6 +391,7 @@ class _DayDisc extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       width: 26,
       height: 26,

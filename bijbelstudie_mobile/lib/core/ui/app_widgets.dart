@@ -31,6 +31,7 @@ class Eyebrow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final style = (compact ? AppTheme.overline : AppTheme.eyebrow).copyWith(
       color: color ?? AppTheme.inkFaint,
     );
@@ -64,6 +65,7 @@ class GradientHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,6 +115,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -212,6 +215,7 @@ class IconChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final color = this.color ?? AppTheme.teal;
     return Container(
       width: size,
@@ -474,6 +478,7 @@ class SiteBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final accent = foreground ?? AppTheme.teal;
     final fg = solid ? Colors.white : accent;
     final bg = background ?? (solid ? accent : accent.withValues(alpha: 0.10));
@@ -624,6 +629,7 @@ class OnBrandButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(AppTheme.radiusMd),

@@ -179,6 +179,7 @@ class _ReviewPromptOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Material(

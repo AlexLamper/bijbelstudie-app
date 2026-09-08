@@ -262,6 +262,7 @@ class _LoadingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return SizedBox(
       width: 168,
       child: ClipRRect(

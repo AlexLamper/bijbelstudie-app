@@ -180,6 +180,7 @@ class _ChipRow<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

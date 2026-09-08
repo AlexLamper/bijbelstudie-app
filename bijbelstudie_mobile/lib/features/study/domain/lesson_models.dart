@@ -437,7 +437,7 @@ class CompletionSummary {
           : (xp as num?)?.toInt() ?? 0,
       levelledUp: xp is Map<String, dynamic> ? xp['levelledUp'] as bool? ?? false : false,
       newBadges: xp is Map<String, dynamic>
-          ? (xp['badges'] as List? ?? const []).whereType<String>().toList(growable: false)
+          ? ((xp['newBadges'] ?? xp['badges']) as List? ?? const []).whereType<String>().toList(growable: false)
           : const [],
       noteId: json['noteId'] as String?,
       nextLessonDay: (json['nextLessonDay'] as num?)?.toInt(),
