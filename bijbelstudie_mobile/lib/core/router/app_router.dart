@@ -22,7 +22,8 @@ import '../../features/bible/present/read_screen.dart';
 import '../../features/bible/present/reader_chrome.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
-import '../../features/levensboom/present/levensboom_screen.dart';
+import '../../features/levensboom/present/levensboom_tab_icon.dart';
+import '../../features/levensboom/present/studio/levensboom_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
@@ -193,11 +194,15 @@ class _NavItem extends StatelessWidget {
             // highlighted mostly empty space and the neighbouring tabs' margins.
             TourAnchor(
               id: item.tourAnchorId,
-              child: Icon(
-                active ? item.activeIcon : item.icon,
-                size: 21,
-                color: color,
-              ),
+              // The Profiel tab wears the reader's own tree - the same face as
+              // the dashboard header and the website's navbar.
+              child: item.route == '/profile'
+                  ? LevensboomTabIcon(active: active)
+                  : Icon(
+                      active ? item.activeIcon : item.icon,
+                      size: 21,
+                      color: color,
+                    ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -277,7 +282,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           // own: it is one account's own thing to look at, not a section.
           GoRoute(
             path: '/profile/boom',
-            builder: (context, state) => const LevensboomScreen(),
+            builder: (context, state) => const LevensboomStudioScreen(),
           ),
           // Reachable from the dashboard and Profiel rather than the tab bar.
           GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),

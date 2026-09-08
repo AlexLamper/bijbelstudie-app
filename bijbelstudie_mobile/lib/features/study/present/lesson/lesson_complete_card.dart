@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../domain/lesson_models.dart';
+import '../../../levensboom/domain/catalog.dart';
+import '../../../levensboom/present/levensboom_avatar.dart';
+import '../../../levensboom/present/levensboom_providers.dart';
+import '../../../levensboom/present/tree_view.dart';
 
 /// What a finished lesson looks like: what it earned, and the way on.
 ///
@@ -50,6 +54,10 @@ class LessonCompleteCard extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       children: [
+        // The reader's own tree, with what this lesson just did to it: the XP
+        // grant has already reached the tree state through the animation bus,
+        // so new leaves are open and a level-up grows its new wood in.
+        _LevensboomMoment(summary: summary),
         Row(
           children: [
             Icon(
@@ -205,6 +213,112 @@ class LessonCompleteCard extends ConsumerWidget {
           onPressed: () => context.go('/studies/${lesson.studyId}'),
         ),
       ],
+    );
+  }
+}
+
+/// The tree at the end of a lesson. Nothing when the reader has no tree to
+/// show - state not loaded, or switched off.
+class _LevensboomMoment extends ConsumerWidget {
+  const _LevensboomMoment({required this.summary});
+
+  final CompletionSummary summary;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tree = ref.watch(treeStateProvider).value;
+    if (tree == null || tree.disabled || tree.seed.isEmpty) return const SizedBox.shrink();
+
+    final still = tree.reducedMotion || MediaQuery.maybeDisableAnimationsOf(context) == true;
+    final gold = tree.avatar.ring == TreeRing.goud;
+    final accent = gold ? kGoldRing : AppTheme.teal;
+    final unlocked = summary.levelledUp ? itemsUnlockedAtLevel(tree.level) : const <CatalogItem>[];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg + 2),
+          border: Border.all(color: accent.withValues(alpha: gold ? 1 : 0.4), width: 2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              TreeView(
+                seed: tree.seed,
+                level: tree.level,
+                frac: tree.progress,
+                health: tree.health,
+                species: tree.avatar.species,
+                scene: tree.avatar.scene,
+                animal: tree.avatar.animal,
+                reducedMotion: still,
+                celebration: summary.levelledUp && !still,
+              ),
+              Positioned(
+                left: 10,
+                bottom: 8,
+                child: Row(
+                  children: [
+                    _MomentPill(text: 'Niveau ${tree.level}', background: accent),
+                    const SizedBox(width: 6),
+                    _MomentPill(text: tree.stage.name, background: Colors.black.withValues(alpha: 0.45)),
+                  ],
+                ),
+              ),
+              if (summary.xpAwarded > 0)
+                Positioned(
+                  right: 10,
+                  top: 8,
+                  child: _MomentPill(
+                    text: '+${summary.xpAwarded} XP',
+                    background: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                    foreground: AppTheme.teal,
+                  ),
+                ),
+              if (unlocked.isNotEmpty)
+                Positioned(
+                  right: 10,
+                  bottom: 8,
+                  child: _MomentPill(
+                    text: 'Nieuw: ${unlocked.map((i) => i.name).join(', ')}',
+                    background: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                    foreground: AppTheme.teal,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MomentPill extends StatelessWidget {
+  const _MomentPill({required this.text, required this.background, this.foreground = Colors.white});
+
+  final String text;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      constraints: const BoxConstraints(maxWidth: 200),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTheme.caption.copyWith(color: foreground, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }

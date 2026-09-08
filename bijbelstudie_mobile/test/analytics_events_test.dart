@@ -55,6 +55,7 @@ void main() {
     'app_resources',
     'app_study',
     'app_ai',
+    'app_levensboom',
   };
 
   group('every declared event is emitted somewhere', () {

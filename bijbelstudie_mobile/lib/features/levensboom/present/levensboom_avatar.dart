@@ -3,15 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../domain/catalog.dart';
 import 'levensboom_celebration.dart';
 import 'levensboom_providers.dart';
 import 'tree_view.dart';
+
+/// The gold of the Pro ring, shared by every avatar surface.
+const Color kGoldRing = Color(0xFFD4A017);
+const Color kGoldRingLight = Color(0xFFF6D77A);
 
 /// The Levensboom *as* the profile picture, not as a card beside it.
 ///
 /// The tree fills the round frame the picture used to occupy, with the XP bar
 /// bent around it as a ring and the level in the corner badge - so the one thing
-/// that says "this is you" is also the thing that grows when you study.
+/// that says "this is you" is also the thing that grows when you study. The
+/// ring is the reader's pick: teal, or the Pro gold.
 ///
 /// [fallback] stands in while the state is still loading, or when the reader has
 /// switched the tree off: the plain initials/photo avatar. XP, levels and badges
@@ -52,6 +58,7 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
         ref,
         seed: tree.seed,
         level: pending,
+        avatar: tree.avatar,
         reducedMotion: tree.reducedMotion,
       );
       _celebrating = false;
@@ -72,6 +79,8 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
 
     final stroke = (widget.size * 0.045).clamp(3.0, 5.0);
     final badge = widget.size * 0.32;
+    final gold = tree.avatar.ring == TreeRing.goud;
+    final ringColor = gold ? kGoldRing : AppTheme.teal;
 
     return GestureDetector(
       onTap: () => context.push('/profile/boom'),
@@ -86,8 +95,8 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
                 value: tree.progress.clamp(0.0, 1.0),
                 strokeWidth: stroke,
                 strokeCap: StrokeCap.round,
-                backgroundColor: AppTheme.rule,
-                color: AppTheme.teal,
+                backgroundColor: gold ? kGoldRing.withValues(alpha: 0.18) : AppTheme.rule,
+                color: ringColor,
               ),
             ),
             Positioned.fill(
@@ -99,6 +108,10 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
                     level: tree.level,
                     frac: tree.progress,
                     health: tree.health,
+                    species: tree.avatar.species,
+                    scene: tree.avatar.scene,
+                    animal: tree.avatar.animal,
+                    framing: TreeFraming.portrait,
                     reducedMotion: tree.reducedMotion,
                   ),
                 ),
@@ -115,7 +128,7 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
                 padding: const EdgeInsets.symmetric(horizontal: 5),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppTheme.teal,
+                  color: ringColor,
                   shape: BoxShape.rectangle,
                   borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                   border: Border.all(

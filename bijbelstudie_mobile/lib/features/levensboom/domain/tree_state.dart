@@ -2,10 +2,12 @@
 ///
 /// One endpoint for level, XP, streak, badges *and* the tree, so the phone and
 /// the website cannot disagree about any of them. Nothing here describes the
-/// tree's shape - that is derived from [seed], [level], [progress] and
-/// [health] by `tree_generator.dart`.
+/// tree's shape - that is derived from [seed], [level], [progress], [health]
+/// and the species by `tree_generator.dart`.
 library;
 
+import 'catalog.dart';
+import 'stages.dart';
 import 'traits.dart';
 
 class XpTableRow {
@@ -55,6 +57,28 @@ class XpGrant {
   }
 }
 
+/// The nearest level-gated catalog item still locked, for the progress strip.
+class NextUnlock {
+  const NextUnlock({required this.kind, required this.id, required this.name, required this.level});
+
+  final String kind;
+  final String id;
+  final String name;
+  final int level;
+
+  static NextUnlock? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    return NextUnlock(
+      kind: raw['kind'] as String? ?? '',
+      id: raw['id'] as String? ?? '',
+      name: raw['name'] as String? ?? '',
+      level: (raw['level'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, Object?> toJson() => {'kind': kind, 'id': id, 'name': name, 'level': level};
+}
+
 class TreeState {
   const TreeState({
     required this.xp,
@@ -74,6 +98,15 @@ class TreeState {
     required this.reducedMotion,
     required this.disabled,
     required this.xpTable,
+    this.chosen = AvatarChoice.defaults,
+    this.avatar = AvatarChoice.defaults,
+    this.unlocked = const {},
+    this.nextUnlock,
+    this.longestStreak = 0,
+    this.planted = false,
+    this.introSeen = false,
+    this.publicProfile = false,
+    this.seenItems = const {},
   });
 
   final int xp;
@@ -101,6 +134,21 @@ class TreeState {
   final bool disabled;
   final List<XpTableRow> xpTable;
 
+  /// What is stored on the account. May name items the account has lost.
+  final AvatarChoice chosen;
+
+  /// What to draw: [chosen] after the server's unlock check.
+  final AvatarChoice avatar;
+
+  /// `kind:id` keys the account may pick today, as the server serves them.
+  final Set<String> unlocked;
+  final NextUnlock? nextUnlock;
+  final int longestStreak;
+  final bool planted;
+  final bool introSeen;
+  final bool publicProfile;
+  final Set<String> seenItems;
+
   /// 0..1 within the current level; drives how many leaves are open.
   double get progress => xpForNextLevel > 0 ? xpIntoLevel / xpForNextLevel : 0;
 
@@ -111,13 +159,36 @@ class TreeState {
 
   bool get shouldCelebrate => level > lastSeenLevel;
 
+  /// Derived locally from the same table the server uses.
+  StageInfo get stage => stageForLevel(level);
+
+  /// Whether the server considers this account Pro: it never serves the gold
+  /// ring to anyone else.
+  bool get isProUnlocked => unlocked.contains('ring:goud');
+
+  UnlockContext get unlockContext => UnlockContext(
+    level: level,
+    badges: badges,
+    longestStreak: longestStreak > streak ? longestStreak : streak,
+    isPro: isProUnlocked,
+  );
+
   /// The optimistic update after an XP-earning call, before the next fetch.
-  /// Both sides use the same level curve, so this and the server agree.
+  /// Both sides use the same level curve, so this and the server agree. The
+  /// unlocked set is widened locally by level; a real refresh follows a
+  /// level-up so the server has the last word.
   TreeState applyGrant(XpGrant grant) {
     final level = _levelForXp(grant.xp);
     final floor = _xpForLevel(level);
     final ceiling = _xpForLevel(level + 1);
     final span = ceiling - floor < 1 ? 1 : ceiling - floor;
+    final badges = {...this.badges, ...grant.newBadges}.toList();
+    final ctx = UnlockContext(
+      level: level,
+      badges: badges,
+      longestStreak: longestStreak > streak ? longestStreak : streak,
+      isPro: isProUnlocked,
+    );
     return copyWith(
       xp: grant.xp,
       level: level,
@@ -129,8 +200,18 @@ class TreeState {
       health: 1,
       wilting: false,
       daysSinceActive: 0,
-      badges: {...badges, ...grant.newBadges}.toList(),
+      badges: badges,
+      unlocked: {...unlocked, ...unlockedKeys(ctx)},
     );
+  }
+
+  /// Replaces the tree block with what `/api/v1/levensboom` answered.
+  TreeState mergeTree(Map<String, dynamic> tree) {
+    final parsed = TreeState.fromJson({
+      ..._summaryJson(),
+      'levensboom': tree,
+    });
+    return parsed;
   }
 
   TreeState copyWith({
@@ -148,6 +229,15 @@ class TreeState {
     int? lastSeenLevel,
     bool? reducedMotion,
     bool? disabled,
+    AvatarChoice? chosen,
+    AvatarChoice? avatar,
+    Set<String>? unlocked,
+    NextUnlock? nextUnlock,
+    int? longestStreak,
+    bool? planted,
+    bool? introSeen,
+    bool? publicProfile,
+    Set<String>? seenItems,
   }) {
     return TreeState(
       xp: xp ?? this.xp,
@@ -167,12 +257,41 @@ class TreeState {
       reducedMotion: reducedMotion ?? this.reducedMotion,
       disabled: disabled ?? this.disabled,
       xpTable: xpTable,
+      chosen: chosen ?? this.chosen,
+      avatar: avatar ?? this.avatar,
+      unlocked: unlocked ?? this.unlocked,
+      nextUnlock: nextUnlock ?? this.nextUnlock,
+      longestStreak: longestStreak ?? this.longestStreak,
+      planted: planted ?? this.planted,
+      introSeen: introSeen ?? this.introSeen,
+      publicProfile: publicProfile ?? this.publicProfile,
+      seenItems: seenItems ?? this.seenItems,
     );
   }
 
   factory TreeState.fromJson(Map<String, dynamic> json) {
     final tree = (json['levensboom'] as Map?)?.cast<String, dynamic>() ?? const {};
     final level = (json['level'] as num?)?.toInt() ?? 1;
+    final badges = (json['badges'] as List?)?.whereType<String>().toList() ?? const <String>[];
+    final streak = (json['streak'] as num?)?.toInt() ?? 0;
+    final longestStreak = (tree['longestStreak'] as num?)?.toInt() ?? 0;
+    final chosen = AvatarChoice.fromJson(tree['chosen']);
+
+    // A server older than the studio serves no unlock list; derive one from
+    // what it does serve, so the tree still draws and the tiles still lock.
+    final served = (tree['unlocked'] as List?)?.whereType<String>().toSet();
+    final unlocked = served ??
+        unlockedKeys(
+          UnlockContext(
+            level: level,
+            badges: badges,
+            longestStreak: longestStreak > streak ? longestStreak : streak,
+            isPro: badges.contains('premium'),
+          ),
+        );
+    final avatar = tree['avatar'] is Map
+        ? AvatarChoice.fromJson(tree['avatar'])
+        : resolveAvatar(chosen, unlocked);
 
     return TreeState(
       xp: (json['xp'] as num?)?.toInt() ?? 0,
@@ -180,9 +299,9 @@ class TreeState {
       xpIntoLevel: (json['xpIntoLevel'] as num?)?.toInt() ?? 0,
       xpForNextLevel: (json['xpForNextLevel'] as num?)?.toInt() ?? 100,
       progressPercentage: (json['progressPercentage'] as num?)?.toInt() ?? 0,
-      streak: (json['streak'] as num?)?.toInt() ?? 0,
+      streak: streak,
       freezes: (json['freezes'] as num?)?.toInt() ?? 0,
-      badges: (json['badges'] as List?)?.whereType<String>().toList() ?? const [],
+      badges: badges,
       // An older server that does not send the block yet still renders a tree;
       // the seed simply falls back to something stable per response.
       seed: (tree['seed'] as String?) ?? '',
@@ -191,7 +310,7 @@ class TreeState {
       daysSinceActive: (tree['daysSinceActive'] as num?)?.toInt() ?? 0,
       lastSeenLevel: (tree['lastSeenLevel'] as num?)?.toInt() ?? level,
       // Served rather than derived, so a build older than a trait-table change
-      // still shows the right list in the detail screen.
+      // still shows the right list.
       traitsUnlocked: _traitsFromJson(tree['traitsUnlocked']) ?? traitsForLevel(level),
       reducedMotion: tree['reducedMotion'] == true,
       disabled: tree['disabled'] == true,
@@ -205,10 +324,19 @@ class TreeState {
             ),
           )
           .toList(),
+      chosen: chosen,
+      avatar: avatar,
+      unlocked: unlocked,
+      nextUnlock: NextUnlock.fromJson(tree['nextUnlock']),
+      longestStreak: longestStreak,
+      planted: tree['planted'] == true,
+      introSeen: tree['introSeen'] == true,
+      publicProfile: tree['publicProfile'] == true,
+      seenItems: (tree['seenItems'] as List?)?.whereType<String>().toSet() ?? const {},
     );
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> _summaryJson() => {
     'xp': xp,
     'level': level,
     'xpIntoLevel': xpIntoLevel,
@@ -217,6 +345,14 @@ class TreeState {
     'streak': streak,
     'freezes': freezes,
     'badges': badges,
+    'xpTable': [
+      for (final row in xpTable)
+        {'event': row.event, 'value': row.value, 'label': row.label},
+    ],
+  };
+
+  Map<String, dynamic> toJson() => {
+    ..._summaryJson(),
     'levensboom': {
       'seed': seed,
       'health': health,
@@ -226,11 +362,16 @@ class TreeState {
       'traitsUnlocked': traitsUnlocked.map((t) => kTraitIds[t]).toList(),
       'reducedMotion': reducedMotion,
       'disabled': disabled,
+      'chosen': chosen.toJson(),
+      'avatar': avatar.toJson(),
+      'unlocked': unlocked.toList(),
+      'nextUnlock': nextUnlock?.toJson(),
+      'longestStreak': longestStreak,
+      'planted': planted,
+      'introSeen': introSeen,
+      'publicProfile': publicProfile,
+      'seenItems': seenItems.toList(),
     },
-    'xpTable': [
-      for (final row in xpTable)
-        {'event': row.event, 'value': row.value, 'label': row.label},
-    ],
   };
 }
 

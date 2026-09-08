@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../features/levensboom/data/tree_image.dart';
 import 'reminder_service.dart' show ReminderStatus;
 
 export 'reminder_service.dart' show ReminderStatus;
@@ -388,7 +389,14 @@ class NotificationService {
     return midnight.add(Duration(days: 1, minutes: quiet.endMinutes));
   }
 
-  NotificationDetails _detailsFor(NotifType type, {bool withActions = true}) {
+  /// [images], when given, put the reader's Levensboom on the notification:
+  /// the scene as Android's big picture and the iOS attachment, the portrait as
+  /// Android's large icon. Rendered on-device by `tree_image.dart`.
+  NotificationDetails _detailsFor(
+    NotifType type, {
+    bool withActions = true,
+    TreeImageFiles? images,
+  }) {
     final android = AndroidNotificationDetails(
       type.channelId,
       _channels
@@ -398,6 +406,13 @@ class NotificationService {
           type == NotifType.milestone ? Importance.high : Importance.defaultImportance,
       priority:
           type == NotifType.milestone ? Priority.high : Priority.defaultPriority,
+      largeIcon: images == null ? null : FilePathAndroidBitmap(images.iconPath),
+      styleInformation: images == null
+          ? null
+          : BigPictureStyleInformation(
+              FilePathAndroidBitmap(images.scenePath),
+              hideExpandedLargeIcon: true,
+            ),
       actions: withActions && type.isCapped
           ? const [
               AndroidNotificationAction('LATER', 'Later vandaag'),
@@ -407,6 +422,7 @@ class NotificationService {
     );
     final ios = DarwinNotificationDetails(
       categoryIdentifier: type.isCapped ? _engagementCategory : null,
+      attachments: images == null ? null : [DarwinNotificationAttachment(images.scenePath)],
     );
     return NotificationDetails(android: android, iOS: ios);
   }
@@ -420,6 +436,7 @@ class NotificationService {
     RenderedVariant variant, {
     required String deepLink,
     int slot = 0,
+    TreeImageFiles? images,
   }) async {
     await initialise();
     if (kIsWeb) return;
@@ -430,7 +447,7 @@ class NotificationService {
       variant.title,
       variant.body,
       when,
-      _detailsFor(type),
+      _detailsFor(type, images: images),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
@@ -445,6 +462,7 @@ class NotificationService {
     RenderedVariant variant, {
     required String deepLink,
     int slot = 0,
+    TreeImageFiles? images,
   }) async {
     await initialise();
     if (kIsWeb) return;
@@ -454,7 +472,7 @@ class NotificationService {
       id,
       variant.title,
       variant.body,
-      _detailsFor(type, withActions: false),
+      _detailsFor(type, withActions: false, images: images),
       payload: deepLink,
     );
   }

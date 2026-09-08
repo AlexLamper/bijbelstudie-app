@@ -15,8 +15,12 @@ Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
   chapter cache), `data/bible_books.dart`, `notifications/`, `preview/`.
 - `features/<name>/` — each with `data/` (repositories, models, local storage),
   `domain/` (entities), `present/` (screens + Riverpod providers).
-  Features: `ai auth bible commentary dashboard feedback groups notes onboarding
-  premium profile resources search settings studies study`.
+  Features: `ai auth bible commentary dashboard feedback groups levensboom notes
+  onboarding premium profile resources search settings studies study`.
+- `features/levensboom/` is the tree avatar. `domain/tree_generator.dart`,
+  `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/levensboom/*.ts` in the
+  website repo line for line; `test/levensboom_parity_test.dart` asserts the same
+  counts as the website's fixtures. Edit both repos in one pass.
 - `test/` — 16 test files plus `screenshot_fixtures.dart`.
 
 Screen ↔ file mapping is 1:1 by feature name: the Start tab is

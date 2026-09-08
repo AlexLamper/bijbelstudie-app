@@ -1,52 +1,39 @@
-/// What the tree gains, and when. Mirror of the website's
+/// What the tree gains with level, beyond size. Mirror of the website's
 /// `lib/levensboom/traits.ts`; both are checked against
 /// `docs/levensboom-spec.md` §6.
 ///
-/// The server also serves `traitsUnlocked`, so a build older than a trait-table
-/// change still gets a correct list. This table is what the *renderer* needs -
-/// the API answer arrives too late to decide whether to draw a canopy.
+/// The bird and the fireflies used to be traits; they are animals in the
+/// catalog now (`catalog.dart`), picked rather than granted.
 library;
 
-enum TreeTrait { canopy, blossom, fruit, bird, twin, fireflies, seasons }
+enum TreeTrait { blossom, fruit, twin, seasons }
 
 const Map<TreeTrait, int> kTraitLevels = {
-  TreeTrait.canopy: 3,
   TreeTrait.blossom: 5,
   TreeTrait.fruit: 8,
-  TreeTrait.bird: 12,
   TreeTrait.twin: 16,
-  TreeTrait.fireflies: 20,
   TreeTrait.seasons: 25,
 };
 
 const List<TreeTrait> kTraitOrder = [
-  TreeTrait.canopy,
   TreeTrait.blossom,
   TreeTrait.fruit,
-  TreeTrait.bird,
   TreeTrait.twin,
-  TreeTrait.fireflies,
   TreeTrait.seasons,
 ];
 
 /// The id the API uses, so a served list can be matched against this table.
 const Map<TreeTrait, String> kTraitIds = {
-  TreeTrait.canopy: 'canopy',
   TreeTrait.blossom: 'blossom',
   TreeTrait.fruit: 'fruit',
-  TreeTrait.bird: 'bird',
   TreeTrait.twin: 'twin',
-  TreeTrait.fireflies: 'fireflies',
   TreeTrait.seasons: 'seasons',
 };
 
 const Map<TreeTrait, String> kTraitLabels = {
-  TreeTrait.canopy: 'Je boom krijgt een echte kroon',
   TreeTrait.blossom: 'Bloesem in het voorjaar',
   TreeTrait.fruit: 'De eerste vrucht van de Geest',
-  TreeTrait.bird: 'Een vogel keert terug naar je boom',
-  TreeTrait.twin: 'Een tweede stam - je boom komt tot zijn recht',
-  TreeTrait.fireflies: "Vuurvliegjes 's nachts",
+  TreeTrait.twin: 'Een tweede stam',
   TreeTrait.seasons: 'Zeldzame seizoenen: sneeuw en bloesemstorm',
 };
 

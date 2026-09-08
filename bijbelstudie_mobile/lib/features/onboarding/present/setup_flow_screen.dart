@@ -7,6 +7,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/catalog.dart';
+import '../../levensboom/domain/species.dart';
+import '../../levensboom/present/levensboom_providers.dart';
+import '../../levensboom/present/tree_view.dart';
 import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
@@ -52,7 +56,7 @@ class SetupFlowScreen extends ConsumerStatefulWidget {
 }
 
 class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
-  static const _totalSteps = 4;
+  static const _totalSteps = 5;
 
   late final PageController _controller = PageController(initialPage: _index);
   late int _index = ref.read(setupStepProvider);
@@ -68,7 +72,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
 
   void _next() {
     if (_isLast) {
-      _finish();
+      _finish(plant: true);
       return;
     }
     _controller.nextPage(
@@ -84,7 +88,10 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
     );
   }
 
-  Future<void> _finish() async {
+  /// [plant] is true only when the wizard was walked to its end: "Overslaan"
+  /// keeps the default eik, and a tree that was never planted still owes the
+  /// reader the studio's one-time intro.
+  Future<void> _finish({bool plant = false}) async {
     if (_finishing) return;
     setState(() => _finishing = true);
     ref.read(setupStepProvider.notifier).moveTo(0);
@@ -109,6 +116,13 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
           'reminderMinutes': settings.dailyReminderMinutes,
       });
     } catch (_) {}
+
+    if (plant) {
+      // Best-effort too: the species is a cosmetic the studio can set later.
+      try {
+        await ref.read(treeStateProvider.notifier).plant(ref.read(plantChoiceProvider));
+      } catch (_) {}
+    }
 
     if (mounted) context.go('/tour');
   }
@@ -157,6 +171,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
                   _TranslationStep(),
                   _ReadingPrefsStep(),
                   _ThemeStep(),
+                  _PlantStep(),
                   _ReminderStep(),
                 ],
               ),
@@ -186,7 +201,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
               child: Column(
                 children: [
                   SiteButton(
-                    label: _isLast ? 'Aan de slag' : 'Volgende',
+                    label: _isLast ? 'Planten en aan de slag' : 'Volgende',
                     trailingIcon: Icons.arrow_forward,
                     loading: _finishing,
                     onPressed: _finishing ? null : _next,
@@ -423,6 +438,145 @@ class _ThemeStep extends ConsumerWidget {
             const SizedBox(height: 10),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Step 4 - "Plant je boom": the two free species. The tree is the face of
+/// the account, so the choice is made where the account is set up. The grown
+/// tree is shown, because a kiem looks the same in every species.
+class _PlantStep extends ConsumerWidget {
+  const _PlantStep();
+
+  static const _options = [TreeSpecies.eik, TreeSpecies.olijf];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(plantChoiceProvider);
+    final seed = ref.watch(authControllerProvider).value?.id ?? 'levensboom';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('Levensboom'),
+          const SizedBox(height: 16),
+          Text('Plant je boom', style: AppTheme.displayLarge),
+          const SizedBox(height: 12),
+          Text(
+            'Je levensboom groeit mee met alles wat je leest en bestudeert. '
+            'Kies waarmee hij begint; meer soorten ontgrendel je onderweg.',
+            style: AppTheme.bodyLead,
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              for (var i = 0; i < _options.length; i++) ...[
+                if (i > 0) const SizedBox(width: 12),
+                Expanded(
+                  child: _PlantCard(
+                    species: _options[i],
+                    seed: seed,
+                    selected: selected == _options[i],
+                    onTap: () => ref.read(plantChoiceProvider.notifier).set(_options[i]),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Je begint als kiem: twee blaadjes boven de grond. Zo ziet je boom er '
+            'na een paar weken uit.',
+            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlantCard extends StatelessWidget {
+  const _PlantCard({
+    required this.species,
+    required this.seed,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TreeSpecies species;
+  final String seed;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = catalogItem(ItemKind.species, kSpeciesIds[species]!);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item?.name ?? kSpeciesIds[species],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        onTap: onTap,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.tealTint : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            border: Border.all(color: selected ? AppTheme.teal : AppTheme.rule, width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: TreeView(
+                  seed: seed,
+                  level: 7,
+                  frac: 0.6,
+                  species: species,
+                  still: true,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text(item?.name ?? '', style: AppTheme.bodyStrong)),
+                        Icon(
+                          selected ? Icons.check_circle : Icons.circle_outlined,
+                          size: 18,
+                          color: selected ? AppTheme.teal : AppTheme.inkFaint,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item?.blurb ?? '',
+                      style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+                    ),
+                    if (item?.verse != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        item!.verse!,
+                        style: AppTheme.caption.copyWith(
+                          color: AppTheme.tealStrong,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

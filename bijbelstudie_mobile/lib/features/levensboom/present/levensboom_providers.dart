@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/provider_cache.dart';
 import '../data/levensboom_repository.dart';
+import '../domain/catalog.dart';
+import '../domain/species.dart';
 import '../domain/tree_state.dart';
 
 /// The tree's state, and the bus every XP-earning screen pushes into.
@@ -12,6 +16,21 @@ import '../domain/tree_state.dart';
 /// applies it immediately so the bar moves and leaves unfurl without a second
 /// round trip, and the next fetch reconciles. Both sides run the same level
 /// curve, so they agree.
+
+/// What a studio tap came back with.
+class SaveOutcome {
+  const SaveOutcome.ok() : failed = false, error = null, label = null;
+
+  const SaveOutcome.failed(this.error, this.label) : failed = true;
+
+  final bool failed;
+  final String? error;
+
+  /// "Niveau 8", when the server refused a locked pick.
+  final String? label;
+
+  bool get locked => error == 'ITEM_LOCKED';
+}
 
 class TreeStateNotifier extends AsyncNotifier<TreeState> {
   @override
@@ -38,11 +57,16 @@ class TreeStateNotifier extends AsyncNotifier<TreeState> {
     }
   }
 
-  /// Applies an XP grant returned by an action endpoint.
+  /// Applies an XP grant returned by an action endpoint. A level-up may have
+  /// unlocked an item only the server can confirm, so one follows.
   void applyGrant(XpGrant grant) {
     final current = state.value;
     if (current == null) return;
     state = AsyncData(current.applyGrant(grant));
+    // A plain unawaited call, not `Future(...)`: that would schedule a Timer,
+    // and a Timer left pending when a screen is torn down is a test failure
+    // (and a wasted wake-up) for nothing.
+    if (grant.levelledUp) unawaited(refresh());
   }
 
   /// Called when the celebration for [level] has been shown.
@@ -72,6 +96,65 @@ class TreeStateNotifier extends AsyncNotifier<TreeState> {
     } catch (_) {
       // Cosmetic; the next toggle retries the write.
     }
+  }
+
+  /// Optimistic write of the studio choice: the stage repaints at once, the
+  /// server answers with the resolved block, and a refusal rolls back.
+  Future<SaveOutcome> _write(
+    Map<String, Object?> body,
+    TreeState Function(TreeState current)? optimistic,
+  ) async {
+    final before = state.value;
+    if (before != null && optimistic != null) {
+      state = AsyncData(optimistic(before));
+    }
+    final repository = ref.read(levensboomRepositoryProvider);
+    final result = await repository.patchAvatar(body);
+    final tree = result.tree;
+    if (tree != null) {
+      final current = state.value ?? before;
+      if (current != null) {
+        final merged = current.mergeTree(tree);
+        state = AsyncData(merged);
+        await repository.cache(merged);
+      }
+      return const SaveOutcome.ok();
+    }
+    if (before != null && optimistic != null) state = AsyncData(before);
+    return SaveOutcome.failed(result.error, result.label);
+  }
+
+  Future<SaveOutcome> setAvatar(AvatarChoice next) {
+    return _write(next.toJson(), (current) => current.copyWith(chosen: next, avatar: next));
+  }
+
+  /// Onboarding's "Planten": species plus the planted marker.
+  Future<SaveOutcome> plant(TreeSpecies species) {
+    return _write(
+      {'species': kSpeciesIds[species], 'planted': true, 'introSeen': true},
+      (current) => current.copyWith(
+        chosen: current.chosen.copyWith(species: species),
+        avatar: current.avatar.copyWith(species: species),
+        planted: true,
+        introSeen: true,
+      ),
+    );
+  }
+
+  Future<void> markIntroSeen() async {
+    await _write({'introSeen': true}, (current) => current.copyWith(introSeen: true));
+  }
+
+  Future<void> markItemsSeen(List<String> keys) async {
+    if (keys.isEmpty) return;
+    await _write(
+      {'seenItems': keys},
+      (current) => current.copyWith(seenItems: {...current.seenItems, ...keys}),
+    );
+  }
+
+  Future<SaveOutcome> setPublicProfile(bool value) {
+    return _write({'publicProfile': value}, (current) => current.copyWith(publicProfile: value));
   }
 }
 
@@ -117,3 +200,14 @@ final pendingLevelUpProvider = Provider.autoDispose<int?>((ref) {
   if (tree == null || tree.disabled) return null;
   return tree.shouldCelebrate ? tree.level : null;
 });
+
+/// Onboarding's species pick, held here so the wizard's finish step can read
+/// it after the page that set it has gone.
+class PlantChoice extends Notifier<TreeSpecies> {
+  @override
+  TreeSpecies build() => kDefaultSpecies;
+
+  void set(TreeSpecies species) => state = species;
+}
+
+final plantChoiceProvider = NotifierProvider<PlantChoice, TreeSpecies>(PlantChoice.new);
