@@ -348,11 +348,14 @@ TreeFrame measureTreeFrame(
     );
   }
 
-  // The scene: the earth band is at least a tenth of the frame, and the trunk
-  // base sits just below its top edge so the tree stands in the ground rather
-  // than on a line above it - which is what the first pass drew.
-  final scale = math.min((width * 0.92) / contentW, (height * 0.82) / treeH);
-  final band = math.max(height * 0.1, kGroundPad * scale);
+  // The scene: a fixed earth band (never scaled from the tree, which for a
+  // kiem swallowed the whole frame), a minimum framed extent so a small tree
+  // stands small in a real landscape, and the trunk base just below the band's
+  // top edge so the tree stands in the ground rather than on a line above it.
+  final band = height * 0.12;
+  final sceneW = math.max(contentW, kMinSceneWidth);
+  final sceneH = math.max(treeH, kMinSceneHeight);
+  final scale = math.min((width * 0.9) / sceneW, ((height - band) * 0.84) / sceneH);
   final groundTop = height - band;
   final pivotY = groundTop + 0.6 * scale;
   final originX = width / 2 - ((minX + maxX) / 2) * scale;
@@ -954,19 +957,19 @@ class TreePainter extends CustomPainter {
       case LeafShape.almond:
         path.addOval(Rect.fromCenter(center: Offset(size * 0.65, 0), width: size * 2.3, height: size * 0.84));
       case LeafShape.needle:
-        // A tuft of three needles; a single stroke at avatar sizes.
-        final length = size * 1.5;
-        final fan = scale > 1.6 ? const [-26.0, 0.0, 26.0] : const [0.0];
+        // A tuft of needles; a single stroke at avatar sizes.
+        final length = size * 1.6;
+        final fan = scale > 1.6 ? const [-40.0, -20.0, 0.0, 20.0, 40.0] : const [0.0];
         for (final a in fan) {
           path
             ..moveTo(0, 0)
             ..lineTo(math.cos(a * _deg) * length, math.sin(a * _deg) * length);
         }
       case LeafShape.frond:
-        final length = size * 2.6;
-        final w = size * 0.55;
+        final length = size * 3.2;
+        final w = size * 0.42;
         final tipX = length + down.dx * length * 0.18;
-        final tipY = down.dy * length * 0.22;
+        final tipY = down.dy * length * 0.26;
         path
           ..moveTo(0, -w)
           ..quadraticBezierTo(length * 0.55, -w * 0.7 + tipY * 0.3, tipX, tipY)
@@ -1023,9 +1026,20 @@ class TreePainter extends CustomPainter {
             ..strokeWidth = math.max(0.5, size * 0.08);
           canvas.drawLine(
             Offset.zero,
-            Offset(size * (shape == LeafShape.frond ? 2.3 : 1.5), 0),
+            Offset(size * (shape == LeafShape.frond ? 2.9 : 1.5), 0),
             rib,
           );
+          // Leaflets either side of the rib, where there is room to see them.
+          if (shape == LeafShape.frond && scale > 1.4) {
+            final length = size * 3.2;
+            rib.strokeWidth = math.max(0.5, size * 0.06);
+            for (var k = 1; k <= 6; k++) {
+              final at = k / 7 * length;
+              final reach = size * 0.9 * (1 - k / 9);
+              canvas.drawLine(Offset(at, 0), Offset(at + reach * 0.55, -reach), rib);
+              canvas.drawLine(Offset(at, 0), Offset(at + reach * 0.55, reach), rib);
+            }
+          }
         }
       }
       canvas.restore();

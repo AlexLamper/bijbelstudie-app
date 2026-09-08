@@ -38,6 +38,8 @@ import 'package:bijbelstudie_mobile/features/onboarding/present/tour_controller.
 import 'package:bijbelstudie_mobile/features/onboarding/present/tour_overlay.dart';
 import 'package:bijbelstudie_mobile/features/profile/data/profile_model.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_provider.dart';
+import 'package:bijbelstudie_mobile/features/profile/present/badge_medallion.dart';
+import 'package:bijbelstudie_mobile/features/profile/present/badges_screen.dart';
 import 'package:bijbelstudie_mobile/features/profile/present/profile_screen.dart';
 import 'package:bijbelstudie_mobile/features/settings/data/reading_settings.dart';
 import 'package:bijbelstudie_mobile/features/settings/present/settings_screen.dart';
@@ -474,6 +476,20 @@ void main() {
     await scrollThrough(tester);
     // Guideline 5.1.1(v): deletion must be reachable in-app.
     expect(find.text('Account verwijderen'), findsOneWidget);
+  });
+
+  testWidgets('badges screen renders both shelves and opens a badge', (tester) async {
+    await pumpAtPhoneSize(tester, const BadgesScreen());
+
+    expectNoLayoutError(tester);
+    expect(find.text('Nog te behalen'), findsOneWidget);
+    expect(find.byType(BadgeMedallion), findsWidgets);
+
+    // A tile opens the badge's own sheet with its description.
+    await tester.tap(find.byType(BadgeMedallion).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expectNoLayoutError(tester);
   });
 
   testWidgets('settings renders the reader controls', (tester) async {

@@ -41,6 +41,7 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     // An email the keyboard has "helpfully" capitalized is a different string
     // to the server, which matches the address as stored. Autocorrect can also
     // rewrite a domain mid-typing.

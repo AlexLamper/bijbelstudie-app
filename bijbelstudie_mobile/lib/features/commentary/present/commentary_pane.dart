@@ -344,6 +344,7 @@ class _VerseLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -434,6 +435,7 @@ class _OriginalVerseBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(

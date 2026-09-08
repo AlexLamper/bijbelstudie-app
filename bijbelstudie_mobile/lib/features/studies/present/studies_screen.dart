@@ -544,6 +544,7 @@ class _TopicTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final accent = selected ? AppTheme.teal : AppTheme.rule;
     return Material(
       color: selected ? AppTheme.tealTint : AppTheme.paperRaised,

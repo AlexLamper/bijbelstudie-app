@@ -412,6 +412,7 @@ class _TourCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final isLast = index == total - 1;
 
     return AppCard(

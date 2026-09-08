@@ -23,6 +23,14 @@ const double kTrunkX = 50;
 
 /// How much earth the bounds include under the ground line.
 const double kGroundPad = 8;
+
+/// The smallest extent a scene framing shows, in tree units - a kiem stands
+/// small in a real landscape instead of filling the stage. See generate.ts.
+const double kMinSceneHeight = 26;
+const double kMinSceneWidth = 34;
+
+/// Fruit hangs from a leaf but must not inherit a frond's or a fig leaf's size.
+const double kMaxFruitSize = 1.6;
 const double _deg = math.pi / 180;
 
 /// Hard stop on the recursion, checked before any random draw so it cannot
@@ -275,15 +283,21 @@ TreeScene generateTree({
         if (i == 1) {
           // The leader keeps going up; that is the whole cedar silhouette.
           raw = endAngle + jitter * 0.35;
-          childLen = len * 0.72;
+          childLen = len * 0.78;
           childWidth = width * 0.72;
           childLeader = true;
         } else {
           // Side branches go out nearly flat, longer near the ground.
-          raw = endAngle + t * (spread + 40) + jitter;
-          childLen = len * sp.childLenRatio * (0.55 + 0.45 * (1 - depth / maxDepth));
-          childWidth = width * 0.55;
+          raw = endAngle + t * (spread + 42) + jitter;
+          childLen = len * 0.62 * (1 - 0.55 * (depth / maxDepth));
+          childWidth = width * 0.5;
         }
+      } else if (sp.form == TreeForm.conical) {
+        // A tier keeps going outward with only a slight fan, so the cedar
+        // reads as layered shelves rather than as a second crown.
+        raw = endAngle + t * spread * 0.55 + jitter * 0.6;
+        childLen = len * 0.66;
+        childWidth = width * 0.66;
       } else {
         raw = endAngle + t * spread + jitter;
         childLen = len * sp.childLenRatio;
@@ -434,7 +448,9 @@ TreeScene generateTree({
     final stride = math.max(1, highest.length ~/ wanted);
     for (var i = 0; i < wanted; i++) {
       final leaf = highest[math.min(highest.length - 1, i * stride)];
-      fruits.add(Ornament(x: leaf.x, y: leaf.y, size: leaf.size, index: i));
+      fruits.add(
+        Ornament(x: leaf.x, y: leaf.y, size: math.min(leaf.size, kMaxFruitSize), index: i),
+      );
     }
   }
 

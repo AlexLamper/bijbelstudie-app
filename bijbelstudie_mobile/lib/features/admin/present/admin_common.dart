@@ -105,6 +105,7 @@ class AdminMetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final accent = tint ?? AppTheme.teal;
     return AppCard(
       radius: AppTheme.radiusMd,
@@ -208,6 +209,7 @@ class AdminSeriesChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final accent = tint ?? AppTheme.teal;
     final total = series.fold<int>(0, (sum, point) => sum + point.count);
     final peak = series.fold<int>(0, (max, p) => p.count > max ? p.count : max);

@@ -339,6 +339,7 @@ class _ColorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

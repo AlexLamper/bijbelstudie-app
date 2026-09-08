@@ -1,0 +1,176 @@
+import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
+import 'package:bijbelstudie_mobile/core/theme/app_theme.dart';
+import 'package:bijbelstudie_mobile/features/levensboom/present/levensboom_providers.dart';
+import 'package:bijbelstudie_mobile/features/study/domain/lesson_models.dart';
+import 'package:bijbelstudie_mobile/features/study/present/lesson/lesson_complete_card.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// The end of a lesson: the tree that grew, what was earned, and the way on.
+///
+/// Pumped in both themes because every colour on it is a theme token, and on a
+/// phone-tall surface so the whole card - down to the buttons - is laid out.
+void main() {
+  LessonPayload lesson({bool last = false}) {
+    return LessonPayload.fromJson({
+      'study': {'id': 'opstanding', 'title': 'De opstanding', 'lessonsTotal': 4},
+      'lesson': {'day': 2, 'title': 'Het lege graf', 'estimatedMinutes': 15},
+      'steps': ['intro', 'word', 'depth', 'reflection', 'quiz'],
+      'passage': {
+        'book': 'Johannes',
+        'chapter': 20,
+        'verseRange': '1-18',
+        'verseStart': 1,
+        'verseEnd': 18,
+      },
+      'translation': 'nbg51',
+      'translations': [
+        {'id': 'nbg51', 'name': 'NBG 1951', 'language': 'nl'},
+      ],
+      'commentaryId': 'dachsel',
+      'content': {
+        'intro': {'headline': 'Hoi', 'body': []},
+        'depth': {'showMedia': false},
+        'reflection': {'question': 'Wat raakt je hier?', 'prompts': []},
+        'quiz': {'enabled': true, 'questionCount': 5},
+      },
+      'outline': [
+        {'day': 1, 'title': 'Les 1', 'reference': 'Johannes 19', 'completed': true},
+        {'day': 2, 'title': 'Het lege graf', 'reference': 'Johannes 20:1-18', 'completed': false},
+        {'day': 3, 'title': 'Aan het meer', 'reference': 'Johannes 21', 'completed': false},
+      ],
+      if (!last) 'nextLessonDay': 3,
+    });
+  }
+
+  Future<void> pump(
+    WidgetTester tester, {
+    required CompletionSummary summary,
+    ThemeData? theme,
+    bool last = false,
+    int? quizScore,
+    int? quizTotal,
+  }) async {
+    tester.view.physicalSize = const Size(420, 1700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [treeStateProvider.overrideWith(PreviewTreeNotifier.new)],
+        child: MaterialApp(
+          theme: theme ?? AppTheme.lightTheme,
+          home: Scaffold(
+            body: LessonCompleteCard(
+              lesson: lesson(last: last),
+              summary: summary,
+              quizScore: quizScore,
+              quizTotal: quizTotal,
+            ),
+          ),
+        ),
+      ),
+    );
+    // Fixed pumps rather than `pumpAndSettle`: the tree keeps its ambient sway
+    // clock running, so the frame never settles. A second is past the growth
+    // bar's animation.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  for (final (name, theme) in [
+    ('light', AppTheme.lightTheme),
+    ('dark', AppTheme.darkTheme),
+  ]) {
+    testWidgets('a first completion shows the growth, the figures and the way on ($name)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        theme: theme,
+        summary: const CompletionSummary(
+          recorded: true,
+          studyCompleted: false,
+          xpAwarded: 25,
+          nextLessonDay: 3,
+        ),
+        quizScore: 4,
+        quizTotal: 5,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Je boom groeide'), findsOneWidget);
+      expect(find.text('+25 XP'), findsOneWidget);
+      expect(find.text('Les 2 van 4 afgerond'), findsOneWidget);
+      expect(find.text('Het lege graf'), findsOneWidget);
+      expect(find.text('4/5'), findsOneWidget);
+      expect(find.text('15 min'), findsOneWidget);
+      expect(find.text('Voortgang in deze studie'), findsOneWidget);
+      expect(find.text('2 van 4'), findsOneWidget);
+      expect(find.text('Aan het meer'), findsOneWidget);
+      expect(find.text('Verder met les 3'), findsOneWidget);
+      expect(find.text('Overzicht'), findsOneWidget);
+    });
+  }
+
+  testWidgets('a lesson read again says so and claims no growth', (tester) async {
+    await pump(
+      tester,
+      summary: const CompletionSummary(
+        recorded: false,
+        reason: 'ALREADY_RECORDED',
+        studyCompleted: false,
+        nextLessonDay: 3,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Les 2 van 4 opnieuw gelezen'), findsOneWidget);
+    expect(find.text('Deze les telde al mee'), findsOneWidget);
+    expect(find.text('Telde al mee'), findsOneWidget);
+    expect(find.text('Je boom groeide'), findsNothing);
+    expect(find.textContaining('XP verdiend'), findsNothing);
+    // Without a quiz score the second figure is what was read.
+    expect(find.text('Gelezen'), findsOneWidget);
+  });
+
+  testWidgets('a level-up names the new level', (tester) async {
+    await pump(
+      tester,
+      summary: const CompletionSummary(
+        recorded: true,
+        studyCompleted: false,
+        xpAwarded: 40,
+        levelledUp: true,
+        newBadges: ['volhouder'],
+        nextLessonDay: 3,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Nieuw niveau'), findsOneWidget);
+    expect(find.text('volhouder'), findsOneWidget);
+    expect(find.textContaining('Je boom groeide naar niveau'), findsOneWidget);
+  });
+
+  testWidgets('the last lesson of a study leads back to the study', (tester) async {
+    await pump(
+      tester,
+      last: true,
+      summary: const CompletionSummary(
+        recorded: true,
+        studyCompleted: true,
+        xpAwarded: 25,
+        noteId: 'note-9',
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Studie afgerond'), findsOneWidget);
+    expect(find.text('De opstanding'), findsOneWidget);
+    expect(find.text('Je reflectie is bewaard als notitie'), findsOneWidget);
+    expect(find.text('Terug naar de studie'), findsOneWidget);
+    expect(find.textContaining('Verder met les'), findsNothing);
+  });
+}

@@ -26,6 +26,7 @@ class VersionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final foreground = selected ? AppTheme.lapis : AppTheme.inkSoft;
 
     return Semantics(
@@ -75,6 +76,7 @@ class LanguageSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Semantics(
       header: true,
       label: '$label, $count vertalingen',

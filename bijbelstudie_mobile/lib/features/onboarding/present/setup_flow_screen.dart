@@ -380,6 +380,7 @@ class _SamplePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return AppCard(
       child: Text(
         'In den beginne schiep God den hemel en de aarde.',

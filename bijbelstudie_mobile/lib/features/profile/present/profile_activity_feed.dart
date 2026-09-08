@@ -178,6 +178,7 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final name = profile.name.trim().isEmpty ? 'Jij' : profile.name.trim();
     final at = entry.at;
 
@@ -335,6 +336,7 @@ class _StudyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final study = entry.study!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,6 +376,7 @@ class _BadgeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final tint = badge.definition.tone.color;
     return Row(
       children: [
@@ -416,6 +419,7 @@ class _InteractionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Row(
       children: [
         Icon(Icons.favorite_border, size: 17, color: AppTheme.inkFaint),
@@ -537,6 +541,7 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final name = profile.name.trim();
     final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
     final image = profile.image?.trim();

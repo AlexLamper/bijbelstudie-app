@@ -21,6 +21,7 @@ class EnvironmentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final label = AppConfig.environmentLabel;
     if (label == null) return child;
 

@@ -114,11 +114,76 @@ class LessonCursor {
     required this.viewTranslation,
     required this.depthPanel,
     required this.reflectionText,
+    this.previouslyCompleted = false,
     this.summary,
   });
 
+  /// Where a lesson opens, seeded from what the server saved about it.
+  ///
+  /// A lesson still in progress resumes where it was left: on the step `?stap=`
+  /// names, else on the saved cursor, else on the first step - with the steps
+  /// the server has as done lit in the rail. The background screen has no
+  /// server key and is never in that list, so it counts as walked once the
+  /// reader is at or past Verdieping, which is the only way to get there.
+  ///
+  /// A lesson the server has on record as *finished* opens as a new run: from
+  /// the first step (or the one asked for), with nothing lit. Its saved
+  /// `stepsCompleted` describe the previous run, and painting them over a rail
+  /// whose reader is on step 1 says "you are starting" and "you are done" at
+  /// once - and lights every step except the client-only one. The rail then
+  /// shows this run only; [previouslyCompleted] keeps every step open to jump
+  /// to, because the reading is not being skipped, it was done.
+  factory LessonCursor.seed({
+    required LessonPayload lesson,
+    required LessonState state,
+    String? initialStep,
+  }) {
+    final steps = lesson.steps;
+    final redo = state.isCompleted;
+    final fromUrl = StudyStep.tryFromId(initialStep);
+    final saved = state.currentStep;
+    final start =
+        [
+          if (fromUrl != null && steps.contains(fromUrl)) fromUrl,
+          if (!redo && saved != null && steps.contains(saved)) saved,
+          if (steps.isNotEmpty) steps.first,
+        ].firstOrNull ??
+        StudyStep.word;
+
+    final completed = <LessonSlot>{};
+    if (!redo) {
+      completed.addAll(
+        state.stepsCompleted.where(steps.contains).map(LessonSlot.of),
+      );
+      // Being at or past Verdieping means the background screen before it has
+      // been walked, whether or not it turns out to exist in this rail.
+      final depth = steps.indexOf(StudyStep.depth);
+      if (depth >= 0 &&
+          (completed.contains(const LessonSlot.of(StudyStep.depth)) ||
+              steps.indexOf(start) >= depth)) {
+        completed.add(const LessonSlot.context());
+      }
+    }
+
+    return LessonCursor(
+      slot: LessonSlot.of(start),
+      completed: completed,
+      previouslyCompleted: redo,
+      viewTranslation: state.viewTranslation ?? lesson.translation,
+      depthPanel: state.depthPanel ?? 'media',
+      reflectionText: state.reflectionText,
+    );
+  }
+
   final LessonSlot slot;
+
+  /// The slots walked in *this* run. Never seeded from a finished lesson.
   final Set<LessonSlot> completed;
+
+  /// The server already had this lesson as finished when it was opened: the
+  /// reader is going through it again. Every step is fair to jump to, and the
+  /// completing write will come back as already recorded.
+  final bool previouslyCompleted;
 
   /// The translation being read right now - the lesson's own, until switched.
   final String viewTranslation;
@@ -147,6 +212,7 @@ class LessonCursor {
     return LessonCursor(
       slot: slot ?? this.slot,
       completed: completed ?? this.completed,
+      previouslyCompleted: previouslyCompleted,
       viewTranslation: viewTranslation ?? this.viewTranslation,
       depthPanel: depthPanel ?? this.depthPanel,
       reflectionText: reflectionText ?? this.reflectionText,

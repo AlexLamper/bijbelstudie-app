@@ -26,6 +26,7 @@ import '../../features/levensboom/present/levensboom_tab_icon.dart';
 import '../../features/levensboom/present/studio/levensboom_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
+import '../../features/profile/present/badges_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
 import '../../features/resources/present/resources_screen.dart';
 import '../../features/search/present/search_screen.dart';
@@ -178,6 +179,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final color = active ? AppTheme.teal : AppTheme.inkMuted;
     return Semantics(
       button: true,
@@ -284,6 +286,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile/boom',
             builder: (context, state) => const LevensboomStudioScreen(),
           ),
+          // The badge cabinet, reached from the card on Profiel. Nested for the
+          // same reason: it is the account's own collection, not a section.
+          GoRoute(
+            path: '/profile/badges',
+            builder: (context, state) => const BadgesScreen(),
+          ),
           // Reachable from the dashboard and Profiel rather than the tab bar.
           GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
           // Groepen is out for the MVP. The route stays as a redirect so any
@@ -384,6 +392,7 @@ class _RouteNotFound extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Scaffold(
       backgroundColor: AppTheme.paper,
       body: SafeArea(

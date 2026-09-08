@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/config/revenuecat_config.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';
@@ -496,6 +499,22 @@ class PremiumController extends Notifier<PremiumState> {
   /// restore. So we actively ask the server to reconcile against RevenueCat,
   /// then refresh the profile. We retry briefly to ride out store propagation.
   Future<void> _syncServerPremium() async {
+    try {
+      await _reconcileServerPremium();
+    } finally {
+      // The server equips the gold ring the moment an account becomes Pro -
+      // it is the standard for Pro, written by /api/v1/sync-premium and the
+      // RevenueCat webhook. The tree state was fetched before the purchase, so
+      // refetch it and the ring shows now rather than on the next launch. A
+      // read only: the app never writes the ring itself, the server is the
+      // truth. Unawaited on purpose, the same way applyGrant does it.
+      if (ref.mounted) {
+        unawaited(ref.read(treeStateProvider.notifier).refresh());
+      }
+    }
+  }
+
+  Future<void> _reconcileServerPremium() async {
     final repo = ref.read(profileRepositoryProvider);
     for (var attempt = 0; attempt < 5; attempt++) {
       final synced = await repo.syncPremium();

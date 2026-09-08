@@ -7,12 +7,15 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../dashboard/present/dashboard_providers.dart';
 import '../../levensboom/present/levensboom_avatar.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import '../domain/profile_stats.dart';
+import 'badge_medallion.dart';
 import 'profile_activity_feed.dart';
 import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
@@ -61,7 +64,12 @@ class ProfileScreen extends ConsumerWidget {
                     onPressed: () => ref.invalidate(profileProvider),
                   ),
                 ),
-          data: (profile) => _ProfileBody(profile: profile),
+          data: (profile) => RefreshIndicator(
+            color: AppTheme.teal,
+            backgroundColor: AppTheme.paperRaised,
+            onRefresh: () => _refresh(ref),
+            child: _ProfileBody(profile: profile),
+          ),
         ),
       ),
     );
@@ -71,6 +79,30 @@ class ProfileScreen extends ConsumerWidget {
   /// as a transport failure.
   static bool _signedOut(Object error) =>
       error is DioException && error.response?.statusCode == 401;
+
+  /// Pull-to-refresh: every request the body reads from is repeated together,
+  /// and the spinner stays up until the last one lands rather than the first.
+  ///
+  /// Failures are swallowed here on purpose. Each provider keeps its own error
+  /// state and the widget reading it already shows that; a rejected future
+  /// would only surface again as an unhandled exception from the indicator.
+  static Future<void> _refresh(WidgetRef ref) async {
+    Future<void> quiet(Future<Object?> request) async {
+      try {
+        await request;
+      } catch (_) {}
+    }
+
+    await Future.wait<void>([
+      quiet(ref.refresh(profileProvider.future)),
+      quiet(ref.refresh(dashboardProvider.future)),
+      quiet(ref.refresh(notesListProvider.future)),
+      quiet(ref.refresh(highlightsListProvider.future)),
+      quiet(ref.refresh(bookmarksProvider.future)),
+      // The tree's own refresh keeps what is on screen if the fetch fails.
+      ref.read(treeStateProvider.notifier).refresh(),
+    ]);
+  }
 }
 
 class _ProfileBody extends ConsumerWidget {
@@ -82,6 +114,9 @@ class _ProfileBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+      // Always scrollable, so the pull-to-refresh around it works on a body
+      // that happens to be shorter than the screen.
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         _HeaderBar(profile: profile),
         const SizedBox(height: 14),
@@ -233,11 +268,19 @@ class _ProfileHeader extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                name,
-                style: AppTheme.displayMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      name,
+                      style: AppTheme.displayMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  _RenameButton(profile: profile),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
@@ -291,65 +334,40 @@ class _ProfileHeader extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 16),
-        _AvatarWithEdit(profile: profile),
+        // The picture is the Levensboom, which falls back to the initials
+        // avatar while the tree loads or when the reader has switched it off.
+        // Nothing sits on top of it: the rename control is beside the name.
+        LevensboomAvatar(
+          size: 84,
+          fallback: ProfileAvatar(profile: profile, size: 84),
+        ),
       ],
     );
   }
 }
 
-/// The avatar with its edit badge.
+/// The rename control, beside the name it changes.
 ///
-/// The picture itself is the Levensboom, which falls back to the initials
-/// avatar while the tree loads or when the reader has switched it off.
-///
-/// The badge carries a pencil rather than a camera on purpose: `PATCH /me`
-/// takes a name and reading preferences and there is no image-upload endpoint
-/// anywhere in `/api/v1`, so the control opens the profile edit that really
-/// exists instead of a picker that could never save anything.
-class _AvatarWithEdit extends ConsumerWidget {
-  const _AvatarWithEdit({required this.profile});
+/// A pencil rather than a camera, and next to the name rather than on the
+/// avatar, on purpose: `PATCH /me` takes a name and reading preferences and
+/// there is no image-upload endpoint anywhere in `/api/v1`, so the control
+/// opens the profile edit that really exists - and sits by the field it edits
+/// instead of over a picture it could never change.
+class _RenameButton extends ConsumerWidget {
+  const _RenameButton({required this.profile});
 
   final ProfileModel profile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SizedBox(
-      width: 92,
-      height: 92,
-      child: Stack(
-        children: [
-          LevensboomAvatar(
-            size: 84,
-            fallback: ProfileAvatar(profile: profile, size: 84),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Material(
-              color: AppTheme.teal,
-              shape: CircleBorder(
-                side: BorderSide(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  width: 2,
-                ),
-              ),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => showProfileNameDialog(context, ref, profile),
-                child: const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: Icon(
-                    Icons.edit_outlined,
-                    size: 15,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return IconButton(
+      tooltip: 'Naam wijzigen',
+      icon: const Icon(Icons.edit_outlined, size: 16),
+      color: AppTheme.inkSoft,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      visualDensity: VisualDensity.compact,
+      onPressed: () => showProfileNameDialog(context, ref, profile),
     );
   }
 }
@@ -468,6 +486,13 @@ class _QuickCard extends StatelessWidget {
 }
 
 /// The badge shelf: how many are unlocked, then the shelf itself.
+/// The badge cabinet's front: the first few medallions, the tally, and the way
+/// in to the rest ([BadgesScreen] at `/profile/badges`).
+///
+/// Earned medallions lead, then whatever is nearest to done - the order
+/// [BadgeCatalog.resolve] hands out - so a new account sees a row of grey
+/// discs waiting to be filled rather than an empty card. The whole card is the
+/// tap target; the "Bekijk alle badges" line says where it goes.
 class _BadgesCard extends ConsumerWidget {
   const _BadgesCard();
 
@@ -475,148 +500,150 @@ class _BadgesCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final badges = ref.watch(profileBadgesProvider);
     final unlocked = badges.where((badge) => badge.unlocked).length;
+    final pending = badges.where((badge) => !badge.unlocked);
+    final next = pending.isEmpty ? null : pending.first;
+
+    final String footer;
+    if (badges.isEmpty) {
+      footer = 'Nog niets te tonen';
+    } else if (next == null) {
+      footer = 'Alles behaald';
+    } else {
+      footer =
+          'Volgende: ${next.definition.label} '
+          '(${next.value}/${next.definition.target})';
+    }
 
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      onTap: () => context.push('/profile/badges'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppTheme.teal.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.military_tech_outlined,
-                    size: 20,
-                    color: AppTheme.teal,
-                  ),
-                ),
+          Row(
+            children: [
+              Expanded(
+                child: badges.isEmpty
+                    ? Text(
+                        'Zodra je voortgang is geladen, verschijnen je '
+                        'badges hier.',
+                        style: AppTheme.bodyMuted,
+                      )
+                    : _BadgeCluster(badges: badges),
+              ),
+              if (badges.isNotEmpty) ...[
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Badges', style: AppTheme.metaLabel),
-                      const SizedBox(height: 2),
-                      Text(
-                        badges.isEmpty
-                            ? 'Nog niets te tonen'
-                            : '$unlocked van ${badges.length} behaald',
-                        style: AppTheme.caption.copyWith(
-                          color: AppTheme.inkFaint,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$unlocked',
+                      style: AppTheme.statNumber.copyWith(fontSize: 24),
+                    ),
+                    Text(
+                      'van ${badges.length}',
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.inkFaint,
                       ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '$unlocked',
-                  style: AppTheme.statNumber.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                    ),
+                  ],
                 ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (badges.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Text(
-                'Zodra je voortgang is geladen, verschijnen je badges hier.',
-                style: AppTheme.bodyMuted,
+          const SizedBox(height: 14),
+          const RuleLine(),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  footer,
+                  style: AppTheme.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            )
-          else
-            SizedBox(
-              height: 108,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(right: 16),
-                itemCount: badges.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) =>
-                    _BadgeTile(badge: badges[index]),
+              const SizedBox(width: 12),
+              Text(
+                'Bekijk alle badges',
+                style: AppTheme.caption.copyWith(
+                  color: AppTheme.teal,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+              const SizedBox(width: 3),
+              Icon(Icons.chevron_right, size: 14, color: AppTheme.teal),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-/// One badge on the shelf, with the progress line underneath it.
-class _BadgeTile extends StatelessWidget {
-  const _BadgeTile({required this.badge});
+/// The first medallions, overlapping like coins laid out on a table - the
+/// leftmost on top - with a "+n" disc for the ones that did not fit.
+class _BadgeCluster extends StatelessWidget {
+  const _BadgeCluster({required this.badges});
 
-  final BadgeProgress badge;
+  final List<BadgeProgress> badges;
+
+  /// How many discs the row holds; the last one turns into "+n" when needed.
+  static const int _slots = 5;
+  static const double _size = 46;
+
+  /// Distance between medallion centres; the rest of each disc overlaps.
+  static const double _step = 34;
 
   @override
   Widget build(BuildContext context) {
-    final tint = badge.definition.tone.color;
-    final earned = badge.unlocked;
+    final scheme = Theme.of(context).colorScheme;
+    final overflow = badges.length > _slots
+        ? badges.length - (_slots - 1)
+        : 0;
+    final shown = overflow > 0 ? badges.take(_slots - 1).toList() : badges;
+    final slots = shown.length + (overflow > 0 ? 1 : 0);
 
-    return Tooltip(
-      message: badge.definition.description,
+    return Align(
+      alignment: Alignment.centerLeft,
       child: SizedBox(
-        width: 76,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        width: _size + (slots - 1) * _step,
+        height: _size,
+        child: Stack(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: earned
-                    ? tint.withValues(alpha: 0.14)
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: earned ? tint.withValues(alpha: 0.4) : AppTheme.rule,
+            if (overflow > 0)
+              Positioned(
+                left: shown.length * _step,
+                child: Container(
+                  width: _size,
+                  height: _size,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.surfaceContainerHighest,
+                    border: Border.all(color: scheme.surface, width: 2),
+                  ),
+                  child: Text(
+                    '+$overflow',
+                    style: AppTheme.bodyStrong.copyWith(
+                      fontSize: 12,
+                      color: AppTheme.inkMuted,
+                    ),
+                  ),
                 ),
               ),
-              child: Icon(
-                badge.definition.icon,
-                size: 24,
-                color: earned ? tint : AppTheme.inkFaint,
+            // Painted right to left, so each medallion lies over its neighbour.
+            for (var i = shown.length - 1; i >= 0; i--)
+              Positioned(
+                left: i * _step,
+                child: BadgeMedallion(
+                  badge: shown[i],
+                  size: _size,
+                  outline: scheme.surface,
+                  lock: false,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              badge.definition.label,
-              style: AppTheme.caption.copyWith(
-                fontWeight: FontWeight.w600,
-                color: earned ? null : AppTheme.inkMuted,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            SiteProgressBar(
-              value: badge.fraction,
-              height: 3,
-              color: earned ? tint : AppTheme.inkFaint,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              badge.unlocked ? 'Behaald' : badge.progressLabel,
-              style: AppTheme.caption.copyWith(
-                fontSize: 10,
-                color: AppTheme.inkFaint,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
           ],
         ),
       ),
@@ -630,25 +657,30 @@ class _BadgesSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SkeletonCard(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Skeleton.circle(40),
-              SizedBox(width: 12),
-              Expanded(child: Skeleton(height: 12, width: 100)),
+              Skeleton.circle(46),
+              SizedBox(width: 6),
+              Skeleton.circle(46),
+              SizedBox(width: 6),
+              Skeleton.circle(46),
+              SizedBox(width: 6),
+              Skeleton.circle(46),
+              Spacer(),
+              Skeleton(height: 24, width: 32),
             ],
           ),
-          SizedBox(height: 18),
+          SizedBox(height: 14),
+          Skeleton(height: 1, radius: 0),
+          SizedBox(height: 10),
           Row(
             children: [
-              Skeleton.circle(52),
-              SizedBox(width: 12),
-              Skeleton.circle(52),
-              SizedBox(width: 12),
-              Skeleton.circle(52),
+              Expanded(child: Skeleton(height: 12, width: 150)),
+              Skeleton(height: 12, width: 110),
             ],
           ),
         ],

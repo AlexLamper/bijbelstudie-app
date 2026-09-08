@@ -214,6 +214,7 @@ class _VersionSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     // A single sunken fill against the raised sheet, with the app's shared
     // input border/radius/focus ring from `inputDecorationTheme`. No wrapper
     // Container: that used to stack a second (card-coloured) themed fill and a

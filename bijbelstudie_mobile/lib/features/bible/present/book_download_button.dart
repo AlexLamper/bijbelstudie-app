@@ -222,6 +222,7 @@ class BookOfflineStatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final status = this.status;
     if (status == null || status.isEmpty) {
       return Text(

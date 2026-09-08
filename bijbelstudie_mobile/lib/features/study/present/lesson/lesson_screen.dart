@@ -13,6 +13,8 @@ import '../../../../core/ui/skeleton.dart';
 import '../../../ai/present/ai_assistant_pane.dart';
 import '../../../dashboard/data/dashboard_repository.dart';
 import '../../../dashboard/present/dashboard_providers.dart';
+import '../../../levensboom/present/levensboom_celebration.dart';
+import '../../../levensboom/present/levensboom_providers.dart';
 import '../../../settings/data/notification_prefs.dart';
 import '../../../settings/data/reading_settings.dart';
 import '../../../studies/data/enrollment_models.dart';
@@ -83,31 +85,20 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   void _seed(LessonPayload lesson, LessonState state) {
     if (_cursor != null) return;
 
-    final steps = lesson.steps;
-    final fromUrl = StudyStep.tryFromId(widget.initialStep);
-    final step =
-        [
-          if (fromUrl != null && steps.contains(fromUrl)) fromUrl,
-          if (state.currentStep != null && steps.contains(state.currentStep))
-            state.currentStep!,
-          if (steps.isNotEmpty) steps.first,
-        ].firstOrNull ??
-        StudyStep.word;
-
-    _cursor = LessonCursor(
-      slot: LessonSlot.of(step),
-      completed: state.stepsCompleted.map(LessonSlot.of).toSet(),
-      viewTranslation: state.viewTranslation ?? lesson.translation,
-      depthPanel: state.depthPanel ?? 'media',
-      reflectionText: state.reflectionText,
-      summary: null,
+    // A finished lesson opened again starts a fresh run with a clean rail; an
+    // unfinished one resumes where it was left. See [LessonCursor.seed].
+    final cursor = LessonCursor.seed(
+      lesson: lesson,
+      state: state,
+      initialStep: widget.initialStep,
     );
+    _cursor = cursor;
     _commentaryId = lesson.commentaryId;
 
     // The website writes the cursor on open, not on first move, so "waar was
     // ik" is right even for a reader who opens a lesson and puts the phone
     // down. Fire and forget: a failed cursor write must not block the lesson.
-    Future.microtask(() => _bestEffort(currentStep: step));
+    Future.microtask(() => _bestEffort(currentStep: cursor.slot.serverStep));
   }
 
   /// A write whose failure the reader should never see: the step they are on,
@@ -234,6 +225,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         );
       });
 
+      // A level-up is celebrated here, over the tree that just grew, before
+      // anything else asks for attention.
+      await _celebrateLevelUp();
+      if (!mounted) return;
+
       // The permission prompt is earned here, once, after the first finished
       // lesson (RETENTION_PLAN §4.6).
       if (firstEver && !ref.read(retentionStoreProvider).permissionAskedAfterFirstLesson) {
@@ -253,6 +249,31 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
     }
+  }
+
+  /// The level-up moment, when this lesson's XP crossed a level.
+  ///
+  /// The same dialog the profile avatar fires - the app's one celebration for a
+  /// level-up - shown here because this is where the tree that grew is on
+  /// screen. It marks the level seen, so the avatar will not celebrate it again
+  /// later; a level-up earned elsewhere and not yet seen is covered too. The
+  /// summary card underneath shows the resulting tree and stays quiet about it.
+  Future<void> _celebrateLevelUp() async {
+    // Let the summary paint first, so the dialog opens over the tree it is
+    // about rather than over the last step.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final tree = ref.read(treeStateProvider).value;
+    final level = ref.read(pendingLevelUpProvider);
+    if (tree == null || level == null) return;
+    await showLevensboomCelebration(
+      context,
+      ref,
+      seed: tree.seed,
+      level: level,
+      avatar: tree.avatar,
+      reducedMotion: tree.reducedMotion,
+    );
   }
 
   /// The Dutch pre-permission bottom sheet (RETENTION_PLAN §4.6). Shown in-app
@@ -282,7 +303,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             const SizedBox(height: 12),
             Text(
               "We sturen je hooguit één herinnering per dag, op het moment dat "
-              "jij kiest — nooit 's avonds laat, nooit als je die dag al bezig "
+              "jij kiest - nooit 's avonds laat, nooit als je die dag al bezig "
               "bent geweest. Je zet het met één tik weer uit.",
               style: Theme.of(sheetContext).textTheme.bodyMedium,
             ),
@@ -537,7 +558,9 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             // Forward jumps are only allowed into ground already covered,
             // otherwise the rail becomes a way to skip the reading.
             final target = slots.indexOf(slot);
-            if (cursor.completed.contains(slot) || target <= index) {
+            if (cursor.previouslyCompleted ||
+                cursor.completed.contains(slot) ||
+                target <= index) {
               _goToSlot(slot);
             }
           },
@@ -775,6 +798,7 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.paperRaised,
@@ -868,6 +892,7 @@ class _StepRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       color: AppTheme.paperRaised,
@@ -897,7 +922,8 @@ class _StepRail extends StatelessWidget {
                             : AppTheme.inkFaint,
                       ),
                       maxLines: 1,
-                      overflow: TextOverflow.clip,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -931,6 +957,7 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.paperRaised,
@@ -987,6 +1014,7 @@ class _NavigatorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return RuleListTile(
       onTap: locked ? null : onTap,
       child: Row(

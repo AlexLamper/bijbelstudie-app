@@ -3,11 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../levensboom/domain/tree_state.dart';
+import '../../levensboom/present/levensboom_providers.dart';
 import '../../studies/data/enrollment_models.dart';
 import '../domain/lesson_models.dart';
 
 final lessonRepositoryProvider = Provider((ref) {
-  return LessonRepository(ref.watch(apiClientProvider));
+  return LessonRepository(
+    ref.watch(apiClientProvider),
+    // The XP a finished lesson earns grows the Levensboom the moment the
+    // completing write returns - the same bus the streak and notes use.
+    onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+  );
 });
 
 /// A lesson could not be read or written.
@@ -32,9 +39,13 @@ class LessonException implements Exception {
 /// `StudyFlowShell` does. One writer means the step cursor, the reflection and
 /// the completion flag can never disagree about what the reader last did.
 class LessonRepository {
-  LessonRepository(this._apiClient);
+  LessonRepository(this._apiClient, {XpSink? onXp}) : _onXp = onXp;
 
   final ApiClient _apiClient;
+
+  /// Forwards the `xp` object of a completing write to the Levensboom. See
+  /// [XpSink]. Null in tests and wherever no tree is listening.
+  final XpSink? _onXp;
 
   /// The lesson itself: steps, passage, translation, commentary and prose.
   Future<LessonPayload> getLesson(String studyId, int day) async {
@@ -98,6 +109,10 @@ class LessonRepository {
 
       final data = response.data as Map<String, dynamic>;
       final completion = data['completion'];
+
+      // Exactly what the website's `StudyFlowShell` does with `completion.xp`:
+      // hand it to the tree, which ignores a grant of nothing (a repeat).
+      if (completion is Map<String, dynamic>) _onXp?.call(completion['xp']);
 
       return LessonPatchResult(
         state: data['state'] is Map<String, dynamic>

@@ -62,6 +62,7 @@ class StudyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     if (study.image.trim().isEmpty) return _painted();
     return ServerImage(imagePath: study.image, fallback: _painted());
   }

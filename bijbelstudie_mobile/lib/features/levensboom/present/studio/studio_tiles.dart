@@ -234,6 +234,7 @@ class _Thumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     if (item.kind == ItemKind.ring) {
       final gold = item.id == 'goud';
       return Container(

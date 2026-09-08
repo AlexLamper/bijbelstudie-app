@@ -1,6 +1,7 @@
 import 'package:bijbelstudie_mobile/features/studies/data/enrollment_models.dart';
 import 'package:bijbelstudie_mobile/features/studies/data/study_models.dart';
 import 'package:bijbelstudie_mobile/features/study/domain/lesson_models.dart';
+import 'package:bijbelstudie_mobile/features/study/present/lesson/lesson_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The guided study flow is almost all server-resolved, so what matters on the
@@ -9,7 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 /// silent drift in either shows up as a lesson that will not open or progress
 /// that never saves.
 void main() {
-  group('lesson payload', () {
     Map<String, dynamic> payload({
       Map<String, dynamic>? intro,
       List<String> steps = const ['intro', 'word', 'depth', 'reflection', 'quiz'],
@@ -46,6 +46,7 @@ void main() {
       };
     }
 
+  group('lesson payload', () {
     test('reads the steps the server sent, in order', () {
       final lesson = LessonPayload.fromJson(payload(intro: {'headline': 'Hoi', 'body': []}));
 
@@ -109,6 +110,116 @@ void main() {
     });
   });
 
+  // Where a lesson opens and what its rail shows as done. The seed is the one
+  // place saved server state becomes rail state, so a redo that leaks the
+  // previous run into the rail can only come from here.
+  group('lesson cursor', () {
+    LessonPayload lesson() =>
+        LessonPayload.fromJson(payload(intro: {'headline': 'Hoi', 'body': []}));
+    const all = ['intro', 'word', 'depth', 'reflection', 'quiz'];
+    const finished = '2026-09-01T09:00:00.000Z';
+
+    test('a lesson never opened starts on the first step with nothing lit', () {
+      final cursor = LessonCursor.seed(lesson: lesson(), state: const LessonState());
+
+      expect(cursor.slot, const LessonSlot.of(StudyStep.intro));
+      expect(cursor.completed, isEmpty);
+      expect(cursor.previouslyCompleted, isFalse);
+    });
+
+    test('an unfinished lesson resumes where it was left, background screen included', () {
+      final state = LessonState.fromJson({
+        'stepsCompleted': ['intro', 'word'],
+        'currentStep': 'depth',
+      });
+      final cursor = LessonCursor.seed(lesson: lesson(), state: state);
+
+      expect(cursor.slot, const LessonSlot.of(StudyStep.depth));
+      // The server has no key for the background screen, but being on
+      // Verdieping means it was walked.
+      expect(cursor.completed, {
+        const LessonSlot.of(StudyStep.intro),
+        const LessonSlot.of(StudyStep.word),
+        const LessonSlot.context(),
+      });
+      expect(cursor.previouslyCompleted, isFalse);
+    });
+
+    test('the background screen is not lit before the reader has reached it', () {
+      final state = LessonState.fromJson({
+        'stepsCompleted': ['intro'],
+        'currentStep': 'word',
+      });
+      final cursor = LessonCursor.seed(lesson: lesson(), state: state);
+
+      expect(cursor.completed, {const LessonSlot.of(StudyStep.intro)});
+    });
+
+    test('a finished lesson opened again starts a clean run on step one', () {
+      // The bug as it looked: "stap 1 van 6" with every server step lit
+      // around a grey background screen, because the previous run's
+      // stepsCompleted were painted over a rail whose reader was at the start.
+      final state = LessonState.fromJson({
+        'stepsCompleted': all,
+        'currentStep': 'done',
+        'completedAt': finished,
+      });
+      final cursor = LessonCursor.seed(lesson: lesson(), state: state);
+
+      expect(cursor.slot, const LessonSlot.of(StudyStep.intro));
+      expect(cursor.completed, isEmpty);
+      expect(cursor.previouslyCompleted, isTrue);
+    });
+
+    test('a finished lesson ignores its saved cursor but honours ?stap=', () {
+      final state = LessonState.fromJson({
+        'stepsCompleted': all,
+        'currentStep': 'quiz',
+        'completedAt': finished,
+      });
+
+      expect(
+        LessonCursor.seed(lesson: lesson(), state: state).slot,
+        const LessonSlot.of(StudyStep.intro),
+      );
+
+      final asked = LessonCursor.seed(
+        lesson: lesson(),
+        state: state,
+        initialStep: 'reflection',
+      );
+      expect(asked.slot, const LessonSlot.of(StudyStep.reflection));
+      expect(asked.completed, isEmpty);
+      expect(asked.previouslyCompleted, isTrue);
+    });
+
+    test('?stap= wins over the saved cursor for an unfinished lesson too', () {
+      final state = LessonState.fromJson({
+        'stepsCompleted': ['intro', 'word'],
+        'currentStep': 'depth',
+      });
+      final cursor = LessonCursor.seed(lesson: lesson(), state: state, initialStep: 'word');
+
+      expect(cursor.slot, const LessonSlot.of(StudyStep.word));
+      // Not on Verdieping yet in this sitting, so the background screen is not
+      // presumed walked either.
+      expect(cursor.completed, {
+        const LessonSlot.of(StudyStep.intro),
+        const LessonSlot.of(StudyStep.word),
+      });
+    });
+
+    test('a step named in ?stap= that this lesson lacks is ignored', () {
+      final cursor = LessonCursor.seed(
+        lesson: LessonPayload.fromJson(payload(steps: const ['word', 'reflection'])),
+        state: const LessonState(),
+        initialStep: 'quiz',
+      );
+
+      expect(cursor.slot, const LessonSlot.of(StudyStep.word));
+    });
+  });
+
   group('lesson state', () {
     test('reads the saved cursor, reflection and quiz score', () {
       final state = LessonState.fromJson({
@@ -150,7 +261,8 @@ void main() {
       final summary = CompletionSummary.fromJson(const {
         'recorded': true,
         'studyCompleted': false,
-        'xp': {'awarded': 25, 'levelledUp': true, 'badges': ['volhouder']},
+        // The server's key is `newBadges`; the older `badges` still reads.
+        'xp': {'awarded': 25, 'levelledUp': true, 'newBadges': ['volhouder']},
         'noteId': 'note-9',
         'nextLessonDay': 3,
       });

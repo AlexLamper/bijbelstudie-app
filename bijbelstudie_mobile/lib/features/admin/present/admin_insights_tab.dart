@@ -289,6 +289,7 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     return AppCard(
       child: Text(
         text,
