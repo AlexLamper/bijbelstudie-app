@@ -365,7 +365,14 @@ void main() {
             return MaterialApp.router(
               theme: AppTheme.lightTheme,
               routerConfig: router,
-              builder: (context, child) => TourHost(child: child ?? const SizedBox.shrink()),
+              // The Start tab now carries ambient motion (the daily verse's
+              // sky drifts), and `pumpAndSettle` never settles while an
+              // animation is running. Asking for reduced motion is what the
+              // platform switch does, and every animated widget honours it.
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: TourHost(child: child ?? const SizedBox.shrink()),
+              ),
             );
           },
         ),

@@ -82,7 +82,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/images/daytext/
   fonts:
     # Body / UI face used on www.bijbelstudie.io (--font-sans).
     - family: Inter

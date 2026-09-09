@@ -93,6 +93,14 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
         'Les {lesson}. Lees zo ver als je komt.'),
   ],
   NotifType.streakAtRisk: [
+    // The picture carries "Nog 3 uur" as pixels, which do not grow with the OS
+    // font size; these two say it in words as well, so nothing is image-only
+    // (`AVATAR_NOTIFICATIONS_PLAN.md` §11). They fall through to the rest of
+    // the pool on a device where the hours cannot be resolved.
+    VariantTemplate('ar9', 'Nog {hours} uur vandaag',
+        'Eén korte les houdt je reeks van {streak} dagen heel.'),
+    VariantTemplate('ar10', 'Je reeks van {streak} dagen',
+        'Nog {hours} uur om vandaag af te maken. Een paar minuten is genoeg.'),
     VariantTemplate('ar1', 'Je bent {streak} dagen bezig',
         'Nog even vandaag en de reeks blijft heel. Eén korte les is genoeg.'),
     VariantTemplate('ar2', 'Nog tijd voor vandaag',
@@ -190,6 +198,10 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
   // has to threaten. The server pool in `lib/notificationCopy.ts` overrides
   // these when `GET /notifications/copy?type=tree_wilting` has been fetched.
   NotifType.treeWilting: [
+    // The name is spent only here, on milestones and on the win-back nudges
+    // (D12): on a daily reminder it would wear out in a week.
+    VariantTemplate('tw5', '{name}, je boom mist wat licht',
+        'Twee dagen zonder lezen. Een paar verzen en hij staat er weer fris bij.'),
     VariantTemplate('tw1', 'Je boom mist wat licht',
         'Twee dagen zonder lezen. Een paar verzen en hij staat er weer fris bij.'),
     VariantTemplate('tw2', 'Je boom wacht op je',
@@ -200,6 +212,8 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
         'Je boom veert op zodra je weer leest. Geen haast.'),
   ],
   NotifType.dormant: [
+    VariantTemplate('dm8', '{name}, je boom staat er nog',
+        'Een paar dagen stil. Eén hoofdstuk laat hem weer opveren.'),
     VariantTemplate('dm1', 'Een paar dagen niet langs geweest',
         'Je {study} ligt klaar bij {lesson}. Kom gerust weer even.'),
     VariantTemplate('dm2', 'Het is een weekje stil',

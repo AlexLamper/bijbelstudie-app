@@ -105,32 +105,35 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 
+  // One optical family across all five: every active icon is the "_rounded"
+  // filled variant of its outlined twin, and no two destinations share a
+  // metaphor (house / open book / graduation cap / pencil-on-notes / person).
   static const List<_NavItemData> _items = [
     _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard', 'nav-dashboard'),
     _NavItemData(
-      Icons.auto_stories_outlined,
-      Icons.auto_stories,
+      Icons.menu_book_outlined,
+      Icons.menu_book_rounded,
       'Bijbel',
       '/study',
       TourAnchorIds.navStudy,
     ),
     _NavItemData(
       Icons.school_outlined,
-      Icons.school,
+      Icons.school_rounded,
       'Studies',
       '/studies',
       TourAnchorIds.navStudies,
     ),
     _NavItemData(
-      Icons.sticky_note_2_outlined,
-      Icons.sticky_note_2,
+      Icons.edit_note_outlined,
+      Icons.edit_note_rounded,
       'Notities',
       '/notes',
       TourAnchorIds.navNotes,
     ),
     _NavItemData(
       Icons.person_outline,
-      Icons.person,
+      Icons.person_rounded,
       'Profiel',
       '/profile',
       TourAnchorIds.navProfile,

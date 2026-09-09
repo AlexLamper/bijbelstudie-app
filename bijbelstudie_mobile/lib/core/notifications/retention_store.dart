@@ -23,6 +23,7 @@ class RetentionState {
     this.completionsByWeek = const {},
     this.localStreak = 0,
     this.serverStreakSeen = 0,
+    this.completionsEver = 0,
     this.graceUsedDay,
     this.tzName,
     this.sentLog = const {},
@@ -42,6 +43,12 @@ class RetentionState {
 
   final int localStreak;
   final int serverStreakSeen;
+
+  /// Every completion ever recorded - a finished lesson or a chapter claimed as
+  /// read. Drives the earned permission moments
+  /// (`AVATAR_NOTIFICATIONS_PLAN.md` §7); never reset.
+  final int completionsEver;
+
   final String? graceUsedDay;
   final String? tzName;
 
@@ -63,6 +70,7 @@ class RetentionState {
     Map<String, List<String>>? completionsByWeek,
     int? localStreak,
     int? serverStreakSeen,
+    int? completionsEver,
     String? graceUsedDay,
     bool clearGrace = false,
     String? tzName,
@@ -78,6 +86,7 @@ class RetentionState {
       completionsByWeek: completionsByWeek ?? this.completionsByWeek,
       localStreak: localStreak ?? this.localStreak,
       serverStreakSeen: serverStreakSeen ?? this.serverStreakSeen,
+      completionsEver: completionsEver ?? this.completionsEver,
       graceUsedDay: clearGrace ? null : (graceUsedDay ?? this.graceUsedDay),
       tzName: tzName ?? this.tzName,
       sentLog: sentLog ?? this.sentLog,
@@ -149,6 +158,7 @@ class RetentionStore extends Notifier<RetentionState> {
         completionsByWeek: _decodeMap(prefs.getString('${_kPrefix}completionsByWeek')),
         localStreak: prefs.getInt('${_kPrefix}localStreak') ?? 0,
         serverStreakSeen: prefs.getInt('${_kPrefix}serverStreakSeen') ?? 0,
+        completionsEver: prefs.getInt('${_kPrefix}completionsEver') ?? 0,
         graceUsedDay: prefs.getString('${_kPrefix}graceUsedDayKey'),
         tzName: prefs.getString('${_kPrefix}tzName'),
         sentLog: _decodeMap(prefs.getString('${_kPrefix}sentLog')),
@@ -198,6 +208,7 @@ class RetentionStore extends Notifier<RetentionState> {
           '${_kPrefix}completionsByWeek', jsonEncode(next.completionsByWeek));
       await prefs.setInt('${_kPrefix}localStreak', next.localStreak);
       await prefs.setInt('${_kPrefix}serverStreakSeen', next.serverStreakSeen);
+      await prefs.setInt('${_kPrefix}completionsEver', next.completionsEver);
       await prefs.setString('${_kPrefix}graceUsedDayKey', next.graceUsedDay ?? '');
       await prefs.setString('${_kPrefix}tzName', next.tzName ?? '');
       await prefs.setString('${_kPrefix}sentLog', jsonEncode(next.sentLog));
@@ -283,6 +294,7 @@ class RetentionStore extends Notifier<RetentionState> {
       lastCompletionDay: rewind ? last : d,
       completionsByWeek: byWeek,
       localStreak: rewind ? state.localStreak : streak,
+      completionsEver: state.completionsEver + 1,
     ));
   }
 

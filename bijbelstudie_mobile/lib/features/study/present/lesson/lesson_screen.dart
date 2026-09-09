@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/notifications/notification_scheduler.dart';
-import '../../../../core/notifications/notification_service.dart';
+import '../../../../core/notifications/permission_moment.dart';
 import '../../../../core/notifications/retention_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
@@ -15,7 +15,6 @@ import '../../../dashboard/data/dashboard_repository.dart';
 import '../../../dashboard/present/dashboard_providers.dart';
 import '../../../levensboom/present/levensboom_celebration.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
-import '../../../settings/data/notification_prefs.dart';
 import '../../../settings/data/reading_settings.dart';
 import '../../../studies/data/enrollment_models.dart';
 import '../../../studies/data/enrollment_repository.dart';
@@ -232,8 +231,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
       // The permission prompt is earned here, once, after the first finished
       // lesson (RETENTION_PLAN §4.6).
-      if (firstEver && !ref.read(retentionStoreProvider).permissionAskedAfterFirstLesson) {
-        await _askForNotifications();
+      if (firstEver) {
+        await maybeAskForNotifications(context, ref, PermissionMoment.firstLesson);
       }
       // A just-earned milestone is celebrated in-app rather than as a push.
       if (!mounted) return;
@@ -274,75 +273,6 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       avatar: tree.avatar,
       reducedMotion: tree.reducedMotion,
     );
-  }
-
-  /// The Dutch pre-permission bottom sheet (RETENTION_PLAN §4.6). Shown in-app
-  /// before the OS dialog; a "Nu niet" only sets the guard, it never re-prompts.
-  Future<void> _askForNotifications() async {
-    final retention = ref.read(retentionStoreProvider.notifier);
-    await retention.markPermissionAsked();
-    if (!mounted) return;
-
-    final wants = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          8,
-          24,
-          24 + MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Wil je een rustig zetje op je studiedag?',
-                style: Theme.of(sheetContext).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Text(
-              "We sturen je hooguit één herinnering per dag, op het moment dat "
-              "jij kiest - nooit 's avonds laat, nooit als je die dag al bezig "
-              "bent geweest. Je zet het met één tik weer uit.",
-              style: Theme.of(sheetContext).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(false),
-                    child: const Text('Nu niet'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(true),
-                    child: const Text('Herinner me'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (wants != true) return;
-    final granted =
-        await ref.read(notificationServiceProvider).requestPermission();
-    if (granted) {
-      await ref.read(notificationPrefsProvider.notifier).setMasterEnabled(true);
-      await ref
-          .read(notificationPrefsProvider.notifier)
-          .setStudyReminder(enabled: true);
-    }
-    await ref
-        .read(notificationPrefsProvider.notifier)
-        .setPendingPermissionRequest(false);
-    ref.invalidate(notificationRecomputeProvider);
   }
 
   Future<void> _celebrate(String title, String body) {

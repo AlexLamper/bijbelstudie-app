@@ -184,7 +184,7 @@ class _PaneSwitcher extends StatelessWidget {
             ),
             button(
               label: 'Studie',
-              icon: Icons.chat_bubble_outline,
+              icon: Icons.article_outlined,
               active: showMaterials,
               onTap: () => onChanged(true),
             ),

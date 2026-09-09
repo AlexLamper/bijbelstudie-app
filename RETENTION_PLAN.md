@@ -297,6 +297,12 @@ priority, keeps the first non-`dailyVerse`/`milestone` one for that day, cancels
 
 ### 4.6 Permission-request timing
 
+> **Extended by `AVATAR_NOTIFICATIONS_PLAN.md` §7.** The one ask below is now
+> offered at whichever earned moment lands first - first finished lesson, third
+> chapter read, or a second day in a row - through
+> `core/notifications/permission_moment.dart`. Still never in onboarding, still
+> only once.
+
 **Do not ask on first launch and do not ask in the onboarding wizard.**
 
 - `setup_flow_screen.dart` step 3: stop calling `service.requestPermission()`. Keep the
@@ -343,6 +349,11 @@ name / streak locally).
 ---
 
 ## 5. Copy (Dutch)
+
+> The picture each of these carries - the tree, the streak, the countdown - is
+> `AVATAR_NOTIFICATIONS_PLAN.md` §4. New lines since: `ar9`/`ar10` say the
+> remaining hours in words (burned pixels do not scale with the OS font size),
+> and `tw5`/`dm8` spend the reader's name on the win-backs.
 
 Tone: warm, calm, second person, scripture-flavoured where it lands naturally, **never**
 "je verliest", "laatste kans", "nog X uur", "je hebt gefaald". Tokens:

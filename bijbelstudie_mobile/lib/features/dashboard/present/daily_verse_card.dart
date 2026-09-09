@@ -7,6 +7,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
+import '../../levensboom/domain/verse_scene.dart';
+import '../../levensboom/present/verse_scene_backdrop.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_repository.dart';
@@ -150,7 +152,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final version = verse == null ? fallback!.version : _versionLabel(verse);
     final liked = memory.isLiked(reference);
     final verseNumber = verse?.verse ?? fallback?.verse;
-    final photo = dailyVersePhoto(DateTime.now());
+    final scene = verseSceneForDay(DateTime.now());
 
     // Tapping the photo opens the same card full screen. The action buttons on
     // top of it keep their own taps: a tap recognizer nested inside this one
@@ -158,7 +160,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _openExpanded(
-        photo: photo,
+        scene: scene,
         text: text,
         reference: reference,
         version: version,
@@ -174,7 +176,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             child: _VerseFace(
-              photo: photo,
+              scene: scene,
               text: text,
               reference: reference,
               version: version,
@@ -202,7 +204,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   /// never reach the corners, and it appears with a scale-and-fade of its own
   /// that has nothing to do with where the card was.
   Future<void> _openExpanded({
-    required String photo,
+    required VerseScene scene,
     required String text,
     required String reference,
     required String version,
@@ -222,7 +224,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
         transitionDuration: const Duration(milliseconds: 340),
         reverseTransitionDuration: const Duration(milliseconds: 280),
         pageBuilder: (routeContext, _, _) => _ExpandedVerseScreen(
-          photo: photo,
+          scene: scene,
           text: text,
           reference: reference,
           version: version,
@@ -308,7 +310,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
 /// scrolls in full, and in the extra actions the modal has room to spell out.
 class _VerseFace extends StatelessWidget {
   const _VerseFace({
-    required this.photo,
+    required this.scene,
     required this.text,
     required this.reference,
     required this.version,
@@ -322,7 +324,7 @@ class _VerseFace extends StatelessWidget {
     this.onClose,
   });
 
-  final String photo;
+  final VerseScene scene;
   final String text;
   final String reference;
   final String version;
@@ -347,7 +349,7 @@ class _VerseFace extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(photo, fit: BoxFit.cover),
+        VerseSceneBackdrop(verse: scene),
 
         // Colours from here down sit on top of a photograph, so they are
         // literal white/black rather than theme tokens: the scrim has to
@@ -599,7 +601,7 @@ Widget dailyVerseFlightShuttle(
 /// watches the store itself.
 class _ExpandedVerseScreen extends ConsumerStatefulWidget {
   const _ExpandedVerseScreen({
-    required this.photo,
+    required this.scene,
     required this.text,
     required this.reference,
     required this.version,
@@ -608,7 +610,7 @@ class _ExpandedVerseScreen extends ConsumerStatefulWidget {
     required this.onHistory,
   });
 
-  final String photo;
+  final VerseScene scene;
   final String text;
   final String reference;
   final String version;
@@ -664,7 +666,7 @@ class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
             tag: dailyVerseHeroTag,
             flightShuttleBuilder: dailyVerseFlightShuttle,
             child: _VerseFace(
-              photo: widget.photo,
+              scene: widget.scene,
               text: widget.text,
               reference: widget.reference,
               version: widget.version,
@@ -992,172 +994,4 @@ class _HistorySheet extends ConsumerWidget {
 String _dayLabel(String date) {
   final parsed = DateTime.tryParse(date);
   return parsed == null ? date : dutchLongDate(parsed);
-}
-
-/// 76 nature photographs, one per day, rotating. Unsplash photographs
-/// under the Unsplash License, the photographer named above each one. All are
-/// calm landscapes measured dark enough for white text (mean luminance at most
-/// 0.42, the top-left quadrant at most 0.50). Same set and order as the web's
-/// `lib/dailyVerseStore.ts`, so both show the same picture on the same day.
-const List<String> _photos = [
-  // Erbol Zhakenov - Ducks swimming in a foggy lake at dawn
-  'assets/images/daytext/u-lTz3ko8JvRo.jpg',
-  // Masaaki Komori - body of water under blue sky during sunset
-  'assets/images/daytext/u-0eJcliicVso.jpg',
-  // Sultonbek Ikromov - A view of the night sky with the milky in the distance
-  'assets/images/daytext/u-ULDBQgDVjas.jpg',
-  // Christian Weiss - a person walking across a sandy field in the desert
-  'assets/images/daytext/u-I0BAGzq7ljA.jpg',
-  // Steven Kamenar - photography of tall trees at daytime
-  'assets/images/daytext/u-MMJx78V7xS8.jpg',
-  // Renden Yoder - stars in the sky
-  'assets/images/daytext/u-H4PKDFNpnpg.jpg',
-  // Joshua Gresham - a large rock sitting in the middle of a desert
-  'assets/images/daytext/u--UaeK5K8q8I.jpg',
-  // Rosie Sun - photography of forest
-  'assets/images/daytext/u-1L71sPT5XKc.jpg',
-  // Anthony Cantin - A group of people standing under a night sky filled with stars
-  'assets/images/daytext/u-BBdPwLMwR4I.jpg',
-  // Erik Adair - the night sky with stars and the milky
-  'assets/images/daytext/u-rQ5rs_e0KWE.jpg',
-  // Benjamin Cole - landscape photography of mountain at night
-  'assets/images/daytext/u-DDhET-updco.jpg',
-  // Natalia Gusakova - a body of water with a cloudy sky above it
-  'assets/images/daytext/u-HcGKcMOMJIU.jpg',
-  // Emilio Garcia - a group of pillars sitting on top of a grass covered field
-  'assets/images/daytext/u-n4TbJNSYZZo.jpg',
-  // Iain - Sunset over the ocean with rocky silhouette
-  'assets/images/daytext/u-kR2-44lS4Yk.jpg',
-  // Nidheesh Kavalan - silhouette of mountains under blue sky
-  'assets/images/daytext/u-Ha501MB_XE8.jpg',
-  // Taylor Burnfield - Pine needles with tiny water droplets
-  'assets/images/daytext/u-rJUWeKvVUlA.jpg',
-  // Venti Views - brown mountain under blue sky during night time
-  'assets/images/daytext/u-USnraKKqLR4.jpg',
-  // Jisca Lucia - The sun is shining through the trees in the forest
-  'assets/images/daytext/u--sidLcag5lo.jpg',
-  // Sean Jahansooz - brown rocky mountain under starry night
-  'assets/images/daytext/u-poED7Zsm5n4.jpg',
-  // Diana Rafira - A large body of water under a cloudy sky
-  'assets/images/daytext/u-37Dc9aJ1PeQ.jpg',
-  // Caleb Jack - the night sky is filled with stars and the milky
-  'assets/images/daytext/u-Il12NRG7yRs.jpg',
-  // Arto Marttinen - photo of mountains and sky
-  'assets/images/daytext/u-K2K1Ec_51SA.jpg',
-  // Marishka Tsiklauri - silhouette of mountain under blue sky with stars during night time
-  'assets/images/daytext/u-UPrBQ3sQ6fA.jpg',
-  // Moon Moons - a large body of water under a cloudy sky
-  'assets/images/daytext/u-aMMKzKWlbds.jpg',
-  'assets/images/daytext/1506905925346.jpg',
-  // K T - brown sand under cloudy sky during daytime
-  'assets/images/daytext/u-0tcgMRJKDf8.jpg',
-  // Sudip Saha - lake near trees and mountain during daytime
-  'assets/images/daytext/u-9aomUwLRN5E.jpg',
-  // thomas shellberg - gray mountain at dawn
-  'assets/images/daytext/u-PCCMe3-YQpA.jpg',
-  // Taylor Wright - bare trees on forest during daytime
-  'assets/images/daytext/u-2aSpCOPNyO0.jpg',
-  'assets/images/daytext/1472214103451.jpg',
-  // ELIAS VICARIO - white clouds
-  'assets/images/daytext/u-8mkzC5-jYbE.jpg',
-  // Casey Horner - Half Dome under a starry night sky in Yosemite Valley, United States
-  'assets/images/daytext/u-O0R5XZfKUGQ.jpg',
-  // Štefan Štefančík - silhouette of mountain beside the body of water at night time
-  'assets/images/daytext/u-TPv9dh822VA.jpg',
-  // Fabrizio Conti - Layered blue mountain silhouettes fading into a misty horizon under a clear sky
-  'assets/images/daytext/u-c3wsMnxQZDw.jpg',
-  'assets/images/daytext/1447752875215.jpg',
-  // Frank Thiemonge - a body of water surrounded by mountains under a cloudy sky
-  'assets/images/daytext/u-zL3bJpejvD8.jpg',
-  // Nadia Ivanova - green leaf trees during daytime
-  'assets/images/daytext/u-HEHSE12vXSg.jpg',
-  // Benjamin Voros - snow mountain under stars
-  'assets/images/daytext/u-phIFdC6lA4E.jpg',
-  // Matt Drenth - the night sky with stars and trees silhouetted against a dark blue sky
-  'assets/images/daytext/u-bBSaP-u_BHo.jpg',
-  // Taylor Burnfield - Close-up view of pine tree needles and buds
-  'assets/images/daytext/u-RlazTYhR-uI.jpg',
-  // Jason Mavrommatis - silhouette of mountains during starry night
-  'assets/images/daytext/u-FzURx0rFhUk.jpg',
-  // Jonas Verstuyft - silhouette of mountain under white clouds
-  'assets/images/daytext/u-fa73YB-Vono.jpg',
-  // Sebastian Unrau - trees on forest with sun rays
-  'assets/images/daytext/u-sp-p7uuT0tw.jpg',
-  // Gigin Krishnan - Twilight over a dark lake with silhouetted peaks
-  'assets/images/daytext/u-bFIQVZZxCd8.jpg',
-  // Kyle Glenn - green leafed pine trees
-  'assets/images/daytext/u-SrASYZZpyjw.jpg',
-  // Akhil Lincoln - desert at night
-  'assets/images/daytext/u-dSeQCOh_q7o.jpg',
-  // Benjaminrobyn Jespersen - silhouette photo of mountain during nighttime
-  'assets/images/daytext/u-syhd5N6nceM.jpg',
-  // JOHN TOWNER - aerial photo of brown moutains
-  'assets/images/daytext/u-JgOeRuGD_Y4.jpg',
-  // Erik Adair - the night sky with stars and the milky
-  'assets/images/daytext/u-TkGGO1r07NA.jpg',
-  // Noah Grossenbacher - lighted house in city near glacier mountain at nighttime
-  'assets/images/daytext/u-_7hiYkKVmsk.jpg',
-  // Ben Griffiths - A single glowing light in the distance between dark silhouettes of pine trees
-  'assets/images/daytext/u-l7R85WBKl1c.jpg',
-  // Alexandr Podvalny - landscape photo of mountain during nighttime
-  'assets/images/daytext/u-n_Jb_d8O43Q.jpg',
-  // Thái Duy - looking up at trees and sky
-  'assets/images/daytext/u-OfGa41jQNTM.jpg',
-  // Hugo L. Casanova - a large body of water with a sunset in the background
-  'assets/images/daytext/u--fl6GXZJugQ.jpg',
-  // Jack Prommel - green trees on brown field during daytime
-  'assets/images/daytext/u-nK4VdS1izPw.jpg',
-  // brandon siu - icy mountains under starry night
-  'assets/images/daytext/u-nI7knd5sQfo.jpg',
-  // Colin Watts - a view of the night sky with the milky in the distance
-  'assets/images/daytext/u-eYXrvDWeJWs.jpg',
-  // Iain - Pier extending into ocean under a cloudy sky
-  'assets/images/daytext/u-7VQ1nx3bpwA.jpg',
-  // Didier Bn - water droplets on brown plant stem
-  'assets/images/daytext/u-EO4J_XWPku4.jpg',
-  // Taylor Burnfield - Pine tree branches are visible with water droplets
-  'assets/images/daytext/u-0Tt7DizCW2I.jpg',
-  // Dimitri Kolpakov - brown trees on forest during daytime
-  'assets/images/daytext/u-vGseyazv2VM.jpg',
-  // Emilio Garcia - the night sky is filled with stars and the milky
-  'assets/images/daytext/u-1-zBIr0Cz44.jpg',
-  // Caleb Sebastian - Dark mountains silhouette a lake with a beautiful sunset glow
-  'assets/images/daytext/u-iNF9KBUYaxw.jpg',
-  // Jr Korpa - low-angle photography of trees during night time
-  'assets/images/daytext/u-_OQ8Jc7kBmA.jpg',
-  // Roksolana Zasiadko - Dense evergreen trees emerging from thick grey mist on a mountain slope
-  'assets/images/daytext/u-cf-ZRVtH6kE.jpg',
-  'assets/images/daytext/1441974231531.jpg',
-  // Haseeb Jamil - A snow-covered mountain peak under a dark night sky filled with bright stars
-  'assets/images/daytext/u-3s85IxVDyXE.jpg',
-  // Rachel Loughman - ocean waves crashing on shore during daytime
-  'assets/images/daytext/u-ePOXA9cwxac.jpg',
-  // James Owen - seashore under dark sky
-  'assets/images/daytext/u-dzUtizbjiq4.jpg',
-  // Emilio Garcia - the night sky is filled with stars and milky
-  'assets/images/daytext/u-xaPsGyURv-c.jpg',
-  // Joshua Woroniecki - silhouette of trees under blue sky
-  'assets/images/daytext/u-0289jpHHk0o.jpg',
-  // Phoebe Strafford - worms eye view of fog covered forest
-  'assets/images/daytext/u-EBbP0Wrbmqs.jpg',
-  // Pete Godfrey - green grass near wooden fence during sunset
-  'assets/images/daytext/u-WmMvztKie48.jpg',
-  // Iain - Sunset illuminates rock formations in the ocean
-  'assets/images/daytext/u-vn0Z6-GTtZ4.jpg',
-  // Raghav Yadav - view of mountain at night
-  'assets/images/daytext/u-l7M7_tuqrZI.jpg',
-  // Arturrro - misty forest
-  'assets/images/daytext/u-x48QL8gNYZ8.jpg',
-];
-
-/// The photo behind the card on [date].
-///
-/// Picked from the calendar day rather than at random so it is stable across
-/// rebuilds — the card must not flicker through its backgrounds while the
-/// dashboard scrolls — while still changing from one day to the next.
-String dailyVersePhoto(DateTime date) {
-  final days = DateTime.utc(date.year, date.month, date.day)
-      .difference(DateTime.utc(1970))
-      .inDays;
-  return _photos[days % _photos.length];
 }

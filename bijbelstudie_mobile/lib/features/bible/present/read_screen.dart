@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/preview_config.dart';
 import '../../../core/notifications/notification_scheduler.dart';
+import '../../../core/notifications/permission_moment.dart';
 import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
@@ -229,7 +230,12 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
       unawaited(
         ref.read(retentionStoreProvider.notifier).markCompleted().then(
           (_) {
-            if (mounted) ref.invalidate(notificationRecomputeProvider);
+            if (!mounted) return;
+            ref.invalidate(notificationRecomputeProvider);
+            // The reader who never opens a study still earns the ask here
+            // (`AVATAR_NOTIFICATIONS_PLAN.md` §7). Both moments are no-ops
+            // until they are earned, and the ask is only ever spent once.
+            unawaited(maybeAskAfterReading(context, ref));
           },
           onError: (_) {},
         ),
@@ -603,6 +609,10 @@ class _VerseRow extends ConsumerWidget {
     final location = ref.watch(readerLocationProvider);
     final key = VerseKey(location.book, location.chapter, verse.number);
     final highlight = highlights[key];
+    final noteMarkers = ref.watch(
+      chapterNoteMarkersProvider(ChapterKey(location.book, location.chapter)),
+    );
+    final hasNote = noteMarkers.contains(verse.number);
 
     Widget body = Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -616,9 +626,9 @@ class _VerseRow extends ConsumerWidget {
       child: Text.rich(
         TextSpan(
           children: [
-            if (settings.showVerseNumbers)
+            if (settings.showVerseNumbers) ...[
               TextSpan(
-                text: '${verse.number} ',
+                text: '${verse.number}',
                 style: TextStyle(
                   fontFamily: AppTheme.sansFontName,
                   fontSize: fontSize * 0.62,
@@ -626,6 +636,27 @@ class _VerseRow extends ConsumerWidget {
                   color: AppTheme.inkMuted,
                 ),
               ),
+              // Small, low-contrast marker for a verse that has a note.
+              // Tapping it reuses the same action sheet the long-press on
+              // the verse opens, rather than a second note-viewing flow.
+              if (hasNote)
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: onLongPress,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Icon(
+                        Icons.edit_note,
+                        size: fontSize * 0.68,
+                        color: AppTheme.inkMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              const TextSpan(text: ' '),
+            ],
             TextSpan(text: verse.text),
           ],
         ),
@@ -658,7 +689,9 @@ class _VerseRow extends ConsumerWidget {
     }
 
     return Semantics(
-      label: 'Vers ${verse.number}. ${verse.text}',
+      label: hasNote
+          ? 'Vers ${verse.number}. ${verse.text} Heeft een notitie.'
+          : 'Vers ${verse.number}. ${verse.text}',
       button: true,
       child: InkWell(onLongPress: onLongPress, child: body),
     );

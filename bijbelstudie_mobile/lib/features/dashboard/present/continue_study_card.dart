@@ -8,7 +8,6 @@ import '../../studies/data/study_models.dart';
 import '../../studies/present/studies_providers.dart';
 import '../../studies/present/study_banner.dart';
 import '../data/dashboard_models.dart';
-import 'dashboard_providers.dart';
 
 /// "Waar je gebleven was" (`RETENTION_PLAN.md` §3.2). The most recently active,
 /// unfinished study: cover, title, "les X van Y", a progress bar, and a CTA
@@ -162,48 +161,6 @@ class ContinueStudyCard extends ConsumerWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// The quiet "vandaag nog niet gedaan" chip (§3.3). One line of encouraging
-/// copy, no urgency styling; taps through to the resume target; vanishes the
-/// instant a completion is recorded.
-class NotDoneTodayChip extends ConsumerWidget {
-  const NotDoneTodayChip({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final nudge = ref.watch(homeNudgeProvider);
-    if (nudge == null) return const SizedBox.shrink();
-
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Material(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () => context.push(nudge.route),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.wb_twilight_outlined, size: 15, color: AppTheme.inkMuted),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    nudge.message,
-                    style: AppTheme.caption.copyWith(color: scheme.onSurface),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

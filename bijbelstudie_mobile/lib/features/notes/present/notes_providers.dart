@@ -54,6 +54,41 @@ final highlightIndexProvider = Provider.autoDispose<Map<VerseKey, HighlightColor
   };
 });
 
+/// Identifies a chapter for [chapterNoteMarkersProvider]. Value equality
+/// matters: it is a family key.
+class ChapterKey {
+  const ChapterKey(this.book, this.chapter);
+
+  final String book;
+  final int chapter;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChapterKey && other.book == book && other.chapter == chapter;
+
+  @override
+  int get hashCode => Object.hash(book, chapter);
+}
+
+/// Verse numbers with a note in one chapter, so the reader can mark them
+/// without a lookup through the whole notes list on every row build.
+///
+/// Derived from [notesListProvider] - the same `/notes` list the Notities tab
+/// uses - rather than a dedicated endpoint. Highlights are a different kind
+/// server-side ([highlightsListProvider]), so a highlight-only verse never
+/// shows up here. Because this only watches [notesListProvider], it picks up
+/// a save or delete automatically wherever that provider is already
+/// invalidated (`verse_action_sheet.dart`, `notes_screen.dart`) - nothing
+/// extra to invalidate for the reader to stay in sync.
+final chapterNoteMarkersProvider =
+    Provider.autoDispose.family<Set<int>, ChapterKey>((ref, key) {
+  final notes = ref.watch(notesListProvider).value ?? const <StudyNote>[];
+  return {
+    for (final n in notes)
+      if (n.book == key.book && n.chapter == key.chapter && n.verse != null) n.verse!,
+  };
+});
+
 /// Most recent reading position, for "verder lezen" on the home tab.
 final continueReadingProvider = Provider.autoDispose<ReadingPosition?>((ref) {
   final history = ref.watch(readingHistoryProvider).value;

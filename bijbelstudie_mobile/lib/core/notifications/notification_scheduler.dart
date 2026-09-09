@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -12,6 +13,7 @@ import '../../features/studies/data/enrollment_models.dart';
 import '../../features/studies/data/study_models.dart';
 import '../../features/studies/data/study_plan_store.dart';
 import '../../features/studies/present/studies_providers.dart';
+import 'notification_art.dart';
 import 'notification_copy.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
@@ -356,8 +358,14 @@ class NotificationScheduler {
             type: NotifType.streakAtRisk,
             when: fire,
             deepLink: deepLink,
+            // The hours are burned into the picture too; a template that wants
+            // them and cannot have them falls through to the next in the pool.
             variant: pickVariant(NotifType.streakAtRisk,
-                rotation: now.day, tokens: tokens),
+                rotation: now.day,
+                tokens: {
+                  ...tokens,
+                  'hours': NotificationArt.hoursToMidnight(fire)?.toString(),
+                }),
           ));
         }
       }
@@ -518,10 +526,8 @@ class NotificationScheduler {
           variant: pickVariant(NotifType.treeWilting,
               rotation: now.day, tokens: tokens),
           // The picture is the nudge: the tree as it will look tomorrow, so the
-          // reader sees what one short read keeps.
-          images: tree == null
-              ? null
-              : await renderTreeImages(tree: tree, name: 'wilting', healthOverride: 0.5),
+          // reader sees what one short read keeps. Drawn by [NotificationArt]
+          // in the write loop, so a candidate the ladder drops costs no render.
         ));
       }
     }
@@ -564,16 +570,23 @@ class NotificationScheduler {
       await service.cancelType(type);
     }
 
+    // One art run per recompute: renders lazily, memoises by name, and stops
+    // when its budget is spent (`AVATAR_NOTIFICATIONS_PLAN.md` §3).
+    final art = NotificationArt.of(ref, now: now);
+    unawaited(NotificationArt.sweep(now: now));
+
     for (final c in kept) {
+      final images =
+          c.images ?? await art.forCandidate(c.type, c.when, celebrate: c.immediate);
       if (c.immediate) {
         await service.showNow(c.type, c.variant,
-            deepLink: c.deepLink, slot: c.slot, images: c.images);
+            deepLink: c.deepLink, slot: c.slot, images: images);
       } else {
         final tzWhen = c.when is tz.TZDateTime
             ? c.when as tz.TZDateTime
             : tz.TZDateTime.from(c.when, tz.local);
         await service.scheduleOneShot(c.type, tzWhen, c.variant,
-            deepLink: c.deepLink, slot: c.slot, images: c.images);
+            deepLink: c.deepLink, slot: c.slot, images: images);
       }
       // Optimistic cap bookkeeping: a capped one-shot firing today counts as
       // spent, so no second capped type is added today even across restarts. A
@@ -642,8 +655,8 @@ class NotificationScheduler {
       final service = ref.read(notificationServiceProvider);
       // A milestone carries the grown tree - the thing the streak or badge
       // just did something for.
-      final tree = ref.exists(treeStateProvider) ? ref.read(treeStateProvider).value : null;
-      final images = tree == null ? null : await renderTreeImages(tree: tree, name: 'milestone');
+      final images = await NotificationArt.ofWidget(ref)
+          .forCandidate(NotifType.milestone, DateTime.now());
       await service.showNow(NotifType.milestone, variant, deepLink: '/dashboard', images: images);
     }
     return variant;

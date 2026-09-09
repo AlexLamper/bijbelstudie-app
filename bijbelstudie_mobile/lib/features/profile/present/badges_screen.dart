@@ -48,12 +48,13 @@ class BadgesScreen extends ConsumerWidget {
 
 /// Column sizing shared by the grid and its skeleton: three across on a phone,
 /// more on a tablet, every tile the same height so the rows line up.
-const SliverGridDelegate _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-  maxCrossAxisExtent: 136,
-  mainAxisExtent: 180,
-  mainAxisSpacing: 12,
-  crossAxisSpacing: 12,
-);
+const SliverGridDelegate _gridDelegate =
+    SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 136,
+      mainAxisExtent: 180,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+    );
 
 class _BadgesGrid extends StatelessWidget {
   const _BadgesGrid({required this.badges});
@@ -163,10 +164,7 @@ class _Summary extends ConsumerWidget {
               const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
-                child: Text(
-                  'van $total behaald',
-                  style: AppTheme.bodyMuted,
-                ),
+                child: Text('van $total behaald', style: AppTheme.bodyMuted),
               ),
             ],
           ),
@@ -199,9 +197,13 @@ class _BadgeGridTile extends StatelessWidget {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final earned = badge.unlocked;
+    final tone = badge.definition.tone;
 
     return AppCard(
       padding: const EdgeInsets.fromLTRB(8, 14, 8, 12),
+      // Earned tiles carry a thin wash of their own tone so the shelf reads
+      // at a glance, without tinting the whole card and making the grid busy.
+      borderColor: earned ? tone.color.withValues(alpha: 0.3) : null,
       onTap: () => showBadgeDetailSheet(context, badge),
       child: Column(
         children: [
@@ -222,13 +224,20 @@ class _BadgeGridTile extends StatelessWidget {
           ),
           const Spacer(),
           if (earned)
-            Text(
-              'Behaald',
-              style: AppTheme.caption.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.positive,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, size: 12, color: AppTheme.positive),
+                const SizedBox(width: 4),
+                Text(
+                  'Behaald',
+                  style: AppTheme.caption.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.positive,
+                  ),
+                ),
+              ],
             )
           else
             Padding(
@@ -236,7 +245,7 @@ class _BadgeGridTile extends StatelessWidget {
               child: SiteProgressBar(
                 value: badge.fraction,
                 height: 4,
-                color: badge.definition.tone.color,
+                color: tone.color,
               ),
             ),
         ],

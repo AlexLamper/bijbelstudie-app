@@ -164,10 +164,8 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The quiet "nog niet gedaan" chip, then "Waar je gebleven was"
-              // - a study lesson in progress, or else the last Bible chapter
-              // read. The chip renders nothing when there is nothing to nudge.
-              const NotDoneTodayChip(),
+              // "Waar je gebleven was" - a study lesson in progress, or else
+              // the last Bible chapter read.
               TourAnchor(
                 id: TourAnchorIds.dashboardHero,
                 child: ContinueStudyCard(
