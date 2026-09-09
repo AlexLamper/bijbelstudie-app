@@ -266,7 +266,7 @@ class PreviewData {
   static Widget scope(Widget child) {
     return ProviderScope(
       overrides: [
-        dashboardProvider.overrideWith((ref) async => dashboard),
+        dashboardProvider.overrideWith(PreviewDashboardNotifier.new),
         curatedStudiesProvider.overrideWith((ref) async => curatedStudies),
         // Preview runs in a browser or a test, where there is no sqflite.
         contentCacheProvider.overrideWithValue(null),
@@ -283,7 +283,7 @@ class PreviewData {
         // cannot succeed.
         remoteReaderLocationProvider.overrideWith((ref) async => null),
         dashboardRepositoryProvider.overrideWithValue(const _PreviewDashboardRepository()),
-        profileProvider.overrideWith((ref) async => profile),
+        profileProvider.overrideWith(PreviewProfileNotifier.new),
         notesListProvider.overrideWith((ref) async => notes),
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => const <Bookmark>[]),
@@ -306,6 +306,18 @@ class PreviewData {
 class PreviewTreeNotifier extends TreeStateNotifier {
   @override
   Future<TreeState> build() async => PreviewData.treeState;
+}
+
+/// The Start and Profiel tabs read through notifiers now (they hydrate from a
+/// disk cache before the request lands), so the preview overrides one too.
+class PreviewDashboardNotifier extends DashboardNotifier {
+  @override
+  Future<DashboardData> build() async => PreviewData.dashboard;
+}
+
+class PreviewProfileNotifier extends ProfileNotifier {
+  @override
+  Future<ProfileModel> build() async => PreviewData.profile;
 }
 
 /// Stands in for the real repository so nothing the reader does can reach the

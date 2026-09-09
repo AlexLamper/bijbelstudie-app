@@ -17,13 +17,38 @@ class AuthLocalStorage {
   static const _tokenKey = 'jwt_token';
   static const _refreshKey = 'refresh_token';
 
+  /// The access token, remembered after the first read.
+  ///
+  /// Every request goes through the bearer interceptor, and every one of those
+  /// used to cost a Keychain/KeyStore round trip - a platform-channel call that
+  /// is serialised with every other one. Opening the Start tab fires eight or
+  /// nine requests at once, so the reads alone delayed the *start* of every
+  /// request behind the platform thread. The token is already held in memory by
+  /// Dio for the duration of each request; keeping one copy here changes what
+  /// it costs, not who can reach it.
+  ///
+  /// Writes and deletions go through this class, so the copy cannot go stale:
+  /// [_tokenLoaded] is only true while [_token] is known to match storage.
+  String? _token;
+  bool _tokenLoaded = false;
+
   Future<void> saveToken(String token) async {
+    _token = token;
+    _tokenLoaded = true;
     await _storage.write(key: _tokenKey, value: token);
   }
 
-  Future<String?> getToken() => _read(_tokenKey);
+  Future<String?> getToken() async {
+    if (_tokenLoaded) return _token;
+    final value = await _read(_tokenKey);
+    _token = value;
+    _tokenLoaded = true;
+    return value;
+  }
 
   Future<void> deleteToken() async {
+    _token = null;
+    _tokenLoaded = true;
     await _storage.delete(key: _tokenKey);
   }
 

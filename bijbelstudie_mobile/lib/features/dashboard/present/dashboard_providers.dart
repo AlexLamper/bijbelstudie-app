@@ -1,14 +1,46 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
 
 import '../data/dashboard_models.dart';
 import '../data/dashboard_repository.dart';
 
-final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) {
-  ref.cacheFor();
-  return ref.watch(dashboardRepositoryProvider).getDashboard();
-});
+/// The whole Start tab hangs off this one request, so on a cold start the
+/// reader used to watch a skeleton for as long as the server took.
+///
+/// Now it opens on the last good `/dashboard` payload and swaps in the fresh
+/// one when it arrives - the same trick `TreeStateNotifier` already used for
+/// the Profiel tab's tree. Nothing about what is rendered changes; only when.
+class DashboardNotifier extends AsyncNotifier<DashboardData> {
+  static const _cacheKey = 'dashboard';
+
+  @override
+  Future<DashboardData> build() async {
+    ref.cacheFor();
+    final repository = ref.watch(dashboardRepositoryProvider);
+
+    final cached = await PayloadCache.read(_cacheKey);
+    if (cached != null && state is AsyncLoading) {
+      try {
+        state = AsyncData(DashboardData.fromJson(cached));
+      } catch (_) {
+        // A payload written by an older build of the app. Wait for the network.
+      }
+    }
+
+    final data = await repository.getDashboard();
+    unawaited(PayloadCache.write(_cacheKey, data.raw));
+    return data;
+  }
+}
+
+final dashboardProvider =
+    AsyncNotifierProvider.autoDispose<DashboardNotifier, DashboardData>(
+      DashboardNotifier.new,
+    );
 
 /// The website recomputes its greeting every minute so it stays correct as the
 /// clock rolls over; the app does the same on each build, which is cheaper and

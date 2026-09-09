@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/config/apple_sign_in_config.dart';
 import '../../../core/config/google_sign_in_config.dart';
 import '../data/auth_repository.dart';
+import '../../../core/data/payload_cache.dart';
 import '../../../core/api/api_client.dart';
 import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
@@ -348,6 +349,7 @@ class AuthController extends AsyncNotifier<User?> {
     await repository.logout();
     // Per-account state that lives on the device goes with the session.
     await LevensboomRepository.clearCache();
+    await PayloadCache.clearAll();
 
     if (GoogleSignInConfig.isAvailable) {
       // Never fatal: a user who cannot sign out is far worse than a Google

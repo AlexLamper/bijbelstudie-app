@@ -424,12 +424,12 @@ void main() {
         commentaryChapterProvider.overrideWith(
           (ref, chapterRef) async => commentaryChapter,
         ),
-        profileProvider.overrideWith((ref) async => profile),
+        profileProvider.overrideWith(() => _FixedProfile(profile)),
         notesListProvider.overrideWith((ref) async => notes),
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => bookmarks),
         readingHistoryProvider.overrideWith((ref) async => history),
-        dashboardProvider.overrideWith((ref) async => _dashboard),
+        dashboardProvider.overrideWith(() => _FixedDashboard(_dashboard)),
         dashboardRepositoryProvider.overrideWithValue(
           _StubDashboardRepository(),
         ),
@@ -549,4 +549,18 @@ void main() {
       shot('07-pro', PremiumScreen.new, free: true);
     });
   }
+}
+
+class _FixedProfile extends ProfileNotifier {
+  _FixedProfile(this.value);
+  final ProfileModel value;
+  @override
+  Future<ProfileModel> build() async => value;
+}
+
+class _FixedDashboard extends DashboardNotifier {
+  _FixedDashboard(this.value);
+  final DashboardData value;
+  @override
+  Future<DashboardData> build() async => value;
 }

@@ -175,6 +175,7 @@ class DashboardData {
     required this.badges,
     this.lastRead,
     this.dailyVerse,
+    this.raw,
   });
 
   final String name;
@@ -200,6 +201,12 @@ class DashboardData {
 
   final LastRead? lastRead;
   final DailyVerse? dailyVerse;
+
+  /// The response this was parsed from, kept so the Start tab can be cached to
+  /// disk and rendered on the first frame of a cold start
+  /// (`core/data/payload_cache.dart`). Null for anything built by hand -
+  /// previews, tests - which simply do not get cached.
+  final Map<String, dynamic>? raw;
 
   /// How many of the 66 books have at least one chapter read. Counted against
   /// the canon rather than the map's own keys, so a spelling the fold did not
@@ -244,6 +251,7 @@ class DashboardData {
     final rawProgress = json['readChapters'] as Map<String, dynamic>? ?? const {};
 
     return DashboardData(
+      raw: json,
       name: user['name'] as String? ?? '',
       isPro: user['isPro'] as bool? ?? false,
       streak: (json['streak'] as num?)?.toInt() ?? 0,

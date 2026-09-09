@@ -518,6 +518,17 @@ simplifications found while wiring it up:
 | `lesson_screen.dart`, `read_screen.dart` | both go through `permission_moment.dart` |
 | `pubspec.yaml`, `assets/images/daytext/` | asset line and 76 JPGs (5.1 MB) removed |
 
+### Follow-up: art is not repainted while nothing has changed
+
+`NotificationArt._render` names each file after a fingerprint of everything that
+would make the picture different - seed, level, progress, health, species,
+scene, animal, streak, countdown, celebration - and reuses the file on disk when
+that fingerprint is unchanged. The scheduler runs on every foreground *and*
+every background, so without this each app open repainted a tree and encoded two
+PNGs identical to the ones already cached, competing with the Start tab for the
+same frames. Superseded fingerprints for a kind are deleted as soon as a new one
+is written, so the cache holds one picture per kind rather than one per day.
+
 ### Still open
 
 - **D7 (§10).** The action buttons were left in place. They already existed and

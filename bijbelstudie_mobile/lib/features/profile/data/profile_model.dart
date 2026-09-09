@@ -87,6 +87,11 @@ class ProfileModel {
   final bool isAdmin;
   final ReadingPreferences preferences;
 
+  /// The response this was parsed from, kept so the Profiel tab can be cached
+  /// to disk and rendered on the first frame of a cold start
+  /// (`core/data/payload_cache.dart`). Null for anything built by hand.
+  final Map<String, dynamic>? raw;
+
   const ProfileModel({
     required this.id,
     required this.name,
@@ -97,6 +102,7 @@ class ProfileModel {
     this.proExpiresAt,
     this.isAdmin = false,
     this.preferences = const ReadingPreferences(),
+    this.raw,
   });
 
   /// Pro bought outside the App Store. Apple's multiplatform exception lets
@@ -106,6 +112,7 @@ class ProfileModel {
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
     final expires = json['proExpiresAt'] as String?;
     return ProfileModel(
+      raw: json,
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',

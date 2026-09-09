@@ -286,7 +286,7 @@ void main() {
         ],
       ),
     ),
-    profileProvider.overrideWith((ref) async => profile),
+    profileProvider.overrideWith(() => _FixedProfile(profile)),
     // Profiel leads with the Levensboom; canned so it renders a tree rather
     // than a skeleton that shimmers forever under `pumpAndSettle`.
     treeStateProvider.overrideWith(PreviewTreeNotifier.new),
@@ -296,7 +296,7 @@ void main() {
     readingHistoryProvider.overrideWith((ref) async => history),
     // The preview fixtures already describe a fully-populated account,
     // which is exactly what these render checks need.
-    dashboardProvider.overrideWith((ref) async => PreviewData.dashboard),
+    dashboardProvider.overrideWith(() => _FixedDashboard(PreviewData.dashboard)),
     curatedStudiesProvider.overrideWith((ref) async => PreviewData.curatedStudies),
     // The studies screen also asks the account which lessons are already
     // done. There is no account here, so answer it locally rather than
@@ -776,4 +776,21 @@ void main() {
       expect(find.byType(DashboardScreen), findsOneWidget);
     });
   });
+}
+
+/// The Start and Profiel tabs read through notifiers now, so their canned data
+/// is supplied by one too. `build` returns it straight away, which is what the
+/// old `overrideWith((ref) async => ...)` did.
+class _FixedProfile extends ProfileNotifier {
+  _FixedProfile(this.value);
+  final ProfileModel value;
+  @override
+  Future<ProfileModel> build() async => value;
+}
+
+class _FixedDashboard extends DashboardNotifier {
+  _FixedDashboard(this.value);
+  final DashboardData value;
+  @override
+  Future<DashboardData> build() async => value;
 }
