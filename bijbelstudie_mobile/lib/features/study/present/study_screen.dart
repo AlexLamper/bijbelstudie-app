@@ -184,11 +184,14 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                           // sign Grondtekst is Pro-gated is the paywall you
                           // hit after tapping.
                           if (!isPro) 1: Icons.lock_outline,
-                          // A sparkle in the tab's own teal rather than a
-                          // purple glyph: it is still the one tab with an
-                          // icon, without a second brand colour to explain.
                           4: Icons.auto_awesome,
                         },
+                        // The assistant's sparkle keeps its gold whether the
+                        // tab is selected or not: it is the one tab that is
+                        // metered and Pro-upsold, and the mark is what says
+                        // so before you tap it. The Pro lock on Grondtekst
+                        // has no entry, so it follows its label as before.
+                        leadingIconColors: {4: AppTheme.assistant},
                         // The row runs to both screen edges, so it is inset
                         // back out of the 16px page margin.
                         padding: const EdgeInsets.symmetric(horizontal: 16),

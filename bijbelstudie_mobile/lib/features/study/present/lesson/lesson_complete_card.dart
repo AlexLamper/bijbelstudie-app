@@ -12,7 +12,19 @@ import '../../../levensboom/domain/tree_state.dart';
 import '../../../levensboom/present/levensboom_avatar.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
 import '../../../levensboom/present/tree_view.dart';
+import '../../../profile/domain/profile_stats.dart' show BadgeCatalog;
 import '../../domain/lesson_models.dart';
+
+/// The Dutch label for a raw badge id straight from `xp.newBadges` /
+/// `xp.badges` (`CompletionSummary.fromJson`).
+///
+/// The server hands back ids (`lib/gamification.ts`), not display text - the
+/// same ids [BadgeCatalog] already knows how to name for the badges screen.
+/// An id this build does not recognise still gets a plain Dutch line rather
+/// than the id itself: a coded string on a celebration screen would only add
+/// to a reader's doubt about whether the achievement is real.
+String _newBadgeLabel(String id) =>
+    BadgeCatalog.serverBadges[id]?.label ?? 'Nieuwe badge';
 
 /// What a finished lesson looks like: what it did to the reader's tree, what
 /// it earned, and the way on.
@@ -225,7 +237,8 @@ class LessonCompleteCard extends ConsumerWidget {
             runSpacing: 8,
             children: [
               if (summary.levelledUp) SiteBadge.vermilion('Nieuw niveau'),
-              for (final badge in summary.newBadges) SiteBadge.teal(badge),
+              for (final badge in summary.newBadges)
+                SiteBadge.teal(_newBadgeLabel(badge)),
             ],
           ),
         ),

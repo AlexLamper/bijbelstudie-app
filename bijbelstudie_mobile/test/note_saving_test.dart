@@ -187,6 +187,10 @@ void main() {
 
     expect(find.text('Genesis 1:1'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Alles begint bij God als Schepper.');
+    // "Opslaan" is disabled until the field has content, and the controller's
+    // update reaches that listener a frame after enterText returns. Without
+    // this the tap lands on a still-disabled button and silently does nothing.
+    await tester.pump();
     await tester.tap(find.text('Opslaan'));
     await tester.pumpAndSettle();
 

@@ -22,8 +22,8 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
+import 'chapter_marks_sheet.dart';
 import 'offline_library_sheet.dart';
-import '../../study/present/study_pane_controller.dart';
 import 'reader_chrome.dart';
 import 'reader_header.dart';
 import 'reader_settings_sheet.dart';
@@ -74,6 +74,11 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   /// highlight is still fading. Null the rest of the time.
   int? _pulsingVerse;
   Timer? _pulseTimer;
+
+  /// True between [_scrollToPendingVerse] accepting an anchor and the frame in
+  /// which it clears it, so the anchor is acted on once however many times
+  /// build runs in between.
+  bool _consumingAnchor = false;
 
   GlobalKey _verseKey(String locationKey, int number) {
     if (_verseKeysFor != locationKey) {
@@ -291,13 +296,21 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     final verseNumber = ref.read(pendingVerseAnchorProvider);
     if (verseNumber == null) return;
     if (!chapter.verses.any((v) => v.number == verseNumber)) return;
+    // Called from inside build, and the anchor is watched there, so a second
+    // build before the frame ends would start this over.
+    if (_consumingAnchor) return;
+    _consumingAnchor = true;
 
-    ref.read(pendingVerseAnchorProvider.notifier).set(null);
     final key = '${location.versionId}/${location.book}/${location.chapter}';
     _restoredFor = key;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Cleared here rather than above: this runs during build, where writing
+      // to a provider this widget also watches is a modify-during-build and
+      // Riverpod throws. The frame has ended by the time this fires.
+      _consumingAnchor = false;
       if (!mounted) return;
+      ref.read(pendingVerseAnchorProvider.notifier).set(null);
       final targetContext = _verseKeys[verseNumber]?.currentContext;
       if (targetContext == null) return;
       await Scrollable.ensureVisible(
@@ -378,7 +391,11 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                     error: (error, _) => _ReaderError(error: error),
                     data: (chapter) {
                       _recordChapterOpen(location);
-                      if (ref.read(pendingVerseAnchorProvider) != null) {
+                      // Watched, not read: the chapter-marks sheet sets this
+                      // while this same screen is already on the target
+                      // chapter, so a rebuild has to come from the provider
+                      // itself rather than from a fresh navigation.
+                      if (ref.watch(pendingVerseAnchorProvider) != null) {
                         _scrollToPendingVerse(location, chapter);
                       } else {
                         _restoreScrollIfNeeded(location, positions);
@@ -455,19 +472,17 @@ class _ReaderBar extends ConsumerWidget {
       );
     }
 
-    final showMaterials = ref.watch(
-      studyPaneProvider.select((pane) => pane.showMaterials),
-    );
-
     return Padding(
       padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 10, 16, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Inside `/studie` the screen above owns this row for both panes,
-          // and has already left 6 under it.
+          // and has already left 6 under it. Standalone `/read` IS the
+          // bible, so it never reads `studyPaneProvider` here - see
+          // ReaderTitleBar.embedded.
           if (!embedded)
-            ReaderTitleBar(showMaterials: showMaterials, embedded: false),
+            const ReaderTitleBar(showMaterials: false, embedded: false),
           Padding(
             padding: EdgeInsets.only(top: embedded ? 6 : 12, bottom: 12),
             child: Row(
@@ -500,12 +515,13 @@ class _ReaderBar extends ConsumerWidget {
   }
 }
 
-/// What the reader already has in this chapter, as one teal line.
+/// What the reader already has in this chapter, as one tappable teal line.
 ///
 /// Counts come from the notes and highlights lists the app loads anyway - see
 /// [chapterMarkCountsProvider]. The line disappears when both are zero rather
 /// than announcing "0 notities", which is noise on a chapter nobody has worked
-/// on yet.
+/// on yet. Tapping it opens [showChapterMarksSheet], listing every note and
+/// highlight in this chapter with a way to jump to its verse.
 class _ChapterMarks extends ConsumerWidget {
   const _ChapterMarks({required this.location});
 
@@ -519,40 +535,59 @@ class _ChapterMarks extends ConsumerWidget {
     );
     if (counts.isEmpty) return const SizedBox.shrink();
 
-    return Row(
-      children: [
-        Icon(Icons.edit_note_outlined, size: 15, color: AppTheme.teal),
-        const SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            _plural(counts.notes, 'notitie', 'notities'),
-            style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
-            overflow: TextOverflow.ellipsis,
+    return Semantics(
+      button: true,
+      label: 'Notities en markeringen van ${location.book} ${location.chapter} bekijken',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => showChapterMarksSheet(
+          context,
+          ref,
+          book: location.book,
+          chapter: location.chapter,
+        ),
+        child: Container(
+          height: 36,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(Icons.edit_note_outlined, size: 15, color: AppTheme.teal),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  _plural(counts.notes, 'notitie', 'notities'),
+                  style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (counts.highlights > 0) ...[
+                const SizedBox(width: 7),
+                Container(
+                  width: 3,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AppTheme.ruleStrong,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    _plural(counts.highlights, 'markering', 'markeringen'),
+                    style: AppTheme.pillLabel.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.inkMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 14, color: AppTheme.inkFaint),
+            ],
           ),
         ),
-        if (counts.highlights > 0) ...[
-          const SizedBox(width: 7),
-          Container(
-            width: 3,
-            height: 3,
-            decoration: BoxDecoration(
-              color: AppTheme.ruleStrong,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 7),
-          Flexible(
-            child: Text(
-              _plural(counts.highlights, 'markering', 'markeringen'),
-              style: AppTheme.pillLabel.copyWith(
-                fontWeight: FontWeight.w500,
-                color: AppTheme.inkMuted,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -722,6 +757,24 @@ class _VerseRow extends ConsumerWidget {
     );
     final hasNote = noteMarkers.contains(verse.number);
 
+    final verseTextStyle = TextStyle(
+      fontFamily: settings.fontFamily.fontName,
+      fontSize: fontSize,
+      height: settings.lineHeight.factor,
+      letterSpacing: settings.letterSpacing.points,
+      color: Theme.of(context).textTheme.bodyLarge?.color,
+    );
+
+    // Margin mark, not inline text: it used to sit inside the running text
+    // right after the verse number, shifting the words after it. A
+    // full-width Stack lets it float top-right of the first line instead,
+    // like marginalia beside the text rather than part of it - the
+    // SizedBox(width: infinity) is what makes that "full width" hold even on
+    // a one-line verse, where Text.rich alone would only be as wide as the
+    // words in it. Still tied to the verse-number setting, as it always was.
+    final showNoteMarker = hasNote && settings.showVerseNumbers;
+    final firstLineHeight = fontSize * settings.lineHeight.factor;
+
     Widget body = Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
@@ -731,50 +784,60 @@ class _VerseRow extends ConsumerWidget {
               color: highlight.swatch,
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            if (settings.showVerseNumbers) ...[
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: Text.rich(
               TextSpan(
-                text: '${verse.number}',
-                style: TextStyle(
-                  fontFamily: AppTheme.sansFontName,
-                  fontSize: fontSize * 0.62,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.inkMuted,
-                ),
-              ),
-              // Small, low-contrast marker for a verse that has a note.
-              // Tapping it reuses the same action sheet the long-press on
-              // the verse opens, rather than a second note-viewing flow.
-              if (hasNote)
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: onLongPress,
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: Icon(
-                        Icons.edit_note,
-                        size: fontSize * 0.68,
+                children: [
+                  if (settings.showVerseNumbers) ...[
+                    TextSpan(
+                      text: '${verse.number}',
+                      style: TextStyle(
+                        fontFamily: AppTheme.sansFontName,
+                        fontSize: fontSize * 0.62,
+                        fontWeight: FontWeight.w600,
                         color: AppTheme.inkMuted,
+                      ),
+                    ),
+                    const TextSpan(text: ' '),
+                  ],
+                  TextSpan(text: verse.text),
+                ],
+              ),
+              style: verseTextStyle,
+            ),
+          ),
+          if (showNoteMarker)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SizedBox(
+                height: firstLineHeight,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Semantics(
+                    button: true,
+                    label: 'Notitie bij dit vers bekijken',
+                    child: GestureDetector(
+                      onTap: onLongPress,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(
+                          Icons.edit_note,
+                          size: fontSize * 0.68,
+                          color: AppTheme.teal,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              const TextSpan(text: ' '),
-            ],
-            TextSpan(text: verse.text),
-          ],
-        ),
-        style: TextStyle(
-          fontFamily: settings.fontFamily.fontName,
-          fontSize: fontSize,
-          height: settings.lineHeight.factor,
-          letterSpacing: settings.letterSpacing.points,
-          color: Theme.of(context).textTheme.bodyLarge?.color,
-        ),
+              ),
+            ),
+        ],
       ),
     );
 

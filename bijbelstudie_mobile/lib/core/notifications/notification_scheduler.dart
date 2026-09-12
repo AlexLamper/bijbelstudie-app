@@ -632,6 +632,42 @@ class NotificationScheduler {
     return found;
   }
 
+  /// The copy that actually matches [id] (`streak-<n>` or `badge-<id>`).
+  ///
+  /// Unlike [pickVariant] - built to rotate through *interchangeable* lines so
+  /// a recurring reminder never repeats two days running - the milestone pool
+  /// is not interchangeable: `ms2`/`ms3`/`ms4`/`ms7` hard-code "7 dagen" / "14
+  /// dagen" / "30 dagen" / "100 dagen" as plain text for that exact streak
+  /// length, not as a rotation slot. Selecting a slot with `n % pool.length`
+  /// (the old approach) put the reader's real milestone through someone
+  /// else's copy whenever the arithmetic lined up - a 14- or a 30-day streak
+  /// both landed on index 6, `ms7`'s "100 dagen", because
+  /// `14 % 8 == 30 % 8 == 6`. This maps each known id to its own template
+  /// instead, so "100 dagen" only ever renders for `streak-100`.
+  static RenderedVariant milestoneVariant(
+    String id, {
+    required Map<String, String?> tokens,
+  }) {
+    final pool = notificationCopy[NotifType.milestone] ?? const [];
+    VariantTemplate byId(String templateId) => pool.firstWhere(
+          (t) => t.id == templateId,
+          orElse: () => pool.first,
+        );
+
+    final templateId = switch (id) {
+      'streak-7' => 'ms2',
+      'streak-14' => 'ms3',
+      'streak-30' => 'ms4',
+      'streak-100' => 'ms7',
+      // 3, 50, or any other threshold with no dedicated line: the generic
+      // "{streak} dagen op rij" line, filled with the real count.
+      _ when id.startsWith('streak-') => 'ms1',
+      // badge-<id>: no per-badge copy exists, so a neutral "new badge" line.
+      _ => 'ms8',
+    };
+    return renderVariant(NotifType.milestone, byId(templateId), tokens);
+  }
+
   /// Fires (backgrounded) or returns (foregrounded) the first pending
   /// milestone, marking it celebrated.
   static Future<RenderedVariant?> celebrateNextMilestone(
@@ -643,10 +679,7 @@ class NotificationScheduler {
     final id = pending.first;
     final store = ref.read(retentionStoreProvider.notifier);
     final data = ref.read(dashboardProvider).value;
-    final rotation = id.startsWith('streak-')
-        ? int.tryParse(id.substring(7)) ?? 0
-        : 8;
-    final variant = pickVariant(NotifType.milestone, rotation: rotation, tokens: {
+    final variant = milestoneVariant(id, tokens: {
       'streak': '${data?.streak ?? 0}',
       'name': data?.name.split(' ').first,
     });

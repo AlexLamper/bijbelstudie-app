@@ -93,6 +93,11 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     final message = raw.trim();
     if (message.isEmpty || _sending || _blocked != null) return;
 
+    // Dismiss the soft keyboard now that the send is actually going ahead -
+    // covers the send button, the field's own submit action, and the
+    // suggestion chips alike, since all three land here.
+    FocusScope.of(context).unfocus();
+
     final location = ref.read(readerLocationProvider);
     final history = List<AiTurn>.from(_turns);
 
@@ -196,10 +201,10 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppTheme.ai.withValues(alpha: 0.06),
+            color: AppTheme.assistantTint,
             child: Text(
               'Nog ${quota.remaining} van ${quota.cap} gratis vragen vandaag',
-              style: AppTheme.caption.copyWith(color: AppTheme.ai),
+              style: AppTheme.caption.copyWith(color: AppTheme.assistant),
             ),
           ),
         Expanded(
@@ -246,7 +251,12 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: const Size(0, 30),
                     ),
-                    child: const Text('Pro'),
+                    child: Text(
+                      'Pro',
+                      style: AppTheme.buttonLabel.copyWith(
+                        color: AppTheme.assistant,
+                      ),
+                    ),
                   ),
                 if (showLoginCta)
                   TextButton(
@@ -291,7 +301,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                       ? null
                       : () => _send(_controller.text),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.ai,
+                    backgroundColor: AppTheme.assistant,
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(44, 44),
                     shape: RoundedRectangleBorder(
@@ -333,10 +343,14 @@ class _EmptyPrompt extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppTheme.ai.withValues(alpha: 0.10),
+              color: AppTheme.assistantTint,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
-            child: Icon(Icons.auto_awesome, size: 20, color: AppTheme.ai),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 20,
+              color: AppTheme.assistant,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -431,7 +445,10 @@ class _TypingBubble extends StatelessWidget {
         child: SizedBox(
           width: 18,
           height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.ai),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppTheme.assistant,
+          ),
         ),
       ),
     );

@@ -36,9 +36,12 @@ Future<void> showVerseActionSheet({
     context: context,
     backgroundColor: Theme.of(context).cardColor,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppTheme.radiusLg),
+      ),
     ),
-    builder: (sheetContext) => _VerseActionSheet(chapter: chapter, verse: verse),
+    builder: (sheetContext) =>
+        _VerseActionSheet(chapter: chapter, verse: verse),
   );
 
   if (result != _VerseSheetResult.note || !context.mounted) return;
@@ -82,9 +85,17 @@ Future<void> showAddNoteDialog({
   final messenger = ScaffoldMessenger.maybeOf(context);
 
   final reference = verse == null ? '$book $chapter' : '$book $chapter:$verse';
-  final text = await showDialog<String>(
+  final text = await showModalBottomSheet<String>(
     context: context,
-    builder: (dialogContext) => _NoteEditorDialog(reference: reference),
+    isScrollControlled: true,
+    backgroundColor: AppTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppTheme.radiusLg),
+      ),
+    ),
+    builder: (sheetContext) =>
+        _NoteEditorSheet(reference: reference, verseText: verseText),
   );
 
   if (text == null || text.isEmpty) return;
@@ -113,30 +124,35 @@ Future<void> showAddNoteDialog({
     // disappear into an unhandled async error, which is exactly how this bug
     // stayed invisible.
     messenger?.showSnackBar(
-      const SnackBar(content: Text('Notitie kon niet worden opgeslagen. Probeer het opnieuw.')),
+      const SnackBar(
+        content: Text(
+          'Notitie kon niet worden opgeslagen. Probeer het opnieuw.',
+        ),
+      ),
     );
   }
 }
 
-/// The note editor's text field.
+/// The note editor's text field and the sheet chrome around it.
 ///
 /// A widget rather than a bare [TextEditingController] held by
-/// [showAddNoteDialog], because the controller has to outlive the dialog's
+/// [showAddNoteDialog], because the controller has to outlive the sheet's
 /// exit animation: the field is still being rebuilt while the route animates
-/// away, and disposing the controller the moment `showDialog` returns throws
-/// "A TextEditingController was used after being disposed". Owning it here
-/// ties its lifetime to the field that uses it, which is the only place that
-/// knows when that is over.
-class _NoteEditorDialog extends StatefulWidget {
-  const _NoteEditorDialog({required this.reference});
+/// away, and disposing the controller the moment `showModalBottomSheet`
+/// returns throws "A TextEditingController was used after being disposed".
+/// Owning it here ties its lifetime to the field that uses it, which is the
+/// only place that knows when that is over.
+class _NoteEditorSheet extends StatefulWidget {
+  const _NoteEditorSheet({required this.reference, required this.verseText});
 
   final String reference;
+  final String verseText;
 
   @override
-  State<_NoteEditorDialog> createState() => _NoteEditorDialogState();
+  State<_NoteEditorSheet> createState() => _NoteEditorSheetState();
 }
 
-class _NoteEditorDialogState extends State<_NoteEditorDialog> {
+class _NoteEditorSheetState extends State<_NoteEditorSheet> {
   final TextEditingController _controller = TextEditingController();
 
   @override
@@ -145,29 +161,125 @@ class _NoteEditorDialogState extends State<_NoteEditorDialog> {
     super.dispose();
   }
 
+  void _save() => Navigator.of(context).pop(_controller.text.trim());
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.reference),
-      content: SizedBox(
-        width: (MediaQuery.sizeOf(context).width * 0.85).clamp(0, 420),
-        child: TextField(
-          controller: _controller,
-          autofocus: true,
-          maxLines: 5,
-          decoration: const InputDecoration(hintText: 'Jouw notitie'),
+    AppTheme.dependOn(context);
+    // The keyboard covers the sheet unless its own inset is padded in here;
+    // the bottom safe-area (home indicator) is separate from that and still
+    // needs SafeArea once the keyboard padding above it is accounted for.
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: SafeArea(
+        top: false,
+        // Two boxes, not one scroll view: on a short viewport - a small phone
+        // with the keyboard up - a single scrolling column put "Opslaan" below
+        // the fold, where a tap landed on the barrier and silently threw the
+        // note away. The actions are pinned; only the verse and the field
+        // scroll.
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 18),
+                        decoration: BoxDecoration(
+                          color: AppTheme.rule,
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusPill,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      widget.reference,
+                      style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+                    ),
+                    if (widget.verseText.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.verseText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.verseFragment,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      minLines: 5,
+                      maxLines: 8,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        hintText: 'Schrijf hier je notitie…',
+                        filled: true,
+                        fillColor: AppTheme.paperSunken,
+                        contentPadding: const EdgeInsets.all(14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
+                          ),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Annuleren'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) => SiteButton(
+                        label: 'Opslaan',
+                        onPressed: value.text.trim().isEmpty ? null : _save,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuleren'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('Opslaan'),
-        ),
-      ],
     );
   }
 }
@@ -182,7 +294,8 @@ class _VerseActionSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reference = '${chapter.book} ${chapter.chapter}:${verse.number}';
     final highlights = ref.watch(highlightIndexProvider);
-    final existing = highlights[VerseKey(chapter.book, chapter.chapter, verse.number)];
+    final existing =
+        highlights[VerseKey(chapter.book, chapter.chapter, verse.number)];
 
     return SafeArea(
       child: Padding(
@@ -202,14 +315,18 @@ class _VerseActionSheet extends ConsumerWidget {
             const SizedBox(height: 20),
             _ColorRow(
               selected: existing,
-              onSelected: (color) => _toggleHighlight(context, ref, color, existing),
+              onSelected: (color) =>
+                  _toggleHighlight(context, ref, color, existing),
             ),
             const SizedBox(height: 20),
             RuleGrid(
               children: [
                 RuleListTile(
                   onTap: () => _addNote(context),
-                  child: const _ActionRow(icon: Icons.edit_note, label: 'Notitie toevoegen'),
+                  child: const _ActionRow(
+                    icon: Icons.edit_note,
+                    label: 'Notitie toevoegen',
+                  ),
                 ),
                 RuleListTile(
                   onTap: () => _addBookmark(context, ref),
@@ -220,12 +337,18 @@ class _VerseActionSheet extends ConsumerWidget {
                 ),
                 RuleListTile(
                   onTap: () => _share(context),
-                  child: const _ActionRow(icon: Icons.ios_share, label: 'Delen'),
+                  child: const _ActionRow(
+                    icon: Icons.ios_share,
+                    label: 'Delen',
+                  ),
                 ),
                 RuleListTile(
                   showRule: false,
                   onTap: () => _copy(context, reference),
-                  child: const _ActionRow(icon: Icons.copy_all_outlined, label: 'Kopiëren'),
+                  child: const _ActionRow(
+                    icon: Icons.copy_all_outlined,
+                    label: 'Kopiëren',
+                  ),
                 ),
               ],
             ),
@@ -247,7 +370,8 @@ class _VerseActionSheet extends ConsumerWidget {
     try {
       if (existing == color) {
         // Tapping the active colour clears the highlight.
-        final all = ref.read(highlightsListProvider).value ?? const <StudyNote>[];
+        final all =
+            ref.read(highlightsListProvider).value ?? const <StudyNote>[];
         final match = all.where(
           (h) =>
               h.book == chapter.book &&
@@ -274,7 +398,9 @@ class _VerseActionSheet extends ConsumerWidget {
       ref.invalidate(highlightsListProvider);
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
 
@@ -290,14 +416,18 @@ class _VerseActionSheet extends ConsumerWidget {
   Future<void> _addBookmark(BuildContext context, WidgetRef ref) async {
     final location = ref.read(readerLocationProvider);
     try {
-      await ref.read(notesRepositoryProvider).saveBookmark(
+      await ref
+          .read(notesRepositoryProvider)
+          .saveBookmark(
             Bookmark(
               id: newClientId(),
               book: chapter.book,
               chapter: chapter.chapter,
               verse: verse.number,
               version: location.versionId,
-              label: verse.text.length > 60 ? '${verse.text.substring(0, 57)}…' : verse.text,
+              label: verse.text.length > 60
+                  ? '${verse.text.substring(0, 57)}…'
+                  : verse.text,
               updatedAt: DateTime.now(),
             ),
           );
@@ -305,7 +435,9 @@ class _VerseActionSheet extends ConsumerWidget {
       await HapticFeedback.lightImpact();
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
     if (context.mounted) Navigator.of(context).pop();
@@ -321,13 +453,15 @@ class _VerseActionSheet extends ConsumerWidget {
 
   Future<void> _copy(BuildContext context, String reference) async {
     await Clipboard.setData(
-      ClipboardData(text: '${verse.text}\n\n$reference - ${chapter.attribution}'),
+      ClipboardData(
+        text: '${verse.text}\n\n$reference - ${chapter.attribution}',
+      ),
     );
     if (!context.mounted) return;
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gekopieerd')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Gekopieerd')));
   }
 }
 

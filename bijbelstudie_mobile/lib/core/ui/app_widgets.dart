@@ -971,6 +971,7 @@ class AppUnderlineTabs extends StatelessWidget {
     required this.onChanged,
     this.gap = 20,
     this.leadingIcons = const {},
+    this.leadingIconColors = const {},
     this.activeColor,
     this.padding = EdgeInsets.zero,
     this.bottomGap = 10,
@@ -983,6 +984,11 @@ class AppUnderlineTabs extends StatelessWidget {
 
   /// Index → glyph, for a tab that needs to read as a different kind.
   final Map<int, IconData> leadingIcons;
+
+  /// Index → a colour that glyph keeps whether its tab is selected or not,
+  /// for a mark that means something on its own — the assistant's gold. Left
+  /// out, a glyph takes its label's colour.
+  final Map<int, Color> leadingIconColors;
 
   /// Defaults to teal; the study-detail tabs underline in [AppTheme.ink].
   final Color? activeColor;
@@ -1031,7 +1037,11 @@ class AppUnderlineTabs extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (leadingIcons[i] != null) ...[
-                            Icon(leadingIcons[i], size: 14, color: color),
+                            Icon(
+                              leadingIcons[i],
+                              size: 14,
+                              color: leadingIconColors[i] ?? color,
+                            ),
                             const SizedBox(width: 5),
                           ],
                           Text(

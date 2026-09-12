@@ -237,7 +237,7 @@ class _BookmarksTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final bookmark = bookmarks[index];
             return _Row(
-              onMenu: () => _confirmRemove(context, ref, bookmark),
+              onMenu: () => _handleMenu(context, ref, bookmark),
               onTap: () {
                 ref
                     .read(readerLocationProvider.notifier)
@@ -276,20 +276,62 @@ class _BookmarksTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmRemove(
+  Future<void> _handleMenu(
     BuildContext context,
     WidgetRef ref,
     Bookmark bookmark,
   ) async {
-    final picked = await _showRowMenu(context, canShare: false);
-    if (picked != _RowAction.delete) return;
+    final picked = await _showRowMenu(context, canShare: true);
+    if (picked == null || !context.mounted) return;
+
+    if (picked == _RowAction.share) {
+      // Bookmark carries no verseText/noteText of its own - label is the
+      // verse excerpt _addBookmark saved at creation time, so it doubles as
+      // the quoted text when there is one.
+      final label = bookmark.label?.trim();
+      final text = (label == null || label.isEmpty)
+          ? bookmark.reference
+          : '$label\n\n${bookmark.reference}';
+      await _share(context, text: text, subject: bookmark.reference);
+      return;
+    }
+
+    final confirmed = await _confirmDelete(
+      context,
+      title: 'Bladwijzer verwijderen',
+      message: 'Weet je zeker dat je de bladwijzer bij ${bookmark.reference} wilt verwijderen?',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    // Captured before the delete invalidates the list and this row is gone -
+    // by the time "Ongedaan maken" is tapped, ref (tied to this row) would
+    // already be disposed, but the container and messenger outlive the row.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
       ref.invalidate(bookmarksProvider);
       await HapticFeedback.selectionClick();
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Bladwijzer verwijderd'),
+          action: SnackBarAction(
+            label: 'Ongedaan maken',
+            onPressed: () async {
+              try {
+                await container.read(notesRepositoryProvider).saveBookmark(bookmark);
+                container.invalidate(bookmarksProvider);
+              } on SyncRejectedException catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+              }
+            },
+          ),
+        ),
+      );
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        messenger.showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -353,21 +395,56 @@ class _NoteRow extends ConsumerWidget {
     final picked = await _showRowMenu(context, canShare: true);
     if (picked == null || !context.mounted) return;
 
+    final kind = note.isHighlight ? 'Markering' : 'Notitie';
+
     if (picked == _RowAction.share) {
-      await Share.share(
-        '${note.verseText}\n\n${note.noteText}\n\n${note.reference}',
-        subject: note.reference,
-      );
+      final text = [
+        note.verseText.trim(),
+        note.noteText.trim(),
+        note.reference,
+      ].where((part) => part.isNotEmpty).join('\n\n');
+      await _share(context, text: text, subject: note.reference);
       return;
     }
 
+    final confirmed = await _confirmDelete(
+      context,
+      title: '$kind verwijderen',
+      message:
+          'Weet je zeker dat je de ${kind.toLowerCase()} bij ${note.reference} wilt verwijderen?',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    // Captured before the delete invalidates the list and this row is gone -
+    // by the time "Ongedaan maken" is tapped, ref (tied to this row) would
+    // already be disposed, but the container and messenger outlive the row.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+    final listProvider = note.isHighlight ? highlightsListProvider : notesListProvider;
+
     try {
       await ref.read(notesRepositoryProvider).deleteNote(note);
-      ref.invalidate(note.isHighlight ? highlightsListProvider : notesListProvider);
+      ref.invalidate(listProvider);
       await HapticFeedback.selectionClick();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$kind verwijderd'),
+          action: SnackBarAction(
+            label: 'Ongedaan maken',
+            onPressed: () async {
+              try {
+                await container.read(notesRepositoryProvider).saveNote(note);
+                container.invalidate(listProvider);
+              } on SyncRejectedException catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+              }
+            },
+          ),
+        ),
+      );
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        messenger.showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -411,6 +488,56 @@ Future<_RowAction?> _showRowMenu(BuildContext context, {required bool canShare})
       ),
     ),
   );
+}
+
+/// Confirms before deleting anything - the sheet used to hand back
+/// [_RowAction.delete] and the caller deleted on the spot, with no reminder
+/// of which row a tap had actually landed on and no way back.
+Future<bool> _confirmDelete(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Annuleren'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+          child: const Text('Verwijderen'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
+/// Shares [text] through the system sheet.
+///
+/// Anchored on the row's own on-screen rect: on iPad share_plus pops the
+/// sheet from [sharePositionOrigin] and has nothing to anchor to without it,
+/// which is one way this used to fail silently. The call is also wrapped
+/// rather than fired-and-forgotten as before, so a platform failure lands as
+/// a SnackBar instead of nothing happening at all.
+Future<void> _share(BuildContext context, {required String text, String? subject}) async {
+  final box = context.findRenderObject() as RenderBox?;
+  final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+  try {
+    await Share.share(text, subject: subject, sharePositionOrigin: origin);
+  } on Exception {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Delen is niet gelukt.')));
+    }
+  }
 }
 
 /// Source, date and the row menu.
@@ -487,8 +614,12 @@ class _Row extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onMenu;
 
-  /// Width reserved for the menu so the meta line never runs under it.
-  static const double _menuWidth = 32;
+  /// Width reserved for the menu so the meta line never runs under it - also
+  /// the button's own tap-target size, Apple HIG's 44x44 minimum. The row's
+  /// own padding (16 right, 17 top) isn't enough room for that on its own, so
+  /// the Stack below spans the whole row rather than sitting inside the
+  /// padding, letting the button reach into it without moving the glyph.
+  static const double _menuWidth = 44;
 
   @override
   Widget build(BuildContext context) {
@@ -498,30 +629,31 @@ class _Row extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: AppTheme.rule)),
         ),
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.only(right: _menuWidth),
+              padding: const EdgeInsets.fromLTRB(16, 17, _menuWidth, 17),
               child: child,
             ),
             Positioned(
               top: 0,
               right: 0,
+              width: _menuWidth,
+              height: _menuWidth,
               child: Semantics(
                 button: true,
                 label: 'Acties',
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: onMenu,
-                  // The glyph is 17; the box around it is the 32 the content
-                  // was inset by, so the tap target is not a 17px sliver.
-                  child: SizedBox(
-                    width: _menuWidth,
-                    height: 22,
+                  // The tap target fills the box above; the glyph is padded
+                  // back down to where the row's own padding used to put it,
+                  // so it doesn't visibly move when the target grows.
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 17, right: 16),
                     child: Align(
                       alignment: Alignment.topRight,
                       child: Icon(

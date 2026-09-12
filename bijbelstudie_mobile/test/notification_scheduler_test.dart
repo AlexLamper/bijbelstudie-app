@@ -160,4 +160,62 @@ void main() {
       expect(met.title, isNot(behind.title));
     });
   });
+
+  group('NotificationScheduler.milestoneVariant', () {
+    // Regression for the bug where a real 14- or 30-day streak celebrated
+    // with the "100 dagen" copy: the old code picked a pool slot with
+    // `n % pool.length` (pool.length == 8), and 14 % 8 == 30 % 8 == 6, the
+    // index of `ms7` ("100 dagen"). Each streak length must render its own,
+    // distinct copy - never another length's hard-coded text.
+    test('each dedicated streak length gets its own copy, not another one\'s', () {
+      const tokens = {'streak': '0', 'name': 'Alex'};
+      final byLength = {
+        for (final n in [7, 14, 30, 100])
+          n: NotificationScheduler.milestoneVariant('streak-$n', tokens: tokens),
+      };
+      expect(byLength[7]!.title, 'Een week volgehouden');
+      expect(byLength[14]!.title, '14 dagen');
+      expect(byLength[30]!.title, '30 dagen');
+      expect(byLength[100]!.title, '100 dagen');
+
+      // No two of these dedicated milestones ever collide on the same copy -
+      // which is exactly how 14 and 30 both used to end up saying "100 dagen".
+      final titles = byLength.values.map((v) => v.title).toSet();
+      expect(titles, hasLength(4));
+    });
+
+    test('a threshold with no dedicated line uses the generic count', () {
+      final variant = NotificationScheduler.milestoneVariant(
+        'streak-3',
+        tokens: const {'streak': '3', 'name': 'Alex'},
+      );
+      expect(variant.title, '3 dagen op rij');
+
+      final fifty = NotificationScheduler.milestoneVariant(
+        'streak-50',
+        tokens: const {'streak': '50', 'name': 'Alex'},
+      );
+      expect(fifty.title, '50 dagen op rij');
+    });
+
+    test('a badge milestone gets the generic new-badge line, never streak copy', () {
+      final variant = NotificationScheduler.milestoneVariant(
+        'badge-firstlesson',
+        tokens: const {'streak': '0', 'name': 'Alex'},
+      );
+      expect(variant.title, 'Nieuw zegel verdiend');
+    });
+
+    test('never leaves an unresolved {token} in what is shown', () {
+      for (final id in ['streak-3', 'streak-7', 'streak-14', 'streak-30',
+          'streak-50', 'streak-100', 'badge-completed1']) {
+        final variant = NotificationScheduler.milestoneVariant(
+          id,
+          tokens: const {'streak': '30', 'name': 'Alex'},
+        );
+        expect(variant.title.contains('{'), isFalse, reason: id);
+        expect(variant.body.contains('{'), isFalse, reason: id);
+      }
+    });
+  });
 }

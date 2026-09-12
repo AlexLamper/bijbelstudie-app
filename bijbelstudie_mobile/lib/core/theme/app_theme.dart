@@ -138,6 +138,19 @@ class AppTheme {
   /// `bg-teal-100` - the study-mode strip.
   static const Color lightTealSoft = Color(0xFFCCFBF1);
 
+  /// The AI assistant's accent - gold, because gold is already what Pro looks
+  /// like in this app (the ring a subscriber can put on their avatar) and the
+  /// assistant is a metered, Pro-upsold surface. Deliberately not the green
+  /// family: green already means "afgerond" on the lesson discs and the streak.
+  ///
+  /// Darker than the avatar's [kGoldRing] on purpose - that one is a fill
+  /// behind a drawing, this one has to carry 12px text on white, where
+  /// #D4A017 lands at 2.4:1. This is 5.3:1.
+  static const Color lightAssistant = Color(0xFF92610A);
+
+  /// The wash behind the assistant's glyph and its quota strip.
+  static const Color lightAssistantTint = Color(0xFFFDF6E3);
+
   /// `rgba(13,148,136,.10)` - the wash behind a teal glyph in an icon chip.
   /// Kept translucent rather than flattened so it also reads on `lineSoft`.
   static const Color lightTealWash = Color(0x1A0D9488);
@@ -206,6 +219,11 @@ class AppTheme {
   static const Color darkTealSoft = Color(0xFF14453F);
   static const Color darkTealWash = Color(0x2D2DB4A6);
 
+  /// Gold reads as gold on a dark ground without darkening; the tint is the
+  /// same hue dropped to a surface.
+  static const Color darkAssistant = Color(0xFFE8B93B);
+  static const Color darkAssistantTint = Color(0xFF3A2E12);
+
   /// The banner gradient keeps its dark end in both themes - it is artwork,
   /// not a surface, and the teal start is what carries the brand.
   static const Color darkBannerEnd = Color(0xFF0B1120);
@@ -258,6 +276,8 @@ class AppTheme {
   static Color get tealTint => _c(lightTealTint, darkTealTint);
   static Color get tealSoft => _c(lightTealSoft, darkTealSoft);
   static Color get tealWash => _c(lightTealWash, darkTealWash);
+  static Color get assistant => _c(lightAssistant, darkAssistant);
+  static Color get assistantTint => _c(lightAssistantTint, darkAssistantTint);
   static Color get bannerEnd => _c(lightBannerEnd, darkBannerEnd);
   static Color get readerInk => _c(lightReaderInk, darkReaderInk);
 

@@ -23,12 +23,20 @@ class ReaderTitleBar extends ConsumerWidget {
     this.embedded = true,
   });
 
-  /// Which segment reads as active.
+  /// Which segment reads as active. Only meaningful when [embedded] is true -
+  /// see below.
   final bool showMaterials;
 
   /// True inside `/studie`, where both panes exist and the switch only flips
   /// [studyPaneProvider]. False for the standalone reader at `/read`, which
   /// has to go to `/studie` to show the other half.
+  ///
+  /// [studyPaneProvider] is global and sticky: leaving `/studie` on the
+  /// Studie pane and then opening `/read` (e.g. from a note) would otherwise
+  /// carry that flag over and light up "Studie" on a screen that is plainly
+  /// showing bible text. `/read` IS the bible, so when not embedded this
+  /// widget ignores [showMaterials] and always reads as "Bijbel" - tapping
+  /// "Studie" still navigates to `/studie` as before.
   final bool embedded;
 
   @override
@@ -89,7 +97,7 @@ class ReaderTitleBar extends ConsumerWidget {
         const SizedBox(width: 12),
         AppSegmentedControl(
           labels: const ['Bijbel', 'Studie'],
-          selectedIndex: showMaterials ? 1 : 0,
+          selectedIndex: embedded && showMaterials ? 1 : 0,
           onChanged: (index) {
             final controller = ref.read(studyPaneProvider.notifier);
             if (index == 0) {

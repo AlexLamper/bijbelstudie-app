@@ -8,19 +8,21 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../levensboom/domain/verse_scene.dart';
-import '../../levensboom/present/verse_scene_backdrop.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_repository.dart';
 import '../data/dashboard_models.dart';
 import 'dashboard_providers.dart';
+import 'widgets/daily_verse_tree_backdrop.dart';
 
 /// "Tekst van de dag" — the photo card at the top of the Start tab.
 ///
 /// Modelled on the verse-of-the-day card in the YouVersion app: a full-bleed
-/// nature photograph, an eyebrow and the reference at the top left, the verse
+/// background, an eyebrow and the reference at the top left, the verse
 /// itself set large and left-aligned in the middle, and a centred row of
-/// actions along the bottom.
+/// actions along the bottom. The background is the reader's own Levensboom
+/// (see [DailyVerseBackdrop]) once it has loaded, and a painted landscape
+/// before then or when there is no tree to show.
 ///
 /// Everything the card remembers is local. `GET /daytext` serves one verse and
 /// nothing else, so the heart and the archive behind "Bekijk voorgaande dagen"
@@ -302,7 +304,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   }
 }
 
-/// Everything painted on the photograph: scrim, eyebrow and reference, the
+/// Everything painted on the background: scrim, eyebrow and reference, the
 /// verse, and the action row.
 ///
 /// Shared by the 330px card on the dashboard and by the modal it opens, which
@@ -349,7 +351,7 @@ class _VerseFace extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        VerseSceneBackdrop(verse: scene),
+        DailyVerseBackdrop(scene: scene),
 
         // Colours from here down sit on top of a photograph, so they are
         // literal white/black rather than theme tokens: the scrim has to

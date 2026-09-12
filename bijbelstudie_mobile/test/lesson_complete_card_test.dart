@@ -157,7 +157,9 @@ void main() {
     );
   });
 
-  testWidgets('a level-up names the new level', (tester) async {
+  testWidgets('a level-up names the new level and the badge by its Dutch label', (
+    tester,
+  ) async {
     await pump(
       tester,
       summary: const CompletionSummary(
@@ -165,15 +167,41 @@ void main() {
         studyCompleted: false,
         xpAwarded: 40,
         levelledUp: true,
-        newBadges: ['volhouder'],
+        // A raw id from `xp.newBadges`, exactly as the server sends it
+        // (`lib/gamification.ts`) - never text meant for a reader.
+        newBadges: ['firstlesson'],
         nextLessonDay: 3,
       ),
     );
 
     expect(tester.takeException(), isNull);
     expect(find.text('Nieuw niveau'), findsOneWidget);
-    expect(find.text('volhouder'), findsOneWidget);
+    // The catalogue's Dutch label shows, not the id the server sent.
+    expect(find.text('Eerste les'), findsOneWidget);
+    expect(find.text('firstlesson'), findsNothing);
     expect(find.textContaining('Je boom groeide naar niveau'), findsOneWidget);
+  });
+
+  testWidgets('a badge id the app does not recognise still gets a Dutch label, never the raw id', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      summary: const CompletionSummary(
+        recorded: true,
+        studyCompleted: false,
+        xpAwarded: 40,
+        levelledUp: true,
+        // Not in `BadgeCatalog.serverBadges` - e.g. a badge this build
+        // predates. It must not print the identifier at the reader.
+        newBadges: ['volhouder'],
+        nextLessonDay: 3,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('volhouder'), findsNothing);
+    expect(find.text('Nieuwe badge'), findsOneWidget);
   });
 
   testWidgets('the last lesson of a study leads back to the study', (tester) async {
