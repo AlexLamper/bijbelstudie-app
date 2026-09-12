@@ -21,6 +21,7 @@ import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
+import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
 import 'chapter_marks_sheet.dart';
 import 'offline_library_sheet.dart';
@@ -500,12 +501,8 @@ class _ReaderBar extends ConsumerWidget {
                   tooltip: 'Weergave',
                   onTap: () => showReaderSettingsSheet(context, ref),
                 ),
-                _ToolButton(
-                  icon: Icons.translate,
-                  tooltip: 'Vertaling kiezen',
-                  onTap: () => showVersionPickerSheet(context, ref),
-                ),
                 _OfflineButton(location: location),
+                _VersionToolButton(version: version),
               ],
             ),
           ),
@@ -518,10 +515,13 @@ class _ReaderBar extends ConsumerWidget {
 /// What the reader already has in this chapter, as one tappable teal line.
 ///
 /// Counts come from the notes and highlights lists the app loads anyway - see
-/// [chapterMarkCountsProvider]. The line disappears when both are zero rather
-/// than announcing "0 notities", which is noise on a chapter nobody has worked
-/// on yet. Tapping it opens [showChapterMarksSheet], listing every note and
-/// highlight in this chapter with a way to jump to its verse.
+/// [chapterMarkCountsProvider]. The line always renders, zeros included: it is
+/// the only thing in the header that says a chapter can hold notes and
+/// highlights at all, so hiding it on an untouched chapter hid the feature
+/// from exactly the reader who had not found it yet. Tapping it opens
+/// [showChapterMarksSheet], listing every note and highlight in this chapter
+/// with a way to jump to its verse - that sheet has its own empty state, so
+/// the tap stays worth making at zero.
 class _ChapterMarks extends ConsumerWidget {
   const _ChapterMarks({required this.location});
 
@@ -533,7 +533,6 @@ class _ChapterMarks extends ConsumerWidget {
     final counts = ref.watch(
       chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
     );
-    if (counts.isEmpty) return const SizedBox.shrink();
 
     return Semantics(
       button: true,
@@ -560,28 +559,26 @@ class _ChapterMarks extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (counts.highlights > 0) ...[
-                const SizedBox(width: 7),
-                Container(
-                  width: 3,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: AppTheme.ruleStrong,
-                    shape: BoxShape.circle,
-                  ),
+              const SizedBox(width: 7),
+              Container(
+                width: 3,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppTheme.ruleStrong,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    _plural(counts.highlights, 'markering', 'markeringen'),
-                    style: AppTheme.pillLabel.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.inkMuted,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  _plural(counts.highlights, 'markering', 'markeringen'),
+                  style: AppTheme.pillLabel.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.inkMuted,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
               const SizedBox(width: 4),
               Icon(Icons.chevron_right, size: 14, color: AppTheme.inkFaint),
             ],
@@ -637,6 +634,77 @@ class _ToolButton extends StatelessWidget {
               size: 19,
               color: active ? AppTheme.teal : AppTheme.inkSoft,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The translation tool: a [_ToolButton]'s box with the short code of the
+/// open translation in it instead of a generic globe.
+///
+/// `Icons.translate` announced that a picker existed and said nothing about
+/// which translation was open, so "am I reading NBG or HSV?" could only be
+/// answered by opening the sheet. The code answers it from the header. Size,
+/// margin, corner radius, tap behaviour, tooltip and ink colour are copied
+/// from [_ToolButton] so the row stays one row of buttons; the hairline
+/// border is the one addition, and it is what keeps two or three letters
+/// reading as a control rather than as text that wandered in among the
+/// icons. Long codes shrink inside the box instead of widening it, the same
+/// way the badges in the translation picker do.
+class _VersionToolButton extends ConsumerWidget {
+  const _VersionToolButton({required this.version});
+
+  /// Null while the translation list is still loading, or when the stored id
+  /// is no longer on offer - there is no code to show yet, and the globe is
+  /// still the honest answer.
+  final BibleSource? version;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final version = this.version;
+    final code = version == null ? null : VersionCatalog.shortCode(version);
+
+    return Tooltip(
+      message: 'Vertaling kiezen',
+      child: Semantics(
+        button: true,
+        label: version == null
+            ? 'Vertaling kiezen'
+            : 'Vertaling kiezen. Huidige vertaling: ${version.name}',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => showVersionPickerSheet(context, ref),
+          child: Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(left: 2),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              border: Border.all(color: AppTheme.rule),
+            ),
+            child: code == null
+                ? Icon(Icons.translate, size: 19, color: AppTheme.inkSoft)
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      code,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontFamily: AppTheme.sansFontName,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        height: 1,
+                        color: AppTheme.inkSoft,
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
@@ -765,13 +833,15 @@ class _VerseRow extends ConsumerWidget {
       color: Theme.of(context).textTheme.bodyLarge?.color,
     );
 
-    // Margin mark, not inline text: it used to sit inside the running text
-    // right after the verse number, shifting the words after it. A
-    // full-width Stack lets it float top-right of the first line instead,
-    // like marginalia beside the text rather than part of it - the
-    // SizedBox(width: infinity) is what makes that "full width" hold even on
-    // a one-line verse, where Text.rich alone would only be as wide as the
-    // words in it. Still tied to the verse-number setting, as it always was.
+    // Margin mark, and beside the text rather than over it. Two earlier
+    // layouts were wrong in opposite directions: inline after the verse
+    // number it shifted every word that followed, and floated top-right in a
+    // Stack it was drawn on top of the first line, which on any verse that
+    // fills its width means on top of the words. A Row gives it a column of
+    // its own, so the text is laid out in what is left and no glyph can end
+    // up underneath it. It still aligns with the first line rather than the
+    // middle of the verse - that is what firstLineHeight buys - and it is
+    // still tied to the verse-number setting, as it always was.
     final showNoteMarker = hasNote && settings.showVerseNumbers;
     final firstLineHeight = fontSize * settings.lineHeight.factor;
 
@@ -784,11 +854,10 @@ class _VerseRow extends ConsumerWidget {
               color: highlight.swatch,
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: double.infinity,
+          Expanded(
             child: Text.rich(
               TextSpan(
                 children: [
@@ -811,26 +880,21 @@ class _VerseRow extends ConsumerWidget {
             ),
           ),
           if (showNoteMarker)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: SizedBox(
-                height: firstLineHeight,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Semantics(
-                    button: true,
-                    label: 'Notitie bij dit vers bekijken',
-                    child: GestureDetector(
-                      onTap: onLongPress,
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: Icon(
-                          Icons.edit_note,
-                          size: fontSize * 0.68,
-                          color: AppTheme.teal,
-                        ),
+            SizedBox(
+              height: firstLineHeight,
+              child: Center(
+                child: Semantics(
+                  button: true,
+                  label: 'Notitie bij dit vers bekijken',
+                  child: GestureDetector(
+                    onTap: onLongPress,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Icon(
+                        Icons.edit_note,
+                        size: fontSize * 0.68,
+                        color: AppTheme.teal,
                       ),
                     ),
                   ),

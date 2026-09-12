@@ -82,9 +82,9 @@ class _ChapterMarksSheet extends ConsumerWidget {
               child: entries.isEmpty
                   ? const AppEmptyState(
                       icon: Icons.edit_note_outlined,
-                      title: 'Niets meer om te tonen',
+                      title: 'Nog niets in dit hoofdstuk',
                       description:
-                          'De notities en markeringen van dit hoofdstuk zijn verwijderd.',
+                          'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven of het te markeren.',
                     )
                   : ListView.builder(
                       shrinkWrap: true,

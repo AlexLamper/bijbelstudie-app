@@ -110,7 +110,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Eyebrow('Zoeken'),
+                  Row(
+                    children: [
+                      // Pushed from the reader, so popping is the way back. The
+                      // guard keeps the arrow off the screen when search is the
+                      // root route and there is nothing to pop.
+                      if (context.canPop()) ...[
+                        Semantics(
+                          button: true,
+                          label: 'Terug',
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => context.pop(),
+                            child: Icon(
+                              Icons.arrow_back_ios_new,
+                              size: 20,
+                              color: AppTheme.inkSoft,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
+                      const Eyebrow('Zoeken'),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _controller,

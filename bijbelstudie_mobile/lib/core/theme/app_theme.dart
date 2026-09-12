@@ -138,18 +138,18 @@ class AppTheme {
   /// `bg-teal-100` - the study-mode strip.
   static const Color lightTealSoft = Color(0xFFCCFBF1);
 
-  /// The AI assistant's accent - gold, because gold is already what Pro looks
-  /// like in this app (the ring a subscriber can put on their avatar) and the
-  /// assistant is a metered, Pro-upsold surface. Deliberately not the green
-  /// family: green already means "afgerond" on the lesson discs and the streak.
+  /// The AI assistant's accent - dark green (`green-800`). Deep enough to
+  /// carry the 12px labels the assistant puts on white: 6.6:1 on
+  /// [lightPaperRaised], 6.3:1 on its own [lightAssistantTint], both clear of
+  /// the 4.5:1 floor for body text.
   ///
-  /// Darker than the avatar's [kGoldRing] on purpose - that one is a fill
-  /// behind a drawing, this one has to carry 12px text on white, where
-  /// #D4A017 lands at 2.4:1. This is 5.3:1.
-  static const Color lightAssistant = Color(0xFF92610A);
+  /// A forest green rather than the emerald of [lightPositive] (#059669) and
+  /// well off the brand teal, so an assistant chip never reads as "afgerond"
+  /// or as a brand surface.
+  static const Color lightAssistant = Color(0xFF166534);
 
-  /// The wash behind the assistant's glyph and its quota strip.
-  static const Color lightAssistantTint = Color(0xFFFDF6E3);
+  /// The wash behind the assistant's glyph and its quota strip - `green-50`.
+  static const Color lightAssistantTint = Color(0xFFF0FDF4);
 
   /// `rgba(13,148,136,.10)` - the wash behind a teal glyph in an icon chip.
   /// Kept translucent rather than flattened so it also reads on `lineSoft`.
@@ -219,10 +219,12 @@ class AppTheme {
   static const Color darkTealSoft = Color(0xFF14453F);
   static const Color darkTealWash = Color(0x2D2DB4A6);
 
-  /// Gold reads as gold on a dark ground without darkening; the tint is the
-  /// same hue dropped to a surface.
-  static const Color darkAssistant = Color(0xFFE8B93B);
-  static const Color darkAssistantTint = Color(0xFF3A2E12);
+  /// The assistant's green, lifted for a dark ground: `green-400` at ~11:1 on
+  /// the dark paper, with the tint the same hue dropped to a surface. A true
+  /// green, kept off both [darkTeal] and the emerald [darkPositive] so the
+  /// assistant still reads as itself here.
+  static const Color darkAssistant = Color(0xFF4ADE80);
+  static const Color darkAssistantTint = Color(0xFF12331F);
 
   /// The banner gradient keeps its dark end in both themes - it is artwork,
   /// not a surface, and the teal start is what carries the brand.

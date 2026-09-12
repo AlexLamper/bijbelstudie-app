@@ -128,7 +128,10 @@ class _Header extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          // The tab row carries the eyebrow and the counts directly above it;
+          // 12 packed all three into one block. 22 lets the tabs read as their
+          // own row - the same step the header already uses between blocks.
+          const SizedBox(height: 22),
           TourAnchor(
             id: TourAnchorIds.notesTabs,
             child: AnimatedBuilder(
@@ -152,32 +155,79 @@ class _Header extends ConsumerWidget {
       '$count ${count == 1 ? one : many}';
 }
 
+/// Awaits a pull-to-refresh refetch without letting it fail the gesture.
+///
+/// The tab renders a failed refetch itself ([_LoadError]), while an `onRefresh`
+/// future that completes with an error surfaces as an unhandled framework
+/// exception - so the spinner only needs to know the round trip is over.
+Future<void> _refetch(Future<void> refresh) async {
+  try {
+    await refresh;
+  } on Object {
+    // Deliberately ignored - see above.
+  }
+}
+
+/// Wraps the states that do not scroll on their own - empty and error - in a
+/// viewport-tall scrollable, since [RefreshIndicator] only reacts to a
+/// scrollable child. Without this, pulling down on "Nog geen notities" does
+/// nothing at all.
+class _Pullable extends StatelessWidget {
+  const _Pullable({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class _NotesTab extends ConsumerWidget {
   const _NotesTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final notesAsync = ref.watch(notesListProvider);
 
-    return notesAsync.when(
-      loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
-      data: (notes) {
-        if (notes.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.edit_note,
-            title: 'Nog geen notities',
-            description:
-                'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven.',
+    return RefreshIndicator(
+      onRefresh: () => _refetch(ref.refresh(notesListProvider.future)),
+      color: AppTheme.teal,
+      backgroundColor: AppTheme.surface,
+      child: notesAsync.when(
+        loading: () => const SkeletonList(),
+        error: (_, _) => const _Pullable(child: _LoadError()),
+        data: (notes) {
+          if (notes.isEmpty) {
+            return const _Pullable(
+              child: AppEmptyState(
+                icon: Icons.edit_note,
+                title: 'Nog geen notities',
+                description:
+                    'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven.',
+              ),
+            );
+          }
+          final sorted = [...notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return ListView.builder(
+            // A list shorter than the screen still has to be draggable, or
+            // there is nothing to pull on.
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
           );
-        }
-        final sorted = [...notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -187,27 +237,36 @@ class _HighlightsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final highlightsAsync = ref.watch(highlightsListProvider);
 
-    return highlightsAsync.when(
-      loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
-      data: (highlights) {
-        if (highlights.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.brush_outlined,
-            title: 'Nog geen markeringen',
-            description: 'Houd een vers ingedrukt en kies een kleur.',
+    return RefreshIndicator(
+      onRefresh: () => _refetch(ref.refresh(highlightsListProvider.future)),
+      color: AppTheme.teal,
+      backgroundColor: AppTheme.surface,
+      child: highlightsAsync.when(
+        loading: () => const SkeletonList(),
+        error: (_, _) => const _Pullable(child: _LoadError()),
+        data: (highlights) {
+          if (highlights.isEmpty) {
+            return const _Pullable(
+              child: AppEmptyState(
+                icon: Icons.brush_outlined,
+                title: 'Nog geen markeringen',
+                description: 'Houd een vers ingedrukt en kies een kleur.',
+              ),
+            );
+          }
+          final sorted = [...highlights]
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
           );
-        }
-        final sorted = [...highlights]
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -220,18 +279,23 @@ class _BookmarksTab extends ConsumerWidget {
     AppTheme.dependOn(context);
     final bookmarksAsync = ref.watch(bookmarksProvider);
 
-    return bookmarksAsync.when(
+    // Lifted out of the RefreshIndicator below only to keep the row builder at
+    // a readable indent.
+    final content = bookmarksAsync.when(
       loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
+      error: (_, _) => const _Pullable(child: _LoadError()),
       data: (bookmarks) {
         if (bookmarks.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.bookmark_outline,
-            title: 'Nog geen bladwijzers',
-            description: 'Bewaar een vers om er later snel bij te komen.',
+          return const _Pullable(
+            child: AppEmptyState(
+              icon: Icons.bookmark_outline,
+              title: 'Nog geen bladwijzers',
+              description: 'Bewaar een vers om er later snel bij te komen.',
+            ),
           );
         }
         return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 96),
           itemCount: bookmarks.length,
           itemBuilder: (context, index) {
@@ -274,6 +338,13 @@ class _BookmarksTab extends ConsumerWidget {
         );
       },
     );
+
+    return RefreshIndicator(
+      onRefresh: () => _refetch(ref.refresh(bookmarksProvider.future)),
+      color: AppTheme.teal,
+      backgroundColor: AppTheme.surface,
+      child: content,
+    );
   }
 
   Future<void> _handleMenu(
@@ -313,8 +384,10 @@ class _BookmarksTab extends ConsumerWidget {
       await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
       ref.invalidate(bookmarksProvider);
       await HapticFeedback.selectionClick();
-      messenger.showSnackBar(
+      _showSnackBar(
+        messenger,
         SnackBar(
+          duration: _confirmationDuration,
           content: const Text('Bladwijzer verwijderd'),
           action: SnackBarAction(
             label: 'Ongedaan maken',
@@ -323,7 +396,7 @@ class _BookmarksTab extends ConsumerWidget {
                 await container.read(notesRepositoryProvider).saveBookmark(bookmark);
                 container.invalidate(bookmarksProvider);
               } on SyncRejectedException catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                _showSnackBar(messenger, SnackBar(content: Text(e.message)));
               }
             },
           ),
@@ -331,7 +404,7 @@ class _BookmarksTab extends ConsumerWidget {
       );
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+        _showSnackBar(messenger, SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -426,8 +499,10 @@ class _NoteRow extends ConsumerWidget {
       await ref.read(notesRepositoryProvider).deleteNote(note);
       ref.invalidate(listProvider);
       await HapticFeedback.selectionClick();
-      messenger.showSnackBar(
+      _showSnackBar(
+        messenger,
         SnackBar(
+          duration: _confirmationDuration,
           content: Text('$kind verwijderd'),
           action: SnackBarAction(
             label: 'Ongedaan maken',
@@ -436,7 +511,7 @@ class _NoteRow extends ConsumerWidget {
                 await container.read(notesRepositoryProvider).saveNote(note);
                 container.invalidate(listProvider);
               } on SyncRejectedException catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                _showSnackBar(messenger, SnackBar(content: Text(e.message)));
               }
             },
           ),
@@ -444,13 +519,29 @@ class _NoteRow extends ConsumerWidget {
       );
     } on SyncRejectedException catch (e) {
       if (context.mounted) {
-        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+        _showSnackBar(messenger, SnackBar(content: Text(e.message)));
       }
     }
   }
 }
 
 enum _RowAction { share, delete }
+
+/// How long a "... verwijderd" confirmation stays up.
+///
+/// Well under the four-second default: the row it refers to is already gone,
+/// so the message has nothing left to explain once it has been read.
+const Duration _confirmationDuration = Duration(milliseconds: 1500);
+
+/// Shows one SnackBar, replacing whatever is already on screen.
+///
+/// SnackBars queue by default, so a second delete waits out the first one's
+/// full duration before its own starts - a few in a row and "Notitie
+/// verwijderd" sits there long enough to look like it is never going away.
+void _showSnackBar(ScaffoldMessengerState messenger, SnackBar snackBar) {
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(snackBar);
+}
 
 /// Delen and Verwijderen, behind the row's `more_vert`. They used to be two
 /// always-visible icon buttons, which put two tap targets the reader almost

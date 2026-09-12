@@ -986,7 +986,7 @@ class AppUnderlineTabs extends StatelessWidget {
   final Map<int, IconData> leadingIcons;
 
   /// Index → a colour that glyph keeps whether its tab is selected or not,
-  /// for a mark that means something on its own — the assistant's gold. Left
+  /// for a mark that means something on its own — the assistant's green. Left
   /// out, a glyph takes its label's colour.
   final Map<int, Color> leadingIconColors;
 

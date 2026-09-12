@@ -300,91 +300,100 @@ class _BadgeDetailSheet extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 132,
-              height: 132,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // A wash of the badge's own tone behind it - brighter once
-                  // earned, a quiet hint of what is coming while it isn't -
-                  // the same reward language [BadgeMedallion]'s glow uses.
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            tone.color.withValues(alpha: earned ? 0.22 : 0.08),
-                            tone.color.withValues(alpha: 0),
-                          ],
+        // Both states have to read as one sheet. The unearned branch's
+        // [SiteProgressBar] stretches to the full width, while the earned
+        // branch's lone [SiteBadge] is intrinsically narrow - a shrink-
+        // wrapping column would therefore change width with the badge's
+        // state. Pinning the width makes the two identical; the centered
+        // cross axis still keeps the medallion, text and badge centered.
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 132,
+                height: 132,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // A wash of the badge's own tone behind it - brighter once
+                    // earned, a quiet hint of what is coming while it isn't -
+                    // the same reward language [BadgeMedallion]'s glow uses.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              tone.color.withValues(alpha: earned ? 0.22 : 0.08),
+                              tone.color.withValues(alpha: 0),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  BadgeMedallion(badge: badge, size: 96),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              definition.label,
-              style: AppTheme.displayTitle,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              definition.description,
-              style: AppTheme.bodyMuted,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            if (earned)
-              SiteBadge.positive('Behaald', icon: Icons.check)
-            else ...[
-              // The count, big enough to feel like a stat rather than a
-              // caption - the motivating read [BadgeTargetPill] gives in
-              // miniature, reusing the same [BadgeProgress] fields.
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '${badge.value}',
-                    style: AppTheme.statNumber.copyWith(
-                      fontSize: 26,
-                      color: tone.color,
-                    ),
-                  ),
-                  Text(
-                    ' / ${definition.target}',
-                    style: AppTheme.statNumber.copyWith(
-                      fontSize: 16,
-                      color: AppTheme.inkFaint,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SiteProgressBar(
-                value: badge.fraction,
-                height: 7,
-                color: tone.color,
-              ),
-              if (remaining != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  remaining,
-                  style: AppTheme.caption,
-                  textAlign: TextAlign.center,
+                    BadgeMedallion(badge: badge, size: 96),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                definition.label,
+                style: AppTheme.displayTitle,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                definition.description,
+                style: AppTheme.bodyMuted,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              if (earned)
+                SiteBadge.positive('Behaald', icon: Icons.check)
+              else ...[
+                // The count, big enough to feel like a stat rather than a
+                // caption - the motivating read [BadgeTargetPill] gives in
+                // miniature, reusing the same [BadgeProgress] fields.
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '${badge.value}',
+                      style: AppTheme.statNumber.copyWith(
+                        fontSize: 26,
+                        color: tone.color,
+                      ),
+                    ),
+                    Text(
+                      ' / ${definition.target}',
+                      style: AppTheme.statNumber.copyWith(
+                        fontSize: 16,
+                        color: AppTheme.inkFaint,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SiteProgressBar(
+                  value: badge.fraction,
+                  height: 7,
+                  color: tone.color,
+                ),
+                if (remaining != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    remaining,
+                    style: AppTheme.caption,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ],
-          ],
+          ),
         ),
       ),
     );

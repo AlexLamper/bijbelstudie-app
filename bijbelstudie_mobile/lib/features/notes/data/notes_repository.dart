@@ -117,16 +117,10 @@ class NotesRepository {
     }
   }
 
-  Future<void> deleteNote(StudyNote note) async {
+  Future<void> deleteNote(StudyNote note) {
     final kind = note.isHighlight ? 'highlight' : 'note';
     final path = note.isHighlight ? '/highlights' : '/notes';
-    try {
-      await _apiClient.dio.delete('$path/${note.id}');
-      unawaitedFlush();
-    } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'verwijderd'));
-      await _cache?.enqueueChange(kind: kind, clientId: note.id, deleted: true);
-    }
+    return _delete('$path/${note.id}', kind: kind, id: note.id);
   }
 
   Future<List<Bookmark>> listBookmarks() async {
@@ -162,14 +156,53 @@ class NotesRepository {
     }
   }
 
-  Future<void> deleteBookmark(String id) async {
+  Future<void> deleteBookmark(String id) =>
+      _delete('/bookmarks/$id', kind: 'bookmark', id: id);
+
+  /// Deletes one record server-side *and* drops whatever the offline queue
+  /// still holds for it.
+  ///
+  /// Clearing the queue is the part that was missing, and it is what made a
+  /// delete look like it had silently failed. [enqueueChange] records a write
+  /// that could not be delivered, and only [flushPendingChanges] takes it back
+  /// out - so a note saved over a flaky connection (a timeout, a 5xx, anything
+  /// [_isRetryable]) can sit on the server and in the queue at the same time.
+  /// Deleting it then removed the server's copy while leaving the queued write
+  /// behind, and both halves of that put the row straight back on screen:
+  /// [_mergePending] folds the queued write into every list refetch, and the
+  /// [unawaitedFlush] fired by this very call replays it to `POST /sync`,
+  /// recreating the record server-side. The UI refreshed correctly - it was
+  /// refreshing a note the client had just re-uploaded.
+  ///
+  /// A 404/410 is success, not a failure: the record is gone (or only ever
+  /// lived in the queue, never having reached the server at all), which is
+  /// exactly what the caller asked for. Reporting it as an error was the other
+  /// way a delete could not be made to stick.
+  Future<void> _delete(
+    String path, {
+    required String kind,
+    required String id,
+  }) async {
     try {
-      await _apiClient.dio.delete('/bookmarks/$id');
-      unawaitedFlush();
+      await _apiClient.dio.delete(path);
     } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'verwijderd'));
-      await _cache?.enqueueChange(kind: 'bookmark', clientId: id, deleted: true);
+      final status = e.response?.statusCode;
+      if (status != 404 && status != 410) {
+        if (!_isRetryable(e)) {
+          throw SyncRejectedException(_rejectionMessage(e, 'verwijderd'));
+        }
+        // Offline. The queued delete replaces any pending write for the same
+        // (kind, id) - the table's primary key - so nothing can resurrect the
+        // record on the next flush.
+        await _cache?.enqueueChange(kind: kind, clientId: id, deleted: true);
+        return;
+      }
     }
+
+    // The server no longer has it. Anything still queued for this id would
+    // only put it back, so it goes before the flush that would replay it.
+    await _cache?.clearPendingChanges([id]);
+    unawaitedFlush();
   }
 
   /// Folds queued-but-unsynced writes of [kind] into [byId], keyed the same

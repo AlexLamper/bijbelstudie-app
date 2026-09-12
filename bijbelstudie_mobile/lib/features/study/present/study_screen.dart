@@ -186,7 +186,7 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                           if (!isPro) 1: Icons.lock_outline,
                           4: Icons.auto_awesome,
                         },
-                        // The assistant's sparkle keeps its gold whether the
+                        // The assistant's sparkle keeps its green whether the
                         // tab is selected or not: it is the one tab that is
                         // metered and Pro-upsold, and the mark is what says
                         // so before you tap it. The Pro lock on Grondtekst
