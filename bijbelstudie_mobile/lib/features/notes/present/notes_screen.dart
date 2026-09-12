@@ -529,9 +529,10 @@ enum _RowAction { share, delete }
 
 /// How long a "... verwijderd" confirmation stays up.
 ///
-/// Well under the four-second default: the row it refers to is already gone,
-/// so the message has nothing left to explain once it has been read.
-const Duration _confirmationDuration = Duration(milliseconds: 1500);
+/// Short, because the row it refers to is already gone and the message has
+/// nothing left to explain once it has been read - but not so short that
+/// "Ongedaan maken" is out of reach before the reader notices it.
+const Duration _confirmationDuration = Duration(seconds: 3);
 
 /// Shows one SnackBar, replacing whatever is already on screen.
 ///
