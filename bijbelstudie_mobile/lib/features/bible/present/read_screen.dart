@@ -460,15 +460,16 @@ class _ReaderBar extends ConsumerWidget {
     );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 6, 16, 0),
+      padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 10, 16, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Inside `/studie` the screen above owns this row for both panes.
+          // Inside `/studie` the screen above owns this row for both panes,
+          // and has already left 6 under it.
           if (!embedded)
             ReaderTitleBar(showMaterials: showMaterials, embedded: false),
           Padding(
-            padding: const EdgeInsets.only(top: 9, bottom: 8),
+            padding: EdgeInsets.only(top: embedded ? 6 : 12, bottom: 12),
             child: Row(
               children: [
                 Expanded(child: _ChapterMarks(location: location)),

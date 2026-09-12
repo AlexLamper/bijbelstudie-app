@@ -237,6 +237,7 @@ class _BookmarksTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final bookmark = bookmarks[index];
             return _Row(
+              onMenu: () => _confirmRemove(context, ref, bookmark),
               onTap: () {
                 ref
                     .read(readerLocationProvider.notifier)
@@ -253,7 +254,6 @@ class _BookmarksTab extends ConsumerWidget {
                   _MetaLine(
                     reference: bookmark.reference,
                     date: dutchRelativeDate(bookmark.updatedAt),
-                    onMenu: () => _confirmRemove(context, ref, bookmark),
                   ),
                   if (bookmark.label != null) ...[
                     const SizedBox(height: 8),
@@ -307,6 +307,7 @@ class _NoteRow extends ConsumerWidget {
     AppTheme.dependOn(context);
 
     return _Row(
+      onMenu: () => _menu(context, ref),
       onTap: () {
         ref
             .read(readerLocationProvider.notifier)
@@ -320,7 +321,6 @@ class _NoteRow extends ConsumerWidget {
             reference: note.reference,
             date: dutchRelativeDate(note.updatedAt),
             swatch: note.isHighlight ? note.color.swatch : null,
-            onMenu: () => _menu(context, ref),
           ),
           if (note.noteText.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -418,13 +418,11 @@ class _MetaLine extends StatelessWidget {
   const _MetaLine({
     required this.reference,
     required this.date,
-    required this.onMenu,
     this.swatch,
   });
 
   final String reference;
   final String date;
-  final VoidCallback onMenu;
 
   /// The highlight's colour, on the Markeringen tab.
   final Color? swatch;
@@ -472,30 +470,25 @@ class _MetaLine extends StatelessWidget {
             color: AppTheme.inkFaint,
           ),
         ),
-        const Spacer(),
-        Semantics(
-          button: true,
-          label: 'Acties',
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onMenu,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Icon(Icons.more_vert, size: 17, color: AppTheme.inkFaint),
-            ),
-          ),
-        ),
       ],
     );
   }
 }
 
 /// An edge-to-edge row under one hairline. No card, no margin, no radius.
+///
+/// The row owns the overflow menu rather than the meta line inside it, so the
+/// glyph lands in the same corner on every row - note, highlight or bookmark -
+/// whatever the reference and date underneath it happen to be.
 class _Row extends StatelessWidget {
-  const _Row({required this.child, required this.onTap});
+  const _Row({required this.child, required this.onTap, required this.onMenu});
 
   final Widget child;
   final VoidCallback onTap;
+  final VoidCallback onMenu;
+
+  /// Width reserved for the menu so the meta line never runs under it.
+  static const double _menuWidth = 32;
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +502,40 @@ class _Row extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: AppTheme.rule)),
         ),
-        child: child,
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: _menuWidth),
+              child: child,
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Semantics(
+                button: true,
+                label: 'Acties',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onMenu,
+                  // The glyph is 17; the box around it is the 32 the content
+                  // was inset by, so the tap target is not a 17px sliver.
+                  child: SizedBox(
+                    width: _menuWidth,
+                    height: 22,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Icon(
+                        Icons.more_vert,
+                        size: 17,
+                        color: AppTheme.inkFaint,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

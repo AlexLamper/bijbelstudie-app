@@ -62,7 +62,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                 child: TourAnchor(
                   id: TourAnchorIds.studyPaneSwitcher,
                   child: ReaderTitleBar(showMaterials: showMaterials),
@@ -146,8 +146,12 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
     return Column(
       children: [
         Container(
+          // No horizontal padding of its own: the tab row runs to both screen
+          // edges so its rule does, and the row insets its own first label to
+          // the page margin instead. Padding here as well put the first tab
+          // 32px in while the chapter title above it sat at 16.
           color: AppTheme.surface,
-          padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -175,17 +179,15 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                         // 14 rather than 20, purely so all five fit. The row
                         // stays scrollable for larger text settings.
                         gap: 14,
-                        leading: {
+                        leadingIcons: {
                           // Kept from the old inline Tab: without it the only
                           // sign Grondtekst is Pro-gated is the paywall you
                           // hit after tapping.
-                          if (!isPro)
-                            1: Icon(
-                              Icons.lock_outline,
-                              size: 12,
-                              color: AppTheme.inkFaint,
-                            ),
-                          4: Icon(Icons.auto_awesome, size: 14, color: AppTheme.ai),
+                          if (!isPro) 1: Icons.lock_outline,
+                          // A sparkle in the tab's own teal rather than a
+                          // purple glyph: it is still the one tab with an
+                          // icon, without a second brand colour to explain.
+                          4: Icons.auto_awesome,
                         },
                         // The row runs to both screen edges, so it is inset
                         // back out of the 16px page margin.

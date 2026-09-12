@@ -523,6 +523,10 @@ class _LessonDisc extends StatelessWidget {
 
 /// What the old screen showed above the lessons: the introduction in full and
 /// the reading plan, now behind their own tab.
+///
+/// The facts were a bordered card of icon rows, which is the one shape this
+/// redesign took off every other screen. They are two figures and a list
+/// instead: what you are committing to, then what you will actually read.
 class _About extends StatelessWidget {
   const _About({required this.study});
 
@@ -543,28 +547,74 @@ class _About extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(paragraph, style: AppTheme.bodyLead),
             ),
-          const SizedBox(height: 8),
-          AppCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _FactLine(
-                  icon: Icons.checklist,
-                  label: '${study.lessonCount} lessen',
-                ),
-                _FactLine(
-                  icon: Icons.schedule,
-                  label: '± ${formatStudyMinutes(study.estimatedMinutes)} totaal',
-                ),
-                for (final entry in plan)
-                  _FactLine(
-                    icon: Icons.menu_book_outlined,
-                    label: entry,
-                    showRule: entry != plan.last,
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppTheme.rule),
+                bottom: BorderSide(color: AppTheme.rule),
+              ),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Fact(
+                    value: '${study.lessonCount}',
+                    label: study.lessonCount == 1 ? 'les' : 'lessen',
                   ),
-              ],
+                  _Fact(
+                    value: formatStudyMinutes(study.estimatedMinutes),
+                    label: 'totale leestijd',
+                    divided: true,
+                  ),
+                  _Fact(
+                    value: '${study.minutesPerLesson}',
+                    label: 'min per les',
+                    divided: true,
+                  ),
+                ],
+              ),
             ),
           ),
+          if (plan.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 22, bottom: 10),
+              child: Row(
+                children: [
+                  Text('WAT JE LEEST', style: AppTheme.groupLabel),
+                  const SizedBox(width: 9),
+                  Expanded(child: Container(height: 1, color: AppTheme.rule)),
+                ],
+              ),
+            ),
+            for (final entry in plan)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.menu_book_outlined,
+                        size: 15,
+                        color: AppTheme.teal,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        entry,
+                        style: AppTheme.bodyStrong.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -593,6 +643,54 @@ class _About extends StatelessWidget {
     final contiguous = chapters.last - chapters.first == chapters.length - 1;
     if (contiguous) return '${chapters.first}-${chapters.last}';
     return chapters.join(', ');
+  }
+}
+
+/// One figure in the Over tab's strip.
+class _Fact extends StatelessWidget {
+  const _Fact({required this.value, required this.label, this.divided = false});
+
+  final String value;
+  final String label;
+
+  /// Every column but the first carries the rule that separates it.
+  final bool divided;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        decoration: divided
+            ? BoxDecoration(
+                border: Border(left: BorderSide(color: AppTheme.rule)),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: AppTheme.statNumber.copyWith(fontSize: 20),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -650,34 +748,6 @@ class _Notes extends ConsumerWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _FactLine extends StatelessWidget {
-  const _FactLine({required this.icon, required this.label, this.showRule = true});
-
-  final IconData icon;
-  final String label;
-  final bool showRule;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: showRule
-          ? BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppTheme.rule)),
-            )
-          : null,
-      child: Row(
-        children: [
-          Icon(icon, size: 15, color: AppTheme.teal),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: AppTheme.bodyStrong)),
-        ],
-      ),
     );
   }
 }

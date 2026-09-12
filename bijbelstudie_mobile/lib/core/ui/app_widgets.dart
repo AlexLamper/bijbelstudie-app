@@ -959,8 +959,10 @@ class AppFilterPill extends StatelessWidget {
 /// An underlined tab row: active label in teal over a 2px teal rule, the row
 /// itself horizontally scrollable so a larger text scale never clips a tab.
 ///
-/// [leading] puts a small glyph in front of one tab, for a tab that is not
-/// like the others — the AI assistant, or a locked Pro tab.
+/// [leadingIcons] puts a small glyph in front of one tab, for a tab that is
+/// not like the others — the AI assistant, or a locked Pro tab. The glyph
+/// takes the label's own colour, so a marked tab still reads as part of the
+/// row rather than as a second accent loose in the design.
 class AppUnderlineTabs extends StatelessWidget {
   const AppUnderlineTabs({
     super.key,
@@ -968,7 +970,7 @@ class AppUnderlineTabs extends StatelessWidget {
     required this.selectedIndex,
     required this.onChanged,
     this.gap = 20,
-    this.leading = const {},
+    this.leadingIcons = const {},
     this.activeColor,
     this.padding = EdgeInsets.zero,
     this.bottomGap = 10,
@@ -980,7 +982,7 @@ class AppUnderlineTabs extends StatelessWidget {
   final double gap;
 
   /// Index → glyph, for a tab that needs to read as a different kind.
-  final Map<int, Widget> leading;
+  final Map<int, IconData> leadingIcons;
 
   /// Defaults to teal; the study-detail tabs underline in [AppTheme.ink].
   final Color? activeColor;
@@ -1020,23 +1022,30 @@ class AppUnderlineTabs extends StatelessWidget {
                       ),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (leading[i] != null) ...[
-                        leading[i]!,
-                        const SizedBox(width: 5),
-                      ],
-                      Text(
-                        labels[i],
-                        style: AppTheme.tabLabel.copyWith(
-                          fontWeight: i == selectedIndex
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                          color: i == selectedIndex ? accent : AppTheme.inkFaint,
-                        ),
-                      ),
-                    ],
+                  child: Builder(
+                    builder: (context) {
+                      final color = i == selectedIndex
+                          ? accent
+                          : AppTheme.inkFaint;
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (leadingIcons[i] != null) ...[
+                            Icon(leadingIcons[i], size: 14, color: color),
+                            const SizedBox(width: 5),
+                          ],
+                          Text(
+                            labels[i],
+                            style: AppTheme.tabLabel.copyWith(
+                              fontWeight: i == selectedIndex
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
