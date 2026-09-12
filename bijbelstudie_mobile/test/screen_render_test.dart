@@ -431,12 +431,12 @@ void main() {
     await pumpAtPhoneSize(tester, const StudiesScreen());
 
     expectNoLayoutError(tester);
-    expect(find.text('Alle'), findsOneWidget);
-    // The tabs, the topic grid and the kind pills all have to be there, or the
+    // One filter row, and the way out to the book overview: without them the
     // catalogue is a flat list again.
-    expect(find.text('Ontdek'), findsOneWidget);
-    expect(find.text('Mijn studies'), findsOneWidget);
+    expect(find.text('Voor jou'), findsOneWidget);
     expect(find.text('Bijbelboeken'), findsOneWidget);
+    expect(find.text('Mijn studies'), findsOneWidget);
+    expect(find.text('Per bijbelboek'), findsOneWidget);
     // The one fixture study is both the featured card and a row in the list,
     // so its title legitimately renders twice.
     expect(find.text('De opstanding van Jezus'), findsWidgets);

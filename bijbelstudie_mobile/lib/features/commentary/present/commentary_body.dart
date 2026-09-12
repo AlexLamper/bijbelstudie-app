@@ -47,7 +47,7 @@ class _CommentaryBodyState extends State<CommentaryBody> {
       fontFamily: widget.settings.fontFamily.fontName,
       fontSize: widget.settings.fontSize.points * 0.92,
       height: widget.settings.lineHeight.factor,
-      color: Theme.of(context).textTheme.bodyLarge?.color,
+      color: AppTheme.inkSoft,
     );
     final em = base.fontSize!;
 
@@ -160,24 +160,27 @@ class _CommentaryBodyState extends State<CommentaryBody> {
         );
 
       case CommentaryBlockKind.quote:
+        // A rule and an indent, no wash and no italic: the quote is set in the
+        // serif the bible text uses, which is what marks it as quoted matter
+        // in a column of Inter. A tinted box made it read as a callout.
         return Padding(
           padding: EdgeInsets.only(top: top(0.75), bottom: em * 0.75),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.teal.withValues(alpha: 0.05),
               border: Border(
-                left: BorderSide(color: AppTheme.teal, width: 3),
-              ),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(AppTheme.radiusXs),
-                bottomRight: Radius.circular(AppTheme.radiusXs),
+                left: BorderSide(color: AppTheme.teal, width: 2),
               ),
             ),
-            padding: EdgeInsets.symmetric(
-              horizontal: em,
-              vertical: em * 0.6,
+            padding: const EdgeInsets.only(left: 14),
+            child: _rich(
+              block,
+              base.copyWith(
+                fontFamily: AppTheme.serifFontName,
+                fontSize: em * 0.97,
+                height: 1.7,
+                color: AppTheme.ink,
+              ),
             ),
-            child: _rich(block, base.copyWith(fontStyle: FontStyle.italic)),
           ),
         );
 

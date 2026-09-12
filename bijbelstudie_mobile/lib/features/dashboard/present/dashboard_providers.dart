@@ -90,3 +90,22 @@ String dutchLongDate([DateTime? now]) {
   final d = now ?? DateTime.now();
   return '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
 }
+
+/// A date as a note list wants it: the weekday alone for anything inside the
+/// last week, `3 september` beyond that, and the year too once it is a
+/// different one. Shares the month and weekday names with [dutchLongDate], so
+/// the app still ships no locale data for either.
+String dutchRelativeDate(DateTime when, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final days = DateTime(today.year, today.month, today.day)
+      .difference(DateTime(when.year, when.month, when.day))
+      .inDays;
+
+  if (days == 0) return 'vandaag';
+  if (days == 1) return 'gisteren';
+  if (days < 7) return _weekdays[when.weekday - 1];
+  if (when.year != today.year) {
+    return '${when.day} ${_months[when.month - 1]} ${when.year}';
+  }
+  return '${when.day} ${_months[when.month - 1]}';
+}

@@ -112,21 +112,24 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Je boom groeide'), findsOneWidget);
-      expect(find.text('+25 XP'), findsOneWidget);
-      expect(find.text('Les 2 van 4 afgerond'), findsOneWidget);
-      expect(find.text('Het lege graf'), findsOneWidget);
-      // The passage heads the figures at heading size rather than being one.
-      expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+      // The eyebrow is set in caps.
+      expect(find.text('LES 2 VAN 4 AFGEROND'), findsOneWidget);
+      // What was read and how long it took is one sentence under the
+      // headline, not a figure.
+      expect(
+        find.textContaining('Johannes 20:1-18 gelezen in 15 min'),
+        findsOneWidget,
+      );
+      // The figure strip: XP, the quiz, the streak, and the study's share.
+      expect(find.text('+25'), findsOneWidget);
+      expect(find.text('XP'), findsOneWidget);
       expect(find.text('4/5'), findsOneWidget);
-      expect(find.text('15 min'), findsOneWidget);
-      expect(find.text('Voortgang in deze studie'), findsOneWidget);
-      expect(find.text('2 van 4'), findsOneWidget);
-      expect(find.text('Aan het meer'), findsOneWidget);
-      expect(find.text('Verder met les 3'), findsOneWidget);
-      expect(find.text('Overzicht'), findsOneWidget);
-      // The streak, in the dashboard's mark: the preview tree state's 12.
       expect(find.text('12'), findsOneWidget);
       expect(find.text('dagen op rij'), findsOneWidget);
+      expect(find.text('50%'), findsOneWidget);
+      expect(find.text('Aan het meer'), findsOneWidget);
+      expect(find.text('Verder met les 3'), findsOneWidget);
+      expect(find.text('Voor nu genoeg'), findsOneWidget);
     });
   }
 
@@ -142,15 +145,16 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Les 2 van 4 opnieuw gelezen'), findsOneWidget);
+    expect(find.text('LES 2 VAN 4 OPNIEUW GELEZEN'), findsOneWidget);
     expect(find.text('Deze les telde al mee'), findsOneWidget);
-    expect(find.text('Telde al mee'), findsOneWidget);
+    // Nothing was earned, so the XP figure is a dash and says why.
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('telde al mee'), findsOneWidget);
     expect(find.text('Je boom groeide'), findsNothing);
-    expect(find.textContaining('XP verdiend'), findsNothing);
-    // Without a quiz score the strip has two figures; what was read still
-    // heads it.
-    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
-    expect(find.text('Gelezen'), findsNothing);
+    expect(
+      find.textContaining('Johannes 20:1-18 gelezen in 15 min'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a level-up names the new level', (tester) async {
@@ -185,7 +189,8 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Studie afgerond'), findsOneWidget);
+    // The eyebrow says what happened; the headline names what was finished.
+    expect(find.text('STUDIE AFGEROND'), findsOneWidget);
     expect(find.text('De opstanding'), findsOneWidget);
     expect(find.text('Je reflectie is bewaard als notitie'), findsOneWidget);
     expect(find.text('Terug naar de studie'), findsOneWidget);
@@ -207,7 +212,10 @@ void main() {
     expect(find.text('Je boom groeide'), findsNothing);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('dagen op rij'), findsOneWidget);
-    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+    expect(
+      find.textContaining('Johannes 20:1-18 gelezen in 15 min'),
+      findsOneWidget,
+    );
     expect(find.text('Verder met les 3'), findsOneWidget);
   });
 
@@ -225,10 +233,14 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Je boom groeide'), findsNothing);
-    // No tree and an empty retention store: no streak to show.
+    // No tree and an empty retention store: no streak figure at all, rather
+    // than a column reading "0 dagen op rij".
     expect(find.text('dagen op rij'), findsNothing);
-    expect(find.text('Les 2 van 4 afgerond'), findsOneWidget);
-    expect(find.text('Johannes 20:1-18 gelezen'), findsOneWidget);
+    expect(find.text('LES 2 VAN 4 AFGEROND'), findsOneWidget);
+    expect(
+      find.textContaining('Johannes 20:1-18 gelezen in 15 min'),
+      findsOneWidget,
+    );
     expect(find.text('Verder met les 3'), findsOneWidget);
   });
 }

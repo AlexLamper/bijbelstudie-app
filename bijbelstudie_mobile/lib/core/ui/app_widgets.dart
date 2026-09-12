@@ -845,3 +845,205 @@ class AppEmptyState extends StatelessWidget {
     );
   }
 }
+
+/// The Bijbel ⇄ Studie switch that sits in the reader header, and any other
+/// two-or-three-way choice that has to fit on one row next to a title.
+///
+/// A track in [AppTheme.paperSunken] with the active segment as a solid teal
+/// slab. Deliberately not Material's `SegmentedButton`: that one is 40px tall
+/// with its own outline and check affordance, and it will not sit inside a
+/// 44px header row beside a 19px title.
+class AppSegmentedControl extends StatelessWidget {
+  const AppSegmentedControl({
+    super.key,
+    required this.labels,
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppTheme.paperSunken,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Semantics(
+              button: true,
+              selected: i == selectedIndex,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex ? AppTheme.teal : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    labels[i],
+                    style: TextStyle(
+                      fontFamily: AppTheme.sansFontName,
+                      fontSize: 13,
+                      height: 1.2,
+                      fontWeight: i == selectedIndex
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: i == selectedIndex ? Colors.white : AppTheme.inkMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One chip in a single-select filter row: teal slab when active, hairline
+/// outline when not.
+class AppFilterPill extends StatelessWidget {
+  const AppFilterPill({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.teal : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+            border: selected ? null : Border.all(color: AppTheme.rule),
+          ),
+          child: Text(
+            label,
+            style: AppTheme.pillLabel.copyWith(
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? Colors.white : AppTheme.inkSoft,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// An underlined tab row: active label in teal over a 2px teal rule, the row
+/// itself horizontally scrollable so a larger text scale never clips a tab.
+///
+/// [leading] puts a small glyph in front of one tab, for a tab that is not
+/// like the others — the AI assistant, or a locked Pro tab.
+class AppUnderlineTabs extends StatelessWidget {
+  const AppUnderlineTabs({
+    super.key,
+    required this.labels,
+    required this.selectedIndex,
+    required this.onChanged,
+    this.gap = 20,
+    this.leading = const {},
+    this.activeColor,
+    this.padding = EdgeInsets.zero,
+    this.bottomGap = 10,
+  });
+
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  final double gap;
+
+  /// Index → glyph, for a tab that needs to read as a different kind.
+  final Map<int, Widget> leading;
+
+  /// Defaults to teal; the study-detail tabs underline in [AppTheme.ink].
+  final Color? activeColor;
+  final EdgeInsets padding;
+
+  /// Space between the label and its underline.
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final accent = activeColor ?? AppTheme.teal;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: padding,
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0) SizedBox(width: gap),
+            Semantics(
+              button: true,
+              selected: i == selectedIndex,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                // The underline is a border on the label's own box rather
+                // than a sized bar: inside a horizontal scroll there is no
+                // width to stretch a bar to.
+                child: Container(
+                  padding: EdgeInsets.only(bottom: bottomGap),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: i == selectedIndex ? accent : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (leading[i] != null) ...[
+                        leading[i]!,
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        labels[i],
+                        style: AppTheme.tabLabel.copyWith(
+                          fontWeight: i == selectedIndex
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: i == selectedIndex ? accent : AppTheme.inkFaint,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

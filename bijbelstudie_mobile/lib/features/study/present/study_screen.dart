@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../ai/present/ai_assistant_pane.dart';
 import '../../bible/present/read_screen.dart';
+import '../../bible/present/reader_header.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_pane.dart';
 import '../../notes/present/notes_providers.dart';
@@ -49,154 +50,54 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // [_PaneSwitcher] paints its own `surface` full-bleed under the status
-      // bar and adds the inset itself, so wrapping the body would only put a
-      // strip of scaffold background above it.
-      body: Column(
-        children: [
-          TourAnchor(
-            id: TourAnchorIds.studyPaneSwitcher,
-            child: _PaneSwitcher(
-              showMaterials: showMaterials,
-              onChanged: (value) => value
-                  ? ref.read(studyPaneProvider.notifier).showMaterials()
-                  : ref.read(studyPaneProvider.notifier).showReader(),
-            ),
-          ),
-          Expanded(
-            // The switcher above has already cleared the status bar, so the
-            // panes below it must not clear it a second time. [ReadScreen] is
-            // also a screen in its own right at `/read`, where its own
-            // SafeArea is exactly right; nested here it measured the full
-            // inset again and opened an empty band of scaffold background
-            // under the switcher. Consuming the top padding at this boundary
-            // fixes it for every pane at once and leaves the standalone
-            // reader untouched.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              // IndexedStack so switching panes does not lose the reader's
-              // scroll offset or an in-flight AI answer.
-              child: IndexedStack(
-                index: showMaterials ? 1 : 0,
-                children: [
-                  const ReadScreen(),
-                  if (restored)
-                    const StudyMaterialsPane()
-                  else
-                    const AppLoader(),
-                ],
+      // The chapter title and the Bijbel/Studie switch are the same row on
+      // both sides, so this screen owns them and the panes draw only what is
+      // theirs - the reading tools on one side, the materials tabs on the
+      // other. Drawn by each pane instead, an IndexedStack would hold two live
+      // copies of the same switch.
+      body: Container(
+        color: AppTheme.surface,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: TourAnchor(
+                  id: TourAnchorIds.studyPaneSwitcher,
+                  child: ReaderTitleBar(showMaterials: showMaterials),
+                ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// `flex items-stretch border-b bg-gray-50` with two `h-12` buttons; the
-/// active one is teal on a 7% teal wash with a 2px rounded underline.
-class _PaneSwitcher extends StatelessWidget {
-  const _PaneSwitcher({required this.showMaterials, required this.onChanged});
-
-  final bool showMaterials;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    Widget button({
-      required String label,
-      required IconData icon,
-      required bool active,
-      required VoidCallback onTap,
-    }) {
-      return Expanded(
-        child: Semantics(
-          button: true,
-          selected: active,
-          child: InkWell(
-            onTap: onTap,
-            child: Container(
-              height: 48,
-              color: active
-                  ? AppTheme.teal.withValues(alpha: 0.07)
-                  : Colors.transparent,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              Expanded(
+                // The header above has already cleared the status bar, so the
+                // panes below it must not clear it a second time. [ReadScreen]
+                // is also a screen in its own right at `/read`, where its own
+                // SafeArea is exactly right.
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeTop: true,
+                  // IndexedStack so switching panes does not lose the reader's
+                  // scroll offset or an in-flight AI answer.
+                  child: IndexedStack(
+                    index: showMaterials ? 1 : 0,
                     children: [
-                      Icon(
-                        icon,
-                        size: 16,
-                        color: active ? AppTheme.teal : AppTheme.inkMuted,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: AppTheme.bodyStrong.copyWith(
-                          color: active ? AppTheme.teal : AppTheme.inkMuted,
-                        ),
-                      ),
+                      const ReadScreen(embedded: true),
+                      if (restored)
+                        const StudyMaterialsPane()
+                      else
+                        const AppLoader(),
                     ],
                   ),
-                  if (active)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 0,
-                      child: Container(
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: AppTheme.teal,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outline)),
-      ),
-      // Inside the decoration: the switcher's colour reaches the top of the
-      // screen, and its buttons still sit below the status bar.
-      child: SafeArea(
-        bottom: false,
-        child: Row(
-          children: [
-            button(
-              label: 'Bijbel',
-              icon: Icons.menu_book_outlined,
-              active: !showMaterials,
-              onTap: () => onChanged(false),
-            ),
-            button(
-              label: 'Studie',
-              icon: Icons.article_outlined,
-              active: showMaterials,
-              onTap: () => onChanged(true),
-            ),
-          ],
         ),
       ),
     );
   }
 }
 
-/// `components/study/StudyMaterialsSection.tsx` — Commentaar, Grondtekst
-/// (Pro), Algemene info, Notities, AI-assistent.
 class StudyMaterialsPane extends ConsumerStatefulWidget {
   const StudyMaterialsPane({super.key});
 
@@ -245,41 +146,58 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
     return Column(
       children: [
         Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              bottom: BorderSide(color: Theme.of(context).colorScheme.outline),
-            ),
-          ),
-          child: TourAnchor(
-            id: TourAnchorIds.studyMaterialsTabs,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelStyle: AppTheme.caption.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              tabs: [
-                const Tab(height: 42, text: 'Commentaar'),
-                Tab(
-                  height: 42,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Grondtekst'),
-                      if (!isPro) ...[
-                        const SizedBox(width: 5),
-                        const Icon(Icons.lock_outline, size: 12),
-                      ],
-                    ],
+          color: AppTheme.surface,
+          padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.zero,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppTheme.rule)),
+                  ),
+                  child: TourAnchor(
+                    id: TourAnchorIds.studyMaterialsTabs,
+                    child: AnimatedBuilder(
+                      animation: _tabController,
+                      builder: (context, _) => AppUnderlineTabs(
+                        // "AI-assistent" spelled out does not fit beside the
+                        // other four at 390px; the purple glyph is what marks
+                        // it as the tab that is not a source of its own.
+                        labels: const [
+                          'Commentaar',
+                          'Grondtekst',
+                          'Info',
+                          'Notities',
+                          'Assistent',
+                        ],
+                        // 14 rather than 20, purely so all five fit. The row
+                        // stays scrollable for larger text settings.
+                        gap: 14,
+                        leading: {
+                          // Kept from the old inline Tab: without it the only
+                          // sign Grondtekst is Pro-gated is the paywall you
+                          // hit after tapping.
+                          if (!isPro)
+                            1: Icon(
+                              Icons.lock_outline,
+                              size: 12,
+                              color: AppTheme.inkFaint,
+                            ),
+                          4: Icon(Icons.auto_awesome, size: 14, color: AppTheme.ai),
+                        },
+                        // The row runs to both screen edges, so it is inset
+                        // back out of the 16px page margin.
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        selectedIndex: _tabController.index,
+                        onChanged: _tabController.animateTo,
+                      ),
+                    ),
                   ),
                 ),
-                const Tab(height: 42, text: 'Algemene info'),
-                const Tab(height: 42, text: 'Notities'),
-                const Tab(height: 42, text: 'AI-assistent'),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         Expanded(

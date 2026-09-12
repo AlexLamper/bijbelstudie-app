@@ -173,3 +173,26 @@ class BibleBooks {
     return _spellingAliases[trimmed] ?? _englishToDutch[trimmed] ?? trimmed;
   }
 }
+
+/// One band of the canon in the "alle studies per bijbelboek" overview.
+///
+/// The six groups are a presentation choice — [BibleBooks] itself knows only
+/// the OT/NT split and the canonical order, which is all the rest of the app
+/// needs. The slices below are taken from that same order, so the grid stays
+/// canonical inside every band and the flattened list is still
+/// [BibleBooks.all].
+class CanonGroup {
+  const CanonGroup(this.label, this.books);
+
+  final String label;
+  final List<String> books;
+
+  static final List<CanonGroup> all = [
+    CanonGroup('Wet', BibleBooks.oldTestament.sublist(0, 5)),
+    CanonGroup('Geschiedenis', BibleBooks.oldTestament.sublist(5, 17)),
+    CanonGroup('Poëzie en wijsheid', BibleBooks.oldTestament.sublist(17, 22)),
+    CanonGroup('Profeten', BibleBooks.oldTestament.sublist(22, 39)),
+    CanonGroup('Evangeliën en Handelingen', BibleBooks.newTestament.sublist(0, 5)),
+    CanonGroup('Brieven en Openbaring', BibleBooks.newTestament.sublist(5, 27)),
+  ];
+}

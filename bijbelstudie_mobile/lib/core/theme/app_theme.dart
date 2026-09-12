@@ -138,6 +138,17 @@ class AppTheme {
   /// `bg-teal-100` - the study-mode strip.
   static const Color lightTealSoft = Color(0xFFCCFBF1);
 
+  /// `rgba(13,148,136,.10)` - the wash behind a teal glyph in an icon chip.
+  /// Kept translucent rather than flattened so it also reads on `lineSoft`.
+  static const Color lightTealWash = Color(0x1A0D9488);
+
+  /// `#0F172A` - the end of the study banner gradient, and its fallback.
+  static const Color lightBannerEnd = Color(0xFF0F172A);
+
+  /// `#1F2937` - running bible text in the reader. A touch softer than [ink],
+  /// which is what a full chapter at Lora 17/1.75 wants.
+  static const Color lightReaderInk = Color(0xFF1F2937);
+
   /// `#EA580C` - orange-600, the streak flame.
   static const Color lightFlame = Color(0xFFEA580C);
 
@@ -193,6 +204,12 @@ class AppTheme {
   static const Color darkTealStrong = Color(0xFF14B8A6);
   static const Color darkTealTint = Color(0xFF11312E);
   static const Color darkTealSoft = Color(0xFF14453F);
+  static const Color darkTealWash = Color(0x2D2DB4A6);
+
+  /// The banner gradient keeps its dark end in both themes - it is artwork,
+  /// not a surface, and the teal start is what carries the brand.
+  static const Color darkBannerEnd = Color(0xFF0B1120);
+  static const Color darkReaderInk = Color(0xFFE5E5E5);
 
   static const Color darkLapis = darkTeal;
   static const Color darkLapisStrong = darkTealStrong;
@@ -240,6 +257,9 @@ class AppTheme {
   static Color get tealStrong => _c(lightTealStrong, darkTealStrong);
   static Color get tealTint => _c(lightTealTint, darkTealTint);
   static Color get tealSoft => _c(lightTealSoft, darkTealSoft);
+  static Color get tealWash => _c(lightTealWash, darkTealWash);
+  static Color get bannerEnd => _c(lightBannerEnd, darkBannerEnd);
+  static Color get readerInk => _c(lightReaderInk, darkReaderInk);
 
   /// Legacy aliases kept so older call sites keep compiling.
   static Color get lapis => teal;
@@ -485,6 +505,69 @@ class AppTheme {
     fontSize: 12,
     height: 1.45,
     color: inkMuted,
+  );
+
+  /// Large screen title — `Studies`, `Genesis`. Inter 28/700.
+  static TextStyle get screenTitle => TextStyle(
+    fontFamily: displayFontName,
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    height: 1.15,
+    letterSpacing: -0.5,
+    color: ink,
+  );
+
+  /// Canon group heading above a band of book tiles. Uppercase at the call
+  /// site, not here — [Text] has no text-transform.
+  static TextStyle get groupLabel => TextStyle(
+    fontFamily: sansFontName,
+    fontSize: 11.5,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.0,
+    color: tealStrong,
+  );
+
+  /// Filter chip and status pill label. Inter 12.5.
+  static TextStyle get pillLabel => TextStyle(
+    fontFamily: sansFontName,
+    fontSize: 12.5,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+    color: ink,
+  );
+
+  /// Underlined tab label in the study pane. Inter 13.5.
+  static TextStyle get tabLabel => TextStyle(
+    fontFamily: sansFontName,
+    fontSize: 13.5,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+    color: ink,
+  );
+
+  /// Running bible text — Lora 17 on a 1.75 leading. The reader's own size and
+  /// family preferences override this; it is the design default, not a lock.
+  static TextStyle get readerBody => TextStyle(
+    fontFamily: serifFontName,
+    fontSize: 17,
+    height: 1.75,
+    color: readerInk,
+  );
+
+  /// The verse a note hangs off, quoted under it on the Notities screen.
+  static TextStyle get verseFragment => TextStyle(
+    fontFamily: serifFontName,
+    fontSize: 13,
+    height: 1.6,
+    color: inkMuted,
+  );
+
+  /// Superscript verse number in the reader.
+  static TextStyle get verseNumber => TextStyle(
+    fontFamily: sansFontName,
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: inkFaint,
   );
 
   /// Button label — `text-sm font-semibold`.

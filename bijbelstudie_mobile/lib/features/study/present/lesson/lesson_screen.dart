@@ -445,27 +445,15 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     final isLast = index >= slots.length - 1;
 
     if (cursor.isFinished) {
-      return Column(
-        children: [
-          _TopBar(
-            title: lesson.title,
-            subtitle:
-                '${lesson.studyTitle} · les ${lesson.day} van ${lesson.lessonsTotal}',
-            onClose: () => _close(lesson),
-            onTapTitle: null,
-            onOpenAssistant: _openAssistant,
-            // The lesson is over; there is nothing left to read differently.
-            onOpenSettings: null,
-          ),
-          Expanded(
-            child: LessonCompleteCard(
-              lesson: lesson,
-              summary: cursor.summary!,
-              quizScore: ref.watch(lessonQuizProvider(_ref)).value?.savedScore,
-              quizTotal: ref.watch(lessonQuizProvider(_ref)).value?.savedTotal,
-            ),
-          ),
-        ],
+      // No top bar on the finished state: the tree runs to the top of the
+      // screen and carries the close and the assistant itself.
+      return LessonCompleteCard(
+        lesson: lesson,
+        summary: cursor.summary!,
+        quizScore: ref.watch(lessonQuizProvider(_ref)).value?.savedScore,
+        quizTotal: ref.watch(lessonQuizProvider(_ref)).value?.savedTotal,
+        onClose: () => _close(lesson),
+        onOpenAssistant: _openAssistant,
       );
     }
 

@@ -23,7 +23,9 @@ import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
 import 'bible_providers.dart';
 import 'offline_library_sheet.dart';
+import '../../study/present/study_pane_controller.dart';
 import 'reader_chrome.dart';
+import 'reader_header.dart';
 import 'reader_settings_sheet.dart';
 import 'source_picker_sheet.dart';
 
@@ -45,7 +47,11 @@ class PendingVerseAnchor extends Notifier<int?> {
 
 /// The reader. Everything else in the app exists to get someone here.
 class ReadScreen extends ConsumerStatefulWidget {
-  const ReadScreen({super.key});
+  const ReadScreen({super.key, this.embedded = false});
+
+  /// True when mounted inside `/studie`, where the Bijbel/Studie switch in
+  /// the header only flips panes instead of navigating.
+  final bool embedded;
 
   @override
   ConsumerState<ReadScreen> createState() => _ReadScreenState();
@@ -356,7 +362,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                 children: [
                   TourAnchor(
                     id: TourAnchorIds.readerBar,
-                    child: _ReaderBar(location: location),
+                    child: _ReaderBar(location: location, embedded: widget.embedded),
                   ),
                   const RuleLine(),
                 ],
@@ -415,13 +421,20 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   }
 }
 
+/// The reader header: where you are and which pane, then what you have left
+/// in this chapter and the four reading tools.
+///
+/// The tool order is the one the design fixed - zoeken, weergave, vertaling,
+/// offline - and it is deliberately not the order the buttons grew in.
 class _ReaderBar extends ConsumerWidget {
-  const _ReaderBar({required this.location});
+  const _ReaderBar({required this.location, required this.embedded});
 
   final ReaderLocation location;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final versions = ref.watch(bibleVersionsProvider).value ?? const <BibleSource>[];
     final version = versions.where((v) => v.id == location.versionId).firstOrNull;
 
@@ -442,59 +455,154 @@ class _ReaderBar extends ConsumerWidget {
       );
     }
 
+    final showMaterials = ref.watch(
+      studyPaneProvider.select((pane) => pane.showMaterials),
+    );
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 6, 16, 0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: InkWell(
-              onTap: () => showBookPickerSheet(context, ref),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Semantics(
-                    header: true,
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '${location.book} ${location.chapter}',
-                            style: AppTheme.displaySmall,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(Icons.expand_more, size: 18, color: AppTheme.inkMuted),
-                      ],
-                    ),
+          // Inside `/studie` the screen above owns this row for both panes.
+          if (!embedded)
+            ReaderTitleBar(showMaterials: showMaterials, embedded: false),
+          Padding(
+            padding: const EdgeInsets.only(top: 9, bottom: 8),
+            child: Row(
+              children: [
+                Expanded(child: _ChapterMarks(location: location)),
+                _ToolButton(
+                  icon: Icons.search,
+                  tooltip: 'Zoeken in de Bijbel',
+                  onTap: () => context.push(
+                    '/search?book=${Uri.encodeComponent(location.book)}',
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    version?.name ?? location.versionId,
-                    style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                  ),
-                ],
-              ),
+                ),
+                _ToolButton(
+                  icon: Icons.text_fields,
+                  tooltip: 'Weergave',
+                  onTap: () => showReaderSettingsSheet(context, ref),
+                ),
+                _ToolButton(
+                  icon: Icons.translate,
+                  tooltip: 'Vertaling kiezen',
+                  onTap: () => showVersionPickerSheet(context, ref),
+                ),
+                _OfflineButton(location: location),
+              ],
             ),
           ),
-          IconButton(
-            tooltip: 'Zoeken in de Bijbel',
-            onPressed: () => context.push('/search?book=${Uri.encodeComponent(location.book)}'),
-            icon: const Icon(Icons.search, size: 20),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the reader already has in this chapter, as one teal line.
+///
+/// Counts come from the notes and highlights lists the app loads anyway - see
+/// [chapterMarkCountsProvider]. The line disappears when both are zero rather
+/// than announcing "0 notities", which is noise on a chapter nobody has worked
+/// on yet.
+class _ChapterMarks extends ConsumerWidget {
+  const _ChapterMarks({required this.location});
+
+  final ReaderLocation location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final counts = ref.watch(
+      chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
+    );
+    if (counts.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      children: [
+        Icon(Icons.edit_note_outlined, size: 15, color: AppTheme.teal),
+        const SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            _plural(counts.notes, 'notitie', 'notities'),
+            style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+            overflow: TextOverflow.ellipsis,
           ),
-          _OfflineButton(location: location),
-          IconButton(
-            tooltip: 'Weergave',
-            onPressed: () => showReaderSettingsSheet(context, ref),
-            icon: const Icon(Icons.text_fields, size: 20),
+        ),
+        if (counts.highlights > 0) ...[
+          const SizedBox(width: 7),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: BoxDecoration(
+              color: AppTheme.ruleStrong,
+              shape: BoxShape.circle,
+            ),
           ),
-          IconButton(
-            tooltip: 'Vertaling kiezen',
-            onPressed: () => showVersionPickerSheet(context, ref),
-            icon: const Icon(Icons.translate, size: 20),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Text(
+              _plural(counts.highlights, 'markering', 'markeringen'),
+              style: AppTheme.pillLabel.copyWith(
+                fontWeight: FontWeight.w500,
+                color: AppTheme.inkMuted,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
+      ],
+    );
+  }
+
+  static String _plural(int count, String one, String many) =>
+      '$count ${count == 1 ? one : many}';
+}
+
+/// One 36x36 tool in the header row. Not an [IconButton]: that one insists on
+/// 48x48 of tap padding, which is wider than the four buttons plus the status
+/// line fit into 390px.
+class _ToolButton extends StatelessWidget {
+  const _ToolButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(left: 2),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: active ? AppTheme.tealWash : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+            child: Icon(
+              icon,
+              size: 19,
+              color: active ? AppTheme.teal : AppTheme.inkSoft,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -504,8 +612,8 @@ class _ReaderBar extends ConsumerWidget {
 ///
 /// The download used to live only inside the book picker's expanded chapter
 /// grid, three taps deep and below the fold - which is why offline reading
-/// could look unimplemented to someone who had paid for it. It sits next to the
-/// translation switch instead, and its icon reports the current book's real
+/// could look unimplemented to someone who had paid for it. It sits in the
+/// header tool row instead, and its icon reports the current book's real
 /// state: filled once every chapter of the book is genuinely on disk, outlined
 /// otherwise. It never anticipates a download that has not finished.
 class _OfflineButton extends ConsumerWidget {
@@ -520,14 +628,13 @@ class _OfflineButton extends ConsumerWidget {
         .value;
     final complete = status?.isComplete ?? false;
 
-    return IconButton(
-      tooltip: complete ? '${location.book} is offline beschikbaar' : 'Offline lezen',
-      onPressed: () => showOfflineLibrarySheet(context),
-      icon: Icon(
-        complete ? Icons.offline_pin : Icons.download_outlined,
-        size: 20,
-        color: complete ? AppTheme.lapis : null,
-      ),
+    return _ToolButton(
+      icon: complete ? Icons.offline_pin : Icons.download_outlined,
+      tooltip: complete
+          ? '${location.book} is offline beschikbaar'
+          : 'Offline lezen',
+      active: complete,
+      onTap: () => showOfflineLibrarySheet(context),
     );
   }
 }
@@ -562,7 +669,7 @@ class _ChapterBody extends StatelessWidget {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 48),
       children: [
         if (chapter.fromCache) ...[const _OfflineNotice(), const SizedBox(height: 16)],
         for (final verse in chapter.verses)
@@ -756,38 +863,93 @@ class _ChapterNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final index = chapters.indexOf(current);
     final hasPrevious = index > 0;
     final hasNext = index >= 0 && index + 1 < chapters.length;
     final controller = ref.read(readerLocationProvider.notifier);
 
+    // Deliberately not bold: this is a way out of the chapter, not the thing
+    // the screen is for, and at 600 it competed with the text above it.
+    TextStyle label(bool enabled) => AppTheme.caption.copyWith(
+      fontSize: 13,
+      fontWeight: FontWeight.w400,
+      color: enabled ? AppTheme.teal : AppTheme.ruleStrong,
+    );
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Flexible on all three: at the largest Dynamic Type setting the two
           // labels plus the counter are wider than a small phone.
           Flexible(
-            child: TextButton.icon(
-              onPressed: hasPrevious ? () => controller.previousChapter(chapters) : null,
-              icon: const Icon(Icons.chevron_left, size: 18),
-              label: const Text('Vorige', overflow: TextOverflow.ellipsis),
+            child: Semantics(
+              button: true,
+              enabled: hasPrevious,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: hasPrevious
+                    ? () => controller.previousChapter(chapters)
+                    : null,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.arrow_back,
+                      size: 16,
+                      color: hasPrevious ? AppTheme.teal : AppTheme.ruleStrong,
+                    ),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: Text(
+                        'Vorige',
+                        style: label(hasPrevious),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           Flexible(
             child: Text(
               '$current / ${chapters.isEmpty ? '–' : chapters.last}',
               overflow: TextOverflow.ellipsis,
-              style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+              style: AppTheme.caption.copyWith(
+                fontSize: 11,
+                color: AppTheme.inkFaint,
+              ),
             ),
           ),
           Flexible(
-            child: TextButton.icon(
-              onPressed: hasNext ? () => controller.nextChapter(chapters) : null,
-              icon: const Icon(Icons.chevron_right, size: 18),
-              label: const Text('Volgende', overflow: TextOverflow.ellipsis),
-              iconAlignment: IconAlignment.end,
+            child: Semantics(
+              button: true,
+              enabled: hasNext,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: hasNext ? () => controller.nextChapter(chapters) : null,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Volgende',
+                        style: label(hasNext),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 16,
+                      color: hasNext ? AppTheme.teal : AppTheme.ruleStrong,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

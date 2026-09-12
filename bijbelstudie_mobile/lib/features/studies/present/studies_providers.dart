@@ -128,57 +128,36 @@ final studyEnrollmentProvider = Provider.autoDispose
     });
 
 /// Which section of the catalogue is on screen.
-enum StudiesTab {
-  discover('Ontdek'),
+/// The one filter row on Studies · Ontdek.
+///
+/// The redesign collapses what used to be three separate controls — the
+/// Ontdek/Mijn/Voltooid tabs, the four topic tiles and the kind pills — into a
+/// single scrollable chip row. The four discovery chips come first because
+/// they are the ones that fit on a 390px screen without scrolling; the two
+/// chips about this reader follow, so nothing that worked before is gone.
+enum StudiesFilter {
+  forYou('Voor jou'),
+  books('Bijbelboeken'),
+  people('Personen'),
+  themes("Thema's"),
   mine('Mijn studies'),
   completed('Voltooid');
 
-  const StudiesTab(this.label);
+  const StudiesFilter(this.label);
 
   final String label;
 }
 
-final studiesTabProvider = NotifierProvider<StudiesTabController, StudiesTab>(
-  StudiesTabController.new,
-);
-
-class StudiesTabController extends Notifier<StudiesTab> {
-  @override
-  StudiesTab build() => StudiesTab.discover;
-
-  void select(StudiesTab tab) => state = tab;
-}
-
-/// The coarse bucket the topic grid selects: `ot`, `nt`, `personen`, `themas`,
-/// or null for "no topic chosen", which is the landing state.
-final studiesCategoryProvider =
-    NotifierProvider<StudiesCategoryController, String?>(
-      StudiesCategoryController.new,
+final studiesFilterProvider =
+    NotifierProvider<StudiesFilterController, StudiesFilter>(
+      StudiesFilterController.new,
     );
 
-class StudiesCategoryController extends Notifier<String?> {
+class StudiesFilterController extends Notifier<StudiesFilter> {
   @override
-  String? build() => null;
+  StudiesFilter build() => StudiesFilter.forYou;
 
-  /// Tapping the active topic again clears it, so the grid doubles as its own
-  /// "back to everything".
-  void toggle(String category) {
-    state = state == category ? null : category;
-  }
-
-  void clear() => state = null;
-}
-
-/// The secondary pill row: a study `type`, or null for `Alle`.
-final studiesKindProvider = NotifierProvider<StudiesKindController, String?>(
-  StudiesKindController.new,
-);
-
-class StudiesKindController extends Notifier<String?> {
-  @override
-  String? build() => null;
-
-  void select(String? kind) => state = kind;
+  void select(StudiesFilter filter) => state = filter;
 }
 
 /// What the reader typed into the search field. Filtering happens over the
@@ -253,4 +232,76 @@ final studyStatusProvider = Provider.autoDispose.family<StudyStatus, CuratedStud
         isStudyFinished(study: study, plans: plans, serverLessons: serverLessons),
     enrollment: enrollment,
   );
+});
+
+/// The study the "verder waar je was" row on Studies · Ontdek offers.
+///
+/// Derived, not stored: the first study in catalogue order that is started and
+/// not finished. The enrollment carries no "last opened" timestamp, so there is
+/// nothing more recent to sort on — catalogue order at least keeps the answer
+/// stable between builds instead of shuffling under the reader.
+final continueStudyProvider = Provider.autoDispose<CuratedStudy?>((ref) {
+  final all = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
+  for (final study in all) {
+    final status = ref.watch(studyStatusProvider(study));
+    if (status.started && !status.completed) return study;
+  }
+  return null;
+});
+
+/// How far along a single bible book is, for the tiles on Alle studies.
+enum BookProgress {
+  /// Every study that covers this book is finished.
+  done,
+
+  /// At least one study covering it has been started.
+  started,
+
+  /// Nothing here yet — also the answer for a book no study covers.
+  none,
+}
+
+/// Book name → [BookProgress], read straight off the study statuses the rest
+/// of the app already computes. Nothing is stored and no endpoint is called:
+/// this is [studyStatusProvider] regrouped by the books each study covers.
+final bookProgressProvider = Provider.autoDispose<Map<String, BookProgress>>((ref) {
+  final all = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
+  final result = <String, BookProgress>{};
+
+  for (final study in all) {
+    final status = ref.watch(studyStatusProvider(study));
+    if (!status.started) continue;
+    final progress = status.completed ? BookProgress.done : BookProgress.started;
+    for (final book in study.books) {
+      // A finished study wins over a merely started one, so a book covered by
+      // both does not read as unfinished.
+      if (result[book] == BookProgress.done) continue;
+      result[book] = progress;
+    }
+  }
+
+  return result;
+});
+
+/// The study a book tile opens: the one that starts in that book, falling back
+/// to the first study that covers it at all. Null when the catalogue has none,
+/// in which case the tile is not tappable.
+final studyForBookProvider = Provider.autoDispose.family<CuratedStudy?, String>((
+  ref,
+  book,
+) {
+  final all = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
+  for (final study in all) {
+    if (study.startBook == book) return study;
+  }
+  for (final study in all) {
+    if (study.books.contains(book)) return study;
+  }
+  return null;
+});
+
+/// How many studies the reader has begun, for the counts in the two headers.
+final startedStudyCountProvider = Provider.autoDispose<int>((ref) {
+  final all = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
+  return all.where((study) => ref.watch(studyStatusProvider(study)).started).length;
 });

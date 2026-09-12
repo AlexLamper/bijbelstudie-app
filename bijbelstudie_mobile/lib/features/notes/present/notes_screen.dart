@@ -8,11 +8,19 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../dashboard/present/dashboard_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
+import 'verse_action_sheet.dart';
 
+/// Everything the reader has written down, as a list they can scan.
+///
+/// Rows rather than cards, and no date headings: a note is three short lines,
+/// and wrapping each one in a bordered card on a grey page turned a page of
+/// text into a page of boxes. One hairline between rows is enough separation,
+/// and it gives every note the full width to be read in.
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
 
@@ -30,31 +38,39 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
     super.dispose();
   }
 
+  /// A note on the chapter the reader last had open, with no verse attached -
+  /// which the model already allows and [showAddNoteDialog] already writes.
+  Future<void> _addLooseNote() async {
+    final location = ref.read(readerLocationProvider);
+    await showAddNoteDialog(
+      context: context,
+      ref: ref,
+      book: location.book,
+      chapter: location.chapter,
+      translation: location.versionId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppTheme.surface,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addLooseNote,
+        backgroundColor: AppTheme.teal,
+        foregroundColor: Colors.white,
+        elevation: 6,
+        shape: const CircleBorder(),
+        tooltip: 'Nieuwe notitie',
+        child: const Icon(Icons.add, size: 26),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Align(alignment: Alignment.centerLeft, child: Eyebrow('Jouw studie')),
-            ),
-            TourAnchor(
-              id: TourAnchorIds.notesTabs,
-              child: TabBar(
-                controller: _tabController,
-                labelStyle: AppTheme.caption.copyWith(fontWeight: FontWeight.w600),
-                tabs: const [
-                  Tab(text: 'Notities'),
-                  Tab(text: 'Markeringen'),
-                  Tab(text: 'Bladwijzers'),
-                ],
-              ),
-            ),
-            const RuleLine(),
+            _Header(controller: _tabController),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -68,6 +84,74 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   }
 }
 
+/// No large title: the tab tells you what you are looking at, and the counts
+/// on the right are the only other thing worth the top of the screen.
+class _Header extends ConsumerWidget {
+  const _Header({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final notes = ref.watch(notesListProvider).value?.length ?? 0;
+    final highlights = ref.watch(highlightsListProvider).value?.length ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(bottom: BorderSide(color: AppTheme.rule)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  'JOUW STUDIE',
+                  style: AppTheme.eyebrow.copyWith(fontSize: 11),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${_plural(notes, 'notitie', 'notities')} · '
+                  '${_plural(highlights, 'markering', 'markeringen')}',
+                  style: AppTheme.caption.copyWith(
+                    fontSize: 12.5,
+                    color: AppTheme.inkFaint,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TourAnchor(
+            id: TourAnchorIds.notesTabs,
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) => AppUnderlineTabs(
+                labels: const ['Notities', 'Markeringen', 'Bladwijzers'],
+                gap: 22,
+                bottomGap: 11,
+                selectedIndex: controller.index,
+                onChanged: controller.animateTo,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  static String _plural(int count, String one, String many) =>
+      '$count ${count == 1 ? one : many}';
+}
+
 class _NotesTab extends ConsumerWidget {
   const _NotesTab();
 
@@ -77,7 +161,7 @@ class _NotesTab extends ConsumerWidget {
 
     return notesAsync.when(
       loading: () => const SkeletonList(),
-      error: (_, __) => const _LoadError(),
+      error: (_, _) => const _LoadError(),
       data: (notes) {
         if (notes.isEmpty) {
           return const AppEmptyState(
@@ -87,10 +171,11 @@ class _NotesTab extends ConsumerWidget {
                 'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven.',
           );
         }
+        final sorted = [...notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 32),
-          itemCount: notes.length,
-          itemBuilder: (context, index) => _NoteTile(note: notes[index]),
+          padding: const EdgeInsets.only(bottom: 96),
+          itemCount: sorted.length,
+          itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
         );
       },
     );
@@ -106,7 +191,7 @@ class _HighlightsTab extends ConsumerWidget {
 
     return highlightsAsync.when(
       loading: () => const SkeletonList(),
-      error: (_, __) => const _LoadError(),
+      error: (_, _) => const _LoadError(),
       data: (highlights) {
         if (highlights.isEmpty) {
           return const AppEmptyState(
@@ -115,10 +200,12 @@ class _HighlightsTab extends ConsumerWidget {
             description: 'Houd een vers ingedrukt en kies een kleur.',
           );
         }
+        final sorted = [...highlights]
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 32),
-          itemCount: highlights.length,
-          itemBuilder: (context, index) => _NoteTile(note: highlights[index]),
+          padding: const EdgeInsets.only(bottom: 96),
+          itemCount: sorted.length,
+          itemBuilder: (context, index) => _NoteRow(note: sorted[index]),
         );
       },
     );
@@ -130,11 +217,12 @@ class _BookmarksTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final bookmarksAsync = ref.watch(bookmarksProvider);
 
     return bookmarksAsync.when(
       loading: () => const SkeletonList(),
-      error: (_, __) => const _LoadError(),
+      error: (_, _) => const _LoadError(),
       data: (bookmarks) {
         if (bookmarks.isEmpty) {
           return const AppEmptyState(
@@ -144,57 +232,41 @@ class _BookmarksTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 32),
+          padding: const EdgeInsets.only(bottom: 96),
           itemCount: bookmarks.length,
           itemBuilder: (context, index) {
             final bookmark = bookmarks[index];
-            return RuleListTile(
+            return _Row(
               onTap: () {
-                ref.read(readerLocationProvider.notifier).openChapter(
+                ref
+                    .read(readerLocationProvider.notifier)
+                    .openChapter(
                       versionId: bookmark.version,
                       book: bookmark.book,
                       chapter: bookmark.chapter,
                     );
                 context.go('/read');
               },
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bookmark.reference,
-                          style: AppTheme.caption.copyWith(color: AppTheme.lapis),
-                        ),
-                        if (bookmark.label != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            bookmark.label!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ],
-                      ],
+                  _MetaLine(
+                    reference: bookmark.reference,
+                    date: dutchRelativeDate(bookmark.updatedAt),
+                    onMenu: () => _confirmRemove(context, ref, bookmark),
+                  ),
+                  if (bookmark.label != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      bookmark.label!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.bodyMuted.copyWith(
+                        height: 1.6,
+                        color: AppTheme.ink,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Bladwijzer verwijderen',
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () async {
-                      try {
-                        await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
-                        ref.invalidate(bookmarksProvider);
-                        await HapticFeedback.selectionClick();
-                      } on SyncRejectedException catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(SnackBar(content: Text(e.message)));
-                        }
-                      }
-                    },
-                  ),
+                  ],
                 ],
               ),
             );
@@ -203,16 +275,38 @@ class _BookmarksTab extends ConsumerWidget {
       },
     );
   }
+
+  Future<void> _confirmRemove(
+    BuildContext context,
+    WidgetRef ref,
+    Bookmark bookmark,
+  ) async {
+    final picked = await _showRowMenu(context, canShare: false);
+    if (picked != _RowAction.delete) return;
+    try {
+      await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
+      ref.invalidate(bookmarksProvider);
+      await HapticFeedback.selectionClick();
+    } on SyncRejectedException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
 }
 
-class _NoteTile extends ConsumerWidget {
-  const _NoteTile({required this.note});
+/// One note: where it is from and when, the note itself, then the verse it
+/// hangs off at a light rule.
+class _NoteRow extends ConsumerWidget {
+  const _NoteRow({required this.note});
 
   final StudyNote note;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return RuleListTile(
+    AppTheme.dependOn(context);
+
+    return _Row(
       onTap: () {
         ref
             .read(readerLocationProvider.notifier)
@@ -222,65 +316,200 @@ class _NoteTile extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              if (note.isHighlight)
-                Container(
-                  width: 12,
-                  height: 12,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: note.color.swatch,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: AppTheme.rule),
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  note.reference,
-                  style: AppTheme.caption.copyWith(color: AppTheme.lapis),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Delen',
-                icon: const Icon(Icons.ios_share, size: 16),
-                onPressed: () => Share.share(
-                  '${note.verseText}\n\n${note.noteText}\n\n${note.reference}',
-                  subject: note.reference,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Verwijderen',
-                icon: const Icon(Icons.delete_outline, size: 16),
-                onPressed: () async {
-                  try {
-                    await ref.read(notesRepositoryProvider).deleteNote(note);
-                    ref.invalidate(
-                      note.isHighlight ? highlightsListProvider : notesListProvider,
-                    );
-                    await HapticFeedback.selectionClick();
-                  } on SyncRejectedException catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(e.message)));
-                    }
-                  }
-                },
-              ),
-            ],
+          _MetaLine(
+            reference: note.reference,
+            date: dutchRelativeDate(note.updatedAt),
+            swatch: note.isHighlight ? note.color.swatch : null,
+            onMenu: () => _menu(context, ref),
           ),
-          if (note.verseText.isNotEmpty)
+          if (note.noteText.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
-              note.verseText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+              note.noteText,
+              style: AppTheme.bodyMuted.copyWith(height: 1.6, color: AppTheme.ink),
             ),
-          if (note.noteText.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(note.noteText, style: Theme.of(context).textTheme.bodyLarge),
+          ],
+          if (note.verseText.trim().isNotEmpty) ...[
+            const SizedBox(height: 9),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 2, color: AppTheme.tealSoft),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(note.verseText, style: AppTheme.verseFragment),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _menu(BuildContext context, WidgetRef ref) async {
+    final picked = await _showRowMenu(context, canShare: true);
+    if (picked == null || !context.mounted) return;
+
+    if (picked == _RowAction.share) {
+      await Share.share(
+        '${note.verseText}\n\n${note.noteText}\n\n${note.reference}',
+        subject: note.reference,
+      );
+      return;
+    }
+
+    try {
+      await ref.read(notesRepositoryProvider).deleteNote(note);
+      ref.invalidate(note.isHighlight ? highlightsListProvider : notesListProvider);
+      await HapticFeedback.selectionClick();
+    } on SyncRejectedException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+}
+
+enum _RowAction { share, delete }
+
+/// Delen and Verwijderen, behind the row's `more_vert`. They used to be two
+/// always-visible icon buttons, which put two tap targets the reader almost
+/// never wants at the top right of every single row.
+Future<_RowAction?> _showRowMenu(BuildContext context, {required bool canShare}) {
+  return showModalBottomSheet<_RowAction>(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canShare)
+            ListTile(
+              leading: Icon(Icons.ios_share, size: 20, color: AppTheme.inkSoft),
+              title: Text('Delen', style: AppTheme.bodyStrong),
+              onTap: () => Navigator.of(sheetContext).pop(_RowAction.share),
+            ),
+          ListTile(
+            leading: Icon(
+              Icons.delete_outline,
+              size: 20,
+              color: AppTheme.destructive,
+            ),
+            title: Text(
+              'Verwijderen',
+              style: AppTheme.bodyStrong.copyWith(color: AppTheme.destructive),
+            ),
+            onTap: () => Navigator.of(sheetContext).pop(_RowAction.delete),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Source, date and the row menu.
+class _MetaLine extends StatelessWidget {
+  const _MetaLine({
+    required this.reference,
+    required this.date,
+    required this.onMenu,
+    this.swatch,
+  });
+
+  final String reference;
+  final String date;
+  final VoidCallback onMenu;
+
+  /// The highlight's colour, on the Markeringen tab.
+  final Color? swatch;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Row(
+      children: [
+        if (swatch != null) ...[
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: swatch,
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: AppTheme.rule),
+            ),
+          ),
+          const SizedBox(width: 9),
+        ],
+        Flexible(
+          child: Text(
+            reference,
+            style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Container(
+          width: 3,
+          height: 3,
+          decoration: BoxDecoration(
+            color: AppTheme.ruleStrong,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          date,
+          style: AppTheme.caption.copyWith(
+            fontSize: 12.5,
+            color: AppTheme.inkFaint,
+          ),
+        ),
+        const Spacer(),
+        Semantics(
+          button: true,
+          label: 'Acties',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onMenu,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Icon(Icons.more_vert, size: 17, color: AppTheme.inkFaint),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// An edge-to-edge row under one hairline. No card, no margin, no radius.
+class _Row extends StatelessWidget {
+  const _Row({required this.child, required this.onTap});
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppTheme.rule)),
+        ),
+        child: child,
       ),
     );
   }

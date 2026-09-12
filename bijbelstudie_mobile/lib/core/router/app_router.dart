@@ -32,6 +32,7 @@ import '../../features/resources/present/resources_screen.dart';
 import '../../features/search/present/search_screen.dart';
 import '../../features/settings/present/settings_screen.dart';
 import '../../features/studies/present/studies_screen.dart';
+import '../../features/studies/present/book_overview_screen.dart';
 import '../../features/studies/present/study_detail_screen.dart';
 import '../../features/study/present/study_pane_controller.dart';
 import '../../features/study/present/study_screen.dart';
@@ -317,6 +318,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/groups/:id', redirect: (context, state) => '/dashboard'),
       // Outside the shell: a study is configured and then left for the reader,
       // so it gets a back arrow rather than a tab bar.
+      // Before `/studies/:id`, or go_router matches "boeken" as a study id.
+      GoRoute(
+        path: '/studies/boeken',
+        builder: (context, state) => const BookOverviewScreen(),
+      ),
       GoRoute(
         path: '/studies/:id',
         builder: (context, state) => StudyDetailScreen(studyId: state.pathParameters['id']!),

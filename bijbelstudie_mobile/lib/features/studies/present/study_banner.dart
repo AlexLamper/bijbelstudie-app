@@ -43,7 +43,7 @@ class StudyBanner extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: _gradientEnd(study.id),
-          colors: [AppTheme.tealStrong, Color(0xFF0F172A)],
+          colors: [AppTheme.tealStrong, AppTheme.bannerEnd],
         ),
       ),
       child: Align(

@@ -96,3 +96,31 @@ final continueReadingProvider = Provider.autoDispose<ReadingPosition?>((ref) {
   final sorted = [...history]..sort((a, b) => b.readAt.compareTo(a.readAt));
   return sorted.first;
 });
+
+/// How many notes and highlights the open chapter carries, for the status line
+/// in the reader header.
+class ChapterMarkCounts {
+  const ChapterMarkCounts({required this.notes, required this.highlights});
+
+  final int notes;
+  final int highlights;
+
+  bool get isEmpty => notes == 0 && highlights == 0;
+}
+
+/// Counts for one chapter, derived from the two lists the Notities tab already
+/// loads. No endpoint and no new model: the reader header is a second view of
+/// rows that are on the device anyway, and it stays in sync for free wherever
+/// those providers are invalidated after a save or delete.
+final chapterMarkCountsProvider =
+    Provider.autoDispose.family<ChapterMarkCounts, ChapterKey>((ref, key) {
+  bool here(StudyNote n) => n.book == key.book && n.chapter == key.chapter;
+
+  final notes = ref.watch(notesListProvider).value ?? const <StudyNote>[];
+  final highlights = ref.watch(highlightsListProvider).value ?? const <StudyNote>[];
+
+  return ChapterMarkCounts(
+    notes: notes.where(here).length,
+    highlights: highlights.where(here).length,
+  );
+});

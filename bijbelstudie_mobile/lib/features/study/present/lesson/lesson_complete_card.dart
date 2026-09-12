@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/notifications/retention_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
-import '../../../dashboard/present/widgets/streak_ring.dart';
 import '../../../levensboom/domain/catalog.dart';
 import '../../../levensboom/domain/tree_state.dart';
 import '../../../levensboom/present/levensboom_avatar.dart';
@@ -34,12 +33,22 @@ class LessonCompleteCard extends ConsumerWidget {
     required this.summary,
     this.quizScore,
     this.quizTotal,
+    this.onClose,
+    this.onOpenAssistant,
   });
 
   final LessonPayload lesson;
   final CompletionSummary summary;
   final int? quizScore;
   final int? quizTotal;
+
+  /// Leaves the lesson. The finished state has no top bar of its own - the
+  /// hero runs to the top of the screen - so the close sits on the hero.
+  final VoidCallback? onClose;
+
+  /// Opens the AI assistant, kept reachable from the finished state because
+  /// the top bar that used to carry it is gone.
+  final VoidCallback? onOpenAssistant;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,9 +74,6 @@ class LessonCompleteCard extends ConsumerWidget {
     );
     final total = lesson.lessonsTotal;
     final progressAfter = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
-    final progressBefore = total == 0 || alreadyCounted
-        ? progressAfter
-        : ((done - 1) / total).clamp(0.0, 1.0);
 
     final next = summary.nextLessonDay ?? lesson.nextLessonDay;
     final nextEntry = next == null
@@ -97,193 +103,148 @@ class LessonCompleteCard extends ConsumerWidget {
         : repeat
         ? 'Les ${lesson.day} van ${lesson.lessonsTotal} opnieuw gelezen'
         : 'Les ${lesson.day} van ${lesson.lessonsTotal} afgerond';
-    final accent = studyDone ? AppTheme.flame : AppTheme.teal;
     final accentText = studyDone ? AppTheme.flame : AppTheme.tealStrong;
 
+    // Where the tree's level bar stands now, and where it stood before this
+    // lesson's XP landed. Exact while the level held; after a level-up the new
+    // level started from nothing, so the bar is all growth.
+    final gained = repeat ? 0 : summary.xpAwarded;
+    final grew = gained > 0;
+    final levelledUp = grew && summary.levelledUp;
+    final unlocked = levelledUp && tree != null
+        ? itemsUnlockedAtLevel(tree.level)
+        : const <CatalogItem>[];
+
+    final headline = _headline(
+      tree: tree,
+      hasTree: hasTree,
+      studyDone: studyDone,
+      repeat: repeat,
+      levelledUp: levelledUp,
+      grew: grew,
+      studyTitle: lesson.studyTitle,
+      lessonTitle: lesson.title,
+    );
+
+    final detail = StringBuffer(
+      '${lesson.passage.reference} gelezen in '
+      '${formatStudyMinutes(lesson.estimatedMinutes)}.',
+    );
+    if (hasTree && !repeat) {
+      detail.write(
+        ' Nog ${tree.xpToNextLevel} XP tot niveau ${tree.level + 1}.',
+      );
+    }
+    if (unlocked.isNotEmpty) {
+      detail.write(
+        ' Nieuw ontgrendeld: ${unlocked.map((i) => i.name).join(', ')}.',
+      );
+    }
+
     final sections = <Widget>[
-      // The reader's own tree, as it stands now that this lesson's XP has
-      // reached it, and the growth that XP was.
-      if (hasTree)
-        _LevensboomHero(
-          tree: tree,
-          summary: summary,
-          repeat: repeat,
-          still: still,
-        ),
-
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Glow(
-            accent: accent,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            studyDone
-                                ? Icons.celebration
-                                : Icons.check_circle,
-                            size: 18,
-                            color: accent,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              eyebrow,
-                              style: AppTheme.eyebrow.copyWith(
-                                color: accentText,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        studyDone ? lesson.studyTitle : lesson.title,
-                        style: AppTheme.displayMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        studyDone
-                            ? '${lesson.title} · ${lesson.passage.reference}'
-                            : '${lesson.studyTitle} · ${lesson.passage.reference}',
-                        style: AppTheme.caption,
-                      ),
-                    ],
-                  ),
-                ),
-                // The same mark the dashboard header carries the streak in,
-                // so the number here is recognisably the one there.
-                if (streak > 0) ...[
-                  const SizedBox(width: 12),
-                  _StreakMark(streak: streak, tree: tree),
-                ],
-              ],
-            ),
-          ),
-          if (summary.levelledUp || summary.newBadges.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (summary.levelledUp) SiteBadge.vermilion('Nieuw niveau'),
-                for (final badge in summary.newBadges) SiteBadge.teal(badge),
-              ],
-            ),
-          ],
-        ],
-      ),
-
       Padding(
-        padding: const EdgeInsets.only(top: 20),
-        child: StatStrip(
-          // What was read is the line the figures are about. A passage
-          // reference is too long to be a figure itself - "Handelingen der
-          // Apostelen 28" shrunk into a third of the strip is unreadable - so
-          // it heads the strip at heading size and wraps instead.
-          header: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 3),
-                child: Icon(Icons.menu_book_outlined, size: 20, color: accent),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '${lesson.passage.reference} gelezen',
-                  style: AppTheme.displaySmall,
-                  softWrap: true,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          items: [
-            StatItem(
-              value: !repeat && summary.xpAwarded > 0
-                  ? '+${summary.xpAwarded}'
-                  : '—',
-              label: repeat ? 'Telde al mee' : 'XP verdiend',
-              icon: Icons.bolt,
-            ),
-            if (quizScore != null && quizTotal != null)
-              StatItem(
-                value: '$quizScore/$quizTotal',
-                label: quizScoreLabel(quizScore!, quizTotal!),
-                icon: Icons.quiz_outlined,
-              ),
-            StatItem(
-              value: formatStudyMinutes(lesson.estimatedMinutes),
-              label: 'Leestijd',
-              icon: Icons.schedule,
-            ),
-          ],
-        ),
-      ),
-
-      Padding(
-        padding: const EdgeInsets.only(top: 24),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Voortgang in deze studie',
-                    style: AppTheme.metaLabel,
-                  ),
-                ),
-                Text(
-                  '$done van ${lesson.lessonsTotal}',
-                  style: AppTheme.caption.copyWith(
-                    color: AppTheme.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            Text(
+              eyebrow.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: AppTheme.groupLabel.copyWith(
+                fontSize: 11.5,
+                color: accentText,
+              ),
             ),
             const SizedBox(height: 8),
-            // This lesson's share of the study, filled in rather than found
-            // full - the same growth the bar under the tree shows for the XP.
-            TweenAnimationBuilder<double>(
-              tween: Tween(
-                begin: still ? progressAfter : progressBefore,
-                end: progressAfter,
-              ),
-              duration: still
-                  ? Duration.zero
-                  : const Duration(milliseconds: 900),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => SiteProgressBar(
-                value: value,
-                color: studyDone ? AppTheme.flame : null,
-              ),
-            ),
-            const SizedBox(height: 6),
             Text(
-              remaining == 0
-                  ? 'Alle lessen afgerond'
-                  : remaining == 1
-                  ? 'Nog één les te gaan'
-                  : 'Nog $remaining lessen te gaan',
-              style: AppTheme.caption,
+              headline,
+              textAlign: TextAlign.center,
+              style: AppTheme.screenTitle.copyWith(fontSize: 27, height: 1.2),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              detail.toString(),
+              textAlign: TextAlign.center,
+              style: AppTheme.bodyMuted.copyWith(height: 1.55),
             ),
           ],
         ),
       ),
+
+      // Three (or four) figures between two rules: what this lesson earned,
+      // the streak it kept alive, and where it leaves the study.
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppTheme.rule),
+              bottom: BorderSide(color: AppTheme.rule),
+            ),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Figure(
+                  value: grew ? '+$gained' : '—',
+                  label: repeat ? 'telde al mee' : 'XP',
+                  color: accentText,
+                ),
+                if (quizScore != null && quizTotal != null)
+                  _Figure(
+                    value: '$quizScore/$quizTotal',
+                    label: quizScoreLabel(quizScore!, quizTotal!),
+                    divided: true,
+                  ),
+                if (streak > 0)
+                  _Figure(
+                    value: '$streak',
+                    label: streak == 1 ? 'dag op rij' : 'dagen op rij',
+                    divided: true,
+                  ),
+                _Figure(
+                  value: '${(progressAfter * 100).round()}%',
+                  label: 'van ${lesson.studyTitle}',
+                  divided: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+
+      // Everything below is state the mock does not show but the screen still
+      // has to be able to say: badges earned, the reflection that was saved,
+      // and what the next lesson actually is.
+      if (summary.levelledUp || summary.newBadges.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (summary.levelledUp) SiteBadge.vermilion('Nieuw niveau'),
+              for (final badge in summary.newBadges) SiteBadge.teal(badge),
+            ],
+          ),
+        ),
+
+      if (remaining > 0)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: Text(
+            remaining == 1
+                ? 'Nog één les te gaan'
+                : 'Nog $remaining lessen te gaan',
+            textAlign: TextAlign.center,
+            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+          ),
+        ),
 
       if (summary.noteId != null)
         Padding(
-          padding: const EdgeInsets.only(top: 18),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
           child: AppCard(
             color: AppTheme.tealTint,
             borderColor: AppTheme.teal,
@@ -313,7 +274,7 @@ class LessonCompleteCard extends ConsumerWidget {
 
       if (nextEntry != null && nextRoute != null)
         Padding(
-          padding: const EdgeInsets.only(top: 18),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
           child: AppCard(
             padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
             onTap: () => context.replace(nextRoute),
@@ -336,269 +297,270 @@ class LessonCompleteCard extends ConsumerWidget {
             ),
           ),
         ),
+    ];
 
-      Padding(
-        padding: const EdgeInsets.only(top: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (nextRoute != null)
-              SiteButton(
-                label: 'Verder met les $next',
-                trailingIcon: Icons.arrow_forward,
-                onPressed: () => context.replace(nextRoute),
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              if (hasTree)
+                _Entrance(
+                  order: 0,
+                  animate: !still,
+                  // The tree comes toward the reader; everything under it rises.
+                  scale: true,
+                  child: _LevensboomHero(
+                    tree: tree,
+                    summary: summary,
+                    repeat: repeat,
+                    still: still,
+                    onClose: onClose,
+                    onOpenAssistant: onOpenAssistant,
+                  ),
+                ),
+              for (var i = 0; i < sections.length; i++)
+                _Entrance(
+                  order: hasTree ? i + 1 : i,
+                  animate: !still,
+                  child: sections[i],
+                ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (nextRoute != null)
+                  SiteButton(
+                    label: 'Verder met les $next',
+                    height: 50,
+                    onPressed: () => context.replace(nextRoute),
+                  )
+                else
+                  SiteButton(
+                    label: 'Terug naar de studie',
+                    height: 50,
+                    onPressed: () => context.go(studyRoute),
+                  ),
+                const SizedBox(height: 10),
+                Semantics(
+                  button: true,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => context.go(studyRoute),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Voor nu genoeg',
+                        textAlign: TextAlign.center,
+                        style: AppTheme.bodyStrong.copyWith(
+                          color: AppTheme.inkMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The one line that says what just happened. The tree is the subject
+  /// whenever there is one and it grew; otherwise the lesson is.
+  static String _headline({
+    required TreeState? tree,
+    required bool hasTree,
+    required bool studyDone,
+    required bool repeat,
+    required bool levelledUp,
+    required bool grew,
+    required String studyTitle,
+    required String lessonTitle,
+  }) {
+    // The eyebrow above already says "Studie afgerond", so the headline is
+    // the thing that was finished.
+    if (studyDone) return studyTitle;
+    if (!hasTree) return lessonTitle;
+    if (repeat) return 'Deze les telde al mee';
+    if (levelledUp) return 'Je boom groeide naar niveau ${tree!.level}';
+    if (grew) return 'Je boom groeide';
+    return 'Je voortgang';
+  }
+}
+
+/// One column of the figure strip.
+class _Figure extends StatelessWidget {
+  const _Figure({
+    required this.value,
+    required this.label,
+    this.color,
+    this.divided = false,
+  });
+
+  final String value;
+  final String label;
+  final Color? color;
+
+  /// Every column but the first carries the rule that separates it.
+  final bool divided;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+        decoration: divided
+            ? BoxDecoration(
+                border: Border(left: BorderSide(color: AppTheme.rule)),
               )
-            else
-              SiteButton(
-                label: 'Terug naar de studie',
-                trailingIcon: Icons.arrow_forward,
-                onPressed: () => context.go(studyRoute),
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              style: AppTheme.statNumber.copyWith(
+                fontSize: 21,
+                color: color ?? AppTheme.ink,
               ),
-            const SizedBox(height: 8),
-            SiteOutlineButton(
-              label: 'Overzicht',
-              onPressed: () => context.go(studyRoute),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
             ),
           ],
         ),
       ),
-    ];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        for (var i = 0; i < sections.length; i++)
-          _Entrance(
-            order: i,
-            animate: !still,
-            // The tree comes toward the reader; everything under it rises.
-            scale: i == 0 && hasTree,
-            child: sections[i],
-          ),
-      ],
     );
   }
 }
 
-/// The tree at the end of a lesson, and what the lesson did to it.
+/// The tree at the end of a lesson, full width and 300 tall.
 ///
-/// The XP grant has already reached the tree state through the animation bus by
-/// the time this builds, so the tree drawn is the result; the bar underneath
-/// shows how far the level stood before and how much this lesson added. When
-/// the lesson grew the tree, its outermost tips grow in over the first second
-/// - the same reveal the level-up sequence uses for the new wood - so the
-/// change is seen happening rather than found done.
+/// The XP grant has already reached the tree state through the animation bus
+/// by the time this builds, so the tree drawn is the result. When the lesson
+/// grew the tree, its outermost tips grow in over the first second - the same
+/// reveal the level-up sequence uses for the new wood - so the change is seen
+/// happening rather than found done.
+///
+/// It used to be a bordered card inset in the page with a headline and an XP
+/// bar under it. Run to the edges instead, the tree is the screen, and the
+/// numbers it was captioned with read better as the figure strip below.
 class _LevensboomHero extends StatelessWidget {
   const _LevensboomHero({
     required this.tree,
     required this.summary,
     required this.repeat,
     required this.still,
+    this.onClose,
+    this.onOpenAssistant,
   });
 
   final TreeState tree;
   final CompletionSummary summary;
   final bool repeat;
   final bool still;
+  final VoidCallback? onClose;
+  final VoidCallback? onOpenAssistant;
+
+  static const double _height = 300;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    // kGoldRing rather than the design's #CA9A16: the same gold already rings
+    // the avatar on Profiel and Mijn voortgang, and two golds a tab apart is
+    // worse than one that is a shade off.
     final gold = tree.avatar.ring == TreeRing.goud;
     final accent = gold ? kGoldRing : AppTheme.teal;
 
     final gained = repeat ? 0 : summary.xpAwarded;
-    final grew = gained > 0;
-    final levelledUp = grew && summary.levelledUp;
-    final unlocked = levelledUp
-        ? itemsUnlockedAtLevel(tree.level)
-        : const <CatalogItem>[];
+    final growIn = gained > 0 && !still;
 
-    // Where the level's bar stood before this lesson's XP landed. Exact while
-    // the level held; after a level-up the new level started from nothing, so
-    // the bar is all growth.
-    final span = tree.xpForNextLevel > 0 ? tree.xpForNextLevel : 1;
-    final before = levelledUp
-        ? 0.0
-        : ((tree.xpIntoLevel - gained) / span).clamp(0.0, 1.0);
-    final after = tree.progress.clamp(0.0, 1.0);
-
-    final String headline;
-    final String detail;
-    final toNext =
-        'nog ${tree.xpToNextLevel} XP tot niveau ${tree.level + 1}';
-    if (repeat) {
-      headline = 'Deze les telde al mee';
-      detail = 'Je boom groeide er de eerste keer al van.';
-    } else if (levelledUp) {
-      headline = 'Je boom groeide naar niveau ${tree.level}';
-      detail = '${tree.stage.name} · $toNext';
-    } else if (grew) {
-      headline = 'Je boom groeide';
-      detail = 'Niveau ${tree.level} · $toNext';
-    } else {
-      headline = 'Je voortgang';
-      detail = 'Niveau ${tree.level} · ${tree.stage.name}';
-    }
-
-    final growIn = grew && !still;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
-      child: Material(
-        color: AppTheme.paperRaised,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          side: BorderSide(
-            color: accent.withValues(alpha: gold ? 0.9 : 0.35),
-            width: 1.5,
-          ),
-        ),
-        child: InkWell(
-          // The same place the profile avatar leads: the tree in full.
-          onTap: () => context.push('/profile/boom'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                image: true,
-                label:
-                    'Je voortgang, niveau ${tree.level}, ${tree.stage.name}',
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: growIn ? 0.84 : 1.0, end: 1.0),
-                        duration: growIn
-                            ? const Duration(milliseconds: 1400)
-                            : Duration.zero,
-                        curve: Curves.easeOutCubic,
-                        builder: (context, reveal, _) => TreeView(
-                          seed: tree.seed,
-                          level: tree.level,
-                          frac: tree.progress,
-                          health: tree.health,
-                          species: tree.avatar.species,
-                          scene: tree.avatar.scene,
-                          animal: tree.avatar.animal,
-                          reveal: reveal,
-                          reducedMotion: still,
-                        ),
-                      ),
-                      Positioned(
-                        left: 12,
-                        bottom: 10,
-                        child: Row(
-                          children: [
-                            _Pill(
-                              text: 'Niveau ${tree.level}',
-                              background: accent,
-                            ),
-                            const SizedBox(width: 6),
-                            _Pill(
-                              text: tree.stage.name,
-                              background: Colors.black.withValues(alpha: 0.45),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          levelledUp ? Icons.auto_awesome : Icons.eco,
-                          size: 18,
-                          color: accent,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(headline, style: AppTheme.bodyStrong),
-                        ),
-                        if (grew) ...[
-                          const SizedBox(width: 8),
-                          _XpChip(text: '+$gained XP'),
-                        ],
-                      ],
-                    ),
-                    if (grew) ...[
-                      const SizedBox(height: 12),
-                      _GrowthBar(
-                        before: before,
-                        after: after,
-                        accent: accent,
-                        animate: !still,
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(detail, style: AppTheme.caption),
-                    if (unlocked.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Nieuw ontgrendeld: ${unlocked.map((i) => i.name).join(', ')}',
-                        style: AppTheme.caption.copyWith(
-                          color: AppTheme.tealStrong,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The reader's streak, in the mark the dashboard header carries it in: the
-/// tree at header size with the count in its corner badge, or the plain count
-/// pill when the tree is switched off, with what the number counts underneath.
-class _StreakMark extends StatelessWidget {
-  const _StreakMark({required this.streak, required this.tree});
-
-  final int streak;
-
-  /// Null before the first fetch lands; [StreakRing] stands a sapling in.
-  final TreeState? tree;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
     return SizedBox(
-      width: 84,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      height: _height,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          StreakRing(
-            streak: streak,
-            hasFreeze: (tree?.freezes ?? 0) > 0,
-            tree: tree,
-            size: 52,
+          ColoredBox(color: AppTheme.tealSoft),
+          Semantics(
+            image: true,
+            label: 'Je voortgang, niveau ${tree.level}, ${tree.stage.name}',
+            child: GestureDetector(
+              // The same place the profile avatar leads: the tree in full.
+              onTap: () => context.push('/profile/boom'),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: growIn ? 0.84 : 1.0, end: 1.0),
+                duration: growIn
+                    ? const Duration(milliseconds: 1400)
+                    : Duration.zero,
+                curve: Curves.easeOutCubic,
+                builder: (context, reveal, _) => TreeView(
+                  seed: tree.seed,
+                  level: tree.level,
+                  frac: tree.progress,
+                  health: tree.health,
+                  species: tree.avatar.species,
+                  scene: tree.avatar.scene,
+                  animal: tree.avatar.animal,
+                  reveal: reveal,
+                  reducedMotion: still,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(height: 6),
-          // The ring's own semantics already say "reeks van N dagen".
-          ExcludeSemantics(
-            child: Text(
-              streak == 1 ? 'dag op rij' : 'dagen op rij',
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTheme.caption.copyWith(
-                color: AppTheme.inkFaint,
-                fontWeight: FontWeight.w600,
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: Row(
+              children: [
+                _Pill(text: 'Niveau ${tree.level}', background: accent),
+                const SizedBox(width: 8),
+                _Pill(
+                  text: tree.stage.name,
+                  background: const Color(0x8C111827),
+                ),
+              ],
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: [
+                  if (onClose != null)
+                    _HeroButton(
+                      icon: Icons.close,
+                      label: 'Les sluiten',
+                      onTap: onClose!,
+                    ),
+                  const Spacer(),
+                  if (onOpenAssistant != null)
+                    _HeroButton(
+                      icon: Icons.auto_awesome,
+                      label: 'AI-assistent',
+                      onTap: onOpenAssistant!,
+                    ),
+                ],
               ),
             ),
           ),
@@ -608,42 +570,40 @@ class _StreakMark extends StatelessWidget {
   }
 }
 
-/// A soft wash of the accent behind the headline - enough to lift it off the
-/// page the way the level-up sequence lights its tree, not enough to read as
-/// a box. Painted past the headline's own bounds so it has no visible edge.
-class _Glow extends StatelessWidget {
-  const _Glow({required this.accent, required this.child});
+/// A control floating over the tree: a translucent white disc, so it reads on
+/// a painted scene without a border of its own.
+class _HeroButton extends StatelessWidget {
+  const _HeroButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
-  final Color accent;
-  final Widget child;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          left: -20,
-          right: 48,
-          top: -28,
-          bottom: -20,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-0.7, -0.1),
-                  radius: 0.95,
-                  colors: [
-                    accent.withValues(alpha: 0.18),
-                    accent.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
+    AppTheme.dependOn(context);
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.7),
+            shape: BoxShape.circle,
           ),
+          child: Icon(icon, size: 17, color: AppTheme.lightInkSoft),
         ),
-        child,
-      ],
+      ),
     );
   }
 }
@@ -687,89 +647,6 @@ class _Entrance extends StatelessWidget {
                 offset: Offset(0, 14 * (1 - t)),
                 child: child,
               ),
-      ),
-    );
-  }
-}
-
-/// The level's XP bar with this lesson's share told apart: what stood before
-/// in a muted accent, what was just added in the full one - grown in, unless
-/// motion is reduced.
-class _GrowthBar extends StatelessWidget {
-  const _GrowthBar({
-    required this.before,
-    required this.after,
-    required this.accent,
-    required this.animate,
-  });
-
-  final double before;
-  final double after;
-  final Color accent;
-  final bool animate;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    final muted = Color.alphaBlend(
-      accent.withValues(alpha: 0.45),
-      AppTheme.paperRaised,
-    );
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: animate ? before : after, end: after),
-      duration: animate ? const Duration(milliseconds: 900) : Duration.zero,
-      curve: Curves.easeOutCubic,
-      builder: (context, value, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-        child: SizedBox(
-          height: 8,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              return Stack(
-                children: [
-                  Positioned.fill(child: ColoredBox(color: AppTheme.rule)),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: width * value,
-                    child: ColoredBox(color: accent),
-                  ),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: width * before,
-                    child: ColoredBox(color: muted),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _XpChip extends StatelessWidget {
-  const _XpChip({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.tealTint,
-        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-      ),
-      child: Text(
-        text,
-        style: AppTheme.metaLabel.copyWith(color: AppTheme.tealStrong),
       ),
     );
   }

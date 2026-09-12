@@ -158,27 +158,43 @@ class _SourceBar extends StatelessWidget {
                 ? null
                 : () => _openSheet(context, current.id),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 9, 16, 8),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.menu_book_outlined,
-                    size: 16,
-                    color: AppTheme.inkMuted,
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppTheme.tealWash,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXs),
+                    ),
+                    child: Icon(
+                      Icons.menu_book_outlined,
+                      size: 13,
+                      color: AppTheme.teal,
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       current.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTheme.bodyStrong.copyWith(fontSize: 14),
+                      style: AppTheme.pillLabel,
                     ),
                   ),
                   if (sources.length > 1) ...[
-                    Text('Wissel', style: AppTheme.metaLabel),
+                    Text(
+                      'WISSEL',
+                      style: AppTheme.overline.copyWith(fontSize: 10),
+                    ),
                     const SizedBox(width: 2),
-                    Icon(Icons.expand_more, size: 18, color: AppTheme.inkMuted),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 14,
+                      color: AppTheme.inkFaint,
+                    ),
                   ],
                 ],
               ),
@@ -320,7 +336,7 @@ class _CommentaryEntry extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _VerseLabel(label),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           CommentaryBody(text: entry.text, settings: settings),
         ],
       ),
@@ -346,14 +362,18 @@ class _VerseLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppTheme.teal.withValues(alpha: 0.08),
+        color: AppTheme.tealWash,
         borderRadius: BorderRadius.circular(AppTheme.radiusPill),
       ),
       child: Text(
         label.toUpperCase(),
-        style: AppTheme.eyebrow.copyWith(fontSize: 11, color: AppTheme.teal),
+        style: AppTheme.overline.copyWith(
+          fontSize: 10.5,
+          letterSpacing: 0.9,
+          color: AppTheme.tealStrong,
+        ),
       ),
     );
   }
