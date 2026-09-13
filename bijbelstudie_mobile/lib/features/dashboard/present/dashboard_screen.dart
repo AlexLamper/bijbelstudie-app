@@ -10,6 +10,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
+import '../../settings/data/reading_settings.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
 import '../../studies/present/studies_providers.dart';
@@ -109,6 +110,14 @@ class _DashboardBody extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final hasArchivedVerse =
         ref.watch(dailyVerseStoreProvider).history.isNotEmpty;
+    // Today's verse in the reader's translation once it has arrived; until
+    // then (and for the Statenvertaling itself) the copy `/dashboard` carried.
+    // `.value` keeps the previous translation on screen while a switch loads.
+    final dailyVerse =
+        ref.watch(translatedDailyVerseProvider).value ?? data.dailyVerse;
+    final readerVersionId = ref.watch(
+      readingSettingsProvider.select((s) => s.lastVersionId),
+    );
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -187,11 +196,19 @@ class _DashboardBody extends ConsumerWidget {
               // The card renders today's verse, or — offline — the newest one
               // in its local archive. It is left out entirely only when there
               // is neither, which is why the archive is consulted here too.
-              if (data.dailyVerse != null || hasArchivedVerse) ...[
+              if (dailyVerse != null || hasArchivedVerse) ...[
                 DailyVerseCard(
-                  verse: data.dailyVerse,
-                  onOpenChapter: (book, chapter) =>
-                      _openChapter(context, ref, book: book, chapter: chapter),
+                  verse: dailyVerse,
+                  // In the translation the reader already reads in: opening
+                  // the chapter must not quietly switch them back to the
+                  // Statenvertaling (which would also flip this card).
+                  onOpenChapter: (book, chapter) => _openChapter(
+                    context,
+                    ref,
+                    book: book,
+                    chapter: chapter,
+                    version: readerVersionId,
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],

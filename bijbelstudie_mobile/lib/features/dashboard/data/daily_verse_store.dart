@@ -27,6 +27,7 @@ class DailyVerseEntry {
     required this.chapter,
     required this.verse,
     required this.version,
+    this.attribution,
   });
 
   /// Local calendar day, `yyyy-mm-dd`. Also the de-duplication key: one entry
@@ -43,6 +44,11 @@ class DailyVerseEntry {
   /// captured, e.g. `SV`. Empty when it could not be determined.
   final String version;
 
+  /// The copyright notice captured with a licensed translation's text (the
+  /// NBG51 string), so an archived verse still carries it offline. Null for
+  /// public domain and for entries stored before it existed.
+  final String? attribution;
+
   Map<String, dynamic> toJson() => {
     'date': date,
     'text': text,
@@ -51,6 +57,7 @@ class DailyVerseEntry {
     'chapter': chapter,
     'verse': verse,
     'version': version,
+    if (attribution != null) 'attribution': attribution,
   };
 
   static DailyVerseEntry? fromJson(Map<String, dynamic> json) {
@@ -65,6 +72,7 @@ class DailyVerseEntry {
       chapter: (json['chapter'] as num?)?.toInt() ?? 1,
       verse: (json['verse'] as num?)?.toInt() ?? 1,
       version: json['version'] as String? ?? '',
+      attribution: json['attribution'] as String?,
     );
   }
 
@@ -183,7 +191,11 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     final existing = state.history;
     if (existing.isNotEmpty &&
         existing.first.date == today &&
-        existing.first.reference == verse.reference) {
+        existing.first.reference == verse.reference &&
+        // Same verse in another translation (the reader switched) replaces
+        // today's entry, so the archive keeps what was actually shown.
+        existing.first.text == verse.text &&
+        existing.first.version == version) {
       return;
     }
 
@@ -195,6 +207,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
       chapter: verse.chapter,
       verse: verse.verse,
       version: version,
+      attribution: verse.attribution,
     );
 
     // Newest first, and sorted by day rather than by arrival: an entry

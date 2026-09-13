@@ -151,9 +151,18 @@ class DashboardRepository {
     );
   }
 
-  Future<DailyVerse?> getDailyVerse() async {
+  /// Today's verse, in [versionId] when given.
+  ///
+  /// The server answers in that translation when it is licensed for the app
+  /// and has the verse, and in the Statenvertaling otherwise; the payload's
+  /// `versionId` says which. Public and CDN-cached per translation, so this is
+  /// a cheap call to repeat whenever the reader switches.
+  Future<DailyVerse?> getDailyVerse({String? versionId}) async {
     try {
-      final response = await _apiClient.dio.get('/daytext');
+      final response = await _apiClient.dio.get(
+        '/daytext',
+        queryParameters: {if (versionId != null) 'version': versionId},
+      );
       return DailyVerse.fromJson(response.data as Map<String, dynamic>);
     } catch (_) {
       return null;

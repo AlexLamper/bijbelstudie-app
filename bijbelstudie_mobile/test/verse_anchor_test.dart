@@ -47,7 +47,7 @@ class _StubDashboardRepository implements DashboardRepository {
   Future<StreakResult?> bumpStreak() async => null;
 
   @override
-  Future<DailyVerse?> getDailyVerse() async => null;
+  Future<DailyVerse?> getDailyVerse({String? versionId}) async => null;
 
   @override
   Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>

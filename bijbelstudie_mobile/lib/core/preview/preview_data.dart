@@ -347,7 +347,7 @@ class _PreviewDashboardRepository implements DashboardRepository {
   Future<StreakResult?> bumpStreak() async => null;
 
   @override
-  Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
+  Future<DailyVerse?> getDailyVerse({String? versionId}) async => PreviewData.dashboard.dailyVerse;
 
   @override
   Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>

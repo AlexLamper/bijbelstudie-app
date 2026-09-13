@@ -66,6 +66,8 @@ class DailyVerse {
     required this.chapter,
     required this.verse,
     this.version,
+    this.versionId,
+    this.attribution,
   });
 
   final String text;
@@ -74,13 +76,19 @@ class DailyVerse {
   final int chapter;
   final int verse;
 
-  /// The translation the feed served the verse in, when it says so.
-  ///
-  /// The BijbelAPI "daytext" payload does not carry one today, so this is
-  /// almost always null; the card then labels the verse with the translation
-  /// the reader has selected instead. Parsed anyway so that a feed that starts
-  /// sending it wins over that guess without an app release.
+  /// The translation's display name as the server sends it
+  /// ("Statenvertaling", "NBG-vertaling 1951").
   final String? version;
+
+  /// The translation id the text is actually in (`nbg51`), sent by
+  /// `GET /daytext?version=`. The server falls back to `statenvertaling` when
+  /// the reader's translation lacks the verse, so this - not the reader's
+  /// selection - is what the label must name. Null on older payloads.
+  final String? versionId;
+
+  /// The copyright notice that has to be shown with this text, verbatim (the
+  /// NBG51 string); null for public-domain translations.
+  final String? attribution;
 
   static DailyVerse? fromJson(Map<String, dynamic>? json) {
     if (json == null || json['text'] == null) return null;
@@ -104,6 +112,8 @@ class DailyVerse {
       version: _nonEmpty(json['version']) ??
           _nonEmpty(json['translation']) ??
           _nonEmpty(json['abbreviation']),
+      versionId: _nonEmpty(json['versionId']),
+      attribution: _nonEmpty(json['attribution']),
     );
   }
 }

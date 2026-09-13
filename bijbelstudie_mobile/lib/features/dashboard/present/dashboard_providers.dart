@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
+import '../../settings/data/reading_settings.dart';
 
 import '../data/dashboard_models.dart';
 import '../data/dashboard_repository.dart';
@@ -41,6 +42,37 @@ final dashboardProvider =
     AsyncNotifierProvider.autoDispose<DashboardNotifier, DashboardData>(
       DashboardNotifier.new,
     );
+
+/// The translation the verse of the day is fetched in when it is not the
+/// Statenvertaling `/dashboard` already carries.
+const kDailyVerseDefaultVersion = 'statenvertaling';
+
+/// Today's verse in the translation the reader reads in, or null when that is
+/// the Statenvertaling - `/dashboard` already carries that copy, so no extra
+/// request is made for the default.
+///
+/// Watches the reader's translation, so switching it in the reader refetches
+/// only this (`GET /daytext?version=`, public and CDN-cached per translation),
+/// not the whole dashboard. Also watches the day's reference, so a new day on
+/// the dashboard fetches the new day's verse. A failure resolves to null, and
+/// the card keeps the Statenvertaling copy.
+final translatedDailyVerseProvider = FutureProvider.autoDispose<DailyVerse?>((
+  ref,
+) async {
+  ref.cacheFor();
+  final versionId = ref.watch(
+    readingSettingsProvider.select((s) => s.lastVersionId),
+  );
+  // Same verse, same day: re-run only when the day's reference changes, not on
+  // every dashboard payload (the cached one and the fresh one are both a
+  // "change" to the object, but not to the reference).
+  ref.watch(dashboardProvider.select((s) => s.value?.dailyVerse?.reference));
+  if (versionId == kDailyVerseDefaultVersion) return null;
+
+  return ref
+      .watch(dashboardRepositoryProvider)
+      .getDailyVerse(versionId: versionId);
+});
 
 /// The website recomputes its greeting every minute so it stays correct as the
 /// clock rolls over; the app does the same on each build, which is cheaper and

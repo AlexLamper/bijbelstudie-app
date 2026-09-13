@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../levensboom/domain/verse_scene.dart';
-import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_repository.dart';
 import '../data/dashboard_models.dart';
@@ -83,7 +82,10 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   @override
   void didUpdateWidget(covariant DailyVerseCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.verse?.reference != widget.verse?.reference) {
+    // The text too, not just the reference: switching translation keeps the
+    // verse but changes what today's archive entry should say.
+    if (oldWidget.verse?.reference != widget.verse?.reference ||
+        oldWidget.verse?.text != widget.verse?.text) {
       _remembered = false;
       _rememberToday();
     }
@@ -108,15 +110,35 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   /// The abbreviation printed after the reference, e.g. `SV` in
   /// "Johannes 3:16 SV".
   ///
-  /// The feed does not send a translation today (see [DailyVerse.version]), so
-  /// this normally names the translation the reader has selected — which is
-  /// also the one "Lees het hele hoofdstuk" will open.
+  /// Names the translation the text is actually in, never the reader's
+  /// selection: when the reader's translation lacks the verse the server sends
+  /// the Statenvertaling, and labelling that "NBG51" would misattribute it.
+  /// [DailyVerse.versionId] when the server sends it; otherwise the display
+  /// name (older payloads only ever say "Statenvertaling"), and with neither,
+  /// the Statenvertaling the feed is in.
   String _versionLabel(DailyVerse verse) {
-    final fromFeed = verse.version;
-    if (fromFeed != null && fromFeed.isNotEmpty) {
-      return versionAbbreviation(fromFeed);
-    }
-    return versionAbbreviation(ref.read(readingSettingsProvider).lastVersionId);
+    final id = verse.versionId;
+    if (id != null && id.isNotEmpty) return versionAbbreviation(id);
+    return versionAbbreviation(
+      _versionIdForName(verse.version) ?? 'statenvertaling',
+    );
+  }
+
+  static String? _versionIdForName(String? name) {
+    final key = (name ?? '').trim().toLowerCase();
+    if (key.isEmpty) return null;
+    return switch (key) {
+      'statenvertaling' => 'statenvertaling',
+      'nbg-vertaling 1951' => 'nbg51',
+      'de heilige schrift 1917' => 'heilige_schrift_1917',
+      'canisiusbijbel 1939' => 'canisiusbijbel',
+      'king james version' => 'kjv',
+      'american standard version' => 'asv',
+      'world english bible' => 'web',
+      'geneva bible (1599)' => 'geneva',
+      'coverdale bible (1535)' => 'coverdale',
+      _ => key,
+    };
   }
 
   @override
@@ -152,6 +174,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final book = verse?.book ?? fallback!.book;
     final chapter = verse?.chapter ?? fallback!.chapter;
     final version = verse == null ? fallback!.version : _versionLabel(verse);
+    final attribution = verse == null ? fallback!.attribution : verse.attribution;
     final liked = memory.isLiked(reference);
     final verseNumber = verse?.verse ?? fallback?.verse;
     final scene = verseSceneForDay(DateTime.now());
@@ -166,6 +189,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
         text: text,
         reference: reference,
         version: version,
+        attribution: attribution,
         book: book,
         chapter: chapter,
         verseNumber: verseNumber,
@@ -182,11 +206,12 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
               text: text,
               reference: reference,
               version: version,
+              attribution: attribution,
               liked: liked,
               expanded: false,
               onLike: () =>
                   ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
-              onShare: () => _share(text, reference, version),
+              onShare: () => _share(text, reference, version, attribution),
               onMore: () => _showMore(book, chapter, verseNumber),
             ),
           ),
@@ -210,6 +235,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     required String text,
     required String reference,
     required String version,
+    required String? attribution,
     required String book,
     required int chapter,
     required int? verseNumber,
@@ -230,7 +256,8 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
           text: text,
           reference: reference,
           version: version,
-          onShare: () => _share(text, reference, version),
+          attribution: attribution,
+          onShare: () => _share(text, reference, version, attribution),
           onReadChapter: () {
             Navigator.of(routeContext).pop();
             _openChapterAtVerse(book, chapter, verseNumber);
@@ -251,9 +278,17 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     );
   }
 
-  Future<void> _share(String text, String reference, String version) {
-    final attribution = version.isEmpty ? reference : '$reference ($version)';
-    return Share.share('"$text"\n\n$attribution', subject: reference);
+  Future<void> _share(
+    String text,
+    String reference,
+    String version,
+    String? attribution,
+  ) {
+    final source = version.isEmpty ? reference : '$reference ($version)';
+    // A licensed translation's notice travels with its text, off the app too.
+    final notice =
+        attribution == null || attribution.isEmpty ? '' : '\n$attribution';
+    return Share.share('"$text"\n\n$source$notice', subject: reference);
   }
 
   Future<void> _showMore(String book, int chapter, int? verseNumber) async {
@@ -320,6 +355,7 @@ class _VerseFace extends StatelessWidget {
     required this.expanded,
     required this.onLike,
     required this.onShare,
+    this.attribution,
     this.onMore,
     this.onReadChapter,
     this.onHistory,
@@ -330,6 +366,9 @@ class _VerseFace extends StatelessWidget {
   final String text;
   final String reference;
   final String version;
+
+  /// Copyright notice for a licensed translation (NBG51), shown verbatim.
+  final String? attribution;
   final bool liked;
 
   /// True in the modal: bigger type, the whole verse, and a close button.
@@ -455,6 +494,21 @@ class _VerseFace extends StatelessWidget {
                   ),
                 ),
               ),
+              // The licensing line, verbatim - the NBG51 notice is a
+              // contractual string, so it is never clipped or reworded.
+              // Public-domain translations send none.
+              if (attribution != null && attribution!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    attribution!,
+                    style: AppTheme.caption.copyWith(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontSize: expanded ? 11.5 : 10.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
               _VerseActions(
                 liked: liked,
                 onLike: onLike,
@@ -610,12 +664,14 @@ class _ExpandedVerseScreen extends ConsumerStatefulWidget {
     required this.onShare,
     required this.onReadChapter,
     required this.onHistory,
+    this.attribution,
   });
 
   final VerseScene scene;
   final String text;
   final String reference;
   final String version;
+  final String? attribution;
   final VoidCallback onShare;
   final VoidCallback onReadChapter;
   final VoidCallback onHistory;
@@ -672,6 +728,7 @@ class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
               text: widget.text,
               reference: widget.reference,
               version: widget.version,
+              attribution: widget.attribution,
               liked: liked,
               expanded: true,
               onLike: () => ref
@@ -978,6 +1035,14 @@ class _HistorySheet extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppTheme.bodyMuted,
                           ),
+                          if (entry.attribution != null &&
+                              entry.attribution!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              entry.attribution!,
+                              style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+                            ),
+                          ],
                         ],
                       ),
                     );
