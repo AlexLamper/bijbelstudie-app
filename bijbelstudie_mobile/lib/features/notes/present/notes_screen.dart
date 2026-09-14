@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../../core/ui/timed_snack_bar.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
@@ -313,14 +314,28 @@ class _BookmarksTab extends ConsumerWidget {
       await ref.read(notesRepositoryProvider).deleteBookmark(bookmark.id);
       ref.invalidate(bookmarksProvider);
       await HapticFeedback.selectionClick();
-      messenger.showSnackBar(
+      showTimedSnackBar(
+        messenger,
         SnackBar(
           content: const Text('Bladwijzer verwijderd'),
+          duration: kActionSnackBarDuration,
           action: SnackBarAction(
             label: 'Ongedaan maken',
             onPressed: () async {
               try {
-                await container.read(notesRepositoryProvider).saveBookmark(bookmark);
+                // A fresh id: the server tombstoned the old one on delete and
+                // answers 409 to anything that tries to bring it back.
+                await container.read(notesRepositoryProvider).saveBookmark(
+                  Bookmark(
+                    id: newClientId(),
+                    book: bookmark.book,
+                    chapter: bookmark.chapter,
+                    verse: bookmark.verse,
+                    version: bookmark.version,
+                    label: bookmark.label,
+                    updatedAt: DateTime.now(),
+                  ),
+                );
                 container.invalidate(bookmarksProvider);
               } on SyncRejectedException catch (e) {
                 messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -426,14 +441,20 @@ class _NoteRow extends ConsumerWidget {
       await ref.read(notesRepositoryProvider).deleteNote(note);
       ref.invalidate(listProvider);
       await HapticFeedback.selectionClick();
-      messenger.showSnackBar(
+      showTimedSnackBar(
+        messenger,
         SnackBar(
           content: Text('$kind verwijderd'),
+          duration: kActionSnackBarDuration,
           action: SnackBarAction(
             label: 'Ongedaan maken',
             onPressed: () async {
               try {
-                await container.read(notesRepositoryProvider).saveNote(note);
+                // A fresh id: the server tombstoned the old one on delete and
+                // answers 409 to anything that tries to bring it back.
+                await container
+                    .read(notesRepositoryProvider)
+                    .saveNote(note.withNewId(newClientId()));
                 container.invalidate(listProvider);
               } on SyncRejectedException catch (e) {
                 messenger.showSnackBar(SnackBar(content: Text(e.message)));

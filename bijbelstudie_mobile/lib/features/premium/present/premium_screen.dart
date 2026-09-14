@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
@@ -70,14 +71,39 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     });
   }
 
+  /// Reached only once the server confirms Pro, so the promise holds: the
+  /// gated features are unlocked the moment the dialog closes.
+  Future<void> _showWelcomeToPro() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Welkom bij Pro'),
+        content: const Text(
+          'Je abonnement is actief. Alle Pro-functies zijn nu ontgrendeld: '
+          'commentaren, grondtekst, meer ruimte voor de AI-assistent en meer.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Aan de slag'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/dashboard');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<PremiumState>(premiumControllerProvider, (previous, next) {
       if (next.status == PurchaseStatus.success) {
         ref.read(premiumControllerProvider.notifier).clearStatus();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pro is geactiveerd. Bedankt!')),
-        );
+        _showWelcomeToPro();
       }
       if (next.status == PurchaseStatus.error && next.errorMessage != null) {
         ref.read(premiumControllerProvider.notifier).clearStatus();

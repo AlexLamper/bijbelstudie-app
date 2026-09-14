@@ -9,6 +9,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../../core/ui/skeleton.dart';
+import '../../../../core/ui/timed_snack_bar.dart';
 import '../../domain/catalog.dart';
 import '../../domain/tree_state.dart';
 import '../levensboom_avatar.dart';
@@ -95,8 +96,8 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
 
   void _notice(String text, {bool pro = false}) {
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
+    showTimedSnackBar(
+      messenger,
       SnackBar(
         content: Text(text),
         behavior: SnackBarBehavior.floating,

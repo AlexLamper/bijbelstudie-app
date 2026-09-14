@@ -41,6 +41,7 @@ class StudyNote {
     required this.book,
     required this.chapter,
     this.verse,
+    this.verseEnd,
     required this.verseText,
     required this.noteText,
     required this.translation,
@@ -54,6 +55,11 @@ class StudyNote {
   final String book;
   final int chapter;
   final int? verse;
+
+  /// Last verse of a passage note written on the website ("gedeelte"). The app
+  /// only creates single-verse notes, but must carry this through so a
+  /// re-save (the delete undo) does not shrink "Genesis 1:1-5" to "Genesis 1:1".
+  final int? verseEnd;
   final String verseText;
   final String noteText;
   final String translation;
@@ -62,7 +68,28 @@ class StudyNote {
   final bool isHighlight;
   final DateTime updatedAt;
 
-  String get reference => verse == null ? '$book $chapter' : '$book $chapter:$verse';
+  String get reference {
+    if (verse == null) return '$book $chapter';
+    final end = verseEnd;
+    return end != null && end > verse! ? '$book $chapter:$verse-$end' : '$book $chapter:$verse';
+  }
+
+  /// A copy under a fresh id. Needed to restore a deleted note: the server
+  /// keeps a tombstone for the old id and refuses to resurrect it (409).
+  StudyNote withNewId(String id) => StudyNote(
+    id: id,
+    book: book,
+    chapter: chapter,
+    verse: verse,
+    verseEnd: verseEnd,
+    verseText: verseText,
+    noteText: noteText,
+    translation: translation,
+    color: color,
+    tags: tags,
+    isHighlight: isHighlight,
+    updatedAt: DateTime.now(),
+  );
 
   factory StudyNote.fromSyncRecord(Map<String, dynamic> record) {
     final data = (record['data'] as Map<String, dynamic>? ?? const {});
@@ -71,6 +98,7 @@ class StudyNote {
       book: data['book'] as String? ?? '',
       chapter: (data['chapter'] as num?)?.toInt() ?? 0,
       verse: (data['verse'] as num?)?.toInt(),
+      verseEnd: (data['verseEnd'] as num?)?.toInt(),
       verseText: (data['verseText'] as String? ?? '').trim(),
       noteText: (data['noteText'] as String? ?? '').trim(),
       translation: data['translation'] as String? ?? 'statenvertaling',
@@ -86,6 +114,7 @@ class StudyNote {
     'book': book,
     'chapter': chapter,
     if (verse != null) 'verse': verse,
+    if (verseEnd != null) 'verseEnd': verseEnd,
     'verseReference': reference,
     'verseText': verseText.isEmpty ? ' ' : verseText,
     'noteText': noteText.isEmpty ? ' ' : noteText,

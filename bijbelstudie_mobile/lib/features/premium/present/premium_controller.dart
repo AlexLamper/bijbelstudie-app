@@ -408,15 +408,16 @@ class PremiumController extends Notifier<PremiumState> {
       final info = package != null
           ? await _svc.purchasePackage(package)
           : await _svc.purchaseByProductId(productId);
-      state = state.copyWith(
-        status: PurchaseStatus.success,
-        customerInfo: info,
-      );
+      // Stay on `loading` until the server agrees: content is gated on the
+      // server profile, so announcing Pro before that is a promise the app
+      // cannot keep yet.
+      state = state.copyWith(customerInfo: info);
       _log(
         'Purchase success. Active entitlements: ${info.entitlements.active.keys.join(', ')}',
       );
       analytics.track(AnalyticsEvents.checkoutCompleted, {'interval': interval});
-      await _syncServerPremium();
+      final serverPro = await _syncServerPremium();
+      _settleAfterStoreSuccess(info, serverPro);
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
       if (code == PurchasesErrorCode.purchaseCancelledError) {
@@ -462,15 +463,13 @@ class PremiumController extends Notifier<PremiumState> {
     state = state.copyWith(status: PurchaseStatus.loading);
     try {
       final info = await _svc.restorePurchases();
-      state = state.copyWith(
-        status: PurchaseStatus.success,
-        customerInfo: info,
-      );
+      state = state.copyWith(customerInfo: info);
       _log(
         'Restore success. Active entitlements: ${info.entitlements.active.keys.join(', ')}',
       );
       ref.read(analyticsProvider).track(AnalyticsEvents.purchasesRestored);
-      await _syncServerPremium();
+      final serverPro = await _syncServerPremium();
+      _settleAfterStoreSuccess(info, serverPro, restore: true);
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
       if (code == PurchasesErrorCode.purchaseCancelledError) {
@@ -498,9 +497,9 @@ class PremiumController extends Notifier<PremiumState> {
   /// a webhook for a NEW transaction - never for an already-owned purchase or a
   /// restore. So we actively ask the server to reconcile against RevenueCat,
   /// then refresh the profile. We retry briefly to ride out store propagation.
-  Future<void> _syncServerPremium() async {
+  Future<bool> _syncServerPremium() async {
     try {
-      await _reconcileServerPremium();
+      return await _reconcileServerPremium();
     } finally {
       // The server equips the gold ring the moment an account becomes Pro -
       // it is the standard for Pro, written by /api/v1/sync-premium and the
@@ -514,22 +513,51 @@ class PremiumController extends Notifier<PremiumState> {
     }
   }
 
-  Future<void> _reconcileServerPremium() async {
+  /// Whether the server reports Pro after reconciling.
+  Future<bool> _reconcileServerPremium() async {
     final repo = ref.read(profileRepositoryProvider);
     for (var attempt = 0; attempt < 5; attempt++) {
       final synced = await repo.syncPremium();
       ref.invalidate(profileProvider);
-      if (synced == true) return;
+      if (synced == true) return true;
       if (synced == null) {
         // Endpoint unreachable/undeployed: fall back to reading the profile in
         // case a webhook already updated it.
         try {
           final profile = await ref.read(profileProvider.future);
-          if (profile.isPro) return;
+          if (profile.isPro) return true;
         } catch (_) {}
       }
       await Future.delayed(const Duration(seconds: 2));
     }
+    return false;
+  }
+
+  /// The store accepted the purchase or restore; only claim Pro when the
+  /// server does too, and say which half is missing otherwise.
+  void _settleAfterStoreSuccess(
+    CustomerInfo info,
+    bool serverPro, {
+    bool restore = false,
+  }) {
+    if (!ref.mounted) return;
+    if (serverPro) {
+      state = state.copyWith(status: PurchaseStatus.success);
+      return;
+    }
+    final storePro = info.entitlements.active.containsKey(kRcProEntitlement);
+    _log(
+      'Store ${restore ? 'restore' : 'purchase'} finished but server is not Pro '
+      '(store entitlement "$kRcProEntitlement" active: $storePro).',
+    );
+    state = state.copyWith(
+      status: PurchaseStatus.error,
+      errorMessage: storePro
+          ? 'Je aankoop is gelukt, maar Pro wordt nog verwerkt. Open de app over een minuut opnieuw.'
+          : restore
+              ? 'Geen actief Pro-abonnement gevonden om te herstellen.'
+              : 'Je betaling is ontvangen, maar Pro kon niet worden geactiveerd. Tik later op "Aankopen herstellen" of neem contact met ons op.',
+    );
   }
 
   String _errorMessage(PurchasesErrorCode code) {
