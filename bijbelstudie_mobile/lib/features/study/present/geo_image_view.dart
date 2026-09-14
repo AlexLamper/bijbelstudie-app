@@ -64,3 +64,167 @@ class GeoImageView extends StatelessWidget {
     );
   }
 }
+
+/// Opens [_GeoImageLightbox] over [images] at [index]. Shared by the lesson's
+/// place tiles and gallery cards and the study panel's photo strip - one
+/// lightbox, however the thumbnails upstream are laid out.
+void openGeoImageLightbox(BuildContext context, List<GeoImage> images, int index) {
+  Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, _, _) =>
+          _GeoImageLightbox(images: images, initialIndex: index),
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}
+
+/// The photographs at full size: one per page, pinchable, with the caption and
+/// the CC credit under them.
+class _GeoImageLightbox extends StatefulWidget {
+  const _GeoImageLightbox({required this.images, required this.initialIndex});
+
+  final List<GeoImage> images;
+  final int initialIndex;
+
+  @override
+  State<_GeoImageLightbox> createState() => _GeoImageLightboxState();
+}
+
+class _GeoImageLightboxState extends State<_GeoImageLightbox> {
+  late final PageController _pages = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.images[_index];
+    final width =
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .clamp(320.0, 1280.0)
+            .round();
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          // Tapping the backdrop closes, as the website's lightbox does; the
+          // photograph keeps its own gestures for panning and zooming.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.close),
+                    color: Colors.white,
+                    tooltip: 'Sluiten',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pages,
+                    itemCount: widget.images.length,
+                    onPageChanged: (value) => setState(() => _index = value),
+                    // The page fills the screen, so without this the letterbox
+                    // beside the photograph would swallow the backdrop tap.
+                    itemBuilder: (context, index) => GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.of(context).pop(),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Center(
+                          // Loose constraints let the image size itself to its
+                          // own aspect ratio, so the absorbing box is the
+                          // photograph and not the letterbox around it.
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth,
+                              maxHeight: constraints.maxHeight,
+                            ),
+                            child: GestureDetector(
+                              // The photograph keeps its own gestures: this
+                              // absorbs the tap so zooming and panning still
+                              // work and tapping the image does not close.
+                              onTap: () {},
+                              child: InteractiveViewer(
+                                minScale: 1,
+                                maxScale: 4,
+                                child: GeoImageView(
+                                  image: widget.images[index],
+                                  width: width,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        image.placeName,
+                        style: AppTheme.bodyStrong.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (image.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          image.description!,
+                          style: AppTheme.caption.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      // CC attribution has to be displayed, not merely recorded.
+                      Text(
+                        '${image.credit} · ${image.license}',
+                        style: AppTheme.metaLabel.copyWith(
+                          color: Colors.white54,
+                        ),
+                      ),
+                      if (widget.images.length > 1) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_index + 1} / ${widget.images.length}',
+                          style: AppTheme.metaLabel.copyWith(
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

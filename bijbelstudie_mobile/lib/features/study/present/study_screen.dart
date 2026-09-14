@@ -186,7 +186,7 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                           if (!isPro) 1: Icons.lock_outline,
                           4: Icons.auto_awesome,
                         },
-                        // The assistant's sparkle keeps its gold whether the
+                        // The assistant's sparkle keeps its teal whether the
                         // tab is selected or not: it is the one tab that is
                         // metered and Pro-upsold, and the mark is what says
                         // so before you tap it. The Pro lock on Grondtekst
@@ -274,14 +274,28 @@ class _GeneralInfoPane extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusSm,
-                              ),
-                              child: SizedBox(
-                                width: 160,
-                                height: 100,
-                                child: GeoImageView(image: image, width: 320),
+                            Semantics(
+                              button: true,
+                              label: 'Foto van ${image.placeName}, vergroten',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusSm,
+                                ),
+                                onTap: () =>
+                                    openGeoImageLightbox(context, list, index),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusSm,
+                                  ),
+                                  child: SizedBox(
+                                    width: 160,
+                                    height: 100,
+                                    child: GeoImageView(
+                                      image: image,
+                                      width: 320,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),

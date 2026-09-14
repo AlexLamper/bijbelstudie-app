@@ -518,10 +518,10 @@ class _ReaderBar extends ConsumerWidget {
 /// What the reader already has in this chapter, as one tappable teal line.
 ///
 /// Counts come from the notes and highlights lists the app loads anyway - see
-/// [chapterMarkCountsProvider]. The line disappears when both are zero rather
-/// than announcing "0 notities", which is noise on a chapter nobody has worked
-/// on yet. Tapping it opens [showChapterMarksSheet], listing every note and
-/// highlight in this chapter with a way to jump to its verse.
+/// [chapterMarkCountsProvider]. Both counts always show, zeros included, so the
+/// header row keeps the same shape on every chapter. Tapping it opens
+/// [showChapterMarksSheet], listing every note and highlight in this chapter
+/// with a way to jump to its verse.
 class _ChapterMarks extends ConsumerWidget {
   const _ChapterMarks({required this.location});
 
@@ -533,8 +533,6 @@ class _ChapterMarks extends ConsumerWidget {
     final counts = ref.watch(
       chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
     );
-    if (counts.isEmpty) return const SizedBox.shrink();
-
     return Semantics(
       button: true,
       label: 'Notities en markeringen van ${location.book} ${location.chapter} bekijken',
@@ -560,28 +558,26 @@ class _ChapterMarks extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (counts.highlights > 0) ...[
-                const SizedBox(width: 7),
-                Container(
-                  width: 3,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: AppTheme.ruleStrong,
-                    shape: BoxShape.circle,
-                  ),
+              const SizedBox(width: 7),
+              Container(
+                width: 3,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppTheme.ruleStrong,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    _plural(counts.highlights, 'markering', 'markeringen'),
-                    style: AppTheme.pillLabel.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.inkMuted,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  _plural(counts.highlights, 'markering', 'markeringen'),
+                  style: AppTheme.pillLabel.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.inkMuted,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
               const SizedBox(width: 4),
               Icon(Icons.chevron_right, size: 14, color: AppTheme.inkFaint),
             ],

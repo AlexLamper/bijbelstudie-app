@@ -126,7 +126,7 @@ class LessonContextStep extends ConsumerWidget {
 /// scrolling before the book's introduction - the part of this step actually
 /// worth reading - came into view at all. Tiles put several places side by
 /// side, keep the introduction near the top, and the photograph at full size is
-/// one tap away in [_PlaceLightbox], where it can be looked at properly.
+/// one tap away in [openGeoImageLightbox], where it can be looked at properly.
 class _PlaceStrip extends StatelessWidget {
   const _PlaceStrip({required this.images});
 
@@ -156,7 +156,7 @@ class _PlaceStrip extends StatelessWidget {
                   label: 'Foto van ${image.placeName}, vergroten',
                   child: InkWell(
                     borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    onTap: () => _openPlaceLightbox(context, images, index),
+                    onTap: () => openGeoImageLightbox(context, images, index),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       child: SizedBox(
@@ -188,24 +188,6 @@ class _PlaceStrip extends StatelessWidget {
       ),
     );
   }
-
-}
-
-/// Opens [_PlaceLightbox] over [images] at [index]. Shared by [_PlaceStrip]'s
-/// tiles and [_PlaceGallery]'s cards - one lightbox, however the thumbnails
-/// upstream are laid out.
-void _openPlaceLightbox(BuildContext context, List<GeoImage> images, int index) {
-  Navigator.of(context).push(
-    PageRouteBuilder<void>(
-      opaque: false,
-      barrierColor: Colors.black87,
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, _, _) =>
-          _PlaceLightbox(images: images, initialIndex: index),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
-    ),
-  );
 }
 
 /// The photographs for a background step with no book introduction: a strip
@@ -306,7 +288,7 @@ class _GalleryTile extends StatelessWidget {
           label: 'Foto van ${image.placeName}, vergroten',
           child: InkWell(
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            onTap: () => _openPlaceLightbox(context, images, index),
+            onTap: () => openGeoImageLightbox(context, images, index),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppTheme.radiusLg),
               child: AspectRatio(
@@ -335,153 +317,6 @@ class _GalleryTile extends StatelessWidget {
           style: AppTheme.metaLabel,
         ),
       ],
-    );
-  }
-}
-
-/// The photographs at full size: one per page, pinchable, with the caption and
-/// the CC credit under them.
-class _PlaceLightbox extends StatefulWidget {
-  const _PlaceLightbox({required this.images, required this.initialIndex});
-
-  final List<GeoImage> images;
-  final int initialIndex;
-
-  @override
-  State<_PlaceLightbox> createState() => _PlaceLightboxState();
-}
-
-class _PlaceLightboxState extends State<_PlaceLightbox> {
-  late final PageController _pages = PageController(
-    initialPage: widget.initialIndex,
-  );
-  late int _index = widget.initialIndex;
-
-  @override
-  void dispose() {
-    _pages.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final image = widget.images[_index];
-    final width =
-        (MediaQuery.sizeOf(context).width *
-                MediaQuery.devicePixelRatioOf(context))
-            .clamp(320.0, 1280.0)
-            .round();
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // Tapping the backdrop closes, as the website's lightbox does; the
-          // photograph keeps its own gestures for panning and zooming.
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.close),
-                    color: Colors.white,
-                    tooltip: 'Sluiten',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pages,
-                    itemCount: widget.images.length,
-                    onPageChanged: (value) => setState(() => _index = value),
-                    // The page fills the screen, so without this the letterbox
-                    // beside the photograph would swallow the backdrop tap.
-                    itemBuilder: (context, index) => GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.of(context).pop(),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => Center(
-                          // Loose constraints let the image size itself to its
-                          // own aspect ratio, so the absorbing box is the
-                          // photograph and not the letterbox around it.
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                              maxHeight: constraints.maxHeight,
-                            ),
-                            child: GestureDetector(
-                              // The photograph keeps its own gestures: this
-                              // absorbs the tap so zooming and panning still
-                              // work and tapping the image does not close.
-                              onTap: () {},
-                              child: InteractiveViewer(
-                                minScale: 1,
-                                maxScale: 4,
-                                child: GeoImageView(
-                                  image: widget.images[index],
-                                  width: width,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        image.placeName,
-                        style: AppTheme.bodyStrong.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-                      if (image.description != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          image.description!,
-                          style: AppTheme.caption.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      // CC attribution has to be displayed, not merely recorded.
-                      Text(
-                        '${image.credit} · ${image.license}',
-                        style: AppTheme.metaLabel.copyWith(
-                          color: Colors.white54,
-                        ),
-                      ),
-                      if (widget.images.length > 1) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          '${_index + 1} / ${widget.images.length}',
-                          style: AppTheme.metaLabel.copyWith(
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

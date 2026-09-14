@@ -138,18 +138,13 @@ class AppTheme {
   /// `bg-teal-100` - the study-mode strip.
   static const Color lightTealSoft = Color(0xFFCCFBF1);
 
-  /// The AI assistant's accent - gold, because gold is already what Pro looks
-  /// like in this app (the ring a subscriber can put on their avatar) and the
-  /// assistant is a metered, Pro-upsold surface. Deliberately not the green
-  /// family: green already means "afgerond" on the lesson discs and the streak.
-  ///
-  /// Darker than the avatar's [kGoldRing] on purpose - that one is a fill
-  /// behind a drawing, this one has to carry 12px text on white, where
-  /// #D4A017 lands at 2.4:1. This is 5.3:1.
-  static const Color lightAssistant = Color(0xFF92610A);
+  /// The AI assistant's accent - teal-700, matching the website's
+  /// `components/study/AiAssistant.tsx` (teal-600 fills, teal-700 text).
+  /// teal-700 rather than [lightTeal] so 12px text on white stays above 4.5:1.
+  static const Color lightAssistant = lightTealStrong;
 
-  /// The wash behind the assistant's glyph and its quota strip.
-  static const Color lightAssistantTint = Color(0xFFFDF6E3);
+  /// The wash behind the assistant's glyph and its quota strip - `bg-teal-50`.
+  static const Color lightAssistantTint = lightTealTint;
 
   /// `rgba(13,148,136,.10)` - the wash behind a teal glyph in an icon chip.
   /// Kept translucent rather than flattened so it also reads on `lineSoft`.
@@ -219,10 +214,9 @@ class AppTheme {
   static const Color darkTealSoft = Color(0xFF14453F);
   static const Color darkTealWash = Color(0x2D2DB4A6);
 
-  /// Gold reads as gold on a dark ground without darkening; the tint is the
-  /// same hue dropped to a surface.
-  static const Color darkAssistant = Color(0xFFE8B93B);
-  static const Color darkAssistantTint = Color(0xFF3A2E12);
+  /// The website's dark assistant is teal-400 on a teal-tinted surface.
+  static const Color darkAssistant = darkTeal;
+  static const Color darkAssistantTint = darkTealTint;
 
   /// The banner gradient keeps its dark end in both themes - it is artwork,
   /// not a surface, and the teal start is what carries the brand.

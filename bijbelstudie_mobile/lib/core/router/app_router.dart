@@ -6,6 +6,7 @@ import '../config/preview_config.dart';
 import '../notifications/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
+import '../ui/lucide_icon.dart';
 
 import '../../features/admin/present/admin_screen.dart';
 import '../../features/premium/present/paywall_funnel_screen.dart';
@@ -106,17 +107,25 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 
-  // One optical family across all five: every active icon is the "_rounded"
-  // filled variant of its outlined twin, and no two destinations share a
-  // metaphor (house / open book / graduation cap / pencil-on-notes / person).
+  // Start, Bijbel and Notities wear the website's Lucide icons (House,
+  // BookMarked, NotebookPen from components/shell/nav.ts); the others keep
+  // their Material outlined/"_rounded" pair.
   static const List<_NavItemData> _items = [
-    _NavItemData(Icons.home_outlined, Icons.home_rounded, 'Start', '/dashboard', 'nav-dashboard'),
+    _NavItemData(
+      Icons.home_outlined,
+      Icons.home_rounded,
+      'Start',
+      '/dashboard',
+      'nav-dashboard',
+      lucide: LucideIcons.house,
+    ),
     _NavItemData(
       Icons.menu_book_outlined,
       Icons.menu_book_rounded,
       'Bijbel',
       '/study',
       TourAnchorIds.navStudy,
+      lucide: LucideIcons.bookMarked,
     ),
     _NavItemData(
       Icons.school_outlined,
@@ -131,6 +140,7 @@ class MainScaffold extends ConsumerWidget {
       'Notities',
       '/notes',
       TourAnchorIds.navNotes,
+      lucide: LucideIcons.notebookPen,
     ),
     _NavItemData(
       Icons.person_outline,
@@ -161,10 +171,20 @@ class MainScaffold extends ConsumerWidget {
 }
 
 class _NavItemData {
-  const _NavItemData(this.icon, this.activeIcon, this.label, this.route, this.tourAnchorId);
+  const _NavItemData(
+    this.icon,
+    this.activeIcon,
+    this.label,
+    this.route,
+    this.tourAnchorId, {
+    this.lucide,
+  });
 
   final IconData icon;
   final IconData activeIcon;
+
+  /// A [LucideIcons] path string; when set it replaces [icon]/[activeIcon].
+  final String? lucide;
   final String label;
   final String route;
 
@@ -204,6 +224,13 @@ class _NavItem extends StatelessWidget {
               // the dashboard header and the website's navbar.
               child: item.route == '/profile'
                   ? LevensboomTabIcon(active: active)
+                  : item.lucide != null
+                  ? LucideIcon(
+                      item.lucide!,
+                      size: 21,
+                      color: color,
+                      strokeWidth: active ? 2.3 : 1.9,
+                    )
                   : Icon(
                       active ? item.activeIcon : item.icon,
                       size: 21,
