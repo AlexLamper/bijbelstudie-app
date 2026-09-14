@@ -82,6 +82,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    # Study cover photos, the website's own files (lib/studyPhotos.ts there,
+    # lib/features/studies/data/study_photos.dart here). ~6.8 MB: 76 banners
+    # at 800 px plus 76 square 240 px thumbnails, all WebP q70.
+    - assets/images/study-photos/
   fonts:
     # Body / UI face used on www.bijbelstudie.io (--font-sans).
     - family: Inter

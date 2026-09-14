@@ -8,7 +8,7 @@ import 'verse_scene_painter.dart';
 /// The daily verse's landscape, alive.
 ///
 /// Replaces the photograph the dagtekst card used to carry. Motion is
-/// deliberately almost nothing (`AVATAR_NOTIFICATIONS_PLAN.md` §6.2): the sky
+/// deliberately almost nothing: the sky
 /// warms and dims on a ninety-second breath and two or three clouds cross in
 /// minutes, at five frames a second. It stops entirely when the reader asked
 /// for less motion, and Flutter's own [TickerMode] stops it whenever the card

@@ -7,7 +7,7 @@ import 'notifications/notification_scheduler.dart';
 import 'notifications/retention_store.dart';
 
 /// Re-runs the notification scheduler on every foreground and arms the
-/// "on close" one-shots on background (`RETENTION_PLAN.md` §4.1). Because
+/// "on close" one-shots on background. Because
 /// `flutter_local_notifications` cannot evaluate a condition at fire time,
 /// every condition is re-evaluated here and the one-shots are (re)written.
 class _AppLifecycleObserver with WidgetsBindingObserver {

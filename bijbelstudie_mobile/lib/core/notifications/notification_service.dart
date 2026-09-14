@@ -14,7 +14,7 @@ export 'reminder_service.dart' show ReminderStatus;
 
 /// Every kind of local notification the app can raise.
 ///
-/// The retention plan (`RETENTION_PLAN.md` §4) turns the single "daily reading
+/// The retention ladder turns the single "daily reading
 /// reminder" into a small ladder of nudges. Each type owns a stable id range so
 /// [NotificationService] can cancel and re-schedule one kind without touching
 /// the others - the whole scheduler is cancel-then-set, on every foreground.
@@ -149,7 +149,7 @@ void notificationBackgroundTap(NotificationResponse response) {
 /// The one place local notifications are scheduled, cancelled and routed.
 ///
 /// Generalises the old `ReminderService` (one repeating "read your chapter"
-/// reminder) into the typed ladder from `RETENTION_PLAN.md`. It owns:
+/// reminder) into a typed ladder of nudges. It owns:
 /// - `tz.setLocalLocation` from the real IANA zone (fixes the UTC-drift bug:
 ///   the old code initialised the zone database but never set `tz.local`, so a
 ///   reminder for 08:00 fired at 08:00 UTC).
@@ -305,7 +305,7 @@ class NotificationService {
     for (final channel in _channels) {
       await android.createNotificationChannel(channel);
     }
-    // The old single channel (`RETENTION_PLAN.md` §4.2). Android ignores
+    // The old single `daily_reading` channel. Android ignores
     // importance changes to a live channel, so the id is retired rather than
     // reused.
     try {

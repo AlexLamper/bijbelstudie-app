@@ -3,7 +3,7 @@ import 'package:bijbelstudie_mobile/core/notifications/retention_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The ask is never spent in onboarding and never on a first launch: it is
-/// earned (`AVATAR_NOTIFICATIONS_PLAN.md` §7). These assert the two moments a
+/// earned. These assert the two moments a
 /// screen may offer blindly, on every chapter read, without asking too early.
 void main() {
   group('permissionMomentEarned', () {

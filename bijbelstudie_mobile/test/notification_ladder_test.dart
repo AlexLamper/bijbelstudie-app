@@ -4,7 +4,7 @@ import 'package:bijbelstudie_mobile/core/notifications/notification_scheduler.da
 import 'package:bijbelstudie_mobile/core/notifications/notification_service.dart';
 import 'package:bijbelstudie_mobile/features/studies/data/enrollment_models.dart';
 
-/// Phase 2 ladder guardrails (`RETENTION_PLAN.md` §4.4, §4.5): the ≤ 1 capped
+/// Phase 2 ladder guardrails: the ≤ 1 capped
 /// notification/day cap, the milestone/verse exemptions, quiet-hours never
 /// scheduling inside the window, and the week-goal "days left" maths the
 /// at-risk trigger leans on.

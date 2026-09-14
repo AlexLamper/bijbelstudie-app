@@ -3,7 +3,7 @@ import 'package:bijbelstudie_mobile/features/levensboom/domain/scenes.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/verse_scene.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The daily verse's landscape (`AVATAR_NOTIFICATIONS_PLAN.md` §6). It replaced
+/// The daily verse's landscape. It replaced
 /// 76 photographs, so the two things that used to be free - "the same picture
 /// all day" and "a different one tomorrow" - now have to be asserted.
 void main() {

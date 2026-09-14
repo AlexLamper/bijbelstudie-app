@@ -27,8 +27,7 @@ There are only two ways an in-app purchase reaches it:
    submitted alongside a binary inherit the binary's fate — cancel the version
    and every IAP riding with it drops to Developer Rejected in the same move.
 
-Given the history in `docs/app-review-1.0.1-rejection.md` and
-`docs/app-review-1.0.5-rejection.md` — several submissions pulled and
+Given the review history of 1.0 (5) and 1.0.1 (11) — several submissions pulled and
 resubmitted — reason 2 is almost certainly what happened, and it happened as a
 side effect rather than as a decision anybody made about the subscriptions.
 

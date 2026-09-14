@@ -6,8 +6,8 @@ import 'species.dart';
 
 /// The landscape behind the daily verse, in the Levensboom's own hand.
 ///
-/// Replaces the 76 stock photographs the dagtekst card used to carry
-/// (`AVATAR_NOTIFICATIONS_PLAN.md` §6): one scene per calendar day, drawn by
+/// Replaces the 76 stock photographs the dagtekst card used to carry:
+/// one scene per calendar day, drawn by
 /// the same painter that draws the tree's world, so the verse and the avatar
 /// finally look like they come from the same app.
 ///

@@ -619,7 +619,7 @@ const _reminderPresets = [
 
 /// Step 3 - the study reminder. It now only *collects* the preferred time and
 /// writes the intent into [NotificationPrefs]; it does **not** ask the OS for
-/// permission (`RETENTION_PLAN.md` §4.6). The permission prompt is earned after
+/// permission. The permission prompt is earned after
 /// the reader finishes their first lesson, where it has context.
 class _ReminderStep extends ConsumerStatefulWidget {
   const _ReminderStep();

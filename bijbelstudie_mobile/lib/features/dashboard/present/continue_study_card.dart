@@ -9,7 +9,7 @@ import '../../studies/present/studies_providers.dart';
 import '../../studies/present/study_banner.dart';
 import '../data/dashboard_models.dart';
 
-/// "Waar je gebleven was" (`RETENTION_PLAN.md` §3.2). The most recently active,
+/// "Waar je gebleven was". The most recently active,
 /// unfinished study: cover, title, "les X van Y", a progress bar, and a CTA
 /// straight into the resume lesson.
 ///

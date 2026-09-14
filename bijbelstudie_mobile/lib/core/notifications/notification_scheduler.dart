@@ -18,8 +18,8 @@ import 'notification_copy.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
 
-/// The two shapes a "streak" can take, chosen by cadence (`RETENTION_PLAN.md`
-/// §2). `none` = the reader picked "geen ritme": no streak, no nudges.
+/// The two shapes a "streak" can take, chosen by cadence. `none` = the reader
+/// picked "geen ritme": no streak, no nudges.
 enum RetentionModel { dailyStreak, weekGoal, none }
 
 /// A cadence resolved from the server [StudyRhythm] (preferred) or the local
@@ -571,7 +571,7 @@ class NotificationScheduler {
     }
 
     // One art run per recompute: renders lazily, memoises by name, and stops
-    // when its budget is spent (`AVATAR_NOTIFICATIONS_PLAN.md` §3).
+    // when its budget is spent.
     final art = NotificationArt.of(ref, now: now);
     unawaited(NotificationArt.sweep(now: now));
 

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart' show NotifType, NotifTypeX;
 
 /// Local, best-effort mirror of the reader's habit, used only to decide whether
-/// to *nudge* (`RETENTION_PLAN.md` §2). The server streak (`GET /dashboard`)
+/// to *nudge*. The server streak (`GET /dashboard`)
 /// stays the number the app displays and celebrates; a wrong nudge is cheap, a
 /// wrong streak is not.
 ///
@@ -45,8 +45,7 @@ class RetentionState {
   final int serverStreakSeen;
 
   /// Every completion ever recorded - a finished lesson or a chapter claimed as
-  /// read. Drives the earned permission moments
-  /// (`AVATAR_NOTIFICATIONS_PLAN.md` §7); never reset.
+  /// read. Drives the earned permission moments; never reset.
   final int completionsEver;
 
   final String? graceUsedDay;

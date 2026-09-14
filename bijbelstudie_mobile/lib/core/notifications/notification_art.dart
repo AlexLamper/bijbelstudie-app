@@ -11,8 +11,7 @@ import '../../features/levensboom/present/levensboom_providers.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
 
-/// Which picture each notification type carries
-/// (`AVATAR_NOTIFICATIONS_PLAN.md` §4).
+/// Which picture each notification type carries.
 ///
 /// One instance per scheduler run. It renders lazily and memoises by art name,
 /// so the fourteen `dailyVerse` one-shots of a single batch share one render,

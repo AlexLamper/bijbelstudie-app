@@ -235,16 +235,16 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
             ),
       );
 
-      // A recorded chapter read is a "completion" for retention purposes
-      // (RETENTION_PLAN §2) - mirror it locally and re-derive the ladder so a
+      // A recorded chapter read is a "completion" for retention purposes -
+      // mirror it locally and re-derive the ladder so a
       // reminder for today is cancelled.
       unawaited(
         ref.read(retentionStoreProvider.notifier).markCompleted().then(
           (_) {
             if (!mounted) return;
             ref.invalidate(notificationRecomputeProvider);
-            // The reader who never opens a study still earns the ask here
-            // (`AVATAR_NOTIFICATIONS_PLAN.md` §7). Both moments are no-ops
+            // The reader who never opens a study still earns the ask here.
+            // Both moments are no-ops
             // until they are earned, and the ask is only ever spent once.
             unawaited(maybeAskAfterReading(context, ref));
           },

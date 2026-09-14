@@ -45,6 +45,9 @@ sign_in_with_apple (auth).
 - Release/signing work is documented in `docs/ios-release-setup.md` and
   `docs/handoff-manual-steps.md` — read those before touching iOS signing,
   and don't re-derive it from the Xcode project.
+- Guideline 3.1.1: Pro is sold through StoreKit only. The app never links to,
+  mentions or steers toward web checkout (no Stripe URL, no "goedkoper op de
+  website"). StoreKit prices are separate truth from the web's `lib/pricing.ts`.
 
 ## Commands
 
@@ -71,8 +74,6 @@ This repo has cheap ways to waste a lot of tokens. Avoid them:
   `ls -R` or `du`. Scope every search to `lib/` or `test/`.
 - **Run one test file, not the suite,** while iterating. The suite includes
   widget-render and screenshot tests.
-- `bijbelstudie-ios-build-prompt.md` (26 KB) is a historical one-shot prompt.
-  It is not current documentation — don't read it unless asked.
 - Prefer `gh` over fetching GitHub pages, and `git log -n 5 --oneline` over
   unbounded log output.
 

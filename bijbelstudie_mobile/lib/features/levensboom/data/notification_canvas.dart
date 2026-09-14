@@ -42,7 +42,7 @@ enum NotifArtKind {
   verse,
 }
 
-/// One notification's picture, described (`AVATAR_NOTIFICATIONS_PLAN.md` §2.3).
+/// One notification's picture, described.
 ///
 /// Everything is optional except the subject: a spec with no streak, no
 /// countdown and no level renders exactly the bare scene the app shipped

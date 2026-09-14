@@ -3,20 +3,39 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/server_image.dart';
 import '../data/study_models.dart';
+import '../data/study_photos.dart';
 
-/// The 16:6 banner on a study card and at the top of its detail screen.
+/// A study's picture: the 16:6 banner on a study card, the square thumbnail in
+/// a list row, and the header of its detail screen.
 ///
-/// `GET /api/v1/studies` hands out `image` as an absolute URL to a hand-authored
-/// SVG under `/images/studies` (see `lib/data/curated-studies.ts`). Those went
-/// through `Image.network`, which has no SVG decoder, so every banner failed and
-/// the cards showed a flat tint instead of a picture. [ServerImage] now routes
-/// vectors to flutter_svg; this widget adds the ground they are drawn on, so a
-/// study with no image - or one whose request fails - still gets a banner with
-/// its own character rather than an empty box.
+/// First choice is the study's bundled photograph from [studyPhotoFor], the
+/// same one the website shows (`lib/studyPhotos.ts`, `app/studies/StudyArtwork.tsx`).
+/// Like the website, a box no wider than 1.5:1 gets the 240 px square crop and
+/// anything wider gets the 800 px banner file.
+///
+/// A study without a photo (one added on the server after this build) falls
+/// back to whatever `image` the API hands out, through [ServerImage], and then
+/// to the painted teal ground - so a card never shows an empty or broken box.
+/// The painted ground also stands in while a photo decodes.
 class StudyBanner extends StatelessWidget {
   const StudyBanner({super.key, required this.study});
 
   final CuratedStudy study;
+
+  /// The website's wash over a photo (`StudyArtwork.tsx`): slate 900, a
+  /// little darker along the top and bottom edges where badges and pills sit,
+  /// clear through the middle so the picture itself is not dimmed.
+  static const LinearGradient photoScrim = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0x380F172A), // 22%
+      Color(0x000F172A),
+      Color(0x000F172A),
+      Color(0x2E0F172A), // 18%
+    ],
+    stops: [0, 0.38, 0.62, 1],
+  );
 
   /// A stable per-study tilt so the fallback banners in a list do not all look
   /// like the same rectangle. Derived from the id, never random, or it would
@@ -60,10 +79,49 @@ class StudyBanner extends StatelessWidget {
     );
   }
 
+  /// The server image, or the painted ground when there is none.
+  Widget _withoutPhoto() {
+    if (study.image.trim().isEmpty) return _painted();
+    return ServerImage(imagePath: study.image, fallback: _painted());
+  }
+
+  /// The same rule as the website: a square-ish box is a list thumbnail.
+  static bool useThumb(BoxConstraints constraints) {
+    if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+      return false;
+    }
+    if (constraints.maxHeight <= 0) return false;
+    return constraints.maxWidth / constraints.maxHeight <= 1.5;
+  }
+
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    if (study.image.trim().isEmpty) return _painted();
-    return ServerImage(imagePath: study.image, fallback: _painted());
+    final photo = studyPhotoFor(study.id);
+    if (photo == null) return _withoutPhoto();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Image.asset(
+          useThumb(constraints) ? photo.thumb : photo.banner,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          excludeFromSemantics: true,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (frame == null && !wasSynchronouslyLoaded) return _painted();
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                child,
+                const DecoratedBox(
+                  decoration: BoxDecoration(gradient: photoScrim),
+                ),
+              ],
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => _withoutPhoto(),
+        );
+      },
+    );
   }
 }

@@ -69,7 +69,7 @@ Future<void> _initRevenueCat() async {
 ///
 /// - sets `tz.local` from the real IANA zone (the old code initialised the
 ///   zone database but never set `tz.local`, so an 08:00 reminder fired at
-///   08:00 **UTC** — `RETENTION_PLAN.md` §1);
+///   08:00 **UTC**);
 /// - registers the new Android channels and deletes the legacy
 ///   `daily_reading` channel.
 ///

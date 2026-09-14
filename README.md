@@ -63,8 +63,6 @@ Lezen, studies volgen, notities maken en je voortgang bijhouden is gratis. **Bij
 |---|---|---|
 | <img src="screenshots/6.5/05-notities.png" alt="Notities" width="180" /> | <img src="screenshots/6.5/06-profiel.png" alt="Voortgang" width="180" /> | <img src="screenshots/6.5/07-pro.png" alt="Pro" width="180" /> |
 
-iPad-schermen staan in [`screenshots/13-ipad`](screenshots/13-ipad).
-
 ## Download
 
 De app is beschikbaar voor iPhone en iPad:

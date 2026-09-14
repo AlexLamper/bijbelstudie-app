@@ -7,8 +7,8 @@ import 'package:bijbelstudie_mobile/features/studies/data/enrollment_models.dart
 import 'package:bijbelstudie_mobile/features/studies/data/study_plan_store.dart';
 
 /// The scheduler is a pure function of cached state; these cover the parts that
-/// decide *whether* and *when* — cadence resolution and the priority/cap ladder
-/// (`RETENTION_PLAN.md` §2, §4.4). The platform-channel write path is not
+/// decide *whether* and *when* — cadence resolution and the priority/cap ladder.
+/// The platform-channel write path is not
 /// exercised here.
 void main() {
   RenderedVariant variant() =>

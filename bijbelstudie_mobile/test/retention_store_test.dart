@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bijbelstudie_mobile/core/notifications/notification_service.dart';
 import 'package:bijbelstudie_mobile/core/notifications/retention_store.dart';
 
-/// The local habit mirror (`RETENTION_PLAN.md` §2). It only ever decides
+/// The local habit mirror. It only ever decides
 /// whether to *nudge*, so its one hard requirement is that a timezone change or
 /// a clock rewind can never inflate or destroy a count.
 void main() {

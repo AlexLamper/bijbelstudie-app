@@ -8,15 +8,14 @@ import 'notification_scheduler.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
 
-/// The earned moments at which the app may ask for notification permission
-/// (`AVATAR_NOTIFICATIONS_PLAN.md` §7).
+/// The earned moments at which the app may ask for notification permission.
 ///
 /// Never on first launch and never in the onboarding wizard: the reader taps
 /// "niet toestaan" there and the one chance is gone. The ask is offered after
 /// something has actually gone well, and only once - whichever moment lands
 /// first wins, the rest become no-ops.
 enum PermissionMoment {
-  /// The first finished lesson. The original moment (`RETENTION_PLAN.md` §4.6).
+  /// The first finished lesson. The original moment.
   firstLesson,
 
   /// Three chapters read. Catches the reader who never starts a study.
@@ -118,8 +117,8 @@ Future<void> maybeAskAfterReading(BuildContext context, WidgetRef ref) async {
   await maybeAskForNotifications(context, ref, PermissionMoment.chaptersRead);
 }
 
-/// The Dutch pre-permission bottom sheet (`RETENTION_PLAN.md` §4.6, extended by
-/// §7). Shown in-app before the OS dialog; "Nu niet" only sets the guard, it
+/// The Dutch pre-permission bottom sheet, shared by every earned moment.
+/// Shown in-app before the OS dialog; "Nu niet" only sets the guard, it
 /// never re-prompts - Settings is the way back.
 Future<bool?> _showSheet(
   BuildContext context,

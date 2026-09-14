@@ -6,8 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/notifications/notification_service.dart' show QuietHours;
 import 'reading_settings.dart' show kDailyReminderMinutesKey;
 
-/// Every notification toggle, time and quiet-hours bound (`RETENTION_PLAN.md`
-/// §6). Stored under the `notif.` prefix, same load/persist shape as
+/// Every notification toggle, time and quiet-hours bound.
+/// Stored under the `notif.` prefix, same load/persist shape as
 /// `ReadingSettingsController`.
 ///
 /// Kept apart from `RetentionStore` on purpose: this is what the *reader*

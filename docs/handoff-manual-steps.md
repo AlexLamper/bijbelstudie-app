@@ -164,8 +164,7 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 - [ ] **App name.** Currently `BijbelStudie App`. Rename to `BijbelStudie` if
       it is still free, under **App Information**.
 - [ ] **Subtitle**, **Promotional text**, **Keywords** - Dutch.
-- [ ] **Description.** Paste the block under "The App Description to paste" in
-      `docs/app-review-1.0.1-rejection.md` verbatim. It is not free copy: the
+- [ ] **Description.** It is not free copy: the
       1.0.1 (11) rejection was guideline 3.1.2, because the product page carried
       no Terms of Use (EULA) link. The description must keep, as plain-text
       clickable URLs, all three of:
@@ -194,7 +193,8 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
       `scripts/ensure-review-account.mjs` in the bijbelstudie repo. Re-run it
       with `--write` if the credentials ever stop working. Note it grants Pro
       through `subscribed`, not `storePremium`: the launch-time RevenueCat sync
-      overwrites the latter. See `docs/app-review-1.0.5-rejection.md`.
+      overwrites the latter, so a `storePremium` grant would vanish on the
+      reviewer's second launch.
 - [ ] **App Review notes.** Paste this:
       > The Bible translations and commentaries in this app are public domain.
       > The original-language text is STEPBible (TAHOT/TAGNT), CC BY 4.0, and

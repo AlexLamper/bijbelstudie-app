@@ -13,7 +13,7 @@ import '../../../studies/present/studies_providers.dart';
 import '../../data/dashboard_models.dart';
 import '../streak_detail_sheet.dart';
 
-/// The header re-entry indicator (`RETENTION_PLAN.md` §3.1): a miniature
+/// The header re-entry indicator: a miniature
 /// Levensboom that grows with whatever the reader is being measured on, with
 /// the number tucked into a corner badge. Daily-streak readers grow it with the
 /// streak; week-goal readers grow it with this week's `done / target`. Both are

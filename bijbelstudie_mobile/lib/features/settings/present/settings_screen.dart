@@ -260,7 +260,7 @@ String _fmtMinutes(int minutes) =>
     '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
     '${(minutes % 60).toString().padLeft(2, '0')}';
 
-/// The full notifications block (`RETENTION_PLAN.md` §6): a master switch, the
+/// The full notifications block: a master switch, the
 /// study-reminder time, per-type toggles, quiet hours, and a one-tap
 /// "sla vandaag over". Full opt-out is a single tap on the master row - no
 /// confirmation nag.

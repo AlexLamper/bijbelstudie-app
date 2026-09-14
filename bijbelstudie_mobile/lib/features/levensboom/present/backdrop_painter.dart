@@ -15,8 +15,8 @@ import '../domain/tree_generator.dart';
 /// Everything here used to live in [TreePainter]. It is split out so a second
 /// painter can draw the same world - sky, backdrop, earth, animals - with no
 /// branches on top: `verse_scene.dart` uses it for the daily-verse art, and
-/// `notification_canvas.dart` for the picture a notification carries
-/// (`AVATAR_NOTIFICATIONS_PLAN.md` §2.1). Pure extraction: no routine below
+/// `notification_canvas.dart` for the picture a notification carries.
+/// Pure extraction: no routine below
 /// changed when it moved, and the generator was not touched, so the website
 /// parity fixtures are unaffected.
 
@@ -218,8 +218,7 @@ mixin SceneLayers {
 
   SpeciesParams get sp => speciesParams(scene.species);
 
-  /// Slow weather, for the daily-verse art only
-  /// (`AVATAR_NOTIFICATIONS_PLAN.md` §6.2).
+  /// Slow weather, for the daily-verse art only.
   ///
   /// [TreePainter] never calls this: the tree's sky is the one the website
   /// mirrors and it stays exactly as it was. Three blurred blobs crossing on

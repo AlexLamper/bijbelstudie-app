@@ -230,7 +230,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       if (!mounted) return;
 
       // The permission prompt is earned here, once, after the first finished
-      // lesson (RETENTION_PLAN §4.6).
+      // lesson, where the ask has context.
       if (firstEver) {
         await maybeAskForNotifications(context, ref, PermissionMoment.firstLesson);
       }

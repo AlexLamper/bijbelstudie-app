@@ -41,7 +41,7 @@ class DashboardScreen extends ConsumerWidget {
     ref.watch(notificationRecomputeProvider);
 
     // The server streak is authoritative; feed it to the local mirror so a
-    // later "streak broke" guess can be corrected (RETENTION_PLAN §2).
+    // later "streak broke" guess can be corrected.
     ref.listen(dashboardProvider, (_, next) {
       final data = next.value;
       if (data != null) {

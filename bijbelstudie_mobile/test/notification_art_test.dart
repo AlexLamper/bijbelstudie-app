@@ -4,7 +4,7 @@ import 'package:bijbelstudie_mobile/core/notifications/notification_service.dart
 import 'package:flutter_test/flutter_test.dart';
 
 /// The countdown burned into the picture and the countdown in the notification
-/// body come from the same number (`AVATAR_NOTIFICATIONS_PLAN.md` §11): if they
+/// body come from the same number: if they
 /// ever disagree the reader is told two different deadlines at once.
 void main() {
   group('hoursToMidnight', () {

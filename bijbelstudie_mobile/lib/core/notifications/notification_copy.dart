@@ -1,7 +1,7 @@
 import 'notification_service.dart' show NotifType, RenderedVariant;
 
 /// One un-personalised line. Tokens are `{study} {lesson} {streak} {name}
-/// {book} {done} {target} {n} {verse} {reference}` (`RETENTION_PLAN.md` §5).
+/// {book} {done} {target} {n} {verse} {reference}`.
 class VariantTemplate {
   const VariantTemplate(this.id, this.title, this.body);
 
@@ -71,7 +71,7 @@ RenderedVariant pickVariant(
   return renderVariant(type, template, tokens);
 }
 
-/// Bundled Dutch fallback pools (`RETENTION_PLAN.md` §5). The server copy batch
+/// Bundled Dutch fallback pools. The server copy batch
 /// (`GET /api/v1/notifications/copy?type=...`) overrides a type when present.
 const Map<NotifType, List<VariantTemplate>> notificationCopy = {
   NotifType.studyReminder: [
@@ -95,7 +95,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
   NotifType.streakAtRisk: [
     // The picture carries "Nog 3 uur" as pixels, which do not grow with the OS
     // font size; these two say it in words as well, so nothing is image-only
-    // (`AVATAR_NOTIFICATIONS_PLAN.md` §11). They fall through to the rest of
+    // (accessibility). They fall through to the rest of
     // the pool on a device where the hours cannot be resolved.
     VariantTemplate('ar9', 'Nog {hours} uur vandaag',
         'Eén korte les houdt je reeks van {streak} dagen heel.'),
