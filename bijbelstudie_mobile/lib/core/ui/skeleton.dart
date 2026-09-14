@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 /// Skeleton loaders.
 ///
 /// The app used to show a centred spinner for every pending request. A
-/// skeleton — a greyed-out sketch of the layout that is coming — tells the
+/// skeleton - a greyed-out sketch of the layout that is coming - tells the
 /// reader what is loading and where, and it does not spin in place while a
 /// slow network keeps someone waiting. These are the primitives plus a few
 /// screen-shaped compositions; every `.when(loading: …)` uses one of them.
@@ -52,7 +52,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
     final brightness = Theme.of(context).brightness;
     final base = AppTheme.paperSunken;
     // A slightly lighter (or, in dark mode, slightly less dim) tint of the
-    // base surface colour — the pulse breathes between the two, never a
+    // base surface colour - the pulse breathes between the two, never a
     // white-hot band and never travelling across the shape.
     final tint = Color.alphaBlend(
       (brightness == Brightness.dark ? Colors.white : Colors.black)
@@ -122,7 +122,7 @@ class SkeletonText extends StatelessWidget {
   }
 }
 
-/// An [AppCard]-shaped skeleton — the same border and radius the real cards
+/// An [AppCard]-shaped skeleton - the same border and radius the real cards
 /// use, so the page does not jump when the data lands.
 class SkeletonCard extends StatelessWidget {
   const SkeletonCard({
@@ -155,7 +155,7 @@ class SkeletonCard extends StatelessWidget {
 }
 
 /// Rule-separated rows, each two short lines. Covers every plain list in the
-/// app — notes, highlights, bookmarks, search hits, resources.
+/// app - notes, highlights, bookmarks, search hits, resources.
 class SkeletonList extends StatelessWidget {
   const SkeletonList({
     super.key,
@@ -190,7 +190,7 @@ class SkeletonList extends StatelessWidget {
   }
 }
 
-/// The dashboard while `/dashboard` is in flight — greeting header and
+/// The dashboard while `/dashboard` is in flight - greeting header and
 /// stand-ins for the cards below it.
 class DashboardSkeleton extends StatelessWidget {
   const DashboardSkeleton({super.key});
@@ -268,7 +268,7 @@ class DashboardSkeleton extends StatelessWidget {
   }
 }
 
-/// The reader while a chapter loads — a run of verse-like lines.
+/// The reader while a chapter loads - a run of verse-like lines.
 class ReaderSkeleton extends StatelessWidget {
   const ReaderSkeleton({super.key});
 
@@ -292,7 +292,7 @@ class ReaderSkeleton extends StatelessWidget {
   }
 }
 
-/// A vertical run of banner-topped cards — the studies list.
+/// A vertical run of banner-topped cards - the studies list.
 class SkeletonCardColumn extends StatelessWidget {
   const SkeletonCardColumn({super.key, this.count = 3});
 

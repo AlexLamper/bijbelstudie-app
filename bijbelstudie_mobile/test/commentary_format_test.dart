@@ -42,7 +42,7 @@ void main() {
     test('folds the em dash the source texts are full of', () {
       // Written as the code point, because the repo does not carry the
       // character itself outside of what `normaliseDashes` folds away.
-      const emDash = '\u2014';
+      final emDash = String.fromCharCode(0x2014);
       final blocks = parseCommentary('Een zin $emDash en nog een.');
       expect(blocks.single.text, 'Een zin - en nog een.');
       expect(blocks.single.text, isNot(contains(emDash)));
@@ -56,8 +56,9 @@ void main() {
 
   group('HTML fragments, Dachsel and KingComments', () {
     // The shape verified against the live API.
-    const fragment =
-        '<ol><li><div class="s9">Vs. 1 en 2. God schept&#8212;in den '
+    // The numeric em-dash entity, built from the code point.
+    final fragment =
+        '<ol><li><div class="s9">Vs. 1 en 2. God schept&#${0x2014};in den '
         'beginne.</div></li>\n'
         '<li><div class="s10">In den beginne <sup>1</sup> schiep '
         '<b>God</b> den hemel.</div></li></ol>';

@@ -14,7 +14,7 @@ import '../data/dashboard_models.dart';
 import 'dashboard_providers.dart';
 import 'widgets/daily_verse_tree_backdrop.dart';
 
-/// "Tekst van de dag" — the photo card at the top of the Start tab.
+/// "Tekst van de dag" - the photo card at the top of the Start tab.
 ///
 /// Modelled on the verse-of-the-day card in the YouVersion app: a full-bleed
 /// background, an eyebrow and the reference at the top left, the verse
@@ -33,7 +33,7 @@ class DailyVerseCard extends ConsumerStatefulWidget {
     required this.onOpenChapter,
   });
 
-  /// Today's verse, or null when `/dashboard` could not supply one — offline,
+  /// Today's verse, or null when `/dashboard` could not supply one - offline,
   /// or a feed hiccup. The card then falls back to the newest verse it has in
   /// its local archive, and renders nothing at all if that is empty too.
   final DailyVerse? verse;
@@ -306,7 +306,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     }
   }
 
-  /// The local archive, as a sheet on [host]'s navigator — the dashboard's for
+  /// The local archive, as a sheet on [host]'s navigator - the dashboard's for
   /// the card, the dialog's for the modal, so the sheet lands on top of it.
   ///
   /// [beforeOpen] runs after the sheet closes and before the reader is sent to
@@ -329,7 +329,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   }
 
   /// Names the verse the reader should scroll to and highlight, then hands
-  /// the actual navigation to [widget.onOpenChapter] as before — that keeps
+  /// the actual navigation to [widget.onOpenChapter] as before - that keeps
   /// this card out of routing, which stays the dashboard's job.
   void _openChapterAtVerse(String book, int chapter, int? verseNumber) {
     if (verseNumber != null) {
@@ -377,7 +377,7 @@ class _VerseFace extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onShare;
 
-  /// Card only — the "…" sheet that holds what the modal spells out.
+  /// Card only - the "…" sheet that holds what the modal spells out.
   final VoidCallback? onMore;
 
   /// Modal only.
@@ -528,8 +528,8 @@ class _VerseFace extends StatelessWidget {
 /// The actions along the bottom of the photo.
 ///
 /// On the card: favourite, share and the "…" sheet. In the modal, where there
-/// is room, the sheet's two entries are spelled out instead — "Lees het hele
-/// hoofdstuk" as a button and the archive as an icon — so both surfaces offer
+/// is room, the sheet's two entries are spelled out instead - "Lees het hele
+/// hoofdstuk" as a button and the archive as an icon - so both surfaces offer
 /// the same four things and the modal never stacks a sheet on a dialog.
 class _VerseActions extends StatelessWidget {
   const _VerseActions({
@@ -811,7 +811,7 @@ class _PhotoAction extends StatelessWidget {
 /// The favourite button on the photo, with a small "pop" when a verse is
 /// liked.
 ///
-/// Behaves like a [_PhotoAction] otherwise — same size, splash and tooltip —
+/// Behaves like a [_PhotoAction] otherwise - same size, splash and tooltip -
 /// but on the transition to liked it plays a one-shot scale overshoot, swaps
 /// the outline heart for the filled one, fades the colour to [AppTheme.flame]
 /// and sends a single accent ring outward. Unliking just settles the colour
@@ -917,7 +917,7 @@ class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
     );
   }
 
-  /// A single expanding, fading circle in the accent colour — one clean pulse
+  /// A single expanding, fading circle in the accent colour - one clean pulse
   /// rather than a particle burst, which only reads as noise at this size.
   Widget _ring(double t) {
     final eased = Curves.easeOut.transform(t);

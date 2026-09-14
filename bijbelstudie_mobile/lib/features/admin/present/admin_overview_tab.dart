@@ -9,7 +9,7 @@ import 'admin_common.dart';
 import 'admin_providers.dart';
 import 'admin_user_sheet.dart';
 
-/// The overview tab — everything `/admin` renders in the browser, stacked for
+/// The overview tab - everything `/admin` renders in the browser, stacked for
 /// a phone: the headline figures, the two growth charts, content counts,
 /// billing health, revenue, the newest signups and the short funnel.
 class AdminOverviewTab extends ConsumerWidget {

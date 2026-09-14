@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// **Emitted with a value the server drops.** `/api/v1/analytics` validates
 /// against a fixed allowlist in `lib/analyticsSchema.ts` and discards anything
-/// outside it — no error, no 400, just a row that never appears. A typo in a
+/// outside it - no error, no 400, just a row that never appears. A typo in a
 /// `surface` or `source` string is therefore invisible at runtime and invisible
 /// in review.
 ///
@@ -88,7 +88,7 @@ void main() {
           isNotEmpty,
           reason:
               'AnalyticsEvents.${entry.key} ("${entry.value}") is declared but '
-              'never tracked. Either emit it or delete the constant — a name '
+              'never tracked. Either emit it or delete the constant - a name '
               'with no call site reads as a measured step that is not measured.',
         );
       });

@@ -1,4 +1,4 @@
-# Paywall shows no prices — what to check
+# Paywall shows no prices - what to check
 
 The app side is exhausted: it asks the current RevenueCat offering, falls back to
 a direct store lookup of the two product ids, matches packages by id then type
@@ -16,12 +16,12 @@ the raw error. Every item below says which line of that block points at it.
 
 ## 1. You are testing somewhere that has no store
 
-*Diagnose says: `sleutel: none:apple` — or configured `false`.*
+*Diagnose says: `sleutel: none:apple` - or configured `false`.*
 
 - The **iOS Simulator** returns no products at all unless the StoreKit
   configuration file is active. `ios/Runner/BijbelStudie.storekit` now exists and
   the Debug scheme points at it, so a simulator run should show €9,99 / €69,99.
-- A **local `flutter run` has no RevenueCat key** — the key only arrives through
+- A **local `flutter run` has no RevenueCat key** - the key only arrives through
   a `--dart-define`, and without it the SDK never contacts the store:
 
   ```
@@ -39,7 +39,7 @@ the raw error. Every item below says which line of that block points at it.
 This is the most common cause of "approved products that return nothing". In
 **App Store Connect → Business**, the Paid Applications Agreement must show
 **Active**, with banking and tax details complete. While it is pending, StoreKit
-returns an empty product list for every request and reports no error — which
+returns an empty product list for every request and reports no error - which
 looks exactly like a code bug and is not one.
 
 ## 3. Product ids do not match
@@ -52,7 +52,7 @@ The app asks for exactly:
 - `bijbelstudie_pro_yearly`
 
 In **App Store Connect → Subscriptions**, the Product ID column must match those
-two strings character for character — no prefix, no capital letters, no trailing
+two strings character for character - no prefix, no capital letters, no trailing
 whitespace. If yours differ, either rename them there or change the two constants
 at the top of `bijbelstudie_mobile/lib/features/premium/data/purchase_service.dart`.
 
@@ -73,7 +73,7 @@ In the **RevenueCat dashboard → Project settings → Apps**:
 *Diagnose says: offering `(geen)` with N offerings available, or an offering with 0 packages.*
 
 In **RevenueCat → Offerings**, one offering must be flagged **Current**, and it
-needs both packages attached — normally `$rc_monthly` and `$rc_annual`, pointing
+needs both packages attached - normally `$rc_monthly` and `$rc_annual`, pointing
 at the two products from step 3.
 
 This one is the least urgent: the app falls back to a direct product lookup, so a
@@ -93,5 +93,5 @@ the button on the card before digging further.
 
 Press **Kopieer diagnose** on the paywall and send the block. It contains the key
 source, configuration state, offering id, package count, requested ids, returned
-count and raw error — enough to tell which of the five above it is without
+count and raw error - enough to tell which of the five above it is without
 guessing.

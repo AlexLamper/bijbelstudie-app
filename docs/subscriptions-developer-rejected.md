@@ -1,4 +1,4 @@
-# The subscriptions are "Developer Rejected" — what that means and how to clear it
+# The subscriptions are "Developer Rejected" - what that means and how to clear it
 
 Written 2026-08-30, after both products stopped appearing in the app.
 
@@ -24,11 +24,11 @@ There are only two ways an in-app purchase reaches it:
    Review**.
 2. **Far more likely here:** the products were attached to an app version, and
    that *version* was withdrawn or rejected by the developer. In-app purchases
-   submitted alongside a binary inherit the binary's fate — cancel the version
+   submitted alongside a binary inherit the binary's fate - cancel the version
    and every IAP riding with it drops to Developer Rejected in the same move.
 
-Given the review history of 1.0 (5) and 1.0.1 (11) — several submissions pulled and
-resubmitted — reason 2 is almost certainly what happened, and it happened as a
+Given the review history of 1.0 (5) and 1.0.1 (11) - several submissions pulled and
+resubmitted - reason 2 is almost certainly what happened, and it happened as a
 side effect rather than as a decision anybody made about the subscriptions.
 
 ## Why this stops the app selling anything
@@ -62,18 +62,18 @@ moment the products go Approved the flow works end to end:
 | Product ids in `purchase_service.dart` | match App Store Connect exactly |
 | Entitlement id `pro` | matches on client and server |
 | Offering → package lookup, with a direct product-id fallback | present |
-| `POST /api/v1/sync-premium` on production | **HTTP 200** — so `REVENUECAT_REST_API_KEY` is set and reconciliation runs |
+| `POST /api/v1/sync-premium` on production | **HTTP 200** - so `REVENUECAT_REST_API_KEY` is set and reconciliation runs |
 | `GET /api/v1/me` | returns `isPro`, `proSource`, `proExpiresAt` |
 | RevenueCat webhook | authenticated (`REVENUECAT_WEBHOOK_AUTHORIZATION`) and idempotent on `event.id` |
 | Restore purchases | exposed on the paywall (App Store requires it) |
-| Web (Stripe) subscribers | `isProFromWeb` shows "Actief via web" and **no** purchase button — guideline 3.1.1(b) |
+| Web (Stripe) subscribers | `isProFromWeb` shows "Actief via web" and **no** purchase button - guideline 3.1.1(b) |
 | Post-purchase | `_syncServerPremium` retries 5× / 2s, invalidates `profileProvider`, paywall flips to `_ActiveCard` |
 
-The one thing still outstanding on this side is `REVENUECAT_APPLE_KEY` — see
+The one thing still outstanding on this side is `REVENUECAT_APPLE_KEY` - see
 Step 1 of `handoff-manual-steps.md`. Without it the build has no store
 configuration at all and the paywall says so explicitly.
 
-## How to clear it — do this in App Store Connect
+## How to clear it - do this in App Store Connect
 
 The subscriptions cannot be resubmitted from this repo or from any API key held
 here. All of it is manual.
@@ -90,7 +90,7 @@ here. All of it is manual.
 3. Repeat for `bijbelstudie_pro_yearly` (€69,99 / year).
 4. Each product's status should now read **Ready to Submit**.
 5. **Check the Paid Applications Agreement.** *Business → Agreements, Tax, and
-   Banking* — it must be **Active**, with banking and tax details complete. A
+   Banking* - it must be **Active**, with banking and tax details complete. A
    pending agreement keeps products unpurchasable no matter what review says.
 6. **Submit them with the next app version.** This is the part that catches
    people out: **an app's first-ever subscription cannot be submitted on its

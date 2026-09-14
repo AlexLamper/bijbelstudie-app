@@ -60,7 +60,7 @@ class AuthRepository {
 
   /// Revokes the refresh token server-side, then clears local storage.
   ///
-  /// The local clear happens even if the network call fails — a logout that
+  /// The local clear happens even if the network call fails - a logout that
   /// leaves a usable token on the device is worse than an orphaned row on the
   /// server, which expires on its own.
   Future<void> logout() async {
@@ -78,7 +78,7 @@ class AuthRepository {
   /// Turns a failed auth call into something a reader can act on.
   ///
   /// `errorV1` defaults `message` to the error code, so a route that passes no
-  /// copy answers `{"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"}` — and
+  /// copy answers `{"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"}` - and
   /// that raw code was shown verbatim on the login screen. It is not Dutch, it
   /// is not a sentence, and it tells the user nothing about whether to retry.
   /// A message equal to the code is therefore dropped in favour of our own

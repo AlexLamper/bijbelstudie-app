@@ -23,7 +23,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 /// flutter run --dart-define=REVENUECAT_TEST_KEY=test_xxx
 /// ```
 ///
-/// CI injects them from GitHub Actions secrets — see
+/// CI injects them from GitHub Actions secrets - see
 /// `.github/workflows/ios-release.yml`.
 class RevenueCatConfig {
   RevenueCatConfig._();
@@ -106,7 +106,7 @@ class RevenueCatConfig {
   /// hole: after a failed launch-time configure, every store call throws an
   /// opaque platform error for the rest of the run and no amount of tapping
   /// "opnieuw proberen" can recover it. Calling this before loading prices
-  /// closes that hole — it is a no-op when the SDK is already up.
+  /// closes that hole - it is a no-op when the SDK is already up.
   static Future<bool> ensureConfigured() async {
     if (kIsWeb) return false;
     final key = sdkPublicApiKey();

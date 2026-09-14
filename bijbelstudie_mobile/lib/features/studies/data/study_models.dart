@@ -1,3 +1,5 @@
+import '../../../core/data/text_format.dart';
+
 // Shapes returned by `GET /api/v1/studies`, sourced from
 // `lib/data/curated-studies.ts` on the website.
 
@@ -33,7 +35,7 @@ class StudyLesson {
   (int, int)? get verseBounds {
     final raw = verseRange;
     if (raw == null || raw.trim().isEmpty) return null;
-    final parts = raw.split(RegExp(r'[-\u2013\u2014]'));
+    final parts = normaliseDashes(raw).split(RegExp(r'[-\u2013]'));
     final start = int.tryParse(parts.first.trim());
     if (start == null) return null;
     final end = parts.length > 1 ? int.tryParse(parts[1].trim()) : null;

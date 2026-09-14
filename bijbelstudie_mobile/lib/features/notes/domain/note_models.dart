@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// Records that sync with `/api/v1/{notes,highlights,bookmarks,reading-history}`.
 ///
 /// Every record carries a client-generated UUID as its `id`. The server keys on
-/// it, so creating a record offline and uploading it later — possibly twice,
-/// after a dropped connection — produces exactly one row.
+/// it, so creating a record offline and uploading it later - possibly twice,
+/// after a dropped connection - produces exactly one row.
 
 enum HighlightColor { yellow, blue, green, pink, purple, orange }
 

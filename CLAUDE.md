@@ -1,19 +1,19 @@
-# BijbelStudie — Flutter iOS/Android app
+# BijbelStudie - Flutter iOS/Android app
 
 Flutter client for www.bijbelstudie.io. The Flutter project is
 `bijbelstudie_mobile/`; the repo root only holds docs, screenshots and CI.
 The Next.js backend it talks to is a **separate repo** at `C:\Projects\bijbelstudie`
-— it is not here, so don't go looking for `/api/v1` handlers in this tree.
+- it is not here, so don't go looking for `/api/v1` handlers in this tree.
 
 ## Layout
 
 Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
 
-- `core/` — `api/api_client.dart` (Dio + bearer refresh), `config/app_config.dart`
+- `core/` - `api/api_client.dart` (Dio + bearer refresh), `config/app_config.dart`
   (base URLs, dart-defines), `router/app_router.dart` (go_router, all routes),
   `theme/app_theme.dart`, `ui/` (shared widgets), `db/content_cache.dart` (sqflite
   chapter cache), `data/bible_books.dart`, `notifications/`, `preview/`.
-- `features/<name>/` — each with `data/` (repositories, models, local storage),
+- `features/<name>/` - each with `data/` (repositories, models, local storage),
   `domain/` (entities), `present/` (screens + Riverpod providers).
   Features: `ai auth bible commentary dashboard feedback groups levensboom notes
   onboarding premium profile resources search settings studies study`.
@@ -21,7 +21,7 @@ Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
   `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/levensboom/*.ts` in the
   website repo line for line; `test/levensboom_parity_test.dart` asserts the same
   counts as the website's fixtures. Edit both repos in one pass.
-- `test/` — 16 test files plus `screenshot_fixtures.dart`.
+- `test/` - 16 test files plus `screenshot_fixtures.dart`.
 
 Screen ↔ file mapping is 1:1 by feature name: the Start tab is
 `features/dashboard/present/dashboard_screen.dart`, the split reader is
@@ -43,7 +43,7 @@ sign_in_with_apple (auth).
 - Auth is `Authorization: Bearer <jwt>` against `/api/v1/*`; the website's
   cookie auth is a different client and irrelevant here.
 - Release/signing work is documented in `docs/ios-release-setup.md` and
-  `docs/handoff-manual-steps.md` — read those before touching iOS signing,
+  `docs/handoff-manual-steps.md` - read those before touching iOS signing,
   and don't re-derive it from the Xcode project.
 - Guideline 3.1.1: Pro is sold through StoreKit only. The app never links to,
   mentions or steers toward web checkout (no Stripe URL, no "goedkoper op de
@@ -56,7 +56,7 @@ trims Flutter output there; the PowerShell tool gets the untrimmed version):
 
 ```bash
 flutter test                 # full suite
-flutter test test/x_test.dart   # one file — prefer this
+flutter test test/x_test.dart   # one file - prefer this
 flutter analyze
 flutter pub get
 ```

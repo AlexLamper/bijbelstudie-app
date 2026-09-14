@@ -64,7 +64,7 @@ class GroeiTab extends StatelessWidget {
                 ),
               const SizedBox(height: 8),
               Text(
-                '${tree.xp} XP totaal. Blijf je een tijd weg, dan hangt je boom er slap bij — '
+                '${tree.xp} XP totaal. Blijf je een tijd weg, dan hangt je boom er slap bij - '
                 'hij gaat nooit dood en herstelt na één sessie.',
                 style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
               ),
@@ -74,7 +74,7 @@ class GroeiTab extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           '"Want hij zal zijn als een boom, geplant aan waterbeken, die zijn vrucht '
-          'geeft op zijn tijd." — Psalm 1:3',
+          'geeft op zijn tijd." - Psalm 1:3',
           style: AppTheme.caption.copyWith(color: AppTheme.inkFaint, fontStyle: FontStyle.italic),
         ),
       ],

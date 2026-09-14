@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:bijbelstudie_mobile/core/analytics/analytics.dart';
+import 'package:bijbelstudie_mobile/features/auth/present/auth_controller.dart';
 import 'package:bijbelstudie_mobile/features/dashboard/data/daily_verse_store.dart';
 import 'package:bijbelstudie_mobile/core/db/content_cache.dart';
 import 'package:bijbelstudie_mobile/core/preview/preview_data.dart';
@@ -40,7 +42,7 @@ import 'screenshot_fixtures.dart';
 ///
 /// iOS cannot be built on this machine, so these come out of the widget tester
 /// rather than a simulator. The surface is set to the 6.5" display's native
-/// **1284 × 2778 px** — 428 × 926 logical at devicePixelRatio 3 — and captured
+/// **1284 × 2778 px** - 428 × 926 logical at devicePixelRatio 3 - and captured
 /// at that same ratio, so the PNGs are pixel-exact and never resampled. Apple
 /// derives every smaller size from this one.
 ///
@@ -69,7 +71,7 @@ class ShotDevice {
 }
 
 const List<ShotDevice> kDevices = [
-  // iPhone 14/15 Pro Max — the 6.5"/6.9" slot. Apple derives the smaller
+  // iPhone 14/15 Pro Max - the 6.5"/6.9" slot. Apple derives the smaller
   // iPhone sizes from this one.
   ShotDevice(
     slug: '6.5',
@@ -77,7 +79,7 @@ const List<ShotDevice> kDevices = [
     scale: 3.0,
     pixels: Size(1284, 2778),
   ),
-  // iPad Pro 13" (M4) — the 13" slot, mandatory because the app ships as
+  // iPad Pro 13" (M4) - the 13" slot, mandatory because the app ships as
   // universal (TARGETED_DEVICE_FAMILY = "1,2").
   ShotDevice(
     slug: '13-ipad',
@@ -135,7 +137,7 @@ Future<void> loadAppFonts() async {
 }
 
 /// The reader tells the server which chapter was opened. A screenshot run must
-/// not, so the repository is swapped for one that answers without a socket —
+/// not, so the repository is swapped for one that answers without a socket -
 /// an in-flight Dio request also leaves a pending timer and fails the test.
 class _StubDashboardRepository implements DashboardRepository {
   @override
@@ -163,7 +165,7 @@ class _StubDashboardRepository implements DashboardRepository {
       const [];
 }
 
-/// A paywall that shows real prices instead of the `—` placeholder the empty
+/// A paywall that shows real prices instead of the `-` placeholder the empty
 /// offering would render. Apple requires a screenshot of this screen for each
 /// subscription product, and a dashed price reads as a broken build.
 class _StubPremiumController extends PremiumController {
@@ -265,13 +267,13 @@ void main() {
       id: 'statenvertaling',
       name: 'Statenvertaling',
       language: 'nl',
-      attribution: 'Statenvertaling (1637) — publiek domein',
+      attribution: 'Statenvertaling (1637) - publiek domein',
     ),
     BibleSource(
       id: 'kjv',
       name: 'King James Version',
       language: 'en',
-      attribution: 'King James Version (1611) — publiek domein',
+      attribution: 'King James Version (1611) - publiek domein',
     ),
   ];
 
@@ -280,7 +282,7 @@ void main() {
       id: 'matthew_henry_nl',
       name: 'Matthew Henry (NL)',
       language: 'nl',
-      attribution: 'Matthew Henry (1662–1714) — publiek domein',
+      attribution: 'Matthew Henry (1662–1714) - publiek domein',
     ),
   ];
 
@@ -323,7 +325,7 @@ void main() {
       chapter: 1,
       verse: 1,
       verseText: 'In den beginne schiep God den hemel en de aarde.',
-      noteText: 'Alles begint bij God als Schepper — niet bij de mens.',
+      noteText: 'Alles begint bij God als Schepper - niet bij de mens.',
       translation: 'statenvertaling',
       isHighlight: false,
       updatedAt: DateTime(2026, 8, 1),
@@ -359,7 +361,7 @@ void main() {
       verse: 27,
       verseText: 'En God schiep den mens naar Zijn beeld.',
       noteText:
-          'Naar Zijn beeld — gezegd van iedereen, voordat er ook maar iets '
+          'Naar Zijn beeld - gezegd van iedereen, voordat er ook maar iets '
           'gepresteerd is.',
       translation: 'statenvertaling',
       isHighlight: false,
@@ -448,6 +450,15 @@ void main() {
           (ref) async => const <String, StudyEnrollment>{},
         ),
         premiumControllerProvider.overrideWith(_StubPremiumController.new),
+        // Pro tracks `pricing_viewed` on open. The real flush reads the token
+        // from secure storage behind a 5s timeout, which has no plugin here and
+        // leaves that timer pending past the end of the test.
+        analyticsProvider.overrideWith(
+          (ref) => _SilentAnalytics(
+            ref.read(apiClientProvider),
+            ref.read(authStorageProvider),
+          ),
+        ),
         // Profiel leads with the Levensboom. Canned, so the screenshot shows a
         // real tree instead of a loading skeleton, and the same one every run.
         treeStateProvider.overrideWith(PreviewTreeNotifier.new),
@@ -492,7 +503,7 @@ void main() {
     File('${device.outDir}/$fileName.png').writeAsBytesSync(bytes);
 
     // Guard the one thing Apple rejects outright: wrong dimensions. Read them
-    // straight out of the PNG's IHDR chunk — `decodeImageFromList` needs the
+    // straight out of the PNG's IHDR chunk - `decodeImageFromList` needs the
     // real event loop and deadlocks under the test binding.
     final header = ByteData.view(bytes.buffer);
     expect(
@@ -549,6 +560,13 @@ void main() {
       shot('07-pro', PremiumScreen.new, free: true);
     });
   }
+}
+
+class _SilentAnalytics extends Analytics {
+  _SilentAnalytics(super.client, super.storage);
+
+  @override
+  void track(String name, [Map<String, String>? props]) {}
 }
 
 class _FixedProfile extends ProfileNotifier {

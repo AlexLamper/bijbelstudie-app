@@ -148,7 +148,7 @@ void main() {
     expect(find.text('LES 2 VAN 4 OPNIEUW GELEZEN'), findsOneWidget);
     expect(find.text('Deze les telde al mee'), findsOneWidget);
     // Nothing was earned, so the XP figure is a dash and says why.
-    expect(find.text('—'), findsOneWidget);
+    expect(find.text('-'), findsOneWidget);
     expect(find.text('telde al mee'), findsOneWidget);
     expect(find.text('Je boom groeide'), findsNothing);
     expect(

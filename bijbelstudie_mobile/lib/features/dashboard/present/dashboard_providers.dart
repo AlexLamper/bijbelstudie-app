@@ -115,7 +115,7 @@ const _months = [
   'december',
 ];
 
-/// `new Date().toLocaleDateString("nl-NL", { weekday, day, month })` — the
+/// `new Date().toLocaleDateString("nl-NL", { weekday, day, month })` - the
 /// sub-line under the dashboard greeting. Written out rather than pulled from
 /// `intl` so the app ships no extra locale data for one string.
 String dutchLongDate([DateTime? now]) {

@@ -198,7 +198,7 @@ class LessonCompleteCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _Figure(
-                  value: grew ? '+$gained' : '—',
+                  value: grew ? '+$gained' : '-',
                   label: repeat ? 'telde al mee' : 'XP',
                   color: accentText,
                 ),

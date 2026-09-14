@@ -349,7 +349,7 @@ class _GeneralInfoPane extends ConsumerWidget {
 /// This used to be one `SelectableText` holding the API's raw string. The
 /// separators in that string are bare carriage returns, which buy no vertical
 /// space in a Flutter paragraph, so several thousand words arrived as a single
-/// unbroken block — readable in the sense that the glyphs were on screen, and
+/// unbroken block - readable in the sense that the glyphs were on screen, and
 /// in no other sense. Paragraphs are laid out individually here so the gap
 /// between them is a real gap, matching what the website does with the same
 /// text.

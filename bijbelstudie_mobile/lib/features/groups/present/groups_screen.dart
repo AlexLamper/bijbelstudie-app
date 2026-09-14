@@ -6,7 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/groups_repository.dart';
 
-/// `/groepen` — the study groups the reader is in, plus the public ones.
+/// `/groepen` - the study groups the reader is in, plus the public ones.
 class GroupsScreen extends ConsumerWidget {
   const GroupsScreen({super.key});
 

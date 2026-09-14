@@ -24,7 +24,7 @@ class _OnboardingPageData {
   /// Leading part of the headline, rendered in ink.
   final String title;
 
-  /// Trailing part of the headline, rendered in lapis — the site always
+  /// Trailing part of the headline, rendered in lapis - the site always
   /// colours one phrase of a heading with `text-lapis`.
   final String accent;
   final String body;
@@ -120,7 +120,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header rail — `sticky top-0 border-b border-rule bg-paper/90`.
+            // Header rail - `sticky top-0 border-b border-rule bg-paper/90`.
             Container(
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: AppTheme.rule)),
@@ -155,7 +155,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 itemBuilder: (context, i) => _OnboardingPage(data: _pages[i]),
               ),
             ),
-            // Hairline step indicator — active segment is solid ink.
+            // Hairline step indicator - active segment is solid ink.
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(

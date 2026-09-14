@@ -103,7 +103,7 @@ void main() async {
   // that *fails*; a platform channel that never answers (a store client that
   // cannot reach the device's account, a notification channel registration
   // waiting on a locked keystore) leaves `main` awaiting forever, `runApp` is
-  // never called, and the launch screen stays up with no Flutter behind it —
+  // never called, and the launch screen stays up with no Flutter behind it -
   // the app "not getting past loading". Neither of these is worth the app not
   // starting: RevenueCat re-links on the next entitlement check and the
   // notification scheduler re-runs on the first foreground.
@@ -157,7 +157,7 @@ class BijbelStudieApp extends ConsumerWidget {
     // depend on brightness, so thirteen of the fourteen baked a light colour
     // and painted near-black on the dark scaffold. The ramp and the semantic
     // palette are getters now, resolved against one app-wide flag, and this
-    // is where that flag is set — before `MaterialApp` builds, so the very
+    // is where that flag is set - before `MaterialApp` builds, so the very
     // first frame is already correct.
     final themeMode = ref.watch(themeModeProvider);
     final brightness = switch (themeMode) {

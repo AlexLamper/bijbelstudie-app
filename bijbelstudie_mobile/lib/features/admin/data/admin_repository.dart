@@ -105,7 +105,7 @@ class AdminRepository {
   }
 
   /// Turns a Dio failure into something an admin can act on. The server's own
-  /// message is preferred when it sent one — on this screen the reader is the
+  /// message is preferred when it sent one - on this screen the reader is the
   /// person who can do something about it.
   AdminException _describe(DioException e, String subject, {String? fallback}) {
     final status = e.response?.statusCode;

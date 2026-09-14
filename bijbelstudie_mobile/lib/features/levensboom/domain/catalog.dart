@@ -11,9 +11,25 @@ library;
 import 'scenes.dart';
 import 'species.dart';
 
-const int kCatalogVersion = 1;
+const int kCatalogVersion = 2;
 
-enum TreeAnimal { geen, vogel, vlinders, schaap, duif, vuurvliegjes, hert }
+enum TreeAnimal {
+  geen,
+  vogel,
+  vlinders,
+  schaap,
+  duif,
+  vuurvliegjes,
+  hert,
+  raaf,
+  vos,
+  ezel,
+  bijen,
+  ooievaar,
+  uil,
+  adelaar,
+  leeuw,
+}
 
 const TreeAnimal kDefaultAnimal = TreeAnimal.geen;
 
@@ -25,6 +41,14 @@ const Map<TreeAnimal, String> kAnimalIds = {
   TreeAnimal.duif: 'duif',
   TreeAnimal.vuurvliegjes: 'vuurvliegjes',
   TreeAnimal.hert: 'hert',
+  TreeAnimal.raaf: 'raaf',
+  TreeAnimal.vos: 'vos',
+  TreeAnimal.ezel: 'ezel',
+  TreeAnimal.bijen: 'bijen',
+  TreeAnimal.ooievaar: 'ooievaar',
+  TreeAnimal.uil: 'uil',
+  TreeAnimal.adelaar: 'adelaar',
+  TreeAnimal.leeuw: 'leeuw',
 };
 
 TreeAnimal animalFromId(String? id) {
@@ -119,18 +143,32 @@ const List<CatalogItem> kCatalog = [
   // Boomsoorten
   CatalogItem(id: 'eik', kind: ItemKind.species, name: 'Eik', blurb: 'Breed en sterk, met eikels in de herfst.', verse: 'Genesis 18:1', unlock: FreeUnlock()),
   CatalogItem(id: 'olijf', kind: ItemKind.species, name: 'Olijfboom', blurb: 'Knoestig en altijd groen.', verse: 'Psalm 52:10', unlock: FreeUnlock()),
+  CatalogItem(id: 'mosterd', kind: ItemKind.species, name: 'Mosterdboom', blurb: 'Het kleinste zaadje; bloeit geel, ieder voorjaar.', verse: 'Mattheüs 13:31', unlock: LevelUnlock(2)),
   CatalogItem(id: 'vijg', kind: ItemKind.species, name: 'Vijgenboom', blurb: 'Laag en wijd, met grote bladeren.', verse: 'Micha 4:4', unlock: LevelUnlock(4)),
   CatalogItem(id: 'palm', kind: ItemKind.species, name: 'Palmboom', blurb: 'Eén hoge stam en een kroon van bladeren.', verse: 'Psalm 92:13', unlock: LevelUnlock(8)),
+  CatalogItem(id: 'appel', kind: ItemKind.species, name: 'Appelboom', blurb: 'Een ronde kroon en rode appels.', verse: 'Hooglied 2:3', unlock: LevelUnlock(10)),
   CatalogItem(id: 'amandel', kind: ItemKind.species, name: 'Amandelboom', blurb: 'Bloeit als eerste, ieder voorjaar.', verse: 'Jeremia 1:11', unlock: LevelUnlock(12)),
+  CatalogItem(id: 'granaatappel', kind: ItemKind.species, name: 'Granaatappelboom', blurb: 'Klein en dicht, met rode bloesem.', verse: 'Deuteronomium 8:8', unlock: LevelUnlock(14)),
+  CatalogItem(id: 'sycomoor', kind: ItemKind.species, name: 'Sycomoor', blurb: 'Laag en breed genoeg om in te klimmen.', verse: 'Lukas 19:4', unlock: LevelUnlock(16)),
+  CatalogItem(id: 'acacia', kind: ItemKind.species, name: 'Acacia', blurb: 'Een lange stam en een vlakke kroon; het hout van de ark.', verse: 'Exodus 25:10', unlock: LevelUnlock(19)),
+  CatalogItem(id: 'wilg', kind: ItemKind.species, name: 'Treurwilg', blurb: 'Lange takken die naar het water hangen.', verse: 'Psalm 137:2', unlock: StreakUnlock(21)),
   CatalogItem(id: 'ceder', kind: ItemKind.species, name: 'Ceder van de Libanon', blurb: 'Hoog en kegelvormig, altijd groen.', verse: 'Psalm 92:13', unlock: ProUnlock()),
+  CatalogItem(id: 'cipres', kind: ItemKind.species, name: 'Cipres', blurb: 'Smal en donker, recht omhoog.', verse: 'Jesaja 55:13', unlock: ProUnlock()),
 
   // Omgevingen
   CatalogItem(id: 'waterbeken', kind: ItemKind.scene, name: 'Waterbeken', blurb: 'Een beek langs de wortels.', verse: 'Psalm 1:3', unlock: FreeUnlock()),
   CatalogItem(id: 'heuvels', kind: ItemKind.scene, name: 'Heuvels van Galilea', blurb: 'Glooiende heuvels met olijfgaarden.', unlock: LevelUnlock(3)),
   CatalogItem(id: 'meer', kind: ItemKind.scene, name: 'Meer van Galilea', blurb: 'De oever, met een bootje op het water.', unlock: LevelUnlock(6)),
+  CatalogItem(id: 'jordaan', kind: ItemKind.scene, name: 'De Jordaan', blurb: 'Een brede rivier met riet langs de oever.', verse: 'Jozua 3:17', unlock: LevelUnlock(9)),
+  CatalogItem(id: 'wijngaard', kind: ItemKind.scene, name: 'Wijngaard', blurb: 'Rijen wijnstokken op de heuvel.', verse: 'Johannes 15:5', unlock: LevelUnlock(18)),
+  CatalogItem(id: 'regenboog', kind: ItemKind.scene, name: 'Regenboog', blurb: 'Een boog in de wolken, na de regen.', verse: 'Genesis 9:13', unlock: LevelUnlock(20)),
   CatalogItem(id: 'woestijn', kind: ItemKind.scene, name: 'Woestijn-oase', blurb: 'Zand, warmte en een bron.', verse: 'Jesaja 35:1', unlock: StreakUnlock(7)),
   CatalogItem(id: 'berg', kind: ItemKind.scene, name: 'De berg', blurb: 'Rotsen en een verre bergketen.', verse: 'Psalm 121:1', unlock: StreakUnlock(30)),
+  CatalogItem(id: 'kust', kind: ItemKind.scene, name: 'De kust', blurb: 'Zand, golven en de zee tot aan de horizon.', verse: 'Psalm 93:4', unlock: StreakUnlock(50)),
+  CatalogItem(id: 'dageraad', kind: ItemKind.scene, name: 'Dageraad', blurb: 'De zon komt op; elke morgen nieuw.', verse: 'Klaagliederen 3:23', unlock: StreakUnlock(90)),
   CatalogItem(id: 'stadsmuur', kind: ItemKind.scene, name: 'Stadsmuur', blurb: 'Onder de muren van Jeruzalem.', verse: 'Psalm 122', unlock: BadgeUnlock('completed5', '5 studies voltooid')),
+  CatalogItem(id: 'graanveld', kind: ItemKind.scene, name: 'Graanveld', blurb: 'Rijp koren, zoals op het veld van Boaz.', verse: 'Ruth 2:3', unlock: BadgeUnlock('completed10', '10 studies voltooid')),
+  CatalogItem(id: 'herdersveld', kind: ItemKind.scene, name: 'Velden van Efratha', blurb: "Een heldere ster boven de velden, 's nachts.", verse: 'Lukas 2:8', unlock: BadgeUnlock('anniversary', 'Een jaar lid')),
   CatalogItem(id: 'hof', kind: ItemKind.scene, name: 'De hof', blurb: 'Een tuin met bloemen en een rivier.', verse: 'Genesis 2:8', unlock: ProUnlock()),
   CatalogItem(id: 'sterrennacht', kind: ItemKind.scene, name: 'Sterrennacht', blurb: 'Kijk omhoog en tel de sterren.', verse: 'Genesis 15:5', unlock: ProUnlock()),
 
@@ -138,10 +176,18 @@ const List<CatalogItem> kCatalog = [
   CatalogItem(id: 'geen', kind: ItemKind.animal, name: 'Geen', blurb: 'Alleen de boom.', unlock: FreeUnlock()),
   CatalogItem(id: 'vogel', kind: ItemKind.animal, name: 'Vogel', blurb: 'Nestelt in je kroon.', verse: 'Psalm 84:4', unlock: LevelUnlock(5)),
   CatalogItem(id: 'vlinders', kind: ItemKind.animal, name: 'Vlinders', blurb: 'Drie vlinders rond je boom.', unlock: LevelUnlock(7)),
-  CatalogItem(id: 'schaap', kind: ItemKind.animal, name: 'Schapen', blurb: 'Twee schapen grazen bij de stam.', verse: 'Psalm 23:2', unlock: BadgeUnlock('completed1', 'Eerste studie voltooid')),
-  CatalogItem(id: 'duif', kind: ItemKind.animal, name: 'Duif', blurb: 'Een witte duif op de hoogste tak.', verse: 'Genesis 8:11', unlock: StreakUnlock(14)),
+  CatalogItem(id: 'vos', kind: ItemKind.animal, name: 'Vos', blurb: 'Een vos, opgerold bij de stam.', verse: 'Lukas 9:58', unlock: LevelUnlock(11)),
+  CatalogItem(id: 'bijen', kind: ItemKind.animal, name: 'Bijen', blurb: 'Een zwerm bijen rond je kroon.', verse: 'Psalm 119:103', unlock: LevelUnlock(13)),
   CatalogItem(id: 'vuurvliegjes', kind: ItemKind.animal, name: 'Vuurvliegjes', blurb: "Lichtjes in je boom, 's nachts.", unlock: LevelUnlock(15)),
+  CatalogItem(id: 'ooievaar', kind: ItemKind.animal, name: 'Ooievaar', blurb: 'Een ooievaar op één poot naast je boom.', verse: 'Jeremia 8:7', unlock: LevelUnlock(17)),
+  CatalogItem(id: 'adelaar', kind: ItemKind.animal, name: 'Adelaar', blurb: 'Cirkelt hoog boven je boom.', verse: 'Jesaja 40:31', unlock: LevelUnlock(22)),
+  CatalogItem(id: 'duif', kind: ItemKind.animal, name: 'Duif', blurb: 'Een witte duif op de hoogste tak.', verse: 'Genesis 8:11', unlock: StreakUnlock(14)),
+  CatalogItem(id: 'uil', kind: ItemKind.animal, name: 'Uil', blurb: "Slaapt overdag in je kroon, waakt 's nachts.", verse: 'Psalm 102:7', unlock: StreakUnlock(40)),
   CatalogItem(id: 'hert', kind: ItemKind.animal, name: 'Hert', blurb: 'Een hert naast je boom.', verse: 'Psalm 42:2', unlock: StreakUnlock(60)),
+  CatalogItem(id: 'schaap', kind: ItemKind.animal, name: 'Schapen', blurb: 'Twee schapen grazen bij de stam.', verse: 'Psalm 23:2', unlock: BadgeUnlock('completed1', 'Eerste studie voltooid')),
+  CatalogItem(id: 'raaf', kind: ItemKind.animal, name: 'Raaf', blurb: 'Een raaf op een tak, zoals bij Elia.', verse: '1 Koningen 17:6', unlock: BadgeUnlock('firstlesson', 'Eerste les voltooid')),
+  CatalogItem(id: 'ezel', kind: ItemKind.animal, name: 'Ezel', blurb: 'Een ezel dat geduldig wacht bij je boom.', verse: 'Zacharia 9:9', unlock: BadgeUnlock('completed5', '5 studies voltooid')),
+  CatalogItem(id: 'leeuw', kind: ItemKind.animal, name: 'Leeuw', blurb: 'De leeuw uit de stam van Juda rust bij je boom.', verse: 'Openbaring 5:5', unlock: ProUnlock()),
 
   // Ring
   CatalogItem(id: 'teal', kind: ItemKind.ring, name: 'Groene ring', blurb: 'De standaard voortgangsring.', unlock: FreeUnlock()),

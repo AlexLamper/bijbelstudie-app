@@ -218,7 +218,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Paper background with the site wordmark — the site has no dark hero.
+    // Paper background with the site wordmark - the site has no dark hero.
     return Scaffold(
       backgroundColor: AppTheme.paper,
       body: Center(
@@ -253,7 +253,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 }
 
-/// A slim determinate bar — the professional stand-in for the old spinner on
+/// A slim determinate bar - the professional stand-in for the old spinner on
 /// the launch screen.
 class _LoadingBar extends StatelessWidget {
   const _LoadingBar({required this.value});

@@ -1,4 +1,4 @@
-# iOS Release via GitHub Actions — Setup Guide
+# iOS Release via GitHub Actions - Setup Guide
 
 The workflow at `.github/workflows/ios-release.yml` builds the Flutter IPA on a
 macOS GitHub runner and uploads it to TestFlight. It is copied verbatim from an
@@ -12,7 +12,7 @@ Bundle identifier for this app: **`com.bijbel-studie.app`**
 
 ---
 
-## Step 1 — Register the App ID and enable Sign in with Apple
+## Step 1 - Register the App ID and enable Sign in with Apple
 
 1. [Apple Developer portal](https://developer.apple.com) → **Identifiers** →
    register App ID `com.bijbel-studie.app`.
@@ -31,7 +31,7 @@ Generate the profile **after** enabling the capability (Step 4), never before.
 
 ---
 
-## Step 2 — Google Sign-In
+## Step 2 - Google Sign-In
 
 Google issues a **different OAuth client per platform**, and the server pins the
 ID token's `aud` claim (`lib/oauthVerify.ts` → `googleAudiences()`). A token
@@ -43,7 +43,7 @@ with `INVALID_TOKEN`.
 
 **Google Cloud Console → APIs & Services → Credentials → Create credentials →
 OAuth client ID**, type **iOS**, bundle ID `com.bijbel-studie.app`. Use the same
-project as the existing web client. Neither value it gives you is a secret — an
+project as the existing web client. Neither value it gives you is a secret - an
 iOS OAuth client is public by design and is bound to the bundle ID.
 
 You get two forms of the same id:
@@ -69,7 +69,7 @@ Without this the app gets a token Google is happy with and the server answers
 ### 2c. Tell the build about it
 
 Set two **repository variables** (Settings → Secrets and variables → Actions →
-Variables — not secrets; these are public ids):
+Variables - not secrets; these are public ids):
 
 | Variable | Value |
 |---|---|
@@ -88,7 +88,7 @@ flutter build ios --release   --dart-define=GOOGLE_IOS_CLIENT_ID=<ios client id>
 
 Nothing breaks. `GoogleSignInConfig.isAvailable` is false without a client id
 for the platform, so the Google button simply does not render and the screens
-look exactly as they did before — Sign in with Apple plus email/password, which
+look exactly as they did before - Sign in with Apple plus email/password, which
 already satisfies guideline 4.8 on its own.
 
 ### Account linking
@@ -101,21 +101,21 @@ website, and a password account whose address matches gains Google as a second
 way in rather than a second account. `/auth/apple` does the same with `appleId`.
 
 Linking by email is safe here only because Google asserts the address in a
-signed token — never do it from a client-supplied email.
+signed token - never do it from a client-supplied email.
 
 ---
 
-## Step 3 — Create an App Store Connect API key
+## Step 3 - Create an App Store Connect API key
 
 1. Log in to [App Store Connect](https://appstoreconnect.apple.com).
 2. **Users and Access → Integrations → App Store Connect API → Team Keys**.
 3. **Generate API Key**, name it `GitHub Actions`, role **App Manager**.
-4. Download the `.p8` private key — it is downloadable exactly once.
+4. Download the `.p8` private key - it is downloadable exactly once.
 5. Note the **Key ID** and the **Issuer ID** on that page.
 
 ---
 
-## Step 4 — Export the Distribution certificate and provisioning profile
+## Step 4 - Export the Distribution certificate and provisioning profile
 
 On a Mac signed into your Apple Developer account:
 
@@ -130,7 +130,7 @@ On a Mac signed into your Apple Developer account:
 
 ---
 
-## Step 5 — Add GitHub Secrets and Variables
+## Step 5 - Add GitHub Secrets and Variables
 
 GitHub repository → **Settings → Secrets and variables → Actions**.
 
@@ -164,13 +164,13 @@ binary is `--dart-define`, which the workflow supplies from the secret above.
 
 ---
 
-## Step 6 — Backend environment (Vercel)
+## Step 6 - Backend environment (Vercel)
 
 The app talks to `https://www.bijbelstudie.io/api/v1`. That surface needs:
 
 | Env var | Purpose |
 |---|---|
-| `MOBILE_JWT_SECRET` | signs mobile access tokens. **Must differ from `NEXTAUTH_SECRET`** — a leaked mobile secret must not forge website sessions |
+| `MOBILE_JWT_SECRET` | signs mobile access tokens. **Must differ from `NEXTAUTH_SECRET`** - a leaked mobile secret must not forge website sessions |
 | `APPLE_CLIENT_IDS` | `com.bijbel-studie.app` (comma-separated if you add the Services ID) |
 | `GOOGLE_MOBILE_CLIENT_IDS` | iOS + Android + web OAuth client IDs, comma-separated |
 | `REVENUECAT_WEBHOOK_AUTHORIZATION` | exact value set in the RevenueCat webhook config |
@@ -196,7 +196,7 @@ fails explicitly:
 
 ```
 ::error::TestFlight upload failed. Common cause: the version string is already
-approved/closed — bump the version (e.g. 1.0.2 → 1.0.3).
+approved/closed - bump the version (e.g. 1.0.2 → 1.0.3).
 ```
 
 That grep is the only thing catching a duplicate version string. Do not remove it.

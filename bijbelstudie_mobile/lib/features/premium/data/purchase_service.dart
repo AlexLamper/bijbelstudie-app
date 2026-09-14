@@ -203,7 +203,7 @@ class PurchaseService {
     return Purchases.purchaseStoreProduct(product);
   }
 
-  /// Restore previous purchases. Required by App Store review — the paywall
+  /// Restore previous purchases. Required by App Store review - the paywall
   /// must expose this as a visible button.
   Future<CustomerInfo> restorePurchases() async {
     _log('Restoring purchases...');

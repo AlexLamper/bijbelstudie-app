@@ -19,7 +19,7 @@ import 'package:bijbelstudie_mobile/features/levensboom/domain/tree_state.dart';
 /// `tests/levensboom.test.ts` in the bijbelstudie repo asserts these exact
 /// numbers from the TypeScript generator. If one side changes and the other
 /// does not, a reader's tree stops being the same tree on their phone and on
-/// the website — which is the one promise this feature makes.
+/// the website - which is the one promise this feature makes.
 void main() {
   const seed = '65f0c1a2b3c4d5e6f7a8b9c0';
 
@@ -105,6 +105,55 @@ void main() {
         (32, 280, 196, 0, 0, 3),
         (83, 852, 810, 0, 2, 4),
         (310, 1400, 875, 0, 6, 5),
+      ],
+      TreeSpecies.mosterd: [
+        (1, 2, 1, 1, 0, 0),
+        (9, 48, 36, 6, 0, 2),
+        (22, 152, 107, 11, 0, 3),
+        (53, 405, 385, 12, 2, 4),
+        (200, 1400, 875, 13, 6, 5),
+      ],
+      TreeSpecies.appel: [
+        (1, 2, 1, 0, 0, 0),
+        (8, 35, 27, 0, 0, 2),
+        (22, 114, 80, 11, 0, 3),
+        (57, 392, 373, 12, 2, 4),
+        (210, 1400, 875, 13, 6, 5),
+      ],
+      TreeSpecies.granaatappel: [
+        (1, 2, 1, 0, 0, 0),
+        (9, 48, 36, 0, 0, 2),
+        (25, 154, 108, 11, 0, 3),
+        (50, 378, 360, 12, 2, 4),
+        (224, 1400, 875, 13, 6, 5),
+      ],
+      TreeSpecies.sycomoor: [
+        (1, 2, 1, 0, 0, 0),
+        (8, 28, 21, 0, 0, 2),
+        (23, 100, 70, 0, 0, 3),
+        (45, 185, 176, 0, 2, 4),
+        (171, 858, 537, 0, 6, 5),
+      ],
+      TreeSpecies.wilg: [
+        (1, 2, 1, 0, 0, 0),
+        (8, 42, 32, 0, 0, 2),
+        (25, 154, 108, 0, 0, 3),
+        (53, 405, 385, 0, 2, 4),
+        (199, 1400, 875, 0, 6, 5),
+      ],
+      TreeSpecies.acacia: [
+        (1, 2, 1, 0, 0, 0),
+        (9, 48, 36, 0, 0, 2),
+        (25, 154, 108, 11, 0, 3),
+        (50, 378, 360, 12, 2, 4),
+        (222, 1400, 875, 13, 6, 5),
+      ],
+      TreeSpecies.cipres: [
+        (1, 2, 1, 0, 0, 0),
+        (12, 77, 58, 0, 0, 2),
+        (36, 288, 202, 0, 0, 3),
+        (91, 858, 816, 0, 2, 4),
+        (294, 1400, 875, 0, 6, 5),
       ],
     };
 
@@ -251,19 +300,25 @@ void main() {
 
     test('unlocks by level, streak, badge and Pro independently', () {
       final level8 = unlockedKeys(const UnlockContext(level: 8, badges: [], longestStreak: 0, isPro: false));
-      expect(level8, containsAll(['species:vijg', 'species:palm', 'scene:heuvels', 'scene:meer', 'animal:vogel', 'animal:vlinders']));
+      expect(level8, containsAll(['species:mosterd', 'species:vijg', 'species:palm', 'scene:heuvels', 'scene:meer', 'animal:vogel', 'animal:vlinders']));
       expect(level8, isNot(contains('species:amandel')));
+      expect(level8, isNot(contains('scene:jordaan')));
 
       final streak30 = unlockedKeys(const UnlockContext(level: 1, badges: [], longestStreak: 30, isPro: false));
-      expect(streak30, containsAll(['scene:woestijn', 'scene:berg', 'animal:duif']));
+      expect(streak30, containsAll(['scene:woestijn', 'scene:berg', 'animal:duif', 'species:wilg']));
       expect(streak30, isNot(contains('animal:hert')));
+      expect(streak30, isNot(contains('animal:uil')));
 
       expect(
         unlockedKeys(const UnlockContext(level: 1, badges: ['completed5'], longestStreak: 0, isPro: false)),
-        contains('scene:stadsmuur'),
+        containsAll(['scene:stadsmuur', 'animal:ezel']),
+      );
+      expect(
+        unlockedKeys(const UnlockContext(level: 1, badges: ['completed10', 'firstlesson', 'anniversary'], longestStreak: 0, isPro: false)),
+        containsAll(['scene:graanveld', 'animal:raaf', 'scene:herdersveld']),
       );
       final pro = unlockedKeys(const UnlockContext(level: 1, badges: [], longestStreak: 0, isPro: true));
-      expect(pro, containsAll(['species:ceder', 'scene:hof', 'scene:sterrennacht', 'ring:goud']));
+      expect(pro, containsAll(['species:ceder', 'species:cipres', 'scene:hof', 'scene:sterrennacht', 'animal:leeuw', 'ring:goud']));
     });
 
     test('falls back to defaults for anything the account is not entitled to', () {
@@ -293,14 +348,21 @@ void main() {
       expect(unlockLabel(const BadgeUnlock('completed5', '5 studies voltooid')), '5 studies voltooid');
       expect(unlockLabel(const ProUnlock()), 'Pro');
       expect(nextLevelUnlock(const UnlockContext(level: 5, badges: [], longestStreak: 0, isPro: false))?.id, 'meer');
-      expect(nextLevelUnlock(const UnlockContext(level: 15, badges: [], longestStreak: 0, isPro: false)), isNull);
+      expect(nextLevelUnlock(const UnlockContext(level: 15, badges: [], longestStreak: 0, isPro: false))?.id, 'sycomoor');
+      expect(nextLevelUnlock(const UnlockContext(level: 22, badges: [], longestStreak: 0, isPro: false)), isNull);
       expect(itemsUnlockedAtLevel(8).map((i) => i.id).toList(), ['palm']);
+      expect(itemsUnlockedAtLevel(2).map((i) => i.id).toList(), ['mosterd']);
     });
 
-    test('has unique keys', () {
+    test('has unique keys and one item per id table entry', () {
       final keys = kCatalog.map((item) => item.key).toList();
       expect(keys.toSet().length, keys.length);
-      expect(kCatalog.length, 23);
+      expect(kCatalog.length, 45);
+      // Every id table and the catalog agree, so a tile can never point at a
+      // species, scene or animal the painter does not know.
+      expect(itemsOfKind(ItemKind.species).map((i) => i.id).toSet(), kSpeciesIds.values.toSet());
+      expect(itemsOfKind(ItemKind.scene).map((i) => i.id).toSet(), kSceneIds.values.toSet());
+      expect(itemsOfKind(ItemKind.animal).map((i) => i.id).toSet(), kAnimalIds.values.toSet());
     });
   });
 
@@ -389,6 +451,26 @@ void main() {
     test('carries the season so the renderer can draw seasonal events', () {
       expect(buildPalette(Season.winter, DayPhase.day).season, Season.winter);
       expect(buildPalette(Season.spring, DayPhase.night).season, Season.spring);
+    });
+
+    test('gives a species its own blossom colour and lets a scene pin the dawn', () {
+      expect(
+        buildPalette(Season.spring, DayPhase.day, species: TreeSpecies.mosterd).blossom,
+        const Color(0xFFF3D45A),
+      );
+      expect(
+        buildPalette(Season.autumn, DayPhase.day, species: TreeSpecies.mosterd).blossom,
+        isNull,
+      );
+      final dawn = buildPalette(Season.summer, DayPhase.night, scene: TreeSceneId.dageraad);
+      expect(dawn.timeOfDay, DayPhase.dawn);
+      expect(dawn.night, isFalse);
+      expect(dawn.skyBottom, const Color(0xFFF9C89A));
+      expect(buildPalette(Season.summer, DayPhase.day, scene: TreeSceneId.herdersveld).night, isTrue);
+      expect(
+        buildPalette(Season.autumn, DayPhase.day, species: TreeSpecies.wilg).leaf,
+        const Color(0xFFC9772E),
+      );
     });
   });
 

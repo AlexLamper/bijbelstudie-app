@@ -1,6 +1,6 @@
 # Checked in deliberately. Without it CocoaPods falls back to the Flutter
 # template default of iOS 12.0, and purchases_flutter (RevenueCat 5.x) and
-# sign_in_with_apple both declare a 13.0 deployment target — `pod install`
+# sign_in_with_apple both declare a 13.0 deployment target - `pod install`
 # then fails on the CI runner, where nobody is around to answer the prompt.
 platform :ios, '13.0'
 

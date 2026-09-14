@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bijbelstudie_mobile/features/study/domain/summary_format.dart';
 
 /// The "Algemene info" tab used to render the API's string as-is, and the
-/// separators in that string are bare carriage returns — which buy no vertical
+/// separators in that string are bare carriage returns - which buy no vertical
 /// space in a Flutter paragraph. Several thousand words arrived as one block.
 
 void main() {

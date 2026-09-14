@@ -9,7 +9,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../data/resources_repository.dart';
 
-/// `/hulpbronnen` — the library of public-domain Dutch works.
+/// `/hulpbronnen` - the library of public-domain Dutch works.
 ///
 /// Each entry opens on the archive that hosts it (DBNL, Delpher,
 /// Archive.org, Gutenberg). Nothing is mirrored into the app, which is both a

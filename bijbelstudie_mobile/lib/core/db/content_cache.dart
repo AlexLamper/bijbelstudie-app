@@ -9,13 +9,13 @@ import 'package:sqflite/sqflite.dart';
 /// On-device cache of fetched chapters.
 ///
 /// The corpus is ~355 MB on the server. It cannot ship inside the IPA and must
-/// not be downloaded wholesale on first launch, so the unit of transfer — and
-/// of caching — is one chapter. Rows are keyed `(kind, sourceId, book,
+/// not be downloaded wholesale on first launch, so the unit of transfer - and
+/// of caching - is one chapter. Rows are keyed `(kind, sourceId, book,
 /// chapter)` and carry the server's `ETag`, which turns a re-read into a
 /// conditional request that usually costs one empty 304.
 ///
 /// Eviction is least-recently-used against a byte cap. `lastReadAt` is what
-/// LRU sorts on, `fetchedAt` is when the bytes were last validated — a 304
+/// LRU sorts on, `fetchedAt` is when the bytes were last validated - a 304
 /// refreshes the second without touching the first.
 class ContentCache {
   static const _dbName = 'bijbelstudie_content.db';
@@ -155,7 +155,7 @@ class ContentCache {
     if (rows.isEmpty) return null;
 
     final row = rows.first;
-    // Touch the LRU timestamp, but do not await it — a read must not block on
+    // Touch the LRU timestamp, but do not await it - a read must not block on
     // a bookkeeping write.
     unawaited(
       db.update(
@@ -257,7 +257,7 @@ class ContentCache {
   /// Drops least-recently-read chapters until the cache fits again.
   ///
   /// Chapters the user explicitly downloaded ("Bewaar dit boek offline") are
-  /// pinned and evicted last — deleting them would silently break the offline
+  /// pinned and evicted last - deleting them would silently break the offline
   /// promise the download button made.
   Future<void> evictIfNeeded() async {
     final db = await _open();

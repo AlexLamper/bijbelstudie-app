@@ -150,7 +150,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
     );
 
     final line = fruit != null
-        ? 'De ${fruit.name.toLowerCase()} hangt nu aan je boom — '
+        ? 'De ${fruit.name.toLowerCase()} hangt nu aan je boom - '
               'een vrucht van de Geest, ${fruit.reference}.'
         : newStage != null
         ? '${newStage.blurb} Je boom is nu een ${newStage.name.toLowerCase()}.'
@@ -223,7 +223,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
                 Text(
                   fruit == null
                       ? 'Niveau ${widget.level}'
-                      : 'Niveau ${widget.level} — ${fruit.name}',
+                      : 'Niveau ${widget.level} - ${fruit.name}',
                   textAlign: TextAlign.center,
                   style: AppTheme.displayMedium.copyWith(color: Colors.white),
                 ),

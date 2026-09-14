@@ -1,4 +1,4 @@
-/// The eight omgevingen the tree can stand in. Mirror of the website's
+/// The fifteen omgevingen the tree can stand in. Mirror of the website's
 /// `lib/levensboom/scenes.ts`.
 ///
 /// A scene is colour plus a backdrop the renderer draws behind the tree. It is
@@ -20,6 +20,13 @@ enum TreeSceneId {
   stadsmuur,
   hof,
   sterrennacht,
+  jordaan,
+  wijngaard,
+  graanveld,
+  kust,
+  regenboog,
+  dageraad,
+  herdersveld,
 }
 
 const TreeSceneId kDefaultScene = TreeSceneId.waterbeken;
@@ -33,6 +40,13 @@ const Map<TreeSceneId, String> kSceneIds = {
   TreeSceneId.stadsmuur: 'stadsmuur',
   TreeSceneId.hof: 'hof',
   TreeSceneId.sterrennacht: 'sterrennacht',
+  TreeSceneId.jordaan: 'jordaan',
+  TreeSceneId.wijngaard: 'wijngaard',
+  TreeSceneId.graanveld: 'graanveld',
+  TreeSceneId.kust: 'kust',
+  TreeSceneId.regenboog: 'regenboog',
+  TreeSceneId.dageraad: 'dageraad',
+  TreeSceneId.herdersveld: 'herdersveld',
 };
 
 TreeSceneId sceneFromId(String? id) {
@@ -43,7 +57,23 @@ TreeSceneId sceneFromId(String? id) {
 }
 
 /// What the renderer paints behind the tree. One routine per value.
-enum Backdrop { meadow, hills, lake, dunes, mountain, wall, garden, stars }
+enum Backdrop {
+  meadow,
+  hills,
+  lake,
+  dunes,
+  mountain,
+  wall,
+  garden,
+  stars,
+  river,
+  vineyard,
+  field,
+  sea,
+  rainbow,
+  sunrise,
+  shepherds,
+}
 
 class SkyStops {
   const SkyStops(this.top, this.bottom, this.glow, this.light);
@@ -63,7 +93,7 @@ class SceneSpec {
     required this.farAlt,
     this.water,
     required this.accent,
-    this.forceNight = false,
+    this.forceTime,
   });
 
   final TreeSceneId id;
@@ -87,8 +117,8 @@ class SceneSpec {
   /// Small colour accents: flowers, the sail, reflections.
   final Color accent;
 
-  /// Always night, whatever the clock says.
-  final bool forceNight;
+  /// Pins the time of day whatever the clock says: the starry night, the dawn.
+  final DayPhase? forceTime;
 }
 
 const Map<TreeSceneId, SceneSpec> kScenes = {
@@ -235,7 +265,135 @@ const Map<TreeSceneId, SceneSpec> kScenes = {
     far: Color(0xFF141B36),
     farAlt: Color(0xFF1E2747),
     accent: Color(0xFFF5F0C8),
-    forceNight: true,
+    forceTime: DayPhase.night,
+  ),
+  TreeSceneId.jordaan: SceneSpec(
+    id: TreeSceneId.jordaan,
+    name: 'De Jordaan',
+    backdrop: Backdrop.river,
+    sky: {
+      DayPhase.day: SkyStops(
+        Color(0xFF84C4E4),
+        Color(0xFFEAF3E6),
+        Color(0xFFFFF4D6),
+        Color(0xFFFFFFFF),
+      ),
+    },
+    groundTop: Color(0xFF7FA25A),
+    groundBottom: Color(0xFF5E7A3E),
+    far: Color(0xFF7FA86C),
+    farAlt: Color(0xFF628A55),
+    water: Color(0xFF4F9CC4),
+    accent: Color(0xFFC9E2B0),
+  ),
+  TreeSceneId.wijngaard: SceneSpec(
+    id: TreeSceneId.wijngaard,
+    name: 'Wijngaard',
+    backdrop: Backdrop.vineyard,
+    sky: {
+      DayPhase.day: SkyStops(
+        Color(0xFF8CC6E4),
+        Color(0xFFF4E9CF),
+        Color(0xFFFFF1C9),
+        Color(0xFFFFFFFF),
+      ),
+    },
+    groundTop: Color(0xFF8E7A4E),
+    groundBottom: Color(0xFF6B5A36),
+    far: Color(0xFF8FA65E),
+    farAlt: Color(0xFF6E8A48),
+    accent: Color(0xFF5B3A6E),
+  ),
+  TreeSceneId.graanveld: SceneSpec(
+    id: TreeSceneId.graanveld,
+    name: 'Graanveld',
+    backdrop: Backdrop.field,
+    sky: {
+      DayPhase.day: SkyStops(
+        Color(0xFF8EC8E8),
+        Color(0xFFF8ECC8),
+        Color(0xFFFFF0BE),
+        Color(0xFFFFFFFF),
+      ),
+    },
+    groundTop: Color(0xFFD8B85E),
+    groundBottom: Color(0xFFB08F3E),
+    far: Color(0xFFD9BE6A),
+    farAlt: Color(0xFFB79A4E),
+    accent: Color(0xFFF2D98A),
+  ),
+  TreeSceneId.kust: SceneSpec(
+    id: TreeSceneId.kust,
+    name: 'De kust',
+    backdrop: Backdrop.sea,
+    sky: {
+      DayPhase.day: SkyStops(
+        Color(0xFF6FB6E0),
+        Color(0xFFE3F1F7),
+        Color(0xFFFFF6DE),
+        Color(0xFFFFFFFF),
+      ),
+    },
+    groundTop: Color(0xFFE4D3A6),
+    groundBottom: Color(0xFFC4AE7C),
+    far: Color(0xFF3F86B0),
+    farAlt: Color(0xFF5FA3C8),
+    water: Color(0xFF3F86B0),
+    accent: Color(0xFFF4F8FA),
+  ),
+  TreeSceneId.regenboog: SceneSpec(
+    id: TreeSceneId.regenboog,
+    name: 'Regenboog',
+    backdrop: Backdrop.rainbow,
+    sky: {
+      DayPhase.day: SkyStops(
+        Color(0xFF7CB9DC),
+        Color(0xFFDDEBEF),
+        Color(0xFFFFF4D6),
+        Color(0xFFFFFFFF),
+      ),
+    },
+    far: Color(0xFF5E8C57),
+    farAlt: Color(0xFF4E7C49),
+    accent: Color(0xFFF4F7FB),
+  ),
+  TreeSceneId.dageraad: SceneSpec(
+    id: TreeSceneId.dageraad,
+    name: 'Dageraad',
+    backdrop: Backdrop.sunrise,
+    sky: {
+      DayPhase.dawn: SkyStops(
+        Color(0xFF3A4A73),
+        Color(0xFFF9C89A),
+        Color(0xFFFFD9A0),
+        Color(0xFFFFE8CC),
+      ),
+    },
+    groundTop: Color(0xFF7A7F55),
+    groundBottom: Color(0xFF585E3E),
+    far: Color(0xFF5C5A7A),
+    farAlt: Color(0xFF7B6E8E),
+    accent: Color(0xFFFFD27A),
+    forceTime: DayPhase.dawn,
+  ),
+  TreeSceneId.herdersveld: SceneSpec(
+    id: TreeSceneId.herdersveld,
+    name: 'Velden van Efratha',
+    backdrop: Backdrop.shepherds,
+    sky: {
+      DayPhase.night: SkyStops(
+        Color(0xFF0A1030),
+        Color(0xFF26305A),
+        Color(0xFF4A5A96),
+        Color(0xFFE2E8FF),
+      ),
+    },
+    groundTop: Color(0xFF33405A),
+    groundBottom: Color(0xFF1F283E),
+    far: Color(0xFF1A2340),
+    farAlt: Color(0xFF26304F),
+    accent: Color(0xFFFFF3C4),
+    forceTime: DayPhase.night,
   ),
 };
 

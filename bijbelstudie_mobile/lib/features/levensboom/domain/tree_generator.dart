@@ -304,7 +304,8 @@ TreeScene generateTree({
         childWidth = width * sp.childWidthRatio;
       }
       // Wilt rotates the tip toward straight down, more the further out it is.
-      final droop = droopT * ((depth + 1) / maxDepth);
+      // A weeping species hangs the same way when it is perfectly healthy.
+      final droop = (droopT + sp.droopBase) * ((depth + 1) / maxDepth);
       final childAngle = raw + (90 - raw) * droop;
       recurse(x1, y1, childAngle, childLen, childWidth, depth + 1, childLeader);
     }

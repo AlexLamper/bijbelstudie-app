@@ -99,7 +99,7 @@ class AuthController extends AsyncNotifier<User?> {
   ///
   ///  1. A null user is an error, not a success. `state = AsyncValue.data(null)`
   ///     reads as "signed out" to every listener, so the screens neither
-  ///     navigated nor showed a message — the button just stopped spinning.
+  ///     navigated nor showed a message - the button just stopped spinning.
   ///  2. Nothing best-effort runs *before* the state is published. Queue
   ///     flushing is a whole sync round trip whose size depends on how much
   ///     the device wrote while offline; awaiting it here held an

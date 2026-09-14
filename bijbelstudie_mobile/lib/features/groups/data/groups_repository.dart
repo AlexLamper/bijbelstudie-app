@@ -30,7 +30,7 @@ class StudyGroup {
   final bool isMember;
   final bool isLeader;
 
-  /// Only ever populated for members — it is a credential.
+  /// Only ever populated for members - it is a credential.
   final String? inviteCode;
 
   final String? assignment;

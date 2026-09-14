@@ -106,7 +106,7 @@ class AiRepository {
   }
 
   /// Sends one turn with the open chapter as context. The server holds no
-  /// conversation state, so the recent history travels with each request —
+  /// conversation state, so the recent history travels with each request -
   /// the same contract the website's widget uses.
   Future<String> ask({
     required String message,

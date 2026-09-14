@@ -6,9 +6,9 @@ this one, so it is the only slot that has to be filled.
 
 | File | Screen | Use |
 |---|---|---|
-| `01-dashboard.png` | Dashboard — streak, book map, recommended studies | store |
-| `02-lezen.png` | Reader — Genesis 1, Statenvertaling | store |
-| `03-commentaar.png` | Commentaar tab — Matthew Henry | store |
+| `01-dashboard.png` | Dashboard - streak, book map, recommended studies | store |
+| `02-lezen.png` | Reader - Genesis 1, Statenvertaling | store |
+| `03-commentaar.png` | Commentaar tab - Matthew Henry | store |
 | `04-studies.png` | Studies and leesplannen | store |
 | `05-notities.png` | Notities, markeringen, bladwijzers | store |
 | `06-profiel.png` | Profiel, settings, licence attribution | store |
@@ -28,7 +28,7 @@ cd bijbelstudie_mobile
 flutter test test/screenshots_test.dart
 ```
 
-Then flatten the alpha channel — App Store Connect rejects screenshots that
+Then flatten the alpha channel - App Store Connect rejects screenshots that
 carry one, and Flutter's `toImage` always writes RGBA:
 
 ```bash
@@ -48,7 +48,7 @@ for f in glob.glob('*.png'):
 
 iOS cannot be built or run on Windows, so there is no simulator to press ⌘S in.
 `test/screenshots_test.dart` sets the test surface to 428 × 926 logical at
-devicePixelRatio 3 — exactly 1284 × 2778 physical — and captures the render
+devicePixelRatio 3 - exactly 1284 × 2778 physical - and captures the render
 tree through a `RepaintBoundary` at that same ratio. Nothing is scaled or
 resampled, so the output is pixel-identical to what the device would produce.
 
@@ -62,4 +62,4 @@ Two things the test has to do by hand, both of which fail silently otherwise:
 
 The screens are fed the same canned fixtures as `screen_render_test.dart`, plus
 a stub RevenueCat offering so the paywall shows € 9,99 / € 69,99 instead of the
-`—` an empty offering would render.
+`-` an empty offering would render.

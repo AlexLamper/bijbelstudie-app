@@ -43,7 +43,7 @@ void main() {
 
     test('merges keys that only differ in spelling', () {
       // Genesis reached via a Dutch key and Numeri via the "Numberi" typo plus
-      // its canonical name — three raw keys, two distinct books.
+      // its canonical name - three raw keys, two distinct books.
       final data = parse({
         'Genesis': [1],
         'Numberi': [3, 1],

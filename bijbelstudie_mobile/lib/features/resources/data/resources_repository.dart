@@ -92,7 +92,7 @@ class ResourcesRepository {
   final ApiClient _apiClient;
 
   /// The Hulpbronnen library. Every entry lives on a third-party archive, so
-  /// the app links out — it mirrors nothing.
+  /// the app links out - it mirrors nothing.
   Future<ResourceLibrary> getLibrary() async {
     try {
       final response = await _apiClient.dio.get('/resources');

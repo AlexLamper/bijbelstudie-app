@@ -103,7 +103,7 @@ void main() {
       final now = DateTime(2026, 9, 4, 9);
       expect(store.cappedSentToday, isFalse);
       await store.recordNotificationSent(NotifType.studyReminder, now: now);
-      // cappedSentToday reads "today" — align by re-recording for the real today.
+      // cappedSentToday reads "today" - align by re-recording for the real today.
       await store.recordNotificationSent(NotifType.studyReminder);
       expect(store.cappedSentToday, isTrue);
       expect(store.sentTypeToday(NotifType.dailyVerse), isFalse);

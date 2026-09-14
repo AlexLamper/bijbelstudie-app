@@ -21,7 +21,7 @@ applyTo: "bijbelstudie_mobile/**/*.dart"
 - **State Management**: Riverpod (`flutter_riverpod`).
 - **Routing**: `go_router`.
 - **Social Login**: `google_sign_in`.
-- **Monetization**: Native In-App Purchases via `purchases_flutter` (RevenueCat) — *Do not use web Stripe checkout*.
+- **Monetization**: Native In-App Purchases via `purchases_flutter` (RevenueCat) - *Do not use web Stripe checkout*.
 
 ## Design System
 - Clone the web application's design system (colors, typography, logos).

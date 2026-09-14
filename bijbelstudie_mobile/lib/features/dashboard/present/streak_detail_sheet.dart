@@ -16,7 +16,7 @@ import 'continue_study_card.dart';
 /// The detail panel behind the header streak/week-goal ring
 /// (`HomeStreakIndicator`). Explains, in plain Dutch, what the ring is
 /// counting, what today's actual value is, which of the last 7 days were
-/// done, how a freeze/grace day works, and how the goal itself is set — a
+/// done, how a freeze/grace day works, and how the goal itself is set - a
 /// daily streak or a "3x per week" week goal, depending on the reader's own
 /// study cadence.
 ///
@@ -96,8 +96,8 @@ class _StreakDetailSheet extends ConsumerWidget {
     return streak > 0 ? '$streak ${_dayWord(streak)} op rij' : 'Nog geen reeks';
   }
 
-  /// The reader's own tree with the count in its badge — the header mark,
-  /// grown a step — or, for readers who switched the tree off, the plain
+  /// The reader's own tree with the count in its badge - the header mark,
+  /// grown a step - or, for readers who switched the tree off, the plain
   /// icon: "Boom verbergen" means no tree anywhere (TREE_FEATURE_PLAN §10).
   Widget _mark(TreeState? tree) {
     if (tree?.disabled == true) {
@@ -114,7 +114,7 @@ class _StreakDetailSheet extends ConsumerWidget {
         tree: tree,
         badge: '$completionsThisWeek/$target',
         semanticsLabel:
-            'Je boom — $completionsThisWeek van $target ${_lessonWord(target)} deze week',
+            'Je boom - $completionsThisWeek van $target ${_lessonWord(target)} deze week',
         dormant: completionsThisWeek <= 0,
         size: _kHeroSize,
       );
@@ -123,8 +123,8 @@ class _StreakDetailSheet extends ConsumerWidget {
       tree: tree,
       badge: '$streak',
       semanticsLabel: freezes > 0
-          ? 'Je boom — reeks van $streak ${_dayWord(streak)}, met een vrije dag'
-          : 'Je boom — reeks van $streak ${_dayWord(streak)}',
+          ? 'Je boom - reeks van $streak ${_dayWord(streak)}, met een vrije dag'
+          : 'Je boom - reeks van $streak ${_dayWord(streak)}',
       dormant: streak <= 0,
       hasFreeze: freezes > 0,
       size: _kHeroSize,
@@ -263,7 +263,7 @@ class _StreakDetailSheet extends ConsumerWidget {
 /// The tapped header mark at sheet size: a soft accent glow behind it and a
 /// short settle-in on open, so the sheet reads as opening *out of* the ring
 /// the reader just tapped rather than appearing beside it. A single finite
-/// tween — nothing here loops — and skipped entirely under reduced motion.
+/// tween - nothing here loops - and skipped entirely under reduced motion.
 class _Hero extends StatelessWidget {
   const _Hero({
     required this.child,
@@ -371,8 +371,8 @@ class _WeekStrip extends StatelessWidget {
 /// One day of the strip. Done days pop in left to right when the sheet opens,
 /// so the week reads as being counted up rather than as a static chart. Each
 /// dot is its own finite tween on a shared timeline (an [Interval] per
-/// position), and days without activity — and every day under reduced
-/// motion — are simply drawn.
+/// position), and days without activity - and every day under reduced
+/// motion - are simply drawn.
 class _WeekDot extends StatelessWidget {
   const _WeekDot({required this.day, required this.order, required this.still});
 

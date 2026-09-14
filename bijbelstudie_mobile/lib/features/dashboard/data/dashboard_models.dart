@@ -95,7 +95,7 @@ class DailyVerse {
     // BijbelAPI.com (the "via BijbelAPI.com" feed behind `GET /daytext`)
     // returns English book names, e.g. "Zechariah" / "Zechariah 4:6"; the app
     // is Dutch-only, so both fields are normalised here, once, at the model
-    // boundary — everything downstream (including the "Lees hoofdstuk →"
+    // boundary - everything downstream (including the "Lees hoofdstuk →"
     // navigation) then only ever sees the Dutch name.
     final rawBook = json['book'] as String? ?? '';
     final book = BibleBooks.toDutch(rawBook);
@@ -128,8 +128,8 @@ String? _nonEmpty(Object? value) {
 /// Swaps the English book name at the start of a "daytext" reference string
 /// (e.g. "Zechariah 4:6") for its Dutch equivalent, leaving the
 /// "chapter:verse" suffix untouched. Falls back to the raw string unchanged
-/// when it does not start with [rawBook] — already Dutch, or an unrecognised
-/// shape — rather than guessing.
+/// when it does not start with [rawBook] - already Dutch, or an unrecognised
+/// shape - rather than guessing.
 String _dutchReference(
   String raw, {
   required String rawBook,
@@ -228,8 +228,8 @@ class DashboardData {
   /// Folds `readChapters` keys onto their canonical Dutch spelling and merges
   /// the chapter lists behind keys that collapse together.
   ///
-  /// The server does this now too, but an older build of the API — or a
-  /// response served from cache — can still hand back keys spelled the way the
+  /// The server does this now too, but an older build of the API - or a
+  /// response served from cache - can still hand back keys spelled the way the
   /// translation that was read spells them ("1 Corinthiërs", "John",
   /// "Numberi"). Without this fold those chapters never match the 66-book grid
   /// and never count towards "… van 66 boeken geopend".

@@ -39,7 +39,7 @@ import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
 /// (`components/layout/app-sidebar.tsx`): Dashboard, Bijbelstudie, Studies,
-/// Notities, Hulpbronnen — trimmed to the five that fit a phone bar, with
+/// Notities, Hulpbronnen - trimmed to the five that fit a phone bar, with
 /// Hulpbronnen reachable from the dashboard's "Snel naar" card and from
 /// Profiel. Groepen is hidden for the MVP: no tab, no links, and `/groups`
 /// redirects to the dashboard so a stale deep link cannot strand anyone.

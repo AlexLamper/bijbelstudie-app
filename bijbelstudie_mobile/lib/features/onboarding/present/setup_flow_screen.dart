@@ -684,7 +684,7 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
           const SizedBox(height: 12),
           Text(
             'Kies vast een moment dat je schikt. We vragen je pas later om '
-            'meldingen aan te zetten — als je je eerste les hebt gedaan. Je kunt '
+            'meldingen aan te zetten - als je je eerste les hebt gedaan. Je kunt '
             'dit altijd wijzigen of uitzetten bij Instellingen.',
             style: AppTheme.bodyLead,
           ),

@@ -1,4 +1,5 @@
 import 'package:bijbelstudie_mobile/features/levensboom/domain/catalog.dart';
+import 'package:bijbelstudie_mobile/features/levensboom/domain/palette.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/scenes.dart';
 import 'package:bijbelstudie_mobile/features/levensboom/domain/verse_scene.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,7 +47,7 @@ void main() {
       for (var day = 0; day < 365; day++) {
         final scene = verseSceneForDay(DateTime(2026, 1, 1).add(Duration(days: day)));
         if (scene.animal == TreeAnimal.vuurvliegjes) {
-          expect(sceneSpec(scene.sceneId).forceNight, isTrue,
+          expect(sceneSpec(scene.sceneId).forceTime, DayPhase.night,
               reason: 'fireflies on a daylit scene are invisible work');
         }
       }
@@ -67,8 +68,9 @@ void main() {
       final night = verseScenePalette(scene, at: DateTime(2026, 6, 21, 23));
 
       expect(noon.scene, night.scene);
-      // A forced-night scene is night at noon too; every other one changes.
-      if (!sceneSpec(scene.sceneId).forceNight) {
+      // A scene that pins its time of day looks the same at noon; every other
+      // one changes.
+      if (sceneSpec(scene.sceneId).forceTime == null) {
         expect(night.night, isTrue);
         expect(noon.night, isFalse);
       }

@@ -5,7 +5,7 @@ Last updated 2026-08-12.
 | | Value |
 |---|---|
 | iOS bundle ID | `com.bijbel-studie.app` |
-| Android applicationId | `com.bijbelstudie.app` (no hyphen — Android forbids it) |
+| Android applicationId | `com.bijbelstudie.app` (no hyphen - Android forbids it) |
 | Services ID | `com.bijbel-studie.app.signin` |
 | Apple Team ID | `4K4D59MXKW` |
 | App Store Connect app id | `6800668187` ("BijbelStudie App") |
@@ -15,21 +15,21 @@ Last updated 2026-08-12.
 
 ---
 
-## Already done — do not redo these
+## Already done - do not redo these
 
 | Thing | State |
 |---|---|
 | Git repo + GitHub remote | `AlexLamper/bijbelstudie-app`, public, `main` pushed |
 | CI trigger | every push to `main` builds and uploads to TestFlight; `workflow_dispatch` still works |
 | Distribution `.p12` | rebuilt from `distribution.pem` + `distribution_key.pem`, password `BijbelStudie2026`, saved as `apple-signing/BijbelStudie/BijbelStudie_distribution.p12` |
-| Provisioning profile | **regenerated** as `BijbelStudie App Store CI` (id `2XWYGY5WRY`) — see the warning below |
+| Provisioning profile | **regenerated** as `BijbelStudie App Store CI` (id `2XWYGY5WRY`) - see the warning below |
 | GitHub secrets | all set, `REVENUECAT_APPLE_KEY` included (set 2026-08-12) |
 | GitHub variables | `APPLE_SERVICE_ID`, `APPLE_REDIRECT_URI` |
-| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories — both are **approved by Apple** and purchasable |
+| App Store Connect subscriptions | group `Pro`, `bijbelstudie_pro_monthly` (€9,99/mnd) and `bijbelstudie_pro_yearly` (€69,99/jr), Dutch localisations, all 175 territories - both are **approved by Apple** and purchasable |
 | Vercel env vars | `MOBILE_JWT_SECRET`, `APPLE_CLIENT_IDS`, `GEMINI_API_KEY`, `GOOGLE_TTS_API_KEY`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `REVENUECAT_PRO_ENTITLEMENT_ID` added to Production/Preview/Development and redeployed |
 
 > **Why the profile was regenerated.** The `BijbelStudie App Store` profile you
-> downloaded is bound to certificate serial `607E78BC…` — an *iPhone
+> downloaded is bound to certificate serial `607E78BC…` - an *iPhone
 > Distribution* cert from 2026-03-31 whose private key is not on this machine.
 > The only private key you have is for *Apple Distribution* serial `3DEF2785…`
 > (`distribution_key.pem`, expires 2027-05-02). A profile that does not list
@@ -39,7 +39,7 @@ Last updated 2026-08-12.
 
 ---
 
-## Step 1 — RevenueCat (this is the only thing blocking a green build)
+## Step 1 - RevenueCat (this is the only thing blocking a green build)
 
 Everything else is wired. The workflow deliberately refuses to build without
 `REVENUECAT_APPLE_KEY`, because a build with a broken paywall is worse than no
@@ -49,7 +49,7 @@ build.
 
 RevenueCat needs this to verify StoreKit 2 transactions.
 
-You may already have one — check for
+You may already have one - check for
 `apple-signing/SubscriptionKey_ZD2BGDJ4JU.p8`. Apple names In-App Purchase keys
 `SubscriptionKey_<KEYID>.p8`, and the key is team-wide, so that file works for
 BijbelStudie too. Its Key ID is `ZD2BGDJ4JU`.
@@ -94,12 +94,12 @@ On the app's settings page that opens:
 3. Repeat for `bijbelstudie_pro_yearly`.
 
 Both already exist in App Store Connect, so RevenueCat will find them. If it
-says it cannot, wait 15 minutes — Apple's product propagation is slow.
+says it cannot, wait 15 minutes - Apple's product propagation is slow.
 
 ### 1.5 Entitlement
 
 1. **Product catalog → Entitlements → + New**.
-2. **Identifier:** `pro` — exactly this, lowercase. `purchase_service.dart` and
+2. **Identifier:** `pro` - exactly this, lowercase. `purchase_service.dart` and
    the backend both key off it.
 3. **Add** → open it → **Attach products** → attach both.
 
@@ -113,7 +113,7 @@ says it cannot, wait 15 minutes — Apple's product propagation is slow.
 4. Mark the offering **Current**.
 
 The paywall reads packages from the current offering. Not marked current means
-an empty paywall with `—` for both prices.
+an empty paywall with `-` for both prices.
 
 ### 1.7 Webhook
 
@@ -133,7 +133,7 @@ an empty paywall with `—` for both prices.
 
 1. **Project settings → API keys → Secret API keys → + New**.
 2. Name `Backend sync`, read access on Customers is enough.
-3. Copy the `sk_…` value — shown once — and add it to Vercel:
+3. Copy the `sk_…` value - shown once - and add it to Vercel:
    ```bash
    cd C:\Projects\bijbelstudie
    printf 'sk_xxxxx' | vercel env add REVENUECAT_REST_API_KEY production
@@ -141,12 +141,12 @@ an empty paywall with `—` for both prices.
    Repeat for `preview` and `development`, then redeploy.
 
 > Without this, `/api/v1/sync-premium` cannot run. That endpoint is what unlocks
-> Pro after a **restore** or an **already-owned** purchase — RevenueCat sends no
+> Pro after a **restore** or an **already-owned** purchase - RevenueCat sends no
 > webhook for either. Skipping it means some paying users stay locked out.
 
 ---
 
-## Step 2 — Sandbox tester
+## Step 2 - Sandbox tester
 
 1. <https://appstoreconnect.apple.com/access/users> → **Sandbox Testers**.
 2. **+** → any name, an email that is **not** already an Apple ID (a `+` alias
@@ -156,7 +156,7 @@ an empty paywall with `—` for both prices.
 
 ---
 
-## Step 3 — Finish the App Store Connect listing
+## Step 3 - Finish the App Store Connect listing
 
 The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 → BijbelStudie App → the `1.0` version:
@@ -189,7 +189,7 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 - [ ] **Privacy nutrition labels:** email address, name, user content
       (notes/highlights), identifiers, purchases. Linked to identity: yes.
       Used for tracking: no.
-- [x] **Reviewer account.** Done — `applereview@mail.com`, created by
+- [x] **Reviewer account.** Done - `applereview@mail.com`, created by
       `scripts/ensure-review-account.mjs` in the bijbelstudie repo. Re-run it
       with `--write` if the credentials ever stop working. Note it grants Pro
       through `subscribed`, not `storePremium`: the launch-time RevenueCat sync
@@ -205,23 +205,23 @@ The app record exists but is empty. In <https://appstoreconnect.apple.com/apps>
 
 Worth doing while you are there: enrol in the **App Store Small Business
 Program** (<https://developer.apple.com/app-store/small-business-program/>).
-It drops Apple's cut from 30% to 15% — on €9,99 that is €8,49 to you instead of
+It drops Apple's cut from 30% to 15% - on €9,99 that is €8,49 to you instead of
 €7,02.
 
 ---
 
-## Step 4 — Google Sign-In on iOS
+## Step 4 - Google Sign-In on iOS
 
 The code side is done. What is left is **three pieces of configuration**, all
 manual, none of which can be created from this repo:
 
-1. **Google Cloud** — create an OAuth client, type *iOS*, bundle ID
+1. **Google Cloud** - create an OAuth client, type *iOS*, bundle ID
    `com.bijbel-studie.app`, in the same project as the existing web client.
-2. **Vercel** — add that client id to `GOOGLE_MOBILE_CLIENT_IDS`
+2. **Vercel** - add that client id to `GOOGLE_MOBILE_CLIENT_IDS`
    (comma-separated, alongside the web client id) and redeploy. The server pins
    the ID token's `aud`, so it rejects tokens from a client it has not been
    told about.
-3. **GitHub repository variables** — `GOOGLE_IOS_CLIENT_ID` and
+3. **GitHub repository variables** - `GOOGLE_IOS_CLIENT_ID` and
    `GOOGLE_WEB_CLIENT_ID`. The workflow passes both as `--dart-define` and
    substitutes the `Info.plist` placeholders during the build.
 
@@ -241,11 +241,11 @@ which was fine only while iOS offered no third-party login at all.
 Accounts link themselves: `/api/v1/auth/google` matches on `googleId`, then
 falls back to a case-insensitive email match and attaches `googleId` to the
 account it finds. Signing in with Google on the phone therefore reaches the same
-account as the website — including one originally created with a password.
+account as the website - including one originally created with a password.
 
 ---
 
-## Step 5 — Content licensing
+## Step 5 - Content licensing
 
 Three sources on the website may **not** ship in the app. The block is
 server-side in `lib/mobileLicensing.ts`; every `/api/v1` content route answers
@@ -254,7 +254,7 @@ spelled. Verified live on production.
 
 | Source | Why | Who to ask |
 |---|---|---|
-| `nbg51` | NBG-vertaling 1951 licence covers `www.bijbel-studie.com` only. Your contract runs to 2029-12-31 and is website-scoped. | Nederlands-Vlaams Bijbelgenootschap — ask for an app addendum |
+| `nbg51` | NBG-vertaling 1951 licence covers `www.bijbel-studie.com` only. Your contract runs to 2029-12-31 and is website-scoped. | Nederlands-Vlaams Bijbelgenootschap - ask for an app addendum |
 | `net` | NET Bible: whole-text electronic distribution needs written permission and "cannot be bundled with anything sold" | permissions@netbible.com |
 | `kingcomments_nl` | © Stichting Titus / Uitgeverij Daniël; they ship their own App Store app | Stichting Titus / Uitgeverij Daniël |
 
@@ -262,7 +262,7 @@ Also blocked: `hsv`, `basisbijbel`, `schlachter`, `afri`.
 
 Granting one is a one-line change to the relevant `Set` in
 `lib/mobileLicensing.ts` plus its attribution in `lib/mobileAttribution.ts`.
-Keep the written permissions on file — Apple asks under guideline 5.2 if anyone
+Keep the written permissions on file - Apple asks under guideline 5.2 if anyone
 complains.
 
 ---

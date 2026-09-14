@@ -10,7 +10,7 @@ import '../../../core/ui/app_widgets.dart';
 /// Shared by the setup wizard's translation step and the reader's translation
 /// picker. Both list Dutch translations followed immediately by English ones,
 /// and without this the two languages ran together as one undifferentiated
-/// column — `Statenvertaling`, `Canisiusbijbel`, `King James Version` with
+/// column - `Statenvertaling`, `Canisiusbijbel`, `King James Version` with
 /// nothing to say where the Dutch stopped.
 class LanguageSeparator extends StatelessWidget {
   const LanguageSeparator({super.key, required this.label});

@@ -81,7 +81,7 @@ VerseScene verseSceneForDay(DateTime day) {
       TreeSpecies.values.length];
   var animal = _animalPool[(rand() * _animalPool.length).floor() % _animalPool.length];
   // Fireflies belong to a night sky; on a bright scene they are invisible work.
-  if (animal == TreeAnimal.vuurvliegjes && !sceneSpec(sceneId).forceNight) {
+  if (animal == TreeAnimal.vuurvliegjes && sceneSpec(sceneId).forceTime != DayPhase.night) {
     animal = TreeAnimal.vogel;
   }
   return VerseScene(

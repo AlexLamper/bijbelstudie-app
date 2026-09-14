@@ -1,4 +1,4 @@
-// GENERATED — do not hand-edit.
+// GENERATED - do not hand-edit.
 //
 // Real Genesis 1 text, pulled from the production API so the store screenshots
 // quote Scripture and Matthew Henry accurately rather than approximately.
@@ -9,7 +9,7 @@
 
 import 'package:bijbelstudie_mobile/features/bible/domain/bible_models.dart';
 
-const String kGenesisAttribution = 'Statenvertaling (1637) — publiek domein';
+const String kGenesisAttribution = 'Statenvertaling (1637) - publiek domein';
 
 const List<Verse> kGenesis1Verses = [
   Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
@@ -45,7 +45,7 @@ const List<Verse> kGenesis1Verses = [
   Verse(number: 31, text: 'En God zag al wat Hij gemaakt had, en ziet, het was zeer goed. Toen was het avond geweest, en het was morgen geweest, de zesde dag.'),
 ];
 
-const String kCommentaryAttribution = 'Matthew Henry (1662–1714) — publiek domein';
+const String kCommentaryAttribution = 'Matthew Henry (1662–1714) - publiek domein';
 
 const List<Verse> kMatthewHenryGenesis1 = [
   Verse(number: 0, text: 'Daar de grondslag van alle Godsdienst gelegd is in onze betrekking tot God als onze Schepper, was het voegzaam, dat het boek van de Goddelijke openbaringen, hetwelk bestemd was om de gids, de steun en de regel te zijn van de Godsdienst in de wereld beginnen zou, zoals het begint, met een duidelijk en volledig bericht van de schepping van de wereld, als antwoord op die eerste vraag van een goede consciëntie, "Waar is God, mijn Maker?" Job. 35:10. Hieromtrent hebben de Heidense filosofen zeer droevig misgetast, en zijn verijdeld geworden in hun overleggingen. Sommigen van hen beweerden, dat de wereld van eeuwigheid af uit zich zelf ontstaan is, anderen schreven haar toe aan een toevallige vereniging van atomen. Aldus heeft de wereld God niet gekend door de wijsheid maar heeft zich alle moeite gegeven om Hem te verliezen. De Heilige Schrift, die zich ten doel stelt de natuurlijke Godsdienst te handhaven en te verbeteren door de geopenbaarde Godsdienst, er het verval van tegen te gaan, er het gebrekkige en onvolkomene van aan te vullen sedert de val, tot wederopleving van de voorschriften van de wet van de natuur, heeft daarom reeds bij de aanvang dit beginsel van het heldere, onomfloerste licht van de natuur vastgesteld, dat deze wereld bij de aanvang des tijds geschapen werd door een Wezen van oneindige wijsheid en macht, en zelf vóór alle tijd, en vóór alle werelden bestaan heeft. De ingang tot Gods woord geeft dit licht, Psalm 119:130. Het eerste vers van de Bijbel geeft ons een betere en meer zekere, een meer bevredigende en meer nuttige kennis van de oorsprong van het heelal dan de boekdelen van de filosofen. Het levende geloof van nederige Christenen verstaat deze zaak beter dan de verhevene verbeeldingskracht van de grootste wijzen van de wereld. Hebreeën 11:13. Wij hebben in dit hoofdstuk drie dingen.\n\nI. Een algemeen denkbeeld, dat ons gegeven is van de schepping van de wereld, vers 1-2.  \nII. Een bijzonder bericht van het werk op de verschillende dagen, opgetekend als in een dagboek klaar en duidelijk en in volgorde. De schepping van het licht op de eerste dag vers 3- 5, van het uitspansel op de tweede dag, vers 6-8, van de zee, de aarde en haar vruchten op de derde dag, vers 9-13, van de lichten aan de hemel op de vierde dag, vers 14-19, van de vissen en vogelen op de vijfde dag, vers 20-23, van de dieren vers 24-25 van de mens, vers 26-28, en van voedsel voor beide op de zesde dag, vers 29-30.  \nIII. Het in ogenschouw nemen en de goedkeuring van het gehele werk, vers 31.'),

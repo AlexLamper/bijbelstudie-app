@@ -6,8 +6,8 @@ import '../../auth/present/auth_controller.dart';
 /// The subset of `GET /preferences` this app reads back.
 ///
 /// The endpoint (`app/api/v1/preferences/route.ts` on the website) stores a
-/// much larger preferences bag than this — translation, commentary, font
-/// choices, reminder time — but the only thing the app needs to *read* is
+/// much larger preferences bag than this - translation, commentary, font
+/// choices, reminder time - but the only thing the app needs to *read* is
 /// whether setup and the tour were already completed elsewhere (the website,
 /// or another device), so a returning user is never asked the same questions
 /// twice.

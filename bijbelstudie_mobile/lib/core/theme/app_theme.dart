@@ -21,21 +21,21 @@ import 'package:flutter/services.dart';
 ///   --brand / --ring 174 60% 44%  #2DB4A6
 class AppTheme {
   // ---------------------------------------------------------------------
-  // Typefaces — the site loads Inter (sans), Lora (serif), Merriweather.
+  // Typefaces - the site loads Inter (sans), Lora (serif), Merriweather.
   // Headings are Inter bold, not a serif display face.
   // ---------------------------------------------------------------------
 
-  /// Body / UI / heading face — `--font-inter`, `font-sans`.
+  /// Body / UI / heading face - `--font-inter`, `font-sans`.
   static const String sansFontName = 'Inter';
 
   /// Headings on the site are Inter too; kept as its own name so screens can
   /// express intent.
   static const String displayFontName = 'Inter';
 
-  /// Reader "serif" preference — `--font-lora`, `font-serif`.
+  /// Reader "serif" preference - `--font-lora`, `font-serif`.
   static const String serifFontName = 'Lora';
 
-  /// Reader "mono" preference — `font-mono`.
+  /// Reader "mono" preference - `font-mono`.
   static const String monoFontName = 'Geist Mono';
 
   // ---------------------------------------------------------------------
@@ -338,19 +338,19 @@ class AppTheme {
   static Color get brandLight => _c(lightBrandLight, darkBrandLight);
 
   // ---------------------------------------------------------------------
-  // Radii — Tailwind's scale, as used in the markup
+  // Radii - Tailwind's scale, as used in the markup
   // ---------------------------------------------------------------------
 
-  /// `rounded-2xl` — cards, hero panels, sheets.
+  /// `rounded-2xl` - cards, hero panels, sheets.
   static const double radiusLg = 16;
 
-  /// `rounded-xl` — buttons, inputs, small cards.
+  /// `rounded-xl` - buttons, inputs, small cards.
   static const double radiusMd = 12;
 
-  /// `rounded-lg` — icon chips, badges.
+  /// `rounded-lg` - icon chips, badges.
   static const double radiusSm = 8;
 
-  /// `rounded-md` — the tightest corner the site uses.
+  /// `rounded-md` - the tightest corner the site uses.
   static const double radiusXs = 6;
 
   /// `rounded-full` pills.
@@ -360,7 +360,7 @@ class AppTheme {
   // Gradients
   // ---------------------------------------------------------------------
 
-  /// `linear-gradient(135deg, #0D9488 0%, #0F766E 100%)` — the dashboard hero
+  /// `linear-gradient(135deg, #0D9488 0%, #0F766E 100%)` - the dashboard hero
   /// and every "continue reading" call to action.
   static LinearGradient get brandGradient => LinearGradient(
     colors: [teal, tealStrong],
@@ -405,10 +405,10 @@ class AppTheme {
   }
 
   // ---------------------------------------------------------------------
-  // Type scale — mirrors the utility classes used on the site
+  // Type scale - mirrors the utility classes used on the site
   // ---------------------------------------------------------------------
 
-  /// `text-3xl font-bold` — marketing / empty-state hero.
+  /// `text-3xl font-bold` - marketing / empty-state hero.
   static TextStyle get displayLarge => TextStyle(
     fontFamily: displayFontName,
     fontSize: 30,
@@ -418,7 +418,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// `text-2xl font-bold` — hero card title.
+  /// `text-2xl font-bold` - hero card title.
   static TextStyle get displayMedium => TextStyle(
     fontFamily: displayFontName,
     fontSize: 24,
@@ -428,7 +428,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// `text-xl font-bold` — page heading (`Goedemorgen, …`) and stat values.
+  /// `text-xl font-bold` - page heading (`Goedemorgen, …`) and stat values.
   static TextStyle get displaySmall => TextStyle(
     fontFamily: displayFontName,
     fontSize: 20,
@@ -438,7 +438,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// `text-base font-bold` — card titles.
+  /// `text-base font-bold` - card titles.
   static TextStyle get displayTitle => TextStyle(
     fontFamily: displayFontName,
     fontSize: 16,
@@ -447,7 +447,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// `text-sm font-bold` — dense card titles.
+  /// `text-sm font-bold` - dense card titles.
   static TextStyle get displayBase => TextStyle(
     fontFamily: displayFontName,
     fontSize: 14,
@@ -456,7 +456,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// `text-xl font-bold tabular-nums` — the stat numbers.
+  /// `text-xl font-bold tabular-nums` - the stat numbers.
   static TextStyle get statNumber => TextStyle(
     fontFamily: displayFontName,
     fontSize: 20,
@@ -527,7 +527,7 @@ class AppTheme {
     color: inkMuted,
   );
 
-  /// Large screen title — `Studies`, `Genesis`. Inter 28/700.
+  /// Large screen title - `Studies`, `Genesis`. Inter 28/700.
   static TextStyle get screenTitle => TextStyle(
     fontFamily: displayFontName,
     fontSize: 28,
@@ -538,7 +538,7 @@ class AppTheme {
   );
 
   /// Canon group heading above a band of book tiles. Uppercase at the call
-  /// site, not here — [Text] has no text-transform.
+  /// site, not here - [Text] has no text-transform.
   static TextStyle get groupLabel => TextStyle(
     fontFamily: sansFontName,
     fontSize: 11.5,
@@ -565,7 +565,7 @@ class AppTheme {
     color: ink,
   );
 
-  /// Running bible text — Lora 17 on a 1.75 leading. The reader's own size and
+  /// Running bible text - Lora 17 on a 1.75 leading. The reader's own size and
   /// family preferences override this; it is the design default, not a lock.
   static TextStyle get readerBody => TextStyle(
     fontFamily: serifFontName,
@@ -590,7 +590,7 @@ class AppTheme {
     color: inkFaint,
   );
 
-  /// Button label — `text-sm font-semibold`.
+  /// Button label - `text-sm font-semibold`.
   static TextStyle get buttonLabel => TextStyle(
     fontFamily: sansFontName,
     fontSize: 14,
@@ -685,7 +685,7 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
       textTheme: textTheme,
       primaryTextTheme: textTheme,
-      // `h-14 border-b border-border bg-white sticky top-0` — the site header.
+      // `h-14 border-b border-border bg-white sticky top-0` - the site header.
       appBarTheme: AppBarTheme(
         backgroundColor: card,
         surfaceTintColor: Colors.transparent,
@@ -711,7 +711,7 @@ class AppTheme {
                 systemNavigationBarIconBrightness: Brightness.light,
               ),
       ),
-      // `bg-white border border-gray-200 rounded-2xl` — no shadow.
+      // `bg-white border border-gray-200 rounded-2xl` - no shadow.
       cardTheme: CardThemeData(
         color: card,
         surfaceTintColor: Colors.transparent,

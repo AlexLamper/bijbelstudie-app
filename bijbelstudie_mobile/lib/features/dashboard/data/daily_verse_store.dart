@@ -8,14 +8,14 @@ import 'dashboard_models.dart';
 /// Local memory for the "Tekst van de dag" card.
 ///
 /// The server has no endpoint for either half of this: `GET /daytext` hands
-/// out today's verse and nothing else — no archive, no favourites. So the app
+/// out today's verse and nothing else - no archive, no favourites. So the app
 /// keeps both on the device, the same way [ReadingSettings] keeps the reader's
 /// typography: every verse that arrives is appended to a capped history, and
 /// the references the reader has hearted are stored as a flat set.
 ///
 /// Both are best-effort. A device with no preferences plugin (tests, an
 /// unusual platform) simply gets an empty history and no likes rather than an
-/// error — the card must still render today's verse.
+/// error - the card must still render today's verse.
 
 /// One day's verse as it was stored, plus the day it was shown.
 class DailyVerseEntry {
@@ -281,7 +281,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   }
 }
 
-/// `yyyy-mm-dd` in local time — the archive's per-day key.
+/// `yyyy-mm-dd` in local time - the archive's per-day key.
 String dayKey(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');

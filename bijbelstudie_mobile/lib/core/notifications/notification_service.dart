@@ -27,7 +27,7 @@ enum NotifType {
   milestone,
   dormant,
   dailyVerse,
-  /// "Je boom mist wat licht" — fired at exactly two days away, before the
+  /// "Je boom mist wat licht" - fired at exactly two days away, before the
   /// Levensboom visibly wilts (TREE_FEATURE_PLAN.md §5.6). No channel of its
   /// own and no toggle of its own: it is a win-back nudge and rides the ones
   /// `dormant` already has.

@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Asking for a rating on the first launch is the fastest way to collect one
 /// star: the reader has not read anything yet, so the only thing they can rate
 /// is the interruption. Everything that decides *when* the ask is allowed lives
-/// in [ReviewPromptThresholds] — one place, so the policy can be read and
+/// in [ReviewPromptThresholds] - one place, so the policy can be read and
 /// changed without hunting through the widget that renders it.
 /// ---------------------------------------------------------------------------
 
@@ -19,7 +19,7 @@ class ReviewPromptThresholds {
   const ReviewPromptThresholds._();
 
   /// Distinct app launches (a cold start, or a return from the background
-  /// after the app was actually suspended) — not rebuilds.
+  /// after the app was actually suspended) - not rebuilds.
   static const int minLaunches = 3;
 
   /// …and those launches must fall on at least this many different calendar
@@ -112,7 +112,7 @@ class ReviewPromptState {
   /// Whether the prompt is allowed to appear at [now].
   ///
   /// This answers "has this reader earned an ask" only. Whether the *moment*
-  /// is right — no tour, no onboarding, not mid-chapter — is the host widget's
+  /// is right - no tour, no onboarding, not mid-chapter - is the host widget's
   /// job, because that depends on the screen and not on any counter.
   bool shouldAsk({required DateTime now}) {
     if (rated) return false;
@@ -236,7 +236,7 @@ class ReviewPromptController extends Notifier<ReviewPromptState> {
     });
   }
 
-  /// A star was tapped. Terminal — nothing asks again on this device.
+  /// A star was tapped. Terminal - nothing asks again on this device.
   Future<void> markRated() async {
     await loaded;
     state = state.copyWith(rated: true);

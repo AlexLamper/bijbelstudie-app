@@ -65,7 +65,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // `/register` is *pushed* on top of this screen, so this State stays
       // mounted and keeps listening while the user registers. Both screens
       // then saw the same success and both called `context.go`, racing over
-      // where a brand-new account lands — and this one resolves the route
+      // where a brand-new account lands - and this one resolves the route
       // with `isNewAccount: false`, so when it won, a user who had just
       // created an account was sent to the dashboard instead of the setup
       // wizard. Only the screen actually on top may act.
@@ -79,7 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // moment this listener runs; if route resolution rejects and nothing
         // catches it, the failure disappears into the zone and they are left
         // sitting on this screen, signed in, with no error and no navigation.
-        // The dashboard is the safe destination — the wizard and the tour can
+        // The dashboard is the safe destination - the wizard and the tour can
         // still be replayed from Profiel.
         resolvePostAuthRoute(ref)
             .then((route) {

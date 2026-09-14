@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bijbelstudie_mobile/features/feedback/data/review_prompt.dart';
 
 /// The rating prompt's gate. Everything here is pure: a counter snapshot plus
-/// a clock, no plugin and no widget tree — which is the point of keeping the
+/// a clock, no plugin and no widget tree - which is the point of keeping the
 /// policy out of the host widget.
 void main() {
   final now = DateTime(2026, 9, 1, 20, 0);

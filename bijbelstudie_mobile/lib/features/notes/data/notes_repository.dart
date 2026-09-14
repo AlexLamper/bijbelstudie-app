@@ -245,7 +245,7 @@ class NotesRepository {
     }
   }
 
-  /// Replays everything queued while offline. Safe to call often — it returns
+  /// Replays everything queued while offline. Safe to call often - it returns
   /// immediately when the queue is empty.
   Future<int> flushPendingChanges() async {
     final cache = _cache;
@@ -274,7 +274,7 @@ class NotesRepository {
     }
   }
 
-  /// Fire-and-forget flush after a successful call — the connection is known
+  /// Fire-and-forget flush after a successful call - the connection is known
   /// good at that moment, which is the cheapest possible trigger.
   void unawaitedFlush() {
     flushPendingChanges().catchError((_) => 0);

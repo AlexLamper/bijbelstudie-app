@@ -408,7 +408,7 @@ class _VerseActionSheet extends ConsumerWidget {
   }
 
   /// Hands the note back to [showVerseActionSheet] instead of opening the
-  /// editor here — see the note on that function for why.
+  /// editor here - see the note on that function for why.
   void _addNote(BuildContext context) {
     Navigator.of(context).pop(_VerseSheetResult.note);
   }

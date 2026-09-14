@@ -7,13 +7,13 @@ import '../../../core/ui/app_widgets.dart';
 import '../../profile/present/profile_provider.dart';
 import 'tour_controller.dart';
 
-/// `/tour` — the entry point to the guided walkthrough.
+/// `/tour` - the entry point to the guided walkthrough.
 ///
 /// This used to *be* the walkthrough: six full-screen pages, each an icon and
 /// a paragraph, describing parts of the app the reader could not see while
 /// being told about them. The tour now runs over the real app, the way
-/// `guided-tour.tsx` does on the website — a spotlight on the live widget with
-/// a card beside it — so this route's whole job is to turn it on and get out
+/// `guided-tour.tsx` does on the website - a spotlight on the live widget with
+/// a card beside it - so this route's whole job is to turn it on and get out
 /// of the way ([TourHost] paints it above every route).
 ///
 /// The route is kept rather than removed because two call sites depend on it:
@@ -38,7 +38,7 @@ class _TourScreenState extends ConsumerState<TourScreen> {
 
     // The first step lives on the dashboard, and the overlay navigates from
     // there. Reached by push (a replay from Profiel) or by go (straight after
-    // setup, with no back stack) — this route must not survive either way, or
+    // setup, with no back stack) - this route must not survive either way, or
     // the reader would end up back on a blank launcher when they pop.
     ref.read(tourControllerProvider.notifier).start();
     if (context.canPop()) {

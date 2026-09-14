@@ -8,7 +8,7 @@ import '../domain/admin_entities.dart';
 import 'admin_common.dart';
 import 'admin_providers.dart';
 
-/// One account as a tappable row — used by both the users tab and the recent
+/// One account as a tappable row - used by both the users tab and the recent
 /// signups card on the overview.
 class AdminAccountRow extends StatelessWidget {
   const AdminAccountRow({
@@ -277,14 +277,14 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                     ),
                     AdminStatRow(
                       label: 'Abonnementsstatus',
-                      value: account.subscriptionStatus ?? '—',
+                      value: account.subscriptionStatus ?? '-',
                     ),
                     AdminStatRow(
                       label: 'Interval',
                       value: switch (account.subscriptionInterval) {
                         'monthly' => 'Maandelijks',
                         'annual' => 'Jaarlijks',
-                        _ => '—',
+                        _ => '-',
                       },
                     ),
                     AdminStatRow(

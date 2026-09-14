@@ -17,7 +17,7 @@ void main() {
   final router = container.read(routerProvider);
   tearDownAll(container.dispose);
 
-  /// `context.go('/x')`, `.push`, `.replace`, `.pushReplacement` — literal
+  /// `context.go('/x')`, `.push`, `.replace`, `.pushReplacement` - literal
   /// single-quoted paths only. Anything interpolated is skipped: the test can
   /// only judge what it can read statically.
   final call = RegExp(
@@ -59,8 +59,8 @@ void main() {
   });
 
   test('/home is still registered, for links persisted by older builds', () {
-    // `findMatch` resolves the route table only — redirects run later, during
-    // navigation — so this asserts the part that actually broke: `/home` no
+    // `findMatch` resolves the route table only - redirects run later, during
+    // navigation - so this asserts the part that actually broke: `/home` no
     // longer falls through to the error page.
     expect(router.configuration.findMatch(Uri.parse('/home')).isError, isFalse);
   });

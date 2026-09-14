@@ -63,7 +63,7 @@ class AuthLocalStorage {
   ///
   /// The Keychain/KeyStore is not a plain file. A restored Android backup, a
   /// rotated or reset KeyStore, a device still locked after boot, or a missing
-  /// plugin all make `read` throw a `PlatformException` — and the splash screen
+  /// plugin all make `read` throw a `PlatformException` - and the splash screen
   /// awaits this before it can route anywhere, so an unhandled throw here is
   /// the whole app never getting past its loading bar. An entry we cannot
   /// decrypt is worth exactly as much as no entry: the user signs in again.

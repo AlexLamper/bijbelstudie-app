@@ -10,8 +10,8 @@
 ///
 /// Two shapes have to be handled, exactly as the website handles them:
 ///
-///  1. Text with explicit blank-line breaks — split on those and keep them.
-///  2. One long block with no breaks at all — group sentences into paragraphs,
+///  1. Text with explicit blank-line breaks - split on those and keep them.
+///  2. One long block with no breaks at all - group sentences into paragraphs,
 ///     closing one after a sentence that ends on a scripture reference, and
 ///     after four sentences regardless, so a book with no markup still reads
 ///     as paragraphs rather than as a page-long block.
@@ -46,7 +46,7 @@ final RegExp _allCapsHeading = RegExp(r'^[A-Z\s]{6,}$');
 final RegExp _numberedPoint = RegExp(r'^\d+\.\s');
 
 /// Sentence boundary: a full stop, whitespace, then a capital. The accented
-/// capitals matter — Dutch prose opens sentences with `Één`, `Óók`, and a bare
+/// capitals matter - Dutch prose opens sentences with `Één`, `Óók`, and a bare
 /// `A-Z` class would run those into the previous sentence.
 final RegExp _sentenceBoundary = RegExp(r'\.\s+(?=[A-ZÀ-Þ])');
 

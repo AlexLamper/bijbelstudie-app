@@ -82,7 +82,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('sr3', 'Verder in {study}',
         'Waar je gebleven was, wacht rustig op je. Geen haast.'),
     VariantTemplate('sr4', 'Eén les, even stil',
-        '{lesson} vraagt niet veel — alleen jou, een ogenblik.'),
+        '{lesson} vraagt niet veel - alleen jou, een ogenblik.'),
     VariantTemplate('sr5', 'Klaar wanneer jij dat bent',
         '{study} staat voor je open bij {lesson}.'),
     VariantTemplate('sr6', 'Vandaag samen verder',
@@ -104,7 +104,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('ar1', 'Je bent {streak} dagen bezig',
         'Nog even vandaag en de reeks blijft heel. Eén korte les is genoeg.'),
     VariantTemplate('ar2', 'Nog tijd voor vandaag',
-        '{streak} dagen achter elkaar — mooi volgehouden. Een paar minuten houdt het vast.'),
+        '{streak} dagen achter elkaar - mooi volgehouden. Een paar minuten houdt het vast.'),
     VariantTemplate('ar3', 'Een kort moment nog?',
         'Je {streak}-daagse reeks wacht op de les van vandaag.'),
     VariantTemplate('ar4', 'Vandaag nog niet langs geweest',
@@ -122,7 +122,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('sl1', 'Welkom terug',
         'Een dag overslaan gebeurt. Je {study} ligt er nog precies zo bij.'),
     VariantTemplate('sl2', 'Gewoon weer beginnen',
-        'Geen streep door alles — pak {lesson} op waar je was.'),
+        'Geen streep door alles - pak {lesson} op waar je was.'),
     VariantTemplate('sl3', 'De draad weer oppakken',
         'Je hoeft niets in te halen. Eén les vandaag is een prima start.'),
     VariantTemplate('sl4', 'Elke morgen nieuw',
@@ -132,7 +132,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('sl6', 'Een nieuwe reeks begint met één dag',
         'Vandaag kan die dag zijn. {lesson} wacht.'),
     VariantTemplate('sl7', 'Niets verloren',
-        'Je voortgang blijft. Alleen de reeks begint opnieuw — dat mag.'),
+        'Je voortgang blijft. Alleen de reeks begint opnieuw - dat mag.'),
     VariantTemplate('sl8', 'Terug in het ritme',
         'Klein beginnen werkt het best. Open {study} even.'),
   ],
@@ -140,7 +140,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('lh1', 'Je was halverwege {lesson}',
         'Nog een paar stappen en de les is af. Verder waar je stopte?'),
     VariantTemplate('lh2', '{lesson} staat nog open',
-        'Je begon eraan — de rest wacht rustig op je.'),
+        'Je begon eraan - de rest wacht rustig op je.'),
     VariantTemplate('lh3', 'Nog even afmaken?',
         'Je liet {lesson} halverwege liggen. Het duurt niet lang meer.'),
     VariantTemplate('lh4', 'Halverwege is een goed startpunt',
@@ -152,7 +152,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('lh7', 'Verder waar je was',
         '{lesson} wacht op de laatste stappen.'),
     VariantTemplate('lh8', 'Nog niet afgerond',
-        'Geen haast — maar {lesson} ligt klaar om af te maken.'),
+        'Geen haast - maar {lesson} ligt klaar om af te maken.'),
   ],
   NotifType.weeklyGoal: [
     // Behind (1..4).
@@ -170,7 +170,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('wg6', 'Deze week zit erop',
         'Je doel van {target} is rond. Alles daarboven is meegenomen.'),
     VariantTemplate('wg7', 'Ritme vastgehouden',
-        '{done} lessen deze week — precies wat je jezelf voornam.'),
+        '{done} lessen deze week - precies wat je jezelf voornam.'),
     VariantTemplate('wg8', 'Goed bezig deze week',
         'Je weekdoel staat. Rust nu gerust even.'),
   ],
@@ -192,7 +192,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('ms8', 'Nieuw zegel verdiend',
         'Er staat een nieuwe mijlpaal op je profiel.'),
   ],
-  // Fired once, at exactly two days away — before the tree visibly wilts, never
+  // Fired once, at exactly two days away - before the tree visibly wilts, never
   // after. No variant says the tree could die, because it cannot: health floors
   // at 0.3 server-side (lib/levensboom/health.ts) precisely so this copy never
   // has to threaten. The server pool in `lib/notificationCopy.ts` overrides
@@ -217,7 +217,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('dm1', 'Een paar dagen niet langs geweest',
         'Je {study} ligt klaar bij {lesson}. Kom gerust weer even.'),
     VariantTemplate('dm2', 'Het is een weekje stil',
-        'Geen zorgen — je voortgang staat er nog. Eén les om er weer in te komen.'),
+        'Geen zorgen - je voortgang staat er nog. Eén les om er weer in te komen.'),
     VariantTemplate('dm3', 'Je plek is bewaard',
         '{study} wacht precies waar je was, wanneer het jou uitkomt.'),
     VariantTemplate('dm4', 'Al een tijdje geleden',
@@ -232,13 +232,13 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
         "'Komt herwaarts tot Mij.' Wanneer je zover bent."),
   ],
   NotifType.dailyVerse: [
-    VariantTemplate('dv1', 'Het woord voor vandaag', '{verse} — {reference}'),
+    VariantTemplate('dv1', 'Het woord voor vandaag', '{verse} - {reference}'),
     VariantTemplate('dv2', 'Even meenemen vandaag', '{verse}'),
     VariantTemplate('dv3', 'Vers van de dag', '{reference}: {verse}'),
     VariantTemplate('dv4', 'Een gedachte om mee te dragen', '{verse} ({reference})'),
-    VariantTemplate('dv5', 'Voor onderweg', '{verse} — {reference}'),
+    VariantTemplate('dv5', 'Voor onderweg', '{verse} - {reference}'),
     VariantTemplate('dv6', 'Stil bij dit vers', '{reference}: {verse}'),
     VariantTemplate('dv7', 'Vandaag', '{verse}'),
-    VariantTemplate('dv8', 'Uit de Schrift', '{verse} — {reference}'),
+    VariantTemplate('dv8', 'Uit de Schrift', '{verse} - {reference}'),
   ],
 };

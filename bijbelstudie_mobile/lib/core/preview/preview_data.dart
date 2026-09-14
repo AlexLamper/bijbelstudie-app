@@ -14,6 +14,7 @@ import '../../features/notes/domain/note_models.dart';
 import '../../features/notes/present/notes_providers.dart';
 import '../../features/profile/data/profile_model.dart';
 import '../../features/profile/present/profile_provider.dart';
+import '../../features/studies/data/enrollment_models.dart';
 import '../../features/studies/data/study_models.dart';
 import '../../features/studies/present/studies_providers.dart';
 
@@ -94,7 +95,7 @@ class PreviewData {
     chapter: 1,
     attribution: 'Matthew Henry (1662–1714) - publiek domein',
     verses: [
-      // Verse 0 is the chapter introduction — that is how the corpus keys it.
+      // Verse 0 is the chapter introduction - that is how the corpus keys it.
       Verse(
         number: 0,
         text:
@@ -288,6 +289,14 @@ class PreviewData {
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => const <Bookmark>[]),
         readingHistoryProvider.overrideWith((ref) async => history),
+        // Study progress and enrollments are account data. Answered locally so
+        // the dashboard never fires a request that has no token to send.
+        serverStudyLessonsProvider.overrideWith(
+          (ref) async => const <String, Set<int>>{},
+        ),
+        studyEnrollmentsProvider.overrideWith(
+          (ref) async => const <String, StudyEnrollment>{},
+        ),
         // Without this the Levensboom on Profiel sits on its loading skeleton
         // forever - and a skeleton shimmers on a repeating controller, which is
         // what makes `pumpAndSettle` in the widget tests never return.

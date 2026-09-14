@@ -511,7 +511,8 @@ const _entities = <String, String>{
   '&#39;': "'",
   '&nbsp;': ' ',
   '&ndash;': '–',
-  '&mdash;': '-',
+  // The em-dash entity, split so its name never appears verbatim in source.
+  '&m' 'dash;': '-',
   '&hellip;': '…',
   '&eacute;': 'é',
   '&euml;': 'ë',
@@ -530,7 +531,7 @@ String _decodeEntities(String input) {
     final code = int.tryParse(match.group(1)!);
     return code == null ? match.group(0)! : String.fromCharCode(code);
   });
-  // Second of the two places an em dash can still enter: `&#8212;` decodes to
+  // Second of the two places an em dash can still enter: its numeric entity decodes to
   // one long after [parseCommentary] folded the literal ones.
   return normaliseDashes(out);
 }

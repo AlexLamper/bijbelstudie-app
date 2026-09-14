@@ -518,9 +518,9 @@ class _ReaderBar extends ConsumerWidget {
 /// What the reader already has in this chapter, as one tappable teal line.
 ///
 /// Counts come from the notes and highlights lists the app loads anyway - see
-/// [chapterMarkCountsProvider]. The line disappears when both are zero rather
-/// than announcing "0 notities", which is noise on a chapter nobody has worked
-/// on yet. Tapping it opens [showChapterMarksSheet], listing every note and
+/// [chapterMarkCountsProvider]. The line always shows, "0 notities · 0
+/// markeringen" included, so its place in the header stays stable between
+/// chapters. Tapping it opens [showChapterMarksSheet], listing every note and
 /// highlight in this chapter with a way to jump to its verse.
 class _ChapterMarks extends ConsumerWidget {
   const _ChapterMarks({required this.location});
@@ -533,7 +533,9 @@ class _ChapterMarks extends ConsumerWidget {
     final counts = ref.watch(
       chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
     );
-    if (counts.isEmpty) return const SizedBox.shrink();
+    // An untouched chapter keeps the line, just in muted ink, so "0 notities"
+    // reads as a status rather than a call to action.
+    final notesColor = counts.isEmpty ? AppTheme.inkMuted : AppTheme.teal;
 
     return Semantics(
       button: true,
@@ -551,37 +553,35 @@ class _ChapterMarks extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: Row(
             children: [
-              Icon(Icons.edit_note_outlined, size: 15, color: AppTheme.teal),
+              Icon(Icons.edit_note_outlined, size: 15, color: notesColor),
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
                   _plural(counts.notes, 'notitie', 'notities'),
-                  style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+                  style: AppTheme.pillLabel.copyWith(color: notesColor),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (counts.highlights > 0) ...[
-                const SizedBox(width: 7),
-                Container(
-                  width: 3,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: AppTheme.ruleStrong,
-                    shape: BoxShape.circle,
-                  ),
+              const SizedBox(width: 7),
+              Container(
+                width: 3,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppTheme.ruleStrong,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    _plural(counts.highlights, 'markering', 'markeringen'),
-                    style: AppTheme.pillLabel.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.inkMuted,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  _plural(counts.highlights, 'markering', 'markeringen'),
+                  style: AppTheme.pillLabel.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.inkMuted,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
               const SizedBox(width: 4),
               Icon(Icons.chevron_right, size: 14, color: AppTheme.inkFaint),
             ],

@@ -30,7 +30,7 @@ const Set<String> _engagementRoutes = {
 /// Hosts the App Store rating prompt above the router's Navigator.
 ///
 /// Renders nothing at all until the gate in [ReviewPromptState.shouldAsk]
-/// opens and the app is sitting still on a safe screen — mirroring how
+/// opens and the app is sitting still on a safe screen - mirroring how
 /// `TourHost` paints its spotlight from the same position. It sits above the
 /// Navigator, so it draws its own scrim and card instead of pushing a route:
 /// there is no `Navigator` in scope this high in the tree.
@@ -170,7 +170,7 @@ class _ReviewPromptHostState extends ConsumerState<ReviewPromptHost> {
   }
 }
 
-/// The card itself — a scrim, five taps, and a way out.
+/// The card itself - a scrim, five taps, and a way out.
 class _ReviewPromptOverlay extends StatelessWidget {
   const _ReviewPromptOverlay({required this.onRate, required this.onDismiss});
 

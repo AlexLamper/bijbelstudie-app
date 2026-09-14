@@ -219,7 +219,7 @@ class SearchResults {
 
   final List<SearchHit> hits;
 
-  /// The server stopped early — either the hit cap or its wall-clock budget.
+  /// The server stopped early - either the hit cap or its wall-clock budget.
   final bool truncated;
 
   factory SearchResults.fromJson(Map<String, dynamic> json) {

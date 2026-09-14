@@ -24,7 +24,7 @@ DEST = pathlib.Path(__file__).resolve().parents[1] / (
     "bijbelstudie_mobile/test/screenshot_fixtures.dart"
 )
 
-HEADER = """// GENERATED — do not hand-edit.
+HEADER = """// GENERATED - do not hand-edit.
 //
 // Real Genesis 1 text, pulled from the production API so the store screenshots
 // quote Scripture and Matthew Henry accurately rather than approximately.

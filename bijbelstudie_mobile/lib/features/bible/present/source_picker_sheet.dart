@@ -11,7 +11,7 @@ import 'book_download_button.dart';
 import 'version_badge.dart';
 
 /// Translation picker. Only allowlisted versions ever reach the client, so
-/// there is nothing to filter here — the server already did it.
+/// there is nothing to filter here - the server already did it.
 Future<void> showVersionPickerSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,

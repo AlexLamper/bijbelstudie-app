@@ -82,7 +82,7 @@ void expectNoLayoutError(WidgetTester tester) {
   final error = tester.takeException();
   if (error == null) return;
 
-  // Walk the element tree to name the widget whose Flex overflowed — the bare
+  // Walk the element tree to name the widget whose Flex overflowed - the bare
   // FlutterError only carries the pixel count.
   final culprits = <String>[];
   for (final element in tester.allElements) {
@@ -139,13 +139,13 @@ void main() {
       id: 'statenvertaling',
       name: 'Statenvertaling',
       language: 'nl',
-      attribution: 'Statenvertaling (1637) — publiek domein',
+      attribution: 'Statenvertaling (1637) - publiek domein',
     ),
     BibleSource(
       id: 'kjv',
       name: 'King James Version',
       language: 'en',
-      attribution: 'King James Version (1611) — publiek domein',
+      attribution: 'King James Version (1611) - publiek domein',
     ),
   ];
 
@@ -154,7 +154,7 @@ void main() {
       id: 'matthew_henry_nl',
       name: 'Matthew Henry (NL)',
       language: 'nl',
-      attribution: 'Matthew Henry (1662–1714) — publiek domein',
+      attribution: 'Matthew Henry (1662–1714) - publiek domein',
     ),
   ];
 
@@ -162,7 +162,7 @@ void main() {
     sourceId: 'statenvertaling',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Statenvertaling (1637) — publiek domein',
+    attribution: 'Statenvertaling (1637) - publiek domein',
     verses: [
       Verse(number: 1, text: 'In den beginne schiep God den hemel en de aarde.'),
       Verse(
@@ -179,9 +179,9 @@ void main() {
     sourceId: 'matthew_henry_nl',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Matthew Henry (1662–1714) — publiek domein',
+    attribution: 'Matthew Henry (1662–1714) - publiek domein',
     verses: [
-      // Verse 0 is how the corpus keys a chapter introduction — the renderer
+      // Verse 0 is how the corpus keys a chapter introduction - the renderer
       // has to label it "Inleiding", not "Vers 0".
       Verse(number: 0, text: 'De grondslag van alle Godsdienst ligt in God als Schepper.'),
       Verse(number: 1, text: 'De eerste woorden stellen God voor als de Schepper.'),
@@ -307,7 +307,7 @@ void main() {
       (ref) async => const <String, StudyEnrollment>{},
     ),
     // The study screen's IndexedStack builds every tab, so the materials
-    // pane's own fetches have to be answered locally too — otherwise these
+    // pane's own fetches have to be answered locally too - otherwise these
     // renders reach the network, which is the thing this harness exists to
     // prevent.
     bookSummaryProvider.overrideWith((ref, book) async => 'Genesis opent met de schepping.'),
@@ -394,7 +394,7 @@ void main() {
     return (paint?.painter as TourScrimPainter?)?.hole;
   }
 
-  /// Scrolls the page to the bottom so lazily-built slivers are laid out too —
+  /// Scrolls the page to the bottom so lazily-built slivers are laid out too -
   /// an overflow further down the list stays invisible otherwise.
   Future<void> scrollThrough(WidgetTester tester) async {
     final list = find.byType(Scrollable).first;
@@ -403,8 +403,8 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: 'layout error after scroll step $i');
     }
-    // A drag that happens to start on a widget listening for a double tap —
-    // the book map does — leaves that recognizer's countdown running, and the
+    // A drag that happens to start on a widget listening for a double tap -
+    // the book map does - leaves that recognizer's countdown running, and the
     // bare `pump` above never advances the clock far enough to retire it. Let
     // those timers expire here, or the test ends with a timer still pending
     // whenever the layout shifts a drag onto such a widget.
@@ -654,7 +654,7 @@ void main() {
 
       // The reader hydrates before the wizard is even reached on a returning
       // account (splash warms it deliberately), so writing the preference
-      // alone left the choice with nothing listening — the reader kept
+      // alone left the choice with nothing listening - the reader kept
       // whatever it had already settled on for the rest of the session.
       await tester.pumpAndSettle();
       expect(container.read(readerLocationProvider).versionId, 'statenvertaling');

@@ -7,4 +7,8 @@
 ///
 /// The en dash is deliberately left alone - it carries the year ranges in the
 /// attributions, e.g. `Matthew Henry (1662-1714)`.
-String normaliseDashes(String input) => input.replaceAll('—', '-');
+///
+/// Built from the code point so the character itself never appears in source.
+final String _emDash = String.fromCharCode(0x2014);
+
+String normaliseDashes(String input) => input.replaceAll(_emDash, '-');

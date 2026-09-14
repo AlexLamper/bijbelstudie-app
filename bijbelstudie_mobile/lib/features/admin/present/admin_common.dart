@@ -13,9 +13,9 @@ import '../domain/admin_entities.dart';
 /// and short dates.
 
 /// A count, or an em dash when the server could not read it. Null is
-/// "unknown" — it must never render as 0, which reads as a real measurement.
+/// "unknown" - it must never render as 0, which reads as a real measurement.
 String adminNumber(num? value) {
-  if (value == null) return '—';
+  if (value == null) return '-';
   final whole = value.round().abs().toString();
   final buffer = StringBuffer(value < 0 ? '-' : '');
   for (var i = 0; i < whole.length; i++) {
@@ -27,7 +27,7 @@ String adminNumber(num? value) {
 
 /// A euro amount with two decimals, Dutch style: `€ 1.234,50`.
 String adminEuro(double? value) {
-  if (value == null) return '—';
+  if (value == null) return '-';
   final cents = (value * 100).round();
   final euros = cents ~/ 100;
   final rest = (cents % 100).abs().toString().padLeft(2, '0');
@@ -36,7 +36,7 @@ String adminEuro(double? value) {
 
 /// A percentage with at most one decimal: `12,4%`.
 String adminPercent(double? value) {
-  if (value == null) return '—';
+  if (value == null) return '-';
   final rounded = (value * 10).round() / 10;
   final text = rounded == rounded.roundToDouble()
       ? rounded.round().toString()
@@ -61,21 +61,21 @@ const _months = [
 
 /// `3 mrt 2025`, or an em dash.
 String adminDate(DateTime? date) {
-  if (date == null) return '—';
+  if (date == null) return '-';
   return '${date.day} ${_months[date.month - 1]} ${date.year}';
 }
 
-/// `3 mrt` — the axis label under the bar chart.
+/// `3 mrt` - the axis label under the bar chart.
 String adminShortDate(String isoDay) {
   final parsed = DateTime.tryParse(isoDay);
   if (parsed == null) return isoDay;
   return '${parsed.day} ${_months[parsed.month - 1]}';
 }
 
-/// `zojuist`, `4 min geleden`, `3 dagen geleden`, then a plain date — the same
+/// `zojuist`, `4 min geleden`, `3 dagen geleden`, then a plain date - the same
 /// ladder the website's recent-signups list uses.
 String adminRelative(DateTime? date) {
-  if (date == null) return '—';
+  if (date == null) return '-';
   final minutes = DateTime.now().difference(date).inMinutes;
   if (minutes < 1) return 'zojuist';
   if (minutes < 60) return '$minutes min geleden';
@@ -144,7 +144,7 @@ class AdminMetricTile extends StatelessWidget {
   }
 }
 
-/// A label/value line inside a card — the funnel and billing rows.
+/// A label/value line inside a card - the funnel and billing rows.
 class AdminStatRow extends StatelessWidget {
   const AdminStatRow({
     super.key,
@@ -157,7 +157,7 @@ class AdminStatRow extends StatelessWidget {
   final String label;
   final String value;
 
-  /// Paints the value in the warning colour — used for the figures that mean
+  /// Paints the value in the warning colour - used for the figures that mean
   /// something is wrong (betaalproblemen, gemiste webhooks).
   final bool emphasis;
 
@@ -279,8 +279,8 @@ class AdminSeriesChart extends StatelessWidget {
   }
 }
 
-/// What a failed admin call looks like. A 403 is terminal — the account is not
-/// an admin — so it gets no retry button, only an explanation.
+/// What a failed admin call looks like. A 403 is terminal - the account is not
+/// an admin - so it gets no retry button, only an explanation.
 class AdminErrorState extends StatelessWidget {
   const AdminErrorState({super.key, required this.error, required this.onRetry});
 

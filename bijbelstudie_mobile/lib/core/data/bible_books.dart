@@ -4,7 +4,7 @@
 ///
 /// The dashboard heat map needs a denominator per book before any chapter has
 /// been fetched, so this table is bundled rather than requested. It is fixed
-/// data — the canon does not gain a book between releases.
+/// data - the canon does not gain a book between releases.
 class BibleBooks {
   const BibleBooks._();
 
@@ -133,7 +133,7 @@ class BibleBooks {
 
   /// Normalises an English book name (as BijbelAPI.com's daytext feed returns
   /// it) to this app's canonical Dutch spelling. A no-op passthrough when
-  /// [name] is already Dutch or unrecognised — never empty, never throws.
+  /// [name] is already Dutch or unrecognised - never empty, never throws.
   static String toDutch(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return name;
@@ -176,7 +176,7 @@ class BibleBooks {
 
 /// One band of the canon in the "alle studies per bijbelboek" overview.
 ///
-/// The six groups are a presentation choice — [BibleBooks] itself knows only
+/// The six groups are a presentation choice - [BibleBooks] itself knows only
 /// the OT/NT split and the canonical order, which is all the rest of the app
 /// needs. The slices below are taken from that same order, so the grid stays
 /// canonical inside every band and the flattened list is still

@@ -5,7 +5,7 @@ import 'package:bijbelstudie_mobile/features/bible/domain/version_catalog.dart';
 
 /// `/api/v1/bibles` hands versions back in manifest order, which is the order
 /// the files sit in on the server. These pin the order the app imposes on top
-/// of it — the first question a new account is ever asked.
+/// of it - the first question a new account is ever asked.
 void main() {
   BibleSource version(String id, String name, String language) =>
       BibleSource(id: id, name: name, language: language, attribution: '');
