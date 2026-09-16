@@ -160,7 +160,7 @@ Dit kan al voordat er iets in Play staat, en Claude heeft de sleutel nodig voor 
 
 ### A7. Eerste AAB naar de interne test (10 min)
 
-> **Wacht op Claude:** de melding dat `store-assets/google-play/builds/bijbelstudie-1.1.1-101.aab` klaarstaat (de eerste GitHub-build, met AI-melden; alleen de RevenueCat-sleutel zit er nog niet in). Gebruik die in plaats van het lokale bestand hieronder. Alleen als Claude meldt dat de GitHub-build mislukt is, gebruik je de lokale build 1.0.7 (99).
+> **Klaar (16 sep):** gebruik `C:\Projectsijbelstudie-app\store-assets\google-playuildsijbelstudie-1.1.1-101.aab` (GitHub-build, gecontroleerd; alleen de RevenueCat-sleutel zit er nog niet in, dus aankopen werken in deze build nog niet). Upload dát bestand bij stap 5 in plaats van het lokale bestand, en verwacht bij stap 6 de rij **101 (1.1.1)**. De lokale build 1.0.7 (99) hieronder is alleen reserve.
 
 Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet perfect te zijn: de interne test heeft geen beoordeling. Het doel is dat Play je app "kent" (abonnementen worden daarna mogelijk) en dat Google zijn ondertekeningssleutel aanmaakt.
 
