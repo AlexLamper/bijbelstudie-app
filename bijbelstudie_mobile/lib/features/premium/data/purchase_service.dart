@@ -198,7 +198,8 @@ class PurchaseService {
     _log(
       'Purchasing package="${package.identifier}" product="${package.storeProduct.identifier}"',
     );
-    return Purchases.purchasePackage(package);
+    final result = await Purchases.purchase(PurchaseParams.package(package));
+    return result.customerInfo;
   }
 
   /// Fallback for when offering packages are temporarily unavailable.
@@ -210,7 +211,8 @@ class PurchaseService {
     }
     final product = products.first;
     _log('Fallback product found id="${product.identifier}" price="${product.priceString}"');
-    return Purchases.purchaseStoreProduct(product);
+    final result = await Purchases.purchase(PurchaseParams.storeProduct(product));
+    return result.customerInfo;
   }
 
   /// Restore previous purchases. Required by App Store review — the paywall
