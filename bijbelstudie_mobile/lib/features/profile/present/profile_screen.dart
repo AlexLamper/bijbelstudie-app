@@ -21,6 +21,7 @@ import 'badge_medallion.dart';
 import 'profile_activity_feed.dart';
 import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
+import '../../premium/domain/store_copy.dart';
 import '../../premium/present/pro_access_provider.dart';
 import 'profile_stats_provider.dart';
 
@@ -181,14 +182,15 @@ class _ProfileBody extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Account verwijderen'),
-        content: const Text(
+        content: Text(
           'Je account, voortgang, notities, markeringen, bladwijzers en '
           'leesgeschiedenis worden definitief verwijderd. Dit kan niet ongedaan '
           'worden gemaakt.\n\n'
-          'Log je daarna opnieuw in met Google of Apple, dan krijg je een nieuw, '
-          'leeg account. Je oude voortgang komt niet terug.\n\n'
-          'Heb je een abonnement via de App Store? Zeg dat apart op in je '
-          'Apple ID-instellingen - Apple staat niet toe dat een app dat voor je doet.',
+          'Log je daarna opnieuw in met ${StoreCopy.isPlay ? 'Google' : 'Google of Apple'}, '
+          'dan krijg je een nieuw, leeg account. Je oude voortgang komt niet terug.\n\n'
+          'Heb je een abonnement via ${StoreCopy.storeInSentence}? Zeg dat apart op in je '
+          '${StoreCopy.manageLocation} - '
+          '${StoreCopy.isPlay ? 'het stopt niet vanzelf als je je account verwijdert.' : 'Apple staat niet toe dat een app dat voor je doet.'}',
         ),
         actions: [
           TextButton(

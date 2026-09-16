@@ -14,6 +14,7 @@ import '../domain/price_framing.dart';
 import '../domain/pro_benefits.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
+import '../domain/store_copy.dart';
 
 enum _ProPlan { monthly, yearly }
 
@@ -229,9 +230,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Het abonnement wordt automatisch verlengd tenzij je het minstens 24 uur voor '
-              'het einde van de periode opzegt. Beheren en opzeggen doe je in je '
-              'Apple ID-instellingen.',
+              StoreCopy.renewalNotice,
               style: AppTheme.bodyMuted.copyWith(fontSize: 11),
             ),
           ],
@@ -400,7 +399,7 @@ class _ActiveCard extends StatelessWidget {
                 // No link, no instructions to go somewhere and pay: stating
                 // that access already applies here is what the multiplatform
                 // exception allows.
-                ? 'Je abonnement loopt buiten de App Store om en geldt ook in deze app.'
+                ? 'Je abonnement loopt buiten ${StoreCopy.storeInSentence} om en geldt ook in deze app.'
                 : serverConfirmed
                     ? 'Alle Pro-functies zijn ontgrendeld. Beheer of stop je abonnement '
                         'in de abonnementsinstellingen van je account.'

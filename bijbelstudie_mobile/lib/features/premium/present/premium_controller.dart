@@ -12,6 +12,7 @@ import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../resources/data/resources_repository.dart';
 import '../data/purchase_service.dart';
+import '../domain/store_copy.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ class PremiumController extends Notifier<PremiumState> {
     required bool failed,
   }) {
     if (!configured) {
-      return 'De verbinding met de App Store kon niet worden opgezet. Sluit de '
+      return 'De verbinding met ${StoreCopy.storeInSentence} kon niet worden opgezet. Sluit de '
           'app helemaal af en open hem opnieuw.';
     }
     if (failed) {
@@ -325,10 +326,10 @@ class PremiumController extends Notifier<PremiumState> {
           'probeer het opnieuw.';
     }
     if (partial) {
-      return 'Eén van de twee abonnementen kwam niet terug uit de App Store. '
+      return 'Eén van de twee abonnementen kwam niet terug uit ${StoreCopy.storeInSentence}. '
           'Het andere kun je gewoon nemen.';
     }
-    return 'De App Store gaf geen abonnementen terug. Controleer of de '
+    return '${StoreCopy.isPlay ? 'Google Play' : 'De App Store'} gaf geen abonnementen terug. Controleer of de '
         'producten actief en goedgekeurd zijn.';
   }
 
@@ -444,7 +445,7 @@ class PremiumController extends Notifier<PremiumState> {
       state = state.copyWith(
         status: PurchaseStatus.error,
         errorMessage:
-            'Product niet gevonden in App Store/RevenueCat. Controleer of je IAP-producten gekoppeld en beschikbaar zijn.',
+            'Product niet gevonden in ${StoreCopy.storeName}/RevenueCat. Controleer of je IAP-producten gekoppeld en beschikbaar zijn.',
       );
       _log(
         'Product lookup failed. Requested="$productId", error="$e". '
@@ -577,7 +578,7 @@ class PremiumController extends Notifier<PremiumState> {
       case PurchasesErrorCode.productAlreadyPurchasedError:
         return 'Je hebt dit product al aangeschaft. Gebruik "Aankopen herstellen".';
       case PurchasesErrorCode.purchaseNotAllowedError:
-        return 'Aankopen zijn niet toegestaan op dit apparaat. Controleer je App Store-instellingen.';
+        return 'Aankopen zijn niet toegestaan op dit apparaat. Controleer je ${StoreCopy.storeName}-instellingen.';
       case PurchasesErrorCode.paymentPendingError:
         return 'Je betaling wordt nog verwerkt. Premium wordt geactiveerd zodra dit voltooid is.';
       case PurchasesErrorCode.productNotAvailableForPurchaseError:

@@ -9,15 +9,27 @@ final aiRepositoryProvider = Provider((ref) {
 });
 
 class AiTurn {
-  const AiTurn({required this.role, required this.content});
+  const AiTurn({required this.role, required this.content, this.model});
 
   /// `user` or `assistant`.
   final String role;
   final String content;
 
+  /// The model that wrote an assistant turn, when the server said so (a cached
+  /// answer does not). Only used to attach to a report; never sent as history.
+  final String? model;
+
   bool get isUser => role == 'user';
 
   Map<String, dynamic> toJson() => {'role': role, 'content': content};
+}
+
+/// One answer from `/ai/chat`: the text plus the model id when known.
+class AiReply {
+  const AiReply({required this.text, this.model});
+
+  final String text;
+  final String? model;
 }
 
 class AiQuota {
@@ -115,6 +127,25 @@ class AiRepository {
     int? chapter,
     String? version,
   }) async {
+    final reply = await askReply(
+      message: message,
+      history: history,
+      book: book,
+      chapter: chapter,
+      version: version,
+    );
+    return reply.text;
+  }
+
+  /// [ask], keeping the model id the server reports so a later report on this
+  /// answer can say which model wrote it.
+  Future<AiReply> askReply({
+    required String message,
+    required List<AiTurn> history,
+    String? book,
+    int? chapter,
+    String? version,
+  }) async {
     try {
       final response = await _apiClient.dio.post(
         '/ai/chat',
@@ -139,7 +170,8 @@ class AiRepository {
           'De assistent gaf geen antwoord. Probeer het opnieuw.',
         );
       }
-      return reply;
+      final model = data['model'];
+      return AiReply(text: reply, model: model is String ? model : null);
     } on DioException catch (e) {
       throw aiError(e);
     }

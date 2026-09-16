@@ -651,7 +651,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
                     ],
                   ),
                 ),
-                const Expanded(child: AiAssistantPane()),
+                const Expanded(child: AiAssistantPane(surface: 'lesson_ai')),
               ],
             ),
           ),

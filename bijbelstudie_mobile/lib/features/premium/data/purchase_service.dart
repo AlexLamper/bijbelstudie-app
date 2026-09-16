@@ -121,8 +121,18 @@ class PurchaseService {
     _log('Fetching products directly: ${ids.join(', ')}');
     final products = await Purchases.getProducts(ids);
     _log('Store returned ${products.length} product(s) for ${ids.length} id(s).');
-    return {for (final product in products) product.identifier: product};
+    final byId = <String, StoreProduct>{};
+    for (final product in products) {
+      byId.putIfAbsent(subscriptionIdOf(product.identifier), () => product);
+    }
+    return byId;
   }
+
+  /// The store-independent product id. Google Play reports subscriptions as
+  /// `subscriptionId:basePlanId` (`bijbelstudie_pro_monthly:monthly`); the App
+  /// Store reports the bare id. Comparing raw identifiers made every Android
+  /// lookup by [kRcMonthlyProductId] or [kRcYearlyProductId] miss.
+  static String subscriptionIdOf(String identifier) => identifier.split(':').first;
 
   Package? findMonthlyPackage(List<Package> packages) {
     return _findPackage(
@@ -167,7 +177,7 @@ class PurchaseService {
     }
 
     return firstWhere((pkg) => pkg.identifier == packageId) ??
-        firstWhere((pkg) => pkg.storeProduct.identifier == productId) ??
+        firstWhere((pkg) => subscriptionIdOf(pkg.storeProduct.identifier) == productId) ??
         firstWhere((pkg) => pkg.packageType == packageType) ??
         firstWhere((pkg) => _isPeriod(pkg.storeProduct.subscriptionPeriod, annual: annual));
   }

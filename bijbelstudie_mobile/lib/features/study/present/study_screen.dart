@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../ai/present/ai_assistant_pane.dart';
 import '../../bible/present/read_screen.dart';
+import '../../bible/present/reader_chrome.dart';
 import '../../bible/present/reader_header.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_pane.dart';
@@ -32,6 +33,14 @@ class StudyScreen extends ConsumerStatefulWidget {
 }
 
 class _StudyScreenState extends ConsumerState<StudyScreen> {
+  /// Space under the title row while the Bijbel side's tool row is scrolled
+  /// away. The tool row put 10 between this row and its 34px tool boxes (5 of
+  /// padding plus 5 of tap slack); keeping that gap stops the chapter title and
+  /// switch from sitting flush on the text once the row is gone.
+  static const double _collapsedHeaderGap = 10;
+
+  bool? _lastShowMaterials;
+
   @override
   Widget build(BuildContext context) {
     // Held in a provider rather than local state so the guided tour can walk
@@ -39,6 +48,21 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     final showMaterials = ref.watch(
       studyPaneProvider.select((pane) => pane.showMaterials),
     );
+    // The reader's tool row collapses on scroll; the title row above it stays.
+    // Only the Bijbel side collapses - the materials pane keeps its own 6.
+    final toolRowHidden = !showMaterials && !ref.watch(readerChromeVisibleProvider);
+    // Flipping panes swaps the whole body at once, so the gap snaps with it
+    // rather than gliding over a pane that did not move. Otherwise it follows
+    // the tool row on the same duration and curve (ReaderChromeReveal's
+    // easeOutCubic forward / easeInCubic reverse is easeOutCubic in time both
+    // ways), and snaps under reduced motion just as the row does.
+    final paneSwitched =
+        _lastShowMaterials != null && _lastShowMaterials != showMaterials;
+    _lastShowMaterials = showMaterials;
+    final reducedMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final headerGapDuration = paneSwitched || reducedMotion
+        ? Duration.zero
+        : ReaderChromeReveal.duration;
     // An IndexedStack builds every child, so the materials pane used to mount
     // during the brief window before the reader knows where it is - firing its
     // fetches at the Genesis 1 placeholder and then again at the real chapter.
@@ -61,8 +85,18 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           bottom: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              // Laid out above the reader, not over it: the text viewport
+              // gives up these pixels in the same frames the tool row hands
+              // its height back, so the scroll offset holds and nothing jumps.
+              AnimatedPadding(
+                duration: headerGapDuration,
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  6,
+                  16,
+                  toolRowHidden ? _collapsedHeaderGap : 0,
+                ),
                 child: TourAnchor(
                   id: TourAnchorIds.studyPaneSwitcher,
                   child: ReaderTitleBar(showMaterials: showMaterials),

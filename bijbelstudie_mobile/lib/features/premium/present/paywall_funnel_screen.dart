@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/paywall_goal.dart';
 import 'pro_access_provider.dart';
+import '../domain/store_copy.dart';
 
 /// The three screens before the price.
 ///
@@ -412,7 +413,7 @@ class _BenefitsStep extends StatelessWidget {
               const SizedBox(height: 10),
               _Assurance(
                 icon: Icons.cancel_outlined,
-                text: 'Opzeggen wanneer je wilt, in je App Store-account',
+                text: 'Opzeggen wanneer je wilt, in je ${StoreCopy.storeName}-account',
               ),
               const SizedBox(height: 10),
               _Assurance(

@@ -1,0 +1,151 @@
+name: Android Build (signed AAB for Google Play)
+
+# Builds a release AAB signed with the upload key and attaches it to the run as
+# an artifact. Uploading to Play Console stays manual: open the run, download
+# the artifact, unzip, and drop the .aab into a release in Play Console.
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "screenshots/**"
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: "Version name (e.g. 1.0.7). Leave blank to read it from pubspec.yaml."
+        required: false
+        default: ""
+      build_number:
+        description: "versionCode — MUST be higher than every AAB ever uploaded to Play. Leave blank to use 100 + run number."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build signed release AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Pinned to the version the Android build is verified with locally
+      # (AGP 8.7.3 / Kotlin 2.1.0). Bump together with the Gradle plugins.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: bijbelstudie_mobile
+        run: flutter pub get
+
+      - name: Restore upload keystore
+        working-directory: bijbelstudie_mobile/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required secret: $name"
+              exit 1
+            fi
+          done
+          printf "%s" "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          {
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "storeFile=$RUNNER_TEMP/upload.jks"
+          } > key.properties
+
+      - name: Build signed AAB
+        working-directory: bijbelstudie_mobile
+        env:
+          # Public SDK key (goog_…) from RevenueCat → Project → API keys.
+          # Without it the build still works, but purchases are disabled.
+          REVENUECAT_GOOGLE_KEY: ${{ secrets.REVENUECAT_GOOGLE_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          BUILD_NAME="${{ github.event.inputs.build_name }}"
+          if [ -z "$BUILD_NAME" ]; then
+            BUILD_NAME="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d'+' -f1)"
+          fi
+          # Offset keeps CI versionCodes above the manually built 1.0.6 (14).
+          BUILD_NUMBER="${{ github.event.inputs.build_number }}"
+          if [ -z "$BUILD_NUMBER" ]; then
+            BUILD_NUMBER=$((100 + ${{ github.run_number }}))
+          fi
+          echo "BUILD_NAME=$BUILD_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Building $BUILD_NAME ($BUILD_NUMBER)"
+
+          if [ -z "${REVENUECAT_GOOGLE_KEY:-}" ]; then
+            echo "::warning::REVENUECAT_GOOGLE_KEY secret is not set - subscriptions will not work in this build."
+          fi
+          if [ -z "${GOOGLE_WEB_CLIENT_ID:-}" ]; then
+            echo "::warning::GOOGLE_WEB_CLIENT_ID variable is not set - Google Sign-In will not work in this build."
+          fi
+
+          # TERMS_OF_USE_URL: the default is Apple's EULA, which is wrong on Play.
+          flutter build appbundle --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=USE_PRODUCTION_API=true \
+            --dart-define=REVENUECAT_GOOGLE_KEY="${REVENUECAT_GOOGLE_KEY:-}" \
+            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}" \
+            --dart-define=TERMS_OF_USE_URL=https://www.bijbelstudie.io/algemene-voorwaarden
+
+      # Play rejects an AAB signed with any other key, so fail here instead.
+      - name: Verify upload key signature
+        working-directory: bijbelstudie_mobile
+        run: |
+          EXPECTED="FF:2C:27:A0:E2:EF:F0:2E:C6:A4:5E:AC:F9:2C:77:8A:AC:14:E7:7E"
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          ACTUAL="$(keytool -printcert -jarfile "$AAB" | grep -m1 'SHA1:' | awk '{print $2}')"
+          echo "Signed with SHA-1 $ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "AAB is not signed with the upload key (expected $EXPECTED)"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/out"
+          cp "$AAB" "$RUNNER_TEMP/out/bijbelstudie-$BUILD_NAME-$BUILD_NUMBER.aab"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bijbelstudie-${{ env.BUILD_NAME }}-${{ env.BUILD_NUMBER }}-aab
+          path: ${{ runner.temp }}/out/*.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          {
+            echo "### Android AAB ready: $BUILD_NAME ($BUILD_NUMBER)"
+            echo ""
+            echo "1. Scroll down to **Artifacts** and download \`bijbelstudie-$BUILD_NAME-$BUILD_NUMBER-aab\`, then unzip it."
+            echo "2. Play Console → BijbelStudie → Testen en releasen → pick a track → Nieuwe release maken."
+            echo "3. Drag \`bijbelstudie-$BUILD_NAME-$BUILD_NUMBER.aab\` into App-bundles."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks" bijbelstudie_mobile/android/key.properties

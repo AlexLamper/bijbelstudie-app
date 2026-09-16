@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../data/ai_repository.dart';
+import 'ai_report_sheet.dart';
 
 /// The AI-assistent tab of the study page.
 ///
@@ -15,7 +16,11 @@ import '../data/ai_repository.dart';
 /// context with every question, the free tier is capped at five questions a
 /// day, and the cap is reported by the server rather than guessed here.
 class AiAssistantPane extends ConsumerStatefulWidget {
-  const AiAssistantPane({super.key});
+  const AiAssistantPane({super.key, this.surface = 'study_ai'});
+
+  /// Which screen hosts the pane, attached to AI-answer reports:
+  /// `study_ai` (split reader) or `lesson_ai` (lesson screen).
+  final String surface;
 
   @override
   ConsumerState<AiAssistantPane> createState() => _AiAssistantPaneState();
@@ -28,10 +33,12 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
 
   bool _sending = false;
   String? _error;
+
   /// Whether [_error] is the daily cap rather than a network or server fault.
   /// Only the cap is a paywall: offering Pro as the answer to "the assistant is
   /// unreachable" sells nothing and reads as opportunism.
   bool _errorIsQuota = false;
+
   /// Whether [_error] is a dead session, which needs a way back to the login
   /// screen rather than a retry that will fail the same way.
   bool _errorIsAuth = false;
@@ -115,7 +122,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     try {
       final reply = await ref
           .read(aiRepositoryProvider)
-          .ask(
+          .askReply(
             message: message,
             history: history,
             book: location.book,
@@ -124,7 +131,9 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
           );
       if (!mounted) return;
       setState(() {
-        _turns.add(AiTurn(role: 'assistant', content: reply));
+        _turns.add(
+          AiTurn(role: 'assistant', content: reply.text, model: reply.model),
+        );
         _sending = false;
       });
     } on AiQuotaExceeded catch (e) {
@@ -223,7 +232,21 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                   itemCount: _turns.length + (_sending ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index >= _turns.length) return const _TypingBubble();
-                    return _TurnBubble(turn: _turns[index]);
+                    final turn = _turns[index];
+                    if (turn.isUser) return _TurnBubble(turn: turn);
+                    final previous = index > 0 ? _turns[index - 1] : null;
+                    return _TurnBubble(
+                      turn: turn,
+                      onReport: () => showAiReportSheet(
+                        context,
+                        answer: turn.content,
+                        question: previous != null && previous.isUser
+                            ? previous.content
+                            : '',
+                        surface: widget.surface,
+                        model: turn.model,
+                      ),
+                    );
                   },
                 ),
         ),
@@ -237,17 +260,18 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                 Expanded(
                   child: Text(
                     notice,
-                    style: AppTheme.caption.copyWith(color: AppTheme.destructive),
+                    style: AppTheme.caption.copyWith(
+                      color: AppTheme.destructive,
+                    ),
                   ),
                 ),
                 if (showProCta)
                   TextButton(
                     onPressed: () {
-                      ref
-                          .read(analyticsProvider)
-                          .track(AnalyticsEvents.paywallCtaClicked, {
-                            'surface': 'ai_limit',
-                          });
+                      ref.read(analyticsProvider).track(
+                        AnalyticsEvents.paywallCtaClicked,
+                        {'surface': 'ai_limit'},
+                      );
                       context.push('/pro-intro?source=app_ai');
                     },
                     style: TextButton.styleFrom(
@@ -273,6 +297,14 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
               ],
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+          child: Text(
+            'AI kan fouten maken. Controleer met de Bijbel.',
+            textAlign: TextAlign.center,
+            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+          ),
+        ),
         const RuleLine(),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -393,19 +425,22 @@ class _EmptyPrompt extends StatelessWidget {
 }
 
 class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({required this.turn});
+  const _TurnBubble({required this.turn, this.onReport});
 
   final AiTurn turn;
+
+  /// Opens the report sheet. Set for assistant answers only.
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isUser = turn.isUser;
 
-    return Align(
+    final bubble = Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
+        margin: EdgeInsets.only(bottom: onReport == null ? 10 : 2),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.82,
@@ -425,6 +460,36 @@ class _TurnBubble extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    final report = onReport;
+    if (report == null) return bubble;
+
+    // Always visible rather than tucked in a long-press menu: the bubble's
+    // long-press already selects text, and a report that has to be discovered
+    // is not one a reader can be expected to find.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        bubble,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TextButton.icon(
+            onPressed: report,
+            icon: Icon(Icons.flag_outlined, size: 14, color: AppTheme.inkFaint),
+            label: Text(
+              'Melden',
+              semanticsLabel: 'AI-antwoord melden',
+              style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

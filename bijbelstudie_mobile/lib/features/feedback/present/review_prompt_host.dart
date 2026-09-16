@@ -9,6 +9,7 @@ import '../../../core/config/preview_config.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../onboarding/present/tour_controller.dart';
+import '../../premium/domain/store_copy.dart';
 import '../data/review_prompt.dart';
 
 /// Routes the prompt may appear over: the two calm "you have arrived" screens.
@@ -226,7 +227,7 @@ class _ReviewPromptOverlay extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Tik op een ster om de app te beoordelen in de App Store.',
+            'Tik op een ster om de app te beoordelen in ${StoreCopy.storeInSentence}.',
             style: AppTheme.bodyMuted,
           ),
           const SizedBox(height: 16),

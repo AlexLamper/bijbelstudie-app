@@ -112,7 +112,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 children: [
                   if (context.canPop())
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 18),
                       child: Semantics(
                         button: true,
                         label: 'Terug',
