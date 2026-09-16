@@ -165,7 +165,7 @@ Dit kan al voordat er iets in Play staat, en Claude heeft de sleutel nodig voor 
 
 ### A7. Eerste AAB naar de interne test (10 min)
 
-> **Klaar (16 sep):** gebruik `C:\Projectsijbelstudie-app\store-assets\google-playuildsijbelstudie-1.1.1-101.aab` (GitHub-build, gecontroleerd; inclusief RevenueCat-sleutel). Upload dát bestand bij stap 5 in plaats van het lokale bestand, en verwacht bij stap 6 de rij **105 (1.1.1)**. De lokale build 1.0.7 (99) hieronder is alleen reserve.
+> **Klaar (16 sep):** gebruik `C:\Projectsijbelstudie-app\store-assets\google-playuildsijbelstudie-1.1.1-101.aab` (GitHub-build, gecontroleerd; inclusief RevenueCat-sleutel). Upload dát bestand bij stap 5 in plaats van het lokale bestand, en verwacht bij stap 6 de rij **106 (1.1.1)**. De lokale build 1.0.7 (99) hieronder is alleen reserve.
 
 Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet perfect te zijn: de interne test heeft geen beoordeling. Het doel is dat Play je app "kent" (abonnementen worden daarna mogelijk) en dat Google zijn ondertekeningssleutel aanmaakt.
 
@@ -181,7 +181,7 @@ Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet p
 Weigert Play het publiceren omdat er nog setup-taken openstaan? Doe dan eerst A10 en probeer opnieuw.
 
 ✅ **Klaar als** de release onder Interne tests de status **Beschikbaar voor interne testers** ≈ heeft.
-**Plak in de chat:** "Interne test staat erop, versiecode <105 of 99>".
+**Plak in de chat:** "Interne test staat erop, versiecode 106".
 
 ### A8. Google-inloggen: twee Android OAuth-clients (15 min)
 
@@ -264,7 +264,7 @@ Staat er een onderdeel dat niet in het bestand voorkomt? **Plak in de chat:** de
 
 ### B2. Build 1.1.1 uploaden (5 min)
 
-1. Claude meldt de bestandsnaam, bijvoorbeeld `store-assets/google-play/builds/bijbelstudie-1.1.1-105.aab`.
+1. Claude meldt de bestandsnaam, bijvoorbeeld `store-assets/google-play/builds/bijbelstudie-1.1.1-106.aab`.
 2. **Testen en releasen** → **Testen** → **Interne tests** → **Nieuwe release maken** → **Uploaden** → dat `.aab`-bestand. **Releaseopmerkingen:** blok A uit `release-notes.md` → **Volgende** → **Opslaan en publiceren** ≈.
 3. (Heb je A7 overgeslagen? Doe nu A8b.)
 
@@ -463,7 +463,7 @@ Na goedkeuring (meestal 1–3 dagen) staat de app op `https://play.google.com/st
 - [ ] A4 Betalingsprofiel + bankrekening
 - [ ] A5 Store-instellingen + handelaarsstatus
 - [ ] A6 RevenueCat Android-app *(goog_-sleutel → chat)*
-- [ ] A7 AAB 105 (of 99) op Interne test *(→ chat)*
+- [ ] A7 AAB 106 op Interne test *(→ chat)*
 - [ ] A8 Twee Android OAuth-clients *(ondertekenings-SHA-1 → chat)*
 - [ ] A9 Service account (Cloud + Play Console + RevenueCat)
 - [ ] A10 App-content: "Vereist aandacht" leeg

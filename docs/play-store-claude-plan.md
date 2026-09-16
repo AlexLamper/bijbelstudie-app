@@ -28,7 +28,7 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 | 8 | App-repo committen + naar `main` pushen (Android AAB + iOS TestFlight) | **Klaar** (f6bf1a9 + b7315f3 op `main`) | – |
 | 9 | Gegevensveiligheid controleren tegen nieuw privacybeleid | **Bezig** (agent) | – |
 | 10 | GitHub-secret `REVENUECAT_GOOGLE_KEY` zetten | **Klaar** (build 105 zonder waarschuwing) | – |
-| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | **Klaar**: `store-assets/google-play/builds/bijbelstudie-1.1.1-105.aab` — uploadsleutel-SHA-1 OK, `com.bijbelstudie.app`, 1.1.1 (105, met RevenueCat-sleutel, paywall-fix en inset-fix), targetSdk 36, geen AD_ID/locatie/exacte alarmen; zonder `REVENUECAT_GOOGLE_KEY` | – |
+| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | **Klaar**: `store-assets/google-play/builds/bijbelstudie-1.1.1-106.aab` — uploadsleutel-SHA-1 OK, `com.bijbelstudie.app`, 1.1.1 (106, Billing Library 8.3.0, RevenueCat-sleutel, paywall- en inset-fix), targetSdk 36, geen AD_ID/locatie/exacte alarmen; zonder `REVENUECAT_GOOGLE_KEY` | – |
 | 12 | Lokale AAB 1.0.7 (99) controleren voor Alex' eerste upload | Alleen nodig als CI-build faalt (lokaal: SHA-1 uploadsleutel geverifieerd) | 11 |
 | 13 | Reviewer-account `applereview@mail.com` controleren | **Klaar**: bestaat in `scriptura`, `subscribed: true`, heeft wachtwoord, niet gearchiveerd | – |
 | 14 | URL-checks website | Te doen | Alex **A0** |
