@@ -391,8 +391,11 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     final chromeVisible = ref.watch(readerChromeVisibleProvider);
     // The tab bar carries the bottom inset while it is there; once it slides
     // away the reader has to carry it itself, in step, or the chapter nav ends
-    // up under the home indicator.
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // up under the home indicator. Read from the view, not the context: the
+    // shell Scaffold has a bottomNavigationBar, so it strips the bottom padding
+    // from its body even while that bar is collapsed - the context says 0 and
+    // on Android 15+ edge-to-edge the nav row sat under the system buttons.
+    final bottomInset = MediaQueryData.fromView(View.of(context)).padding.bottom;
     // Reduced motion: the padding snaps, exactly as the bars themselves do.
     final chromeDuration = MediaQuery.maybeOf(context)?.disableAnimations ?? false
         ? Duration.zero

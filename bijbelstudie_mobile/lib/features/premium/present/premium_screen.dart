@@ -145,7 +145,9 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('BijbelStudie Pro')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        // An explicit padding replaces ListView's own safe-area padding, so the
+        // system navigation bar is added back by hand.
+        padding: EdgeInsets.fromLTRB(20, 8, 20, 40 + MediaQuery.viewPaddingOf(context).bottom),
         children: [
           if (showActive)
             _ActiveCard(
