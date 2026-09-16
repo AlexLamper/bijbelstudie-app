@@ -45,10 +45,10 @@ De flessenhals is Google's regel: **12 testers, 14 dagen onafgebroken aangemeld*
 
 | Stap | Plak in de chat |
 |---|---|
-| A0 | "website live" (na merge + deploy) |
+| A0 | ✅ Website is live (Claude heeft gemerged); alleen nog `RESEND_API_KEY` |
 | A11 | ✅ Gedaan (naam, KvK, Middelharnis; Atlas = Frankfurt) |
 | A2 (dag 2) | Hoeveel mensen lid zijn van de testgroep |
-| A6 | De RevenueCat-sleutel `goog_…` |
+| A6 | ✅ `goog_`-sleutel ontvangen en in GitHub gezet |
 | A7 | "Interne test staat erop" + de versiecode die Play toont |
 | A8 | De SHA-1 van de **app-ondertekeningssleutel** + "beide OAuth-clients aangemaakt" |
 | A10 | Een App-content-onderdeel dat niet in `app-content-antwoorden.md` staat (alleen als dat gebeurt) |
@@ -83,7 +83,7 @@ De Play-formulieren verwijzen naar `https://www.bijbelstudie.io/privacybeleid` e
    Let op: `hooks/useBibleData.ts` en `lib/book-mapping.ts` zijn ongecommitte wijzigingen van nog een andere sessie. Die gaan niet mee, zolang je ze niet zelf commit.
 4. **Vercel** → project BijbelStudie → **Settings** → **Environment Variables**:
    - **`CRON_SECRET`**: ✅ al gezet door Claude (16 sep).
-   - **`RESEND_API_KEY`** (ontbreekt: wachtwoord-vergeten-mails worden nu niet verstuurd). De app verstuurt vanaf `geenantwoord@mail.bijbelstudie.io`, dus:
+   - **`RESEND_API_KEY`** (ontbreekt: wachtwoord-vergeten-mails worden nu niet verstuurd). De website verstuurt vanaf `noreply@mail.bijbelstudie.io`, dus:
      1. <https://resend.com> → inloggen/aanmelden → **Domains** → **Add Domain** → `mail.bijbelstudie.io`, regio **EU (Ireland)**.
      2. Resend toont 3–4 DNS-records (MX, TXT/SPF, TXT/DKIM `resend._domainkey…`). Je DNS staat bij **Hostinger**: hPanel → **Domeinen** → `bijbelstudie.io` → **DNS / Nameservers** → voeg elk record precies zo toe (naam, type, waarde).
      3. Terug in Resend → **Verify DNS records** → wacht tot **Verified** (minuten tot een paar uur).
@@ -165,7 +165,7 @@ Dit kan al voordat er iets in Play staat, en Claude heeft de sleutel nodig voor 
 
 ### A7. Eerste AAB naar de interne test (10 min)
 
-> **Klaar (16 sep):** gebruik `C:\Projectsijbelstudie-app\store-assets\google-playuildsijbelstudie-1.1.1-101.aab` (GitHub-build, gecontroleerd; alleen de RevenueCat-sleutel zit er nog niet in, dus aankopen werken in deze build nog niet). Upload dát bestand bij stap 5 in plaats van het lokale bestand, en verwacht bij stap 6 de rij **103 (1.1.1)**. De lokale build 1.0.7 (99) hieronder is alleen reserve.
+> **Klaar (16 sep):** gebruik `C:\Projectsijbelstudie-app\store-assets\google-playuildsijbelstudie-1.1.1-101.aab` (GitHub-build, gecontroleerd; inclusief RevenueCat-sleutel). Upload dát bestand bij stap 5 in plaats van het lokale bestand, en verwacht bij stap 6 de rij **105 (1.1.1)**. De lokale build 1.0.7 (99) hieronder is alleen reserve.
 
 Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet perfect te zijn: de interne test heeft geen beoordeling. Het doel is dat Play je app "kent" (abonnementen worden daarna mogelijk) en dat Google zijn ondertekeningssleutel aanmaakt.
 
@@ -181,7 +181,7 @@ Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet p
 Weigert Play het publiceren omdat er nog setup-taken openstaan? Doe dan eerst A10 en probeer opnieuw.
 
 ✅ **Klaar als** de release onder Interne tests de status **Beschikbaar voor interne testers** ≈ heeft.
-**Plak in de chat:** "Interne test staat erop, versiecode <103 of 99>".
+**Plak in de chat:** "Interne test staat erop, versiecode <105 of 99>".
 
 ### A8. Google-inloggen: twee Android OAuth-clients (15 min)
 
@@ -264,7 +264,7 @@ Staat er een onderdeel dat niet in het bestand voorkomt? **Plak in de chat:** de
 
 ### B2. Build 1.1.1 uploaden (5 min)
 
-1. Claude meldt de bestandsnaam, bijvoorbeeld `store-assets/google-play/builds/bijbelstudie-1.1.1-103.aab`.
+1. Claude meldt de bestandsnaam, bijvoorbeeld `store-assets/google-play/builds/bijbelstudie-1.1.1-105.aab`.
 2. **Testen en releasen** → **Testen** → **Interne tests** → **Nieuwe release maken** → **Uploaden** → dat `.aab`-bestand. **Releaseopmerkingen:** blok A uit `release-notes.md` → **Volgende** → **Opslaan en publiceren** ≈.
 3. (Heb je A7 overgeslagen? Doe nu A8b.)
 
@@ -455,14 +455,15 @@ Na goedkeuring (meestal 1–3 dagen) staat de app op `https://play.google.com/st
 ## Checklist
 
 **Fase A – wo 16 sep**
-- [ ] A0 Website gemerged + gedeployd, `RESEND_API_KEY` in Vercel (`CRON_SECRET` al gedaan) *(→ chat)*
+- [x] A0 Website gemerged + gedeployd door Claude (16 sep); `CRON_SECRET` gezet
+- [ ] A0 `RESEND_API_KEY` in Vercel (Resend-domein `mail.bijbelstudie.io`)
 - [ ] A1 Account zonder meldingen
 - [ ] A2 Google Group + bericht 1 naar 20 mensen *(dag 2: aantal leden → chat)*
 - [ ] A3 App aangemaakt
 - [ ] A4 Betalingsprofiel + bankrekening
 - [ ] A5 Store-instellingen + handelaarsstatus
 - [ ] A6 RevenueCat Android-app *(goog_-sleutel → chat)*
-- [ ] A7 AAB 103 (of 99) op Interne test *(→ chat)*
+- [ ] A7 AAB 105 (of 99) op Interne test *(→ chat)*
 - [ ] A8 Twee Android OAuth-clients *(ondertekenings-SHA-1 → chat)*
 - [ ] A9 Service account (Cloud + Play Console + RevenueCat)
 - [ ] A10 App-content: "Vereist aandacht" leeg
