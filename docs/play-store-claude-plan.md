@@ -28,13 +28,13 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 | 8 | App-repo committen + naar `main` pushen (Android AAB + iOS TestFlight) | **Klaar** (f6bf1a9 + b7315f3 op `main`) | – |
 | 9 | Gegevensveiligheid controleren tegen nieuw privacybeleid | **Bezig** (agent) | – |
 | 10 | GitHub-secret `REVENUECAT_GOOGLE_KEY` zetten | Te doen | Alex **A6** |
-| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | **Klaar**: `store-assets/google-play/builds/bijbelstudie-1.1.1-102.aab` — uploadsleutel-SHA-1 OK, `com.bijbelstudie.app`, 1.1.1 (102, met paywall-fix e80d78a), targetSdk 36, geen AD_ID/locatie/exacte alarmen; zonder `REVENUECAT_GOOGLE_KEY` | – |
+| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | **Klaar**: `store-assets/google-play/builds/bijbelstudie-1.1.1-103.aab` — uploadsleutel-SHA-1 OK, `com.bijbelstudie.app`, 1.1.1 (103, met paywall-fix e80d78a en inset-fix e335c65), targetSdk 36, geen AD_ID/locatie/exacte alarmen; zonder `REVENUECAT_GOOGLE_KEY` | – |
 | 12 | Lokale AAB 1.0.7 (99) controleren voor Alex' eerste upload | Alleen nodig als CI-build faalt (lokaal: SHA-1 uploadsleutel geverifieerd) | 11 |
 | 13 | Reviewer-account `applereview@mail.com` controleren | **Klaar**: bestaat in `scriptura`, `subscribed: true`, heeft wachtwoord, niet gearchiveerd | – |
 | 14 | URL-checks website | Te doen | Alex **A0** |
 | 15 | Winkeltekst-claims verifiëren tegen productie | **Bezig** (agent) | – |
 | 16 | `GOOGLE_MOBILE_CLIENT_IDS` op Vercel controleren | **Klaar**: bevat de webclient `1005113136089-24a9…` | – |
-| 17 | Android 16-emulatorcheck (edge-to-edge, terug-gebaar, draaien) | **Bezig** (agent, API 36-image wordt geïnstalleerd) | – |
+| 17 | Android 16-emulatorcheck (edge-to-edge, terug-gebaar, draaien) | **Klaar** (Pixel 8 API 36): hoofdstuknavigatie onder navbalk + paywall-padding gefixt in e335c65 (test in `test/reader_header_test.dart`); rest OK. Nog open (geen blokkade): terug op tab-root sluit app i.p.v. naar Start | – |
 | 18 | Google-inloggen- en RevenueCat-mapping verifiëren | Te doen | Alex **A8**, **C2**, **C4** |
 | 19 | Testerfeedback verzamelen + productietoegang-antwoorden invullen | Te doen | Alex **D1**; dag 13 |
 | 20 | Fixes/updates tijdens de gesloten test | Te doen | Alex **D1** |
