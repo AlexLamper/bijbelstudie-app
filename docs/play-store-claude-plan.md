@@ -18,23 +18,23 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 | # | Taak | Status | Wacht op |
 |---|---|---|---|
-| 1 | Afbeeldingen: App Store 1.1.1 + Play (screenshots, icoon, functieafbeelding) | **Bezig** (parallelle agent) | – |
-| 2 | "AI-antwoord melden" in de app | **Bezig** (parallelle agent) | – |
-| 3 | Privacybeleid herschrijven + 90-dagen-purge automatiseren | **Bezig** (parallelle agent) | – |
-| 4 | Prijs-fallback Play-product-ID's (R5) + pubspec 1.1.1 | pubspec **Klaar**; R5 **Bezig/controleren** | – |
+| 1 | Afbeeldingen: App Store 1.1.1 + Play (screenshots, icoon, functieafbeelding) | **Klaar** (`store-assets/`) | – |
+| 2 | "AI-antwoord melden" in de app | **Klaar** (app gepusht; backend op website-branch) | – |
+| 3 | Privacybeleid herschrijven + 90-dagen-purge automatiseren | **Klaar** (gecommit `levensboom` 3d6fba25); open punten → Alex **A11** | – |
+| 4 | Prijs-fallback Play-product-ID's (R5) + pubspec 1.1.1 | **Klaar** (gepusht) | – |
 | 5 | Plakteksten in `store-assets/google-play/` | **Klaar** | – |
-| 6 | Website committen + deployen | Te doen | 3 |
-| 7 | BijbelAPI deployen (Render) | Te doen | dagtekst-curatie klaar |
-| 8 | App-repo committen + naar `main` pushen (Android AAB + iOS TestFlight) | Te doen | 2, 4, liefst 10 |
-| 9 | Gegevensveiligheid controleren tegen nieuw privacybeleid | Te doen | 3 |
+| 6 | Website committen + deployen | Gecommit op `levensboom`; **merge/push = Alex A0** (website-CLAUDE.md) | Alex **A0** |
+| 7 | BijbelAPI deployen (Render) | Gecommit 5982018 (tests OK), **push na A0** | Alex **A0** |
+| 8 | App-repo committen + naar `main` pushen (Android AAB + iOS TestFlight) | **Klaar** (f6bf1a9 + b7315f3 op `main`) | – |
+| 9 | Gegevensveiligheid controleren tegen nieuw privacybeleid | **Bezig** (agent) | – |
 | 10 | GitHub-secret `REVENUECAT_GOOGLE_KEY` zetten | Te doen | Alex **A6** |
-| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | Te doen | 8 |
-| 12 | Lokale AAB 1.0.7 (99) controleren voor Alex' eerste upload | Te doen (nu) | – |
-| 13 | Reviewer-account `applereview@mail.com` controleren | Te doen (nu) | – |
-| 14 | URL-checks website | Te doen | 6 |
-| 15 | Winkeltekst-claims verifiëren tegen productie | Te doen (nu) | – |
-| 16 | `GOOGLE_MOBILE_CLIENT_IDS` op Vercel controleren | Te doen (nu) | – |
-| 17 | Android 16-emulatorcheck (edge-to-edge, terug-gebaar, draaien) | Te doen | 8 |
+| 11 | CI-AAB downloaden, verifiëren, klaarzetten voor Alex | **Bezig** (run 35109937787) | – |
+| 12 | Lokale AAB 1.0.7 (99) controleren voor Alex' eerste upload | Alleen nodig als CI-build faalt (lokaal: SHA-1 uploadsleutel geverifieerd) | 11 |
+| 13 | Reviewer-account `applereview@mail.com` controleren | **Klaar**: bestaat in `scriptura`, `subscribed: true`, heeft wachtwoord, niet gearchiveerd | – |
+| 14 | URL-checks website | Te doen | Alex **A0** |
+| 15 | Winkeltekst-claims verifiëren tegen productie | **Bezig** (agent) | – |
+| 16 | `GOOGLE_MOBILE_CLIENT_IDS` op Vercel controleren | **Klaar**: bevat de webclient `1005113136089-24a9…` | – |
+| 17 | Android 16-emulatorcheck (edge-to-edge, terug-gebaar, draaien) | **Bezig** (agent, API 36-image wordt geïnstalleerd) | – |
 | 18 | Google-inloggen- en RevenueCat-mapping verifiëren | Te doen | Alex **A8**, **C2**, **C4** |
 | 19 | Testerfeedback verzamelen + productietoegang-antwoorden invullen | Te doen | Alex **D1**; dag 13 |
 | 20 | Fixes/updates tijdens de gesloten test | Te doen | Alex **D1** |
@@ -56,7 +56,7 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 - **Doel:** Play: app-icoon 512 × 512, functieafbeelding 1024 × 500, 2–8 telefoon-screenshots 1080 × 1920. App Store 1.1.1: screenshots per vereist formaat.
 - **Bestanden:** `store-assets/google-play/graphics/`, `store-assets/app-store-1.1.1/<formaat>/`.
-- **Afhankelijkheid:** geen. **Status:** Bezig (parallelle agent).
+- **Afhankelijkheid:** geen. **Status:** Klaar.
 - **Verificatie** (na oplevering):
   ```bash
   cd /c/Projects/bijbelstudie-app && python - <<'EOF'
@@ -73,14 +73,14 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 - **Doel:** per AI-antwoord een in-app meldactie (Play-beleid voor AI-gegenereerde content), zonder de app te verlaten.
 - **Bestanden:** `bijbelstudie_mobile/lib/features/ai/present/ai_assistant_pane.dart`, feedback-repository in `lib/features/feedback/data/`.
-- **Afhankelijkheid:** geen. **Status:** Bezig (parallelle agent).
+- **Afhankelijkheid:** geen. **Status:** Klaar.
 - **Verificatie:** `flutter analyze`; het bijbehorende testbestand in `test/`; het exacte knoplabel opzoeken en de reviewer-instructie (regel 3) in `store-assets/google-play/app-content-antwoorden.md` daarop laten kloppen; ook "Meld het direct in de app" in `winkelvermelding.md`.
 
 ### 3. Privacybeleid + automatische purge
 
 - **Doel:** volledig privacybeleid (verwerkers, bewaartermijnen, rechten, accountverwijdering); het archief van verwijderde accounts automatisch na 90 dagen wissen.
 - **Repo:** `C:\Projects\bijbelstudie` (`app/privacybeleid/page.tsx`, `scripts/purge-deleted-accounts.mjs`, `docs/privacy-policy-draft.md`, planning via Vercel cron of GitHub Action).
-- **Afhankelijkheid:** geen. **Status:** Bezig (parallelle agent).
+- **Afhankelijkheid:** geen. **Status:** Klaar.
 - **Verificatie:** `npx tsc --noEmit` (alleen de 2 bekende fouten); relevante lokale vitest-bestanden in `tests/`; na deploy taak 14. Lijst met verwerkers doorgeven aan taak 9.
 
 ### 4. Prijs-fallback (R5) + versie
@@ -103,8 +103,8 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 - **Doel:** live: `/account-verwijderen`, `lib/accountPurge.ts`, nieuw privacybeleid, purge-automatisering, dagtekst-curatie, FAQ "Hoe verwijder ik mijn account?" (`lib/content/helpFaq.ts`, controleren of die al is bijgewerkt), plus de nog ongecommitte owner-guard/archief-wijzigingen (memory: owner-account-deleted-2026-09-08).
 - **Repo:** `C:\Projects\bijbelstudie` (Vercel deployt bij push naar `main`).
-- **Afhankelijkheid:** taak 3. **Status:** Te doen.
-- **Stappen:**
+- **Afhankelijkheid:** taak 3. **Status:** Gecommit op `levensboom` (3d6fba25, alleen eigen bestanden). **Niet** mergen/pushen: website-`CLAUDE.md` en de andere sessie (bijbelstudie-52) zeggen dat `main` door Alex wordt gemerged/gepusht na lokaal testen → Alex **A0**. Ook nodig: `CRON_SECRET` en `RESEND_API_KEY` (ontbreekt → wachtwoord-reset-mails worden niet verstuurd) in Vercel.
+- **Stappen (historisch):**
   ```bash
   cd /c/Projects/bijbelstudie
   git status --short
@@ -120,7 +120,7 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 - **Doel:** dagtekst-curatie live.
 - **Repo:** `C:\Projects\bijbelapi` (heeft `render.yaml`; Render deployt bij push).
-- **Afhankelijkheid:** curatiewerk klaar. **Status:** Te doen.
+- **Afhankelijkheid:** Alex **A0** (oude website toont bij passages de verkeerde verwijzing). **Status:** Gecommit 5982018, tests OK (`.venv/Scripts/python.exe -m unittest tests.test_daytext`). Na "website live": `git -C /c/Projects/bijbelapi push origin main`, dan `curl 'https://bijbelapi.com/api/daytext?version=sv&seed=2026-09-17'`.
 - **Stappen:** `git status`, tests van die repo draaien, gericht committen, `git push origin main`.
 - **Verificatie:** Render-deploy geslaagd; het dagtekst-endpoint met `curl` aanroepen en controleren dat de website/app de gecureerde tekst tonen.
 
@@ -128,7 +128,7 @@ Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex allee
 
 - **Doel:** eerste CI-build 1.1.1 voor Play (met AI-melden, R5, StoreCopy, targetSdk 36, `goog_`-sleutel) en iOS TestFlight 1.1.1.
 - **Repo:** `C:\Projects\bijbelstudie-app`. Huidige branch `feature/bijbel-gelezen` staat op dezelfde commit als `main` (2731f23) plus ongecommitte wijzigingen.
-- **Afhankelijkheid:** taak 2 en 4; liefst na taak 10 (anders opnieuw draaien). **Status:** Te doen.
+- **Afhankelijkheid:** taak 2 en 4. **Status:** Klaar: f6bf1a9 (code) + b7315f3 (docs) gepusht naar `main` vanaf `feature/bijbel-gelezen` via `git push origin HEAD:main`, alleen eigen hunks (Bijbel gelezen-scherm en `/profile/bijbel`-links van sessie bijbelstudie-52 bewust niet meegenomen). Runs: Android 35109937787, iOS 35109937791.
 - **Stappen:**
   ```bash
   cd /c/Projects/bijbelstudie-app/bijbelstudie_mobile

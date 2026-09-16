@@ -4,10 +4,12 @@ Bijgewerkt **wo 16 sep 2026**. Hier staan **alleen de stappen die jij zelf moet 
 
 **Wat Claude al gedaan heeft of nu doet**
 
-- **Klaar:** targetSdk 36; op Android noemen paywall, profiel en reviewvraag nu Google Play in plaats van Apple; GitHub bouwt automatisch een ondertekende AAB (versiecode = 100 + runnummer); de pagina `/account-verwijderen` en het volledig wissen van gegevens zijn geschreven.
+- **Klaar en gepusht naar `main` (app):** targetSdk 36; op Android noemen paywall, profiel en reviewvraag Google Play in plaats van Apple; knop **Melden** onder elk AI-antwoord + "AI kan fouten maken"; prijs-fallback voor Play-abonnementen; versie 1.1.1; GitHub bouwt bij elke push een ondertekende AAB (versiecode = 100 + runnummer).
+- **Klaar, maar nog NIET live (website):** nieuw privacybeleid, `/account-verwijderen`, volledig wissen van gegevens, AI-meldingen in `/beheer/feedback`, dagtekst-verbetering en een dagelijkse bewaartermijn-cron. Staat gecommit op branch `levensboom` van de website. Live zetten doe jij (stap **A0**), want de website-regels zeggen dat alleen jij `main` merget/pusht.
+- **Klaar:** screenshots en afbeeldingen: `store-assets/google-play/phone/` (8 telefoon-screenshots), `store-assets/google-play/graphics/` (icoon + functieafbeelding), `store-assets/app-store-1.1.1/` (iPhone 6.9", 6.5", iPad 13"). Uitleg in `store-assets/README.md`.
 - **Klaar:** alle plakteksten staan in `store-assets/google-play/`: `winkelvermelding.md`, `release-notes.md`, `app-content-antwoorden.md`, `abonnementen.md`, `productietoegang-antwoorden.md`, `testers-uitnodiging.md`.
-- **Nu bezig:** screenshots, app-icoon en functieafbeelding (`store-assets/google-play/graphics/`), App Store 1.1.1-screenshots (`store-assets/app-store-1.1.1/`), de knop "AI-antwoord melden" in de app, en een nieuw privacybeleid.
-- **Daarna:** website + BijbelAPI deployen, de app pushen (Android-build + iOS TestFlight), elke build controleren en de AAB voor je klaarzetten in `store-assets/google-play/builds/`.
+- **Nu bezig:** de eerste GitHub-build 1.1.1 controleren en klaarzetten in `store-assets/google-play/builds/`; Gegevensveiligheid en winkeltekst nalopen; reviewer-account en Google-inlogconfig op de server controleren; Android 16-check.
+- **Na jouw A0:** BijbelAPI deployen (dagtekst) en de live pagina's controleren.
 
 **Zo lees je deze gids**
 
@@ -43,6 +45,8 @@ De flessenhals is Google's regel: **12 testers, 14 dagen onafgebroken aangemeld*
 
 | Stap | Plak in de chat |
 |---|---|
+| A0 | "website live" (na merge + deploy) |
+| A11 | Je juridische naam + adres (+ KvK-nummer als je dat hebt), of Gemini-facturering aan staat, en de MongoDB Atlas-regio |
 | A2 (dag 2) | Hoeveel mensen lid zijn van de testgroep |
 | A6 | De RevenueCat-sleutel `goog_…` |
 | A7 | "Interne test staat erop" + de versiecode die Play toont |
@@ -60,6 +64,31 @@ De flessenhals is Google's regel: **12 testers, 14 dagen onafgebroken aangemeld*
 ---
 
 ## Fase A: vandaag (wo 16 sep), ± 3 uur
+
+### A0. Website live zetten (30 min incl. testen)
+
+De Play-formulieren verwijzen naar `https://www.bijbelstudie.io/privacybeleid` en `/account-verwijderen`. Die moeten live de nieuwe versie tonen vóór je de gesloten test indient.
+
+1. Op branch `levensboom` in `C:\Projectsijbelstudie` staan 3 ongepushte commits:
+   - 2 van je andere Claude-sessie (commandopalet, wachtwoord wijzigen, account verwijderen op de website, Pro-gates, lescursor, feedback-limieten). Die sessie vraagt je ze eerst lokaal te testen.
+   - `3d6fba25` van deze sessie: dagtekst, AI-meldingen, privacybeleid, `/account-verwijderen`, bewaartermijn-cron.
+2. Lokaal testen: `npm run dev` → open `/privacybeleid`, `/account-verwijderen`, `/beheer/feedback` (filter **AI-antwoord gemeld**) en de onderdelen van de andere sessie.
+3. Mergen en deployen (de website-regels: alleen jij doet dit):
+   ```bash
+   cd /c/Projects/bijbelstudie
+   git checkout main && git pull
+   git merge levensboom
+   git push
+   ```
+   Let op: `hooks/useBibleData.ts` en `lib/book-mapping.ts` zijn ongecommitte wijzigingen van nog een andere sessie. Die gaan niet mee, zolang je ze niet zelf commit.
+4. **Vercel** → project BijbelStudie → **Settings** → **Environment Variables**:
+   - **`CRON_SECRET`** (Production) = een lange willekeurige waarde, bijv. uit `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Nodig voor de nieuwe dagelijkse bewaartermijn-cron. Hij zet ook je bestaande abonnement-reconcile-cron aan, die nu elke dag faalt omdat er geen geheim is.
+   - **`RESEND_API_KEY`** (Production): ontbreekt nu, dus **wachtwoord-vergeten-mails worden in productie niet verstuurd**. Maak een sleutel in Resend → **API Keys** en voeg hem toe.
+   - Daarna **Deployments** → laatste deploy → **Redeploy**.
+
+✅ **Klaar als** `https://www.bijbelstudie.io/privacybeleid` "Laatst bijgewerkt: 16 september 2026" toont en `/account-verwijderen` bestaat.
+**Plak in de chat:** "website live". Claude controleert de pagina's en deployt daarna de BijbelAPI.
+
 
 ### A1. Play Console-account controleren (5 min)
 
@@ -131,6 +160,8 @@ Dit kan al voordat er iets in Play staat, en Claude heeft de sleutel nodig voor 
 
 ### A7. Eerste AAB naar de interne test (10 min)
 
+> **Wacht op Claude:** de melding dat `store-assets/google-play/builds/bijbelstudie-1.1.1-101.aab` klaarstaat (de eerste GitHub-build, met AI-melden; alleen de RevenueCat-sleutel zit er nog niet in). Gebruik die in plaats van het lokale bestand hieronder. Alleen als Claude meldt dat de GitHub-build mislukt is, gebruik je de lokale build 1.0.7 (99).
+
 Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet perfect te zijn: de interne test heeft geen beoordeling. Het doel is dat Play je app "kent" (abonnementen worden daarna mogelijk) en dat Google zijn ondertekeningssleutel aanmaakt.
 
 1. BijbelStudie → **Testen en releasen** → **Testen** → **Interne tests**.
@@ -145,7 +176,7 @@ Dit gebruikt de build 1.0.7 (99) die vandaag lokaal is gemaakt. Hij hoeft niet p
 Weigert Play het publiceren omdat er nog setup-taken openstaan? Doe dan eerst A10 en probeer opnieuw.
 
 ✅ **Klaar als** de release onder Interne tests de status **Beschikbaar voor interne testers** ≈ heeft.
-**Plak in de chat:** "Interne test staat erop, versiecode 99".
+**Plak in de chat:** "Interne test staat erop, versiecode <101 of 99>".
 
 ### A8. Google-inloggen: twee Android OAuth-clients (15 min)
 
@@ -198,7 +229,15 @@ Nu doen: Google heeft soms tot 36 uur nodig voordat deze toegang werkt.
 
 1. BijbelStudie → **Controleren en verbeteren** → **Beleid en programma's** → **App-content**.
 2. Werk alle onderdelen af met `store-assets/google-play/app-content-antwoorden.md` (staat in dezelfde volgorde als in de console). Voor **App-toegang** heb je het wachtwoord van `applereview@mail.com` nodig: hetzelfde als in App Store Connect → App Review Information.
-3. **Gegevensveiligheid** kun je nu al invullen; Claude controleert het na het nieuwe privacybeleid en laat weten als er een regel moet veranderen.
+3. **Gegevensveiligheid** kun je nu al invullen; Claude controleert het tegen het nieuwe privacybeleid en laat weten als er een regel moet veranderen.
+4. Bij **Privacybeleid** en **Link voor accountverwijdering**: de URL's werken pas goed na **A0**.
+
+### A11. Gegevens voor het privacybeleid (5 min)
+
+Het nieuwe privacybeleid mist nog een paar dingen die alleen jij weet. **Plak in de chat:**
+- je juridische naam, adres (plaats is genoeg als je geen bedrijfsadres wilt tonen; Google toont bij betaalde apps sowieso het adres uit je betalingsprofiel) en KvK-nummer als je dat hebt;
+- of **facturering aan staat** voor het Google Cloud-project van de Gemini API (het beleid zegt dat vragen niet voor training gebruikt worden; dat klopt alleen met betaalde facturering);
+- de **regio van je MongoDB Atlas-cluster** (Atlas → Database → cluster → regio, bijv. `AWS / Frankfurt (eu-central-1)`).
 
 ✅ **Klaar als** het tabblad **Vereist aandacht** leeg is.
 Staat er een onderdeel dat niet in het bestand voorkomt? **Plak in de chat:** de titel ervan.
@@ -213,7 +252,7 @@ Staat er een onderdeel dat niet in het bestand voorkomt? **Plak in de chat:** de
 
 1. BijbelStudie → **Aantal gebruikers vergroten** → **Aanwezigheid in Google Play Store** → **Store-vermeldingen** → **Primaire Store-vermelding** ≈.
 2. Plak **App-naam**, **Korte beschrijving** en **Volledige beschrijving** uit `store-assets/google-play/winkelvermelding.md`.
-3. Upload onder **Grafische items**: **App-icoon**, **Functieafbeelding** en **Screenshots telefoon** uit `store-assets/google-play/graphics/` (tabel 4 in `winkelvermelding.md`). Screenshots in de volgorde van de bestandsnamen.
+3. Upload onder **Grafische items**: **App-icoon**, **Functieafbeelding** en **Screenshots telefoon** uit `store-assets/google-play/graphics/` (icoon + functieafbeelding) en `store-assets/google-play/phone/` (8 screenshots). Screenshots in de volgorde van de bestandsnamen.
 4. **Opslaan** (onderaan).
 
 ✅ **Klaar als** de Dashboard-taak "Store-vermelding instellen" ≈ is afgevinkt.
@@ -411,16 +450,18 @@ Na goedkeuring (meestal 1–3 dagen) staat de app op `https://play.google.com/st
 ## Checklist
 
 **Fase A – wo 16 sep**
+- [ ] A0 Website gemerged + gedeployd, `CRON_SECRET` en `RESEND_API_KEY` in Vercel *(→ chat)*
 - [ ] A1 Account zonder meldingen
 - [ ] A2 Google Group + bericht 1 naar 20 mensen *(dag 2: aantal leden → chat)*
 - [ ] A3 App aangemaakt
 - [ ] A4 Betalingsprofiel + bankrekening
 - [ ] A5 Store-instellingen + handelaarsstatus
 - [ ] A6 RevenueCat Android-app *(goog_-sleutel → chat)*
-- [ ] A7 AAB 99 op Interne test *(→ chat)*
+- [ ] A7 AAB 101 (of 99) op Interne test *(→ chat)*
 - [ ] A8 Twee Android OAuth-clients *(ondertekenings-SHA-1 → chat)*
 - [ ] A9 Service account (Cloud + Play Console + RevenueCat)
 - [ ] A10 App-content: "Vereist aandacht" leeg
+- [ ] A11 Naam/adres/KvK, Gemini-facturering, Atlas-regio *(→ chat)*
 
 **Fase B – do 17 sep** (na "GO gesloten test")
 - [ ] B1 Winkelvermelding + afbeeldingen
