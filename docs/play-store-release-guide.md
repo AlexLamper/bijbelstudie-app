@@ -46,7 +46,7 @@ De flessenhals is Google's regel: **12 testers, 14 dagen onafgebroken aangemeld*
 | Stap | Plak in de chat |
 |---|---|
 | A0 | "website live" (na merge + deploy) |
-| A11 | Je juridische naam + adres (+ KvK-nummer als je dat hebt), of Gemini-facturering aan staat, en de MongoDB Atlas-regio |
+| A11 | ✅ Gedaan (naam, KvK, Middelharnis; Atlas = Frankfurt) |
 | A2 (dag 2) | Hoeveel mensen lid zijn van de testgroep |
 | A6 | De RevenueCat-sleutel `goog_…` |
 | A7 | "Interne test staat erop" + de versiecode die Play toont |
@@ -82,8 +82,13 @@ De Play-formulieren verwijzen naar `https://www.bijbelstudie.io/privacybeleid` e
    ```
    Let op: `hooks/useBibleData.ts` en `lib/book-mapping.ts` zijn ongecommitte wijzigingen van nog een andere sessie. Die gaan niet mee, zolang je ze niet zelf commit.
 4. **Vercel** → project BijbelStudie → **Settings** → **Environment Variables**:
-   - **`CRON_SECRET`** (Production) = een lange willekeurige waarde, bijv. uit `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Nodig voor de nieuwe dagelijkse bewaartermijn-cron. Hij zet ook je bestaande abonnement-reconcile-cron aan, die nu elke dag faalt omdat er geen geheim is.
-   - **`RESEND_API_KEY`** (Production): ontbreekt nu, dus **wachtwoord-vergeten-mails worden in productie niet verstuurd**. Maak een sleutel in Resend → **API Keys** en voeg hem toe.
+   - **`CRON_SECRET`**: ✅ al gezet door Claude (16 sep).
+   - **`RESEND_API_KEY`** (ontbreekt: wachtwoord-vergeten-mails worden nu niet verstuurd). De app verstuurt vanaf `geenantwoord@mail.bijbelstudie.io`, dus:
+     1. <https://resend.com> → inloggen/aanmelden → **Domains** → **Add Domain** → `mail.bijbelstudie.io`, regio **EU (Ireland)**.
+     2. Resend toont 3–4 DNS-records (MX, TXT/SPF, TXT/DKIM `resend._domainkey…`). Je DNS staat bij **Hostinger**: hPanel → **Domeinen** → `bijbelstudie.io` → **DNS / Nameservers** → voeg elk record precies zo toe (naam, type, waarde).
+     3. Terug in Resend → **Verify DNS records** → wacht tot **Verified** (minuten tot een paar uur).
+     4. Resend → **API Keys** → **Create API Key** → naam `bijbelstudie-prod`, **Sending access**, domein `mail.bijbelstudie.io` → kopieer de sleutel (`re_…`, je ziet hem maar één keer).
+     5. Vercel → project **bijbelstudie** → **Settings** → **Environment Variables** → Key `RESEND_API_KEY`, Value `re_…`, alleen **Production** → **Save**.
    - Daarna **Deployments** → laatste deploy → **Redeploy**.
 
 ✅ **Klaar als** `https://www.bijbelstudie.io/privacybeleid` "Laatst bijgewerkt: 16 september 2026" toont en `/account-verwijderen` bestaat.
@@ -152,7 +157,7 @@ Nu doen, want het bevestigen van je bankrekening duurt 1–5 werkdagen, en zonde
 Dit kan al voordat er iets in Play staat, en Claude heeft de sleutel nodig voor de eerste echte build.
 
 1. <https://app.revenuecat.com> → project **BijbelStudie** → **Project settings** → **Apps & providers** (≈ **Apps**) → **+ New** → **Google Play Store**.
-2. **App name:** `BijbelStudie (Android)` · **Google Play package:** `com.bijbelstudie.app` → **Save**.
+2. **App name:** `BijbelStudie (Play Store)` · **Google Play package name:** `com.bijbelstudie.app` · **Custom URL Scheme:** leeg · **Service Account Credentials JSON:** nu leeg laten (komt in A9) · **Financial reports bucket ID:** leeg · **Google Apps Experience / Games Level Up:** uit → **Save**.
 3. **API keys** → kopieer de **public SDK key** van deze app (begint met `goog_`).
 
 ✅ **Klaar als** je een sleutel hebt die met `goog_` begint.
@@ -450,7 +455,7 @@ Na goedkeuring (meestal 1–3 dagen) staat de app op `https://play.google.com/st
 ## Checklist
 
 **Fase A – wo 16 sep**
-- [ ] A0 Website gemerged + gedeployd, `CRON_SECRET` en `RESEND_API_KEY` in Vercel *(→ chat)*
+- [ ] A0 Website gemerged + gedeployd, `RESEND_API_KEY` in Vercel (`CRON_SECRET` al gedaan) *(→ chat)*
 - [ ] A1 Account zonder meldingen
 - [ ] A2 Google Group + bericht 1 naar 20 mensen *(dag 2: aantal leden → chat)*
 - [ ] A3 App aangemaakt
