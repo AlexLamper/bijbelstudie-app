@@ -11,6 +11,7 @@ import '../ui/lucide_icon.dart';
 import '../../features/admin/present/admin_screen.dart';
 import '../../features/premium/present/paywall_funnel_screen.dart';
 import '../../features/study/present/lesson/lesson_screen.dart';
+import '../../features/study/domain/chapter_study_models.dart';
 import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
@@ -30,6 +31,7 @@ import '../../features/premium/present/premium_screen.dart';
 import '../../features/premium/present/pro_access_provider.dart';
 import '../../features/premium/present/pro_celebration_screen.dart';
 import '../../features/profile/present/badges_screen.dart';
+import '../../features/profile/present/bible_progress_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
 import '../../features/resources/present/resources_screen.dart';
 import '../../features/search/present/search_screen.dart';
@@ -325,6 +327,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile/badges',
             builder: (context, state) => const BadgesScreen(),
           ),
+          // "Bijbel gelezen": every book and chapter read, from the
+          // Bijbelboeken tile on Profiel and the book map on Start.
+          GoRoute(
+            path: '/profile/bijbel',
+            builder: (context, state) => const BibleProgressScreen(),
+          ),
           // Reachable from the dashboard and Profiel rather than the tab bar.
           GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
           // Groepen is out for the MVP. The route stays as a redirect so any
@@ -400,6 +408,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       // One lesson of a guided study, full screen and outside the tab shell:
       // a lesson is a sitting, and a bottom bar inviting you elsewhere works
       // against it. `?stap=` resumes on the step the reader left off on.
+      // One chapter studied on its own ("Losse studie"): the book study's lesson
+      // for that chapter, opened without an enrollment. Registered before
+      // `/studie/:studyId/:day` so "hoofdstuk" can never be read as a study id.
+      // `:book` is a slug or a Dutch book name; `?stap=` as below.
+      GoRoute(
+        path: '/studie/hoofdstuk/:book/:chapter',
+        builder: (context, state) => ChapterLessonScreen(
+          chapterKey: ChapterStudyKey.parse(
+            state.pathParameters['book'],
+            state.pathParameters['chapter'],
+          ),
+          initialStep: state.uri.queryParameters['stap'],
+        ),
+      ),
       GoRoute(
         path: '/studie/:studyId/:day',
         builder: (context, state) => LessonScreen(

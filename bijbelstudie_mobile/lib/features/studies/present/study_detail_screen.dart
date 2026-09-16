@@ -7,6 +7,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
+import '../../study/domain/chapter_study_models.dart';
 import '../../study/domain/lesson_models.dart';
 import '../data/study_models.dart';
 import 'studies_providers.dart';
@@ -371,8 +372,8 @@ class _Timeline extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
-    // Unchanged rule: without an enrollment no lesson opens from here, so
-    // nothing is "current" either and the footer is the only way in.
+    // Without an enrollment nothing is "current"; a row still opens, as a
+    // single-chapter study (see [lessonRowRoute]).
     final enrolled = status.enrollment != null;
     final resumeDay = status.resumeDay(study);
 
@@ -424,7 +425,10 @@ class _LessonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final open = enrolled && (done || isCurrent);
+    // Every row opens now: inside the study when enrolled, otherwise as a
+    // single-chapter study where that is the same lesson. See [lessonRowRoute].
+    final route = lessonRowRoute(study: study, lesson: lesson, enrolled: enrolled);
+    final open = route != null;
 
     final titleStyle = isCurrent
         ? AppTheme.bodyStrong.copyWith(fontSize: 15, fontWeight: FontWeight.w700)
@@ -453,9 +457,7 @@ class _LessonRow extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         // A locked lesson is inert: no ripple, no snackbar. Telling someone
         // off for tapping is worse than nothing happening.
-        onTap: open
-            ? () => context.push('/studie/${study.id}/${lesson.day}')
-            : null,
+        onTap: route != null ? () => context.push(route) : null,
         child: Padding(
           padding: EdgeInsets.only(bottom: isCurrent ? 16 : 14),
           child: Row(

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../data/study_models.dart';
+import 'chapter_picker_sheet.dart';
 import 'studies_providers.dart';
 import 'study_banner.dart';
 
@@ -130,6 +131,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       const SliverToBoxAdapter(child: _FilterRow()),
       if (continueStudy != null)
         SliverToBoxAdapter(child: _ContinueRow(study: continueStudy)),
+      const SliverToBoxAdapter(child: _ChapterPickerEntry()),
       if (featured.isNotEmpty)
         SliverToBoxAdapter(child: _NewThisMonth(studies: featured)),
       SliverToBoxAdapter(
@@ -658,6 +660,42 @@ class _StudyRow extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One chapter, without starting a whole study: opens the book and chapter
+/// picker, which goes straight into the single-chapter study.
+class _ChapterPickerEntry extends StatelessWidget {
+  const _ChapterPickerEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        onTap: () => showChapterPickerSheet(context),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Kies een hoofdstuk', style: AppTheme.bodyStrong),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Bestudeer één hoofdstuk, zonder een hele studie te starten.',
+                    style: AppTheme.caption,
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: AppTheme.inkFaint),
+          ],
         ),
       ),
     );

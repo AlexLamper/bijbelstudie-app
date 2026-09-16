@@ -271,6 +271,8 @@ class _BookMapCardState extends State<_BookMapCard> {
             description:
                 '${widget.booksStarted} van 66 '
                 '${widget.booksStarted == 1 ? 'boek' : 'boeken'} geopend',
+            actionLabel: 'Bekijken',
+            onAction: () => context.push('/profile/bijbel'),
           ),
           const SizedBox(height: 14),
 

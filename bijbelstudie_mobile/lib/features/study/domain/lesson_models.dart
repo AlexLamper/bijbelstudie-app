@@ -409,6 +409,8 @@ class CompletionSummary {
     this.newBadges = const [],
     this.noteId,
     this.nextLessonDay,
+    this.chapterNextBook,
+    this.chapterNextChapter,
   });
 
   /// False when this lesson was already in the ledger, in which case no XP was
@@ -426,8 +428,15 @@ class CompletionSummary {
 
   final int? nextLessonDay;
 
+  /// Single-chapter study only: the chapter after this one (book slug and
+  /// number), from `completion.chapterNext`. Null otherwise, and after
+  /// Openbaring 22.
+  final String? chapterNextBook;
+  final int? chapterNextChapter;
+
   factory CompletionSummary.fromJson(Map<String, dynamic> json) {
     final xp = json['xp'];
+    final chapterNext = json['chapterNext'];
     return CompletionSummary(
       recorded: json['recorded'] as bool? ?? false,
       reason: json['reason'] as String?,
@@ -441,6 +450,12 @@ class CompletionSummary {
           : const [],
       noteId: json['noteId'] as String?,
       nextLessonDay: (json['nextLessonDay'] as num?)?.toInt(),
+      chapterNextBook: chapterNext is Map<String, dynamic>
+          ? chapterNext['book'] as String?
+          : null,
+      chapterNextChapter: chapterNext is Map<String, dynamic>
+          ? (chapterNext['chapter'] as num?)?.toInt()
+          : null,
     );
   }
 }

@@ -443,7 +443,7 @@ class _QuickActions extends ConsumerWidget {
               value: stats == null
                   ? null
                   : '${stats.booksRead}/${ProfileStats.canonBooks}',
-              onTap: () => context.go('/dashboard'),
+              onTap: () => context.push('/profile/bijbel'),
             ),
           ),
           const SizedBox(width: 8),

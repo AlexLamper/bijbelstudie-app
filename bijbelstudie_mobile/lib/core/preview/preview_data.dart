@@ -338,6 +338,7 @@ class _PreviewDashboardRepository implements DashboardRepository {
     required int chapter,
     required String version,
     String? commentary,
+    bool? awardXp,
   }) async {}
 
   @override

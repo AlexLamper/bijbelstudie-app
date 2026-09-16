@@ -20,7 +20,9 @@ import '../../../studies/data/enrollment_models.dart';
 import '../../../studies/data/enrollment_repository.dart';
 import '../../../studies/present/studies_providers.dart';
 import '../../data/context_repository.dart';
+import '../../data/chapter_study_repository.dart';
 import '../../data/lesson_repository.dart';
+import '../../domain/chapter_study_models.dart';
 import '../../domain/lesson_models.dart';
 import 'lesson_complete_card.dart';
 import 'lesson_providers.dart';
@@ -51,6 +53,7 @@ class LessonScreen extends ConsumerStatefulWidget {
     required this.studyId,
     required this.day,
     this.initialStep,
+    this.chapter,
   });
 
   final String studyId;
@@ -58,6 +61,13 @@ class LessonScreen extends ConsumerStatefulWidget {
 
   /// From `?stap=`, when resuming. Ignored when the lesson has no such step.
   final String? initialStep;
+
+  /// Set for a single-chapter study ("Losse studie"), already loaded by
+  /// [ChapterLessonScreen]. The lesson then comes from it rather than from the
+  /// lessons endpoint, the header names the chapter, the navigator offers the
+  /// neighbouring chapters, closing goes back to where the reader came from,
+  /// and every write carries `entry: 'chapter'` so no resume cursor moves.
+  final ChapterStudy? chapter;
 
   @override
   ConsumerState<LessonScreen> createState() => _LessonScreenState();
@@ -79,6 +89,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
   LessonRef get _ref => LessonRef(widget.studyId, widget.day);
 
+  bool get _chapterMode => widget.chapter != null;
+
+  /// `entry` on every write: `chapter` in chapter mode, absent otherwise.
+  String? get _entry => _chapterMode ? 'chapter' : null;
+
   /// Seed the cursor from the saved state the first time both the lesson and
   /// its state have arrived.
   void _seed(LessonPayload lesson, LessonState state) {
@@ -98,6 +113,22 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     // ik" is right even for a reader who opens a lesson and puts the phone
     // down. Fire and forget: a failed cursor write must not block the lesson.
     Future.microtask(() => _bestEffort(currentStep: cursor.slot.serverStep));
+
+    // Opening a lesson reads its chapter, in both modes, exactly as the
+    // website's StudyFlowShell records it: marked read and "verder lezen"
+    // updated, but `awardXp: false`, because finishing the lesson already pays
+    // for this reading and a chapter must never be paid twice.
+    final passage = lesson.passage;
+    Future.microtask(
+      () => ref
+          .read(dashboardRepositoryProvider)
+          .recordRead(
+            book: passage.book,
+            chapter: passage.chapter,
+            version: cursor.viewTranslation,
+            awardXp: false,
+          ),
+    );
   }
 
   /// A write whose failure the reader should never see: the step they are on,
@@ -127,6 +158,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             completeStep: completeStep,
             viewTranslation: viewTranslation,
             depthPanel: depthPanel,
+            entry: _entry,
           )
           .then((_) {}, onError: (_, _) {}),
     );
@@ -190,11 +222,13 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             widget.day,
             completeStep: _serverStepFor(slots, cursor.slot),
             reflectionText: cursor.reflectionText,
+            entry: _entry,
           );
 
       // The catalogue, the detail screen and the dashboard all read these.
       ref.invalidate(serverStudyLessonsProvider);
       ref.invalidate(studyEnrollmentsProvider);
+      if (_chapterMode) ref.invalidate(chapterStudyProvider);
 
       // Retention: mirror the completion locally, advance the server streak
       // (its only caller), and re-derive the notification ladder so any nudge
@@ -327,12 +361,26 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     }
 
     if (!mounted) return;
+    if (_chapterMode) {
+      // Back to wherever the chapter was chosen: the reader, a study, the
+      // picker. Opened from a deep link there is nothing to pop to, and the
+      // reader is where a single chapter belongs.
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/read');
+      }
+      return;
+    }
     context.go('/studies/${widget.studyId}');
   }
 
   @override
   Widget build(BuildContext context) {
-    final lessonAsync = ref.watch(lessonProvider(_ref));
+    final chapter = widget.chapter;
+    final lessonAsync = chapter != null
+        ? AsyncValue<LessonPayload>.data(chapter.lesson)
+        : ref.watch(lessonProvider(_ref));
     final stateAsync = ref.watch(lessonStateProvider(_ref));
 
     final lesson = lessonAsync.value;
@@ -454,17 +502,23 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         quizTotal: ref.watch(lessonQuizProvider(_ref)).value?.savedTotal,
         onClose: () => _close(lesson),
         onOpenAssistant: _openAssistant,
+        chapter: widget.chapter,
       );
     }
 
     return Column(
       children: [
         _TopBar(
-          title: lesson.title,
-          subtitle:
-              'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${slots.length}',
+          title: widget.chapter != null
+              ? '${widget.chapter!.ref.label} · Losse studie'
+              : lesson.title,
+          subtitle: widget.chapter != null
+              ? 'stap ${index + 1} van ${slots.length}'
+              : 'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${slots.length}',
           onClose: () => _close(lesson),
-          onTapTitle: () => _openNavigator(lesson),
+          onTapTitle: widget.chapter != null
+              ? () => _openChapterNavigator(widget.chapter!)
+              : () => _openNavigator(lesson),
           onOpenAssistant: _openAssistant,
           onOpenSettings: () => _openSettings(lesson),
         ),
@@ -654,6 +708,66 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
                 const Expanded(child: AiAssistantPane(surface: 'lesson_ai')),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Chapter mode's navigator: the chapters either side, across book
+  /// boundaries, and the whole book as a study. A chapter picked out of a book
+  /// has no lesson list to walk.
+  Future<void> _openChapterNavigator(ChapterStudy chapter) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppTheme.paperRaised,
+      builder: (sheetContext) {
+        void go(String route) {
+          Navigator.of(sheetContext).pop();
+          context.replace(route);
+        }
+
+        return SafeArea(
+          top: false,
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            children: [
+              const Eyebrow('Losse studie'),
+              const SizedBox(height: 10),
+              if (chapter.previous != null)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.chevron_left),
+                  title: Text('Vorig hoofdstuk', style: AppTheme.bodyStrong),
+                  subtitle: Text(chapter.previous!.label, style: AppTheme.caption),
+                  onTap: () => go(chapter.previous!.route),
+                ),
+              if (chapter.next != null)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.chevron_right),
+                  title: Text('Volgend hoofdstuk', style: AppTheme.bodyStrong),
+                  subtitle: Text(chapter.next!.label, style: AppTheme.caption),
+                  onTap: () => go(chapter.next!.route),
+                ),
+              if (!chapter.isWholeBook)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.school_outlined),
+                  title: Text(
+                    chapter.enrolled
+                        ? 'Naar de studie ${chapter.ref.bookName}'
+                        : 'Heel ${chapter.ref.bookName} als studie volgen',
+                    style: AppTheme.bodyStrong,
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/studies/${chapter.followStudyId}');
+                  },
+                ),
+            ],
           ),
         );
       },
@@ -967,6 +1081,100 @@ class _NavigatorRow extends StatelessWidget {
             ),
           ),
           if (isCurrent) SiteBadge.teal('Nu'),
+        ],
+      ),
+    );
+  }
+}
+
+/// `/studie/hoofdstuk/:book/:chapter`: loads the chapter study, then hands the
+/// lesson to [LessonScreen] in chapter mode. No enrollment is needed or made.
+class ChapterLessonScreen extends ConsumerWidget {
+  const ChapterLessonScreen({
+    super.key,
+    required this.chapterKey,
+    this.initialStep,
+  });
+
+  /// Null when the route's parameters did not parse.
+  final ChapterStudyKey? chapterKey;
+  final String? initialStep;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final key = chapterKey;
+    if (key == null) {
+      return _ChapterError(message: 'Dit hoofdstuk bestaat niet.', onRetry: null);
+    }
+    return ref.watch(chapterStudyProvider(key)).when(
+      loading: () => Scaffold(
+        backgroundColor: AppTheme.paper,
+        body: const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: SkeletonCardColumn(count: 3),
+          ),
+        ),
+      ),
+      error: (error, _) => _ChapterError(
+        message: error is LessonException
+            ? error.message
+            : 'Controleer je verbinding en probeer het opnieuw.',
+        onRetry: () => ref.invalidate(chapterStudyProvider(key)),
+      ),
+      data: (chapter) => LessonScreen(
+        key: ValueKey('chapter:${chapter.studyId}:${chapter.lessonDay}'),
+        studyId: chapter.studyId,
+        day: chapter.lessonDay,
+        initialStep: initialStep,
+        chapter: chapter,
+      ),
+    );
+  }
+}
+
+class _ChapterError extends StatelessWidget {
+  const _ChapterError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    void close() {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/read');
+      }
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.paper,
+      body: Column(
+        children: [
+          _TopBar(
+            title: 'Losse studie',
+            subtitle: null,
+            onClose: close,
+            onTapTitle: null,
+            onOpenAssistant: null,
+            onOpenSettings: null,
+          ),
+          Expanded(
+            child: AppEmptyState(
+              icon: Icons.wifi_off_outlined,
+              title: 'Hoofdstuk niet geladen',
+              description: message,
+              action: SiteButton(
+                label: onRetry != null ? 'Opnieuw proberen' : 'Terug',
+                expand: false,
+                onPressed: onRetry ?? close,
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -23,6 +23,7 @@ import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
+import '../../study/domain/chapter_study_models.dart';
 import '../domain/bible_models.dart';
 import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
@@ -572,6 +573,14 @@ class _ReaderBar extends ConsumerWidget {
                       tooltip: 'Weergave',
                       onTap: () => showReaderSettingsSheet(context, ref),
                     ),
+                    if (canStudyChapter(location.book))
+                      _ToolButton(
+                        icon: Icons.school_outlined,
+                        tooltip: 'Bestudeer dit hoofdstuk',
+                        onTap: () => context.push(
+                          chapterStudyRoute(location.book, location.chapter),
+                        ),
+                      ),
                     _OfflineButton(location: location),
                     _MoreButton(location: location),
                   ],
@@ -885,6 +894,18 @@ class _ChapterBody extends StatelessWidget {
             pulse: verse.number == pulsingVerse,
           ),
         const SizedBox(height: 28),
+        // The end of the chapter is the natural moment to go deeper into it.
+        if (canStudyChapter(chapter.book)) ...[
+          // A plain OutlinedButton rather than SiteOutlineButton: its label
+          // must be free to wrap at large text sizes instead of overflowing.
+          OutlinedButton(
+            onPressed: () => context.push(
+              chapterStudyRoute(chapter.book, chapter.chapter),
+            ),
+            child: const Text('Bestudeer dit hoofdstuk', textAlign: TextAlign.center),
+          ),
+          const SizedBox(height: 24),
+        ],
         const RuleLine(),
         const SizedBox(height: 12),
         Text(chapter.attribution, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),

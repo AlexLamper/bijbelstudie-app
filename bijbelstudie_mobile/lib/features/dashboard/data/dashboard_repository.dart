@@ -49,6 +49,9 @@ class DashboardRepository {
     required int chapter,
     required String version,
     String? commentary,
+    // False where the caller already pays for this reading (a lesson): the
+    // chapter is still marked read, but no chapter XP is granted.
+    bool? awardXp,
   }) async {
     try {
       final response = await _apiClient.dio.post(
@@ -58,6 +61,7 @@ class DashboardRepository {
           'chapter': chapter,
           'version': version,
           if (commentary != null) 'commentary': commentary,
+          if (awardXp != null) 'awardXp': awardXp,
         },
       );
       // Null on a chapter already marked read, which is the common case.

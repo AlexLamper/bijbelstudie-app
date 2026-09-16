@@ -89,6 +89,7 @@ class LessonRepository {
     String? depthPanel,
     String? reflectionText,
     bool? complete,
+    String? entry,
     Options? options,
   }) async {
     try {
@@ -104,6 +105,9 @@ class LessonRepository {
           if (depthPanel != null) 'depthPanel': depthPanel,
           if (reflectionText != null) 'reflectionText': reflectionText,
           if (complete != null) 'complete': complete,
+          // `chapter` for a single-chapter study: the server then never moves
+          // a resume cursor and never creates an enrollment.
+          if (entry != null) 'entry': entry,
         },
       );
 
@@ -154,6 +158,7 @@ class LessonRepository {
     int day, {
     required StudyStep completeStep,
     String? reflectionText,
+    String? entry,
   }) async {
     LessonException? failure;
 
@@ -172,6 +177,7 @@ class LessonRepository {
           // what decides whether the note carries their words or is skipped.
           reflectionText: reflectionText,
           complete: true,
+          entry: entry,
           options: Options(receiveTimeout: const Duration(seconds: 60)),
         );
       } on LessonException catch (e) {

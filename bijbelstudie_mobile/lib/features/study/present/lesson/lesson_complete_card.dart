@@ -13,6 +13,7 @@ import '../../../levensboom/present/levensboom_avatar.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
 import '../../../levensboom/present/tree_view.dart';
 import '../../../profile/domain/profile_stats.dart' show BadgeCatalog;
+import '../../domain/chapter_study_models.dart';
 import '../../domain/lesson_models.dart';
 
 /// The Dutch label for a raw badge id straight from `xp.newBadges` /
@@ -47,9 +48,15 @@ class LessonCompleteCard extends ConsumerWidget {
     this.quizTotal,
     this.onClose,
     this.onOpenAssistant,
+    this.chapter,
   });
 
   final LessonPayload lesson;
+
+  /// Set for a single-chapter study: "Hoofdstuk bestudeerd", no study
+  /// progress figures, and the way on is the next chapter, the whole book as a
+  /// study, or back to reading.
+  final ChapterStudy? chapter;
   final CompletionSummary summary;
   final int? quizScore;
   final int? quizTotal;
@@ -110,7 +117,17 @@ class LessonCompleteCard extends ConsumerWidget {
       tree?.streak ?? 0,
     );
 
-    final eyebrow = studyDone
+    final chapter = this.chapter;
+    // The chapter after this one: what the server says, else what the chapter
+    // study already knew when it opened.
+    final nextChapterRoute =
+        summary.chapterNextBook != null && summary.chapterNextChapter != null
+        ? chapterStudyRoute(summary.chapterNextBook!, summary.chapterNextChapter!)
+        : chapter?.next?.route;
+
+    final eyebrow = chapter != null
+        ? (repeat ? 'Hoofdstuk opnieuw bestudeerd' : 'Hoofdstuk bestudeerd')
+        : studyDone
         ? 'Studie afgerond'
         : repeat
         ? 'Les ${lesson.day} van ${lesson.lessonsTotal} opnieuw gelezen'
@@ -130,12 +147,14 @@ class LessonCompleteCard extends ConsumerWidget {
     final headline = _headline(
       tree: tree,
       hasTree: hasTree,
-      studyDone: studyDone,
+      // In chapter mode the book study is not what was finished, even when
+      // this chapter happened to close it; the line says so below instead.
+      studyDone: chapter == null && studyDone,
       repeat: repeat,
       levelledUp: levelledUp,
       grew: grew,
       studyTitle: lesson.studyTitle,
-      lessonTitle: lesson.title,
+      lessonTitle: chapter?.ref.label ?? lesson.title,
     );
 
     final detail = StringBuffer(
@@ -150,6 +169,13 @@ class LessonCompleteCard extends ConsumerWidget {
     if (unlocked.isNotEmpty) {
       detail.write(
         ' Nieuw ontgrendeld: ${unlocked.map((i) => i.name).join(', ')}.',
+      );
+    }
+    if (chapter != null) {
+      detail.write(
+        chapter.isWholeBook
+            ? ' ${chapter.ref.bookName} heeft één hoofdstuk, dus je hebt het hele boek bestudeerd.'
+            : ' Telt mee voor de studie ${chapter.ref.bookName}.',
       );
     }
 
@@ -214,11 +240,12 @@ class LessonCompleteCard extends ConsumerWidget {
                     label: streak == 1 ? 'dag op rij' : 'dagen op rij',
                     divided: true,
                   ),
-                _Figure(
-                  value: '${(progressAfter * 100).round()}%',
-                  label: 'van ${lesson.studyTitle}',
-                  divided: true,
-                ),
+                if (chapter == null)
+                  _Figure(
+                    value: '${(progressAfter * 100).round()}%',
+                    label: 'van ${lesson.studyTitle}',
+                    divided: true,
+                  ),
               ],
             ),
           ),
@@ -243,7 +270,7 @@ class LessonCompleteCard extends ConsumerWidget {
           ),
         ),
 
-      if (remaining > 0)
+      if (chapter == null && remaining > 0)
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
           child: Text(
@@ -285,7 +312,7 @@ class LessonCompleteCard extends ConsumerWidget {
           ),
         ),
 
-      if (nextEntry != null && nextRoute != null)
+      if (chapter == null && nextEntry != null && nextRoute != null)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
           child: AppCard(
@@ -350,6 +377,42 @@ class LessonCompleteCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (chapter != null) ...[
+                  if (nextChapterRoute != null)
+                    SiteButton(
+                      label: 'Volgend hoofdstuk bestuderen',
+                      height: 50,
+                      onPressed: () => context.replace(nextChapterRoute),
+                    ),
+                  if (!chapter.isWholeBook) ...[
+                    const SizedBox(height: 10),
+                    SiteOutlineButton(
+                      label: chapter.enrolled
+                          ? 'Naar de studie ${chapter.ref.bookName}'
+                          : 'Heel ${chapter.ref.bookName} als studie volgen',
+                      height: 46,
+                      onPressed: () => context.push('/studies/${chapter.followStudyId}'),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Semantics(
+                    button: true,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onClose,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Terug naar lezen',
+                          textAlign: TextAlign.center,
+                          style: AppTheme.bodyStrong.copyWith(
+                            color: AppTheme.inkMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
                 if (nextRoute != null)
                   SiteButton(
                     label: 'Verder met les $next',
@@ -380,6 +443,7 @@ class LessonCompleteCard extends ConsumerWidget {
                     ),
                   ),
                 ),
+                ],
               ],
             ),
           ),
