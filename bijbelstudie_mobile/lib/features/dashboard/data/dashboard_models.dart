@@ -164,6 +164,7 @@ class RecentNote {
 class DashboardData {
   const DashboardData({
     required this.name,
+    this.email = '',
     required this.isPro,
     required this.streak,
     required this.freezes,
@@ -179,6 +180,11 @@ class DashboardData {
   });
 
   final String name;
+
+  /// Used only to tell a placeholder `name` (the Apple/Google Hide-My-Email
+  /// local-part) apart from a real one - see `display_name.dart`. Not shown
+  /// anywhere itself.
+  final String email;
   final bool isPro;
   final int streak;
 
@@ -253,6 +259,7 @@ class DashboardData {
     return DashboardData(
       raw: json,
       name: user['name'] as String? ?? '',
+      email: user['email'] as String? ?? '',
       isPro: user['isPro'] as bool? ?? false,
       streak: (json['streak'] as num?)?.toInt() ?? 0,
       freezes: (json['freezes'] as num?)?.toInt() ?? 0,

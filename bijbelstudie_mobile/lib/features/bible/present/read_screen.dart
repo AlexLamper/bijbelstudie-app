@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,9 @@ import '../../../core/notifications/permission_moment.dart';
 import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/lazy_scroll.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../commentary/present/commentary_jump.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
@@ -21,6 +24,7 @@ import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
 import '../domain/bible_models.dart';
+import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
 import 'chapter_marks_sheet.dart';
 import 'offline_library_sheet.dart';
@@ -140,6 +144,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     if (metrics.axis != Axis.vertical) return false;
 
     if (notification is ScrollEndNotification) {
+      _publishTopVerse(metrics.pixels);
       // Resting at either end of the chapter always shows the chrome: there is
       // nothing left to read into, and the user needs a way onward.
       if (metrics.pixels <= metrics.minScrollExtent + 4 ||
@@ -175,6 +180,32 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
       _setChromeVisible(true);
     }
     return false;
+  }
+
+  /// Tells [readerTopVerseProvider] which verse is at the top of the text, so
+  /// switching to Studie can line the commentary up with it. Runs when a
+  /// scroll comes to rest, never per frame.
+  void _publishTopVerse(double pixels) {
+    final location = ref.read(readerLocationProvider);
+    final locationKey =
+        '${location.versionId}/${location.book}/${location.chapter}';
+    if (_verseKeysFor != locationKey) return;
+
+    final numbers = _verseKeys.keys.toList()..sort();
+    for (final number in numbers) {
+      final box = _verseKeys[number]?.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      final viewport = RenderAbstractViewport.maybeOf(box);
+      if (viewport == null) continue;
+      final top = viewport.getOffsetToReveal(box, 0).offset;
+      // The first verse with more than a sliver of it still below the top edge.
+      if (top + box.size.height > pixels + 12) {
+        ref
+            .read(readerTopVerseProvider.notifier)
+            .set(ChapterVerse(location.book, location.chapter, number));
+        return;
+      }
+    }
   }
 
   void _persistPosition() {
@@ -311,15 +342,21 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
       _consumingAnchor = false;
       if (!mounted) return;
       ref.read(pendingVerseAnchorProvider.notifier).set(null);
-      final targetContext = _verseKeys[verseNumber]?.currentContext;
-      if (targetContext == null) return;
-      await Scrollable.ensureVisible(
-        targetContext,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
+      final index = chapter.verses.indexWhere((v) => v.number == verseNumber);
+      // `ensureVisible` alone needs the verse's row to be built, and the list
+      // only builds rows near the viewport - so a far verse (Psalm 119:150
+      // from the top) used to find no context and silently go nowhere.
+      final landed = await scrollToLazyItem(
+        controller: _scrollController,
+        index: index,
+        itemCount: chapter.verses.length,
+        contextFor: (i) =>
+            _verseKeys[chapter.verses[i].number]?.currentContext,
         alignment: 0.2,
+        animate: !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
+        duration: const Duration(milliseconds: 420),
       );
-      if (!mounted) return;
+      if (!mounted || !landed) return;
       setState(() => _pulsingVerse = verseNumber);
       _pulseTimer?.cancel();
       _pulseTimer = Timer(const Duration(milliseconds: 1300), () {
@@ -377,7 +414,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                     id: TourAnchorIds.readerBar,
                     child: _ReaderBar(location: location, embedded: widget.embedded),
                   ),
-                  const RuleLine(),
+                  RuleLine(color: AppTheme.rule),
                 ],
               ),
             ),
@@ -434,15 +471,25 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   Future<void> _openVerseActions(ChapterContent chapter, Verse verse) async {
     await HapticFeedback.selectionClick();
     if (!mounted) return;
-    await showVerseActionSheet(context: context, ref: ref, chapter: chapter, verse: verse);
+    await showVerseActionSheet(
+      context: context,
+      ref: ref,
+      chapter: chapter,
+      verse: verse,
+      // Inside `/studie` the sheet only flips the pane; the standalone reader
+      // has no commentary beside it and has to go there.
+      onOpenCommentary: widget.embedded ? null : () => context.push('/study'),
+    );
   }
 }
 
-/// The reader header: where you are and which pane, then what you have left
-/// in this chapter and the four reading tools.
+/// The reader header: where you are and which pane, then the translation and
+/// the four reading tools.
 ///
-/// The tool order is the one the design fixed - zoeken, weergave, vertaling,
-/// offline - and it is deliberately not the order the buttons grew in.
+/// The tool order is the one the design fixed - zoeken, weergave, offline,
+/// meer - and it is deliberately not the order the buttons grew in. Choosing
+/// a translation moved from a fifth tool into the pill on the left, and the
+/// chapter's note and highlight counts moved behind "meer".
 class _ReaderBar extends ConsumerWidget {
   const _ReaderBar({required this.location, required this.embedded});
 
@@ -459,7 +506,7 @@ class _ReaderBar extends ConsumerWidget {
     // dropped from the mobile allowlist - and the id the reader last used is
     // stored on the device. Without this, such a device opens on "Niet
     // beschikbaar in de app" every launch and stays there until the reader
-    // works out that the answer is hidden behind the translate icon. Falling
+    // works out that the answer is hidden behind the translation pill. Falling
     // back to the first translation the server does offer costs nothing when
     // the stored one is still valid, because then `version` is not null.
     if (versions.isNotEmpty && version == null) {
@@ -472,137 +519,173 @@ class _ReaderBar extends ConsumerWidget {
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 10, 16, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Inside `/studie` the screen above owns this row for both panes,
-          // and has already left 6 under it. Standalone `/read` IS the
-          // bible, so it never reads `studyPaneProvider` here - see
-          // ReaderTitleBar.embedded.
-          if (!embedded)
-            const ReaderTitleBar(showMaterials: false, embedded: false),
-          Padding(
-            padding: EdgeInsets.only(top: embedded ? 6 : 12, bottom: 12),
-            child: Row(
-              children: [
-                Expanded(child: _ChapterMarks(location: location)),
-                _ToolButton(
-                  icon: Icons.search,
-                  tooltip: 'Zoeken in de Bijbel',
-                  onTap: () => context.push(
-                    '/search?book=${Uri.encodeComponent(location.book)}',
-                  ),
+    final versionName = version?.name ?? location.versionId;
+
+    return ColoredBox(
+      color: AppTheme.paperRaised,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 6, 16, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Inside `/studie` the screen above owns this row for both panes.
+            // Standalone `/read` IS the bible, so it never reads
+            // `studyPaneProvider` here - see ReaderTitleBar.embedded.
+            if (!embedded)
+              const ReaderTitleBar(showMaterials: false, embedded: false),
+            // 10 above and 9 below a 34px tool box. The row is 44 tall so each
+            // tool gets a full 44px of tap height; the padding gives the
+            // difference back.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 5, 0, 4),
+              child: SizedBox(
+                height: _ToolButton.tapHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _VersionPill(
+                          code: VersionCatalog.shortCodeFor(
+                            id: location.versionId,
+                            name: versionName,
+                          ),
+                          name: versionName,
+                          onTap: () => showVersionPickerSheet(context, ref),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _ToolButton(
+                      icon: Icons.search,
+                      tooltip: 'Zoeken in de Bijbel',
+                      onTap: () => context.push(
+                        '/search?book=${Uri.encodeComponent(location.book)}',
+                      ),
+                    ),
+                    _ToolButton(
+                      glyph: 'Aa',
+                      tooltip: 'Weergave',
+                      onTap: () => showReaderSettingsSheet(context, ref),
+                    ),
+                    _OfflineButton(location: location),
+                    _MoreButton(location: location),
+                  ],
                 ),
-                _ToolButton(
-                  icon: Icons.text_fields,
-                  tooltip: 'Weergave',
-                  onTap: () => showReaderSettingsSheet(context, ref),
-                ),
-                _ToolButton(
-                  icon: Icons.translate,
-                  tooltip: 'Vertaling kiezen',
-                  onTap: () => showVersionPickerSheet(context, ref),
-                ),
-                _OfflineButton(location: location),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// What the reader already has in this chapter, as one tappable teal line.
+/// The active translation as a rounded pill: code, full name, chevron.
 ///
-/// Counts come from the notes and highlights lists the app loads anyway - see
-/// [chapterMarkCountsProvider]. Both counts always show, zeros included, so the
-/// header row keeps the same shape on every chapter. Tapping it opens
-/// [showChapterMarksSheet], listing every note and highlight in this chapter
-/// with a way to jump to its verse.
-class _ChapterMarks extends ConsumerWidget {
-  const _ChapterMarks({required this.location});
+/// The code never shrinks - it is what a reader scans for - so only the name
+/// gives way, with an ellipsis, when the row runs out of width.
+class _VersionPill extends StatelessWidget {
+  const _VersionPill({
+    required this.code,
+    required this.name,
+    required this.onTap,
+  });
 
-  final ReaderLocation location;
+  final String code;
+  final String name;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final counts = ref.watch(
-      chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
-    );
+
     return Semantics(
       button: true,
-      label: 'Notities en markeringen van ${location.book} ${location.chapter} bekijken',
+      label: 'Vertaling: $name. Vertaling kiezen',
+      excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => showChapterMarksSheet(
-          context,
-          ref,
-          book: location.book,
-          chapter: location.chapter,
-        ),
-        child: Container(
-          height: 36,
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              Icon(Icons.edit_note_outlined, size: 15, color: AppTheme.teal),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  _plural(counts.notes, 'notitie', 'notities'),
-                  style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
-                  overflow: TextOverflow.ellipsis,
-                ),
+        onTap: onTap,
+        // The pill is 30 tall; the gesture area takes the row's full 44.
+        child: SizedBox(
+          height: _ToolButton.tapHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              height: 30,
+              padding: const EdgeInsets.fromLTRB(12, 0, 9, 0),
+              decoration: BoxDecoration(
+                color: AppTheme.paperRaised,
+                border: Border.all(color: AppTheme.ruleStrong),
+                borderRadius: BorderRadius.circular(99),
               ),
-              const SizedBox(width: 7),
-              Container(
-                width: 3,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: AppTheme.ruleStrong,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  _plural(counts.highlights, 'markering', 'markeringen'),
-                  style: AppTheme.pillLabel.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.inkMuted,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    code,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontFamily: AppTheme.sansFontName,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      height: 1.2,
+                      color: AppTheme.tealStrong,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTheme.sansFontName,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        height: 1.2,
+                        color: AppTheme.inkMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.keyboard_arrow_down, size: 12, color: AppTheme.inkMuted),
+                ],
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right, size: 14, color: AppTheme.inkFaint),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  static String _plural(int count, String one, String many) =>
-      '$count ${count == 1 ? one : many}';
 }
 
-/// One 36x36 tool in the header row. Not an [IconButton]: that one insists on
-/// 48x48 of tap padding, which is wider than the four buttons plus the status
-/// line fit into 390px.
+/// One 34x34 tool in the header row, on a 36px pitch (34 plus the 2px gap).
+///
+/// Not an [IconButton]: that one insists on 48x48 of layout, which would push
+/// the four boxes apart. The tap area is the whole slot - 36 wide, 44 tall -
+/// so there is no dead strip between neighbours; it cannot be wider than the
+/// pitch without two buttons claiming the same point.
 class _ToolButton extends StatelessWidget {
   const _ToolButton({
-    required this.icon,
+    this.icon,
+    this.glyph,
     required this.tooltip,
     required this.onTap,
     this.active = false,
-  });
+  }) : assert(icon != null || glyph != null);
 
-  final IconData icon;
+  static const double tapHeight = 44;
+
+  final IconData? icon;
+
+  /// Drawn as text instead of [icon] - the "Aa" of weergave, which no Material
+  /// icon matches.
+  final String? glyph;
   final String tooltip;
   final VoidCallback onTap;
   final bool active;
@@ -610,30 +693,66 @@ class _ToolButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    final color = active ? AppTheme.teal : AppTheme.inkSoft;
+    final label = glyph;
 
     return Tooltip(
       message: tooltip,
       child: Semantics(
         button: true,
         label: tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        excludeSemantics: true,
+        child: InkResponse(
           onTap: onTap,
-          child: Container(
-            width: 36,
-            height: 36,
-            margin: const EdgeInsets.only(left: 2),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: active ? AppTheme.tealWash : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            ),
-            child: Icon(
-              icon,
-              size: 19,
-              color: active ? AppTheme.teal : AppTheme.inkSoft,
-            ),
+          radius: 20,
+          child: _ToolSlot(
+            active: active,
+            child: label != null
+                ? Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontFamily: AppTheme.sansFontName,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.3,
+                      height: 1,
+                      color: color,
+                    ),
+                  )
+                : Icon(icon, size: 19, color: color),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The 36x44 slot a tool sits in, its 34x34 box flush right so the last box
+/// lines up with the header's 16px edge and every gap is exactly 2.
+class _ToolSlot extends StatelessWidget {
+  const _ToolSlot({required this.child, this.active = false});
+
+  final Widget child;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: _ToolButton.tapHeight,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? AppTheme.tealWash : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          ),
+          child: child,
         ),
       ),
     );
@@ -670,6 +789,55 @@ class _OfflineButton extends ConsumerWidget {
     );
   }
 }
+
+/// "Meer": what the reader already has in this chapter.
+///
+/// Counts come from the notes and highlights lists the app loads anyway - see
+/// [chapterMarkCountsProvider] - and both always show, zeros included. Both
+/// entries open [showChapterMarksSheet], the chapter's one list of notes and
+/// highlights. A plain [PopupMenuButton] until the menu gets its own design.
+class _MoreButton extends ConsumerWidget {
+  const _MoreButton({required this.location});
+
+  final ReaderLocation location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final counts = ref.watch(
+      chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
+    );
+
+    return PopupMenuButton<_MarksEntry>(
+      tooltip: 'Meer',
+      color: AppTheme.surface,
+      onSelected: (_) => showChapterMarksSheet(
+        context,
+        ref,
+        book: location.book,
+        chapter: location.chapter,
+      ),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: _MarksEntry.notes,
+          child: Text(_plural(counts.notes, 'notitie', 'notities')),
+        ),
+        PopupMenuItem(
+          value: _MarksEntry.highlights,
+          child: Text(_plural(counts.highlights, 'markering', 'markeringen')),
+        ),
+      ],
+      child: _ToolSlot(
+        child: Icon(Icons.more_vert, size: 19, color: AppTheme.inkSoft),
+      ),
+    );
+  }
+
+  static String _plural(int count, String one, String many) =>
+      '$count ${count == 1 ? one : many}';
+}
+
+enum _MarksEntry { notes, highlights }
 
 class _ChapterBody extends StatelessWidget {
   const _ChapterBody({
@@ -777,7 +945,7 @@ class _VerseRow extends ConsumerWidget {
       decoration: highlight == null
           ? null
           : BoxDecoration(
-              color: highlight.swatch,
+              color: highlight.fill(Theme.of(context).brightness),
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
       child: Stack(

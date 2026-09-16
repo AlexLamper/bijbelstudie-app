@@ -27,6 +27,8 @@ import '../../features/levensboom/present/levensboom_tab_icon.dart';
 import '../../features/levensboom/present/studio/levensboom_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
+import '../../features/premium/present/pro_access_provider.dart';
+import '../../features/premium/present/pro_celebration_screen.dart';
 import '../../features/profile/present/badges_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
 import '../../features/resources/present/resources_screen.dart';
@@ -358,8 +360,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       // this reader. Ends by replacing itself with /premium, so the price is
       // still the one App Store-reviewed screen and backing out of it leaves
       // rather than walking the pitch backwards.
+      //
+      // Paywall guard: a subscriber never sits through the pitch. They are
+      // sent straight to /premium, which shows a subscriber their Pro status
+      // (and the manage-subscription link) instead of plans and prices.
       GoRoute(
         path: '/pro-intro',
+        redirect: (context, state) => ref.read(hasProProvider)
+            ? Uri(
+                path: '/premium',
+                queryParameters: state.uri.queryParameters.isEmpty
+                    ? null
+                    : state.uri.queryParameters,
+              ).toString()
+            : null,
         builder: (context, state) =>
             PaywallFunnelScreen(source: state.uri.queryParameters['source']),
       ),
@@ -367,6 +381,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/premium',
         // ?source= records which surface sent the user to the paywall.
         builder: (context, state) => PremiumScreen(source: state.uri.queryParameters['source']),
+      ),
+      // The post-purchase celebration. Reached only by `pushReplacement` from
+      // the paywall, so it takes the paywall's place in the stack.
+      GoRoute(
+        path: '/pro-welkom',
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const ProCelebrationScreen(),
+          transitionDuration: const Duration(milliseconds: 380),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(
+                opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                child: child,
+              ),
+        ),
       ),
       // One lesson of a guided study, full screen and outside the tab shell:
       // a lesson is a sitting, and a bottom bar inviting you elsewhere works

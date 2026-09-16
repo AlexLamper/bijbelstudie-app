@@ -11,7 +11,7 @@ import '../../commentary/present/commentary_pane.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
-import '../../profile/present/profile_provider.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/context_repository.dart';
 import 'geo_image_view.dart';
@@ -62,7 +62,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                 child: TourAnchor(
                   id: TourAnchorIds.studyPaneSwitcher,
                   child: ReaderTitleBar(showMaterials: showMaterials),
@@ -82,8 +82,14 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                     index: showMaterials ? 1 : 0,
                     children: [
                       const ReadScreen(embedded: true),
+                      // The Bijbel side's tool row carries its own top
+                      // padding; the materials tabs keep the 6 they always
+                      // had under the shared title row.
                       if (restored)
-                        const StudyMaterialsPane()
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: StudyMaterialsPane(),
+                        )
                       else
                         const AppLoader(),
                     ],
@@ -141,7 +147,7 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
 
     final location = ref.watch(readerLocationProvider);
     final settings = ref.watch(readingSettingsProvider);
-    final isPro = ref.watch(profileProvider).value?.isPro ?? false;
+    final isPro = ref.watch(hasProProvider);
 
     return Column(
       children: [
@@ -209,7 +215,11 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
           child: TabBarView(
             controller: _tabController,
             children: [
-              CommentaryPane(location: location, settings: settings),
+              CommentaryPane(
+                location: location,
+                settings: settings,
+                followReader: true,
+              ),
               // The server already truncates this to the free preview and
               // reports `locked` when it did, so the pane itself decides what
               // to show - see the doc comment on OriginalTextPane.

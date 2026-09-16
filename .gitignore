@@ -41,3 +41,12 @@ build/
 # ─── Claude Code ─────────────────────────────────────────────────────────────
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# ─── Local-only files ────────────────────────────────────────────────────────
+# Tests stay on disk but are not pushed; no CI workflow runs them.
+bijbelstudie_mobile/test/
+# All-caps planning docs in the root. Listed explicitly because Windows git
+# matches case-insensitively, so a [A-Z] pattern would also hit README/CLAUDE.
+/*_PLAN.md
+/APP_STORE_MONETISATION.md
+branding/social/

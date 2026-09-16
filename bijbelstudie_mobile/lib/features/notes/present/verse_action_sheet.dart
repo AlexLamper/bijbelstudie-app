@@ -7,15 +7,17 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../commentary/present/commentary_jump.dart';
+import '../../study/present/study_pane_controller.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
 
 /// What the sheet was dismissed with. Only the note needs one: everything else
 /// the sheet offers is done before it closes.
-enum _VerseSheetResult { note }
+enum _VerseSheetResult { note, commentary }
 
-/// Long-press on a verse: highlight, note, bookmark, share, copy.
+/// Long-press on a verse: highlight, commentary, note, bookmark, share, copy.
 ///
 /// The note editor is opened by *this* function, after the sheet has closed,
 /// rather than by the sheet itself. The sheet used to pop and then immediately
@@ -31,9 +33,18 @@ Future<void> showVerseActionSheet({
   required WidgetRef ref,
   required ChapterContent chapter,
   required Verse verse,
+
+  /// Called after "Commentaar bij vers N" has pointed the study page at this
+  /// verse, for a caller that is not already inside `/studie` and has to
+  /// navigate there. Null inside `/studie`, where flipping the pane is enough.
+  VoidCallback? onOpenCommentary,
 }) async {
   final result = await showModalBottomSheet<_VerseSheetResult>(
     context: context,
+    // Six rows under a four-line verse are taller than the default 9/16 cap
+    // on a small phone; the sheet sizes to its content and scrolls instead.
+    isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Theme.of(context).cardColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
@@ -44,6 +55,10 @@ Future<void> showVerseActionSheet({
         _VerseActionSheet(chapter: chapter, verse: verse),
   );
 
+  if (result == _VerseSheetResult.commentary) {
+    if (context.mounted) onOpenCommentary?.call();
+    return;
+  }
   if (result != _VerseSheetResult.note || !context.mounted) return;
   await showAddNoteDialog(
     context: context,
@@ -298,7 +313,7 @@ class _VerseActionSheet extends ConsumerWidget {
         highlights[VerseKey(chapter.book, chapter.chapter, verse.number)];
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -321,6 +336,13 @@ class _VerseActionSheet extends ConsumerWidget {
             const SizedBox(height: 20),
             RuleGrid(
               children: [
+                RuleListTile(
+                  onTap: () => _openCommentary(context, ref),
+                  child: _ActionRow(
+                    icon: Icons.menu_book_outlined,
+                    label: 'Commentaar bij vers ${verse.number}',
+                  ),
+                ),
                 RuleListTile(
                   onTap: () => _addNote(context),
                   child: const _ActionRow(
@@ -407,6 +429,19 @@ class _VerseActionSheet extends ConsumerWidget {
     if (context.mounted) Navigator.of(context).pop();
   }
 
+  /// Points the Commentaar tab of `/studie` at this verse and shows it. The
+  /// navigation, when the reader is not already inside `/studie`, is left to
+  /// [showVerseActionSheet]'s caller once this sheet has closed.
+  void _openCommentary(BuildContext context, WidgetRef ref) {
+    ref
+        .read(pendingCommentaryVerseProvider.notifier)
+        .jumpTo(ChapterVerse(chapter.book, chapter.chapter, verse.number));
+    ref
+        .read(studyPaneProvider.notifier)
+        .apply(showMaterials: true, materialsTab: 0);
+    Navigator.of(context).pop(_VerseSheetResult.commentary);
+  }
+
   /// Hands the note back to [showVerseActionSheet] instead of opening the
   /// editor here — see the note on that function for why.
   void _addNote(BuildContext context) {
@@ -489,7 +524,7 @@ class _ColorRow extends StatelessWidget {
                 width: 42,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: color.swatch,
+                  color: color.fill(Theme.of(context).brightness),
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   border: Border.all(
                     color: selected == color ? AppTheme.teal : AppTheme.rule,
@@ -516,7 +551,11 @@ class _ActionRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: AppTheme.inkSoft),
         const SizedBox(width: 12),
-        Text(label, style: Theme.of(context).textTheme.titleMedium),
+        // Flexible so a long label under large text wraps rather than
+        // overflowing the sheet.
+        Flexible(
+          child: Text(label, style: Theme.of(context).textTheme.titleMedium),
+        ),
       ],
     );
   }

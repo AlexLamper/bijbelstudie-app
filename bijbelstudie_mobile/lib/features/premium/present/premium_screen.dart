@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +9,11 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/analytics/analytics.dart';
-import '../../profile/data/profile_model.dart';
 import '../../profile/present/profile_provider.dart';
 import '../domain/price_framing.dart';
+import '../domain/pro_benefits.dart';
 import 'premium_controller.dart';
+import 'pro_access_provider.dart';
 
 enum _ProPlan { monthly, yearly }
 
@@ -37,14 +39,23 @@ class PremiumScreen extends ConsumerStatefulWidget {
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   _ProPlan _selectedPlan = _ProPlan.yearly;
 
+  /// Set once the purchase is confirmed and the celebration is on its way in,
+  /// so the paywall underneath does not swap to the "Je hebt Pro" state
+  /// during the transition.
+  bool _celebrating = false;
+
   @override
   void initState() {
     super.initState();
-    // Funnel entry, recorded once per visit rather than per rebuild.
-    ref.read(analyticsProvider).track(AnalyticsEvents.pricingViewed, {
-      'source': widget.source ?? 'direct',
-      'logged_in': 'yes',
-    });
+    // Funnel entry, recorded once per visit rather than per rebuild. A
+    // subscriber reaching this route sees their status, not prices, so that
+    // is not a pricing view.
+    if (!ref.read(hasProProvider)) {
+      ref.read(analyticsProvider).track(AnalyticsEvents.pricingViewed, {
+        'source': widget.source ?? 'direct',
+        'logged_in': 'yes',
+      });
+    }
 
     // The controller loads prices once for the whole app run, so a load that
     // failed at launch would otherwise leave this screen showing "-" forever.
@@ -71,39 +82,25 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     });
   }
 
-  /// Reached only once the server confirms Pro, so the promise holds: the
-  /// gated features are unlocked the moment the dialog closes.
-  Future<void> _showWelcomeToPro() async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Welkom bij Pro'),
-        content: const Text(
-          'Je abonnement is actief. Alle Pro-functies zijn nu ontgrendeld: '
-          'commentaren, grondtekst, meer ruimte voor de AI-assistent en meer.',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Aan de slag'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/dashboard');
-    }
+  /// Reached only once the server confirms Pro (a purchase, or a restore that
+  /// activated it), so the promise holds: the gated features are unlocked by
+  /// the time the celebration is on screen.
+  ///
+  /// `pushReplacement`, not `push`: the paywall leaves the stack, so leaving
+  /// the celebration - its button or the system back - lands wherever the
+  /// paywall was opened from and can never return to the paywall.
+  void _celebrate() {
+    if (_celebrating) return;
+    setState(() => _celebrating = true);
+    context.pushReplacement('/pro-welkom');
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen<PremiumState>(premiumControllerProvider, (previous, next) {
       if (next.status == PurchaseStatus.success) {
+        _celebrate();
         ref.read(premiumControllerProvider.notifier).clearStatus();
-        _showWelcomeToPro();
       }
       if (next.status == PurchaseStatus.error && next.errorMessage != null) {
         ref.read(premiumControllerProvider.notifier).clearStatus();
@@ -116,6 +113,11 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     final premiumState = ref.watch(premiumControllerProvider);
     final profile = ref.watch(profileProvider).value;
     final isLoading = premiumState.status == PurchaseStatus.loading;
+    // The guard: a subscriber who reaches this route - a stale link, a surface
+    // that has not caught up yet - is shown their status, never prices. Held
+    // back while a purchase is still settling with the server, or the store's
+    // answer would swap the screen out from under the spinner.
+    final showActive = ref.watch(hasProProvider) && !isLoading && !_celebrating;
 
     // Resolved by the controller from the current offering, or by a direct
     // product lookup when the offering could not supply them.
@@ -144,8 +146,14 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
-          if (profile != null && profile.isPro)
-            _ActiveCard(profile: profile)
+          if (showActive)
+            _ActiveCard(
+              fromWeb: profile?.isProFromWeb ?? false,
+              serverConfirmed: profile?.isPro ?? false,
+              managementUrl: premiumState.customerInfo?.managementURL,
+              onRestore: () =>
+                  ref.read(premiumControllerProvider.notifier).restorePurchases(),
+            )
           else ...[
             const _Benefits(),
             const SizedBox(height: 24),
@@ -162,16 +170,15 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             // Annual leads, in the widget order as well as by default selection.
             _PlanTile(
               title: 'Jaarlijks',
-              subtitle: yearlyProduct != null
-                  ? 'Eén keer per jaar · ${PriceFraming.effectivePerMonth(yearlyProduct)} per maand'
-                  : 'Eén keer per jaar betalen',
+              subtitle: 'Eén keer per jaar betalen',
               // Guideline 3.1.2(c): the billed amount must be the most clear
-              // and conspicuous price on the tile. The per-week figure is only
-              // a subordinate reference, shown smaller underneath it.
+              // and conspicuous price on the tile. The per-week figure - the
+              // real yearly store price divided by 52 - is only a subordinate
+              // reference, shown smaller underneath it.
               price: yearlyPrice,
               priceSuffix: 'per jaar',
               perWeekLabel: yearlyProduct != null
-                  ? '${PriceFraming.perWeek(yearlyProduct, isAnnual: true)} per week'
+                  ? '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week'
                   : null,
               savingLabel: savingLabel,
               badge: discountPercent != null ? '$discountPercent% goedkoper' : 'Voordeligst',
@@ -342,10 +349,41 @@ class _PriceNotice extends StatelessWidget {
   }
 }
 
+/// The "Je hebt Pro" state: what a subscriber sees on this route instead of
+/// plans and prices.
 class _ActiveCard extends StatelessWidget {
-  const _ActiveCard({required this.profile});
+  const _ActiveCard({
+    required this.fromWeb,
+    required this.serverConfirmed,
+    required this.managementUrl,
+    required this.onRestore,
+  });
 
-  final ProfileModel profile;
+  /// Pro paid for on the website (Stripe) or granted by an admin.
+  final bool fromWeb;
+
+  /// Whether the server profile already reports Pro. False only in the window
+  /// where the store confirmed a purchase the server has not reconciled yet,
+  /// which is exactly when "Aankopen herstellen" is still worth offering.
+  final bool serverConfirmed;
+
+  /// RevenueCat's subscription management URL, when the store supplied one.
+  final String? managementUrl;
+
+  final VoidCallback onRestore;
+
+  static const _appleSubscriptions = 'https://apps.apple.com/account/subscriptions';
+  static const _playSubscriptions = 'https://play.google.com/store/account/subscriptions';
+
+  /// The store's own subscription settings - managing or cancelling, never
+  /// buying, so this is not an external purchase link.
+  Future<void> _manage() async {
+    final fallback = defaultTargetPlatform == TargetPlatform.android
+        ? _playSubscriptions
+        : _appleSubscriptions;
+    final uri = Uri.tryParse(managementUrl ?? fallback);
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -353,19 +391,58 @@ class _ActiveCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SiteBadge.positive(profile.isProFromWeb ? 'Actief via web' : 'Actief'),
+          SiteBadge.positive(fromWeb ? 'Actief via web' : 'Actief'),
           const SizedBox(height: 12),
-          Text('Je hebt Pro', style: Theme.of(context).textTheme.headlineMedium),
+          Text('BijbelStudie Pro actief', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text(
-            profile.isProFromWeb
+            fromWeb
                 // No link, no instructions to go somewhere and pay: stating
                 // that access already applies here is what the multiplatform
                 // exception allows.
                 ? 'Je abonnement loopt buiten de App Store om en geldt ook in deze app.'
-                : 'Beheer of stop je abonnement in je Apple ID-instellingen.',
+                : serverConfirmed
+                    ? 'Alle Pro-functies zijn ontgrendeld. Beheer of stop je abonnement '
+                        'in de abonnementsinstellingen van je account.'
+                    : 'Je aankoop is gelukt en wordt nog verwerkt. Staat Pro er over '
+                        'een minuut nog niet, tik dan op "Aankopen herstellen".',
             style: AppTheme.bodyMuted,
           ),
+          const SizedBox(height: 16),
+          for (final benefit in kProBenefits)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.check, size: 15, color: AppTheme.positive),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(benefit.$1, style: AppTheme.bodyStrong)),
+                ],
+              ),
+            ),
+          if (!fromWeb) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SiteOutlineButton(
+                  label: 'Abonnement beheren',
+                  icon: Icons.open_in_new,
+                  expand: false,
+                  height: 40,
+                  onPressed: _manage,
+                ),
+                if (!serverConfirmed)
+                  SiteOutlineButton(
+                    label: 'Aankopen herstellen',
+                    expand: false,
+                    height: 40,
+                    onPressed: onRestore,
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -375,12 +452,7 @@ class _ActiveCard extends StatelessWidget {
 class _Benefits extends StatelessWidget {
   const _Benefits();
 
-  static const _items = [
-    ('Offline lezen', 'Bewaar hele bijbelboeken op je toestel en lees zonder verbinding.'),
-    ('Alle commentaren', 'Matthew Henry en Dachsel bij elk hoofdstuk.'),
-    ('Grondtekst', 'Hebreeuws en Grieks met transliteratie en Strong-nummers.'),
-    ('Onbeperkt notities', 'Markeringen, notities en bladwijzers, gesynchroniseerd met de website.'),
-  ];
+  static const _items = kProBenefits;
 
   @override
   Widget build(BuildContext context) {

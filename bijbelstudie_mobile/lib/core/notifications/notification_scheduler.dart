@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../features/auth/domain/display_name.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
@@ -299,7 +300,9 @@ class NotificationScheduler {
       'study': study?.title,
       'lesson': lessonTitle,
       'streak': streak > 0 ? '$streak' : null,
-      'name': dashboard?.name.split(' ').first,
+      'name': dashboard == null
+          ? null
+          : displayFirstName(dashboard.name, dashboard.email),
     };
 
     final quiet = prefs.quietHours;
@@ -681,7 +684,7 @@ class NotificationScheduler {
     final data = ref.read(dashboardProvider).value;
     final variant = milestoneVariant(id, tokens: {
       'streak': '${data?.streak ?? 0}',
-      'name': data?.name.split(' ').first,
+      'name': data == null ? null : displayFirstName(data.name, data.email),
     });
     await store.markMilestone(id);
     if (!foregrounded) {

@@ -111,8 +111,10 @@ class AppTheme {
   /// `text-gray-700` - secondary body copy.
   static const Color lightInkSoft = Color(0xFF374151);
 
-  /// `--muted-foreground` / `text-gray-500`.
-  static const Color lightInkMuted = Color(0xFF6B7280);
+  /// `--muted-foreground` / `text-gray-500`, a hair darker than the site's
+  /// #6B7280: that one is 4.39:1 on [lightPaper] #F3F4F6, just under the
+  /// 4.5:1 body-text minimum, and this is the app's page colour.
+  static const Color lightInkMuted = Color(0xFF666E7E);
 
   /// `text-gray-400` - the faintest label tier the site uses.
   static const Color lightInkFaint = Color(0xFF9CA3AF);
@@ -270,6 +272,11 @@ class AppTheme {
   static Color get tealTint => _c(lightTealTint, darkTealTint);
   static Color get tealSoft => _c(lightTealSoft, darkTealSoft);
   static Color get tealWash => _c(lightTealWash, darkTealWash);
+
+  /// A teal fill that carries white text at 4.5:1 or better in both themes -
+  /// the active segment of `AppSegmentedControl`. [teal] itself is 3.7:1
+  /// under white in light mode and 2.6:1 in dark.
+  static Color get tealFill => lightTealStrong;
   static Color get assistant => _c(lightAssistant, darkAssistant);
   static Color get assistantTint => _c(lightAssistantTint, darkAssistantTint);
   static Color get bannerEnd => _c(lightBannerEnd, darkBannerEnd);

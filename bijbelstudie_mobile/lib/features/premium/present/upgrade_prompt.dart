@@ -8,16 +8,22 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/price_framing.dart';
 import 'premium_controller.dart';
+import 'pro_access_provider.dart';
 
 /// Mirrors components/pricing/UpgradePrompt.tsx.
 ///
 /// The single upgrade prompt meant to be used at every gated surface (the
 /// web component's `PaywallSurface` union is `"commentary" | "ai_limit" |
-/// "original_text" | "plan_limit"`). It carries the price, framed per month -
-/// the same effective-per-month figure and savings badge `PremiumScreen`
-/// shows for the yearly plan - so the ask is answered in place rather than
-/// one navigation away, and it records which surface produced the impression
-/// and the click.
+/// "original_text" | "plan_limit"`). It carries the price - the billed yearly
+/// amount first, with the same per-week reference and savings badge
+/// `PremiumScreen` shows for the yearly plan - so the ask is answered in place
+/// rather than one navigation away, and it records which surface produced the
+/// impression and the click.
+///
+/// Renders nothing for a subscriber ([hasProProvider]): a gated payload that
+/// is still marked locked right after a purchase is refetched by
+/// `PremiumController`, and must not ask a paying reader to pay again while
+/// it does.
 ///
 /// Only the commentary paywall (`_CommentaryPaywall` in
 /// `commentary_pane.dart`) has been switched over to this widget so far. The
@@ -55,7 +61,9 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
   void initState() {
     super.initState();
     // One impression per mount, not per rebuild - mirrors the web
-    // component's `reported` ref guard.
+    // component's `reported` ref guard. A subscriber is shown nothing, so
+    // there is no impression to count.
+    if (ref.read(hasProProvider)) return;
     ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
       'surface': widget.surface,
     });
@@ -70,6 +78,7 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(hasProProvider)) return const SizedBox.shrink();
     final premiumState = ref.watch(premiumControllerProvider);
     final yearlyProduct = premiumState.yearlyProduct;
     final monthlyProduct = premiumState.monthlyProduct;
@@ -133,14 +142,15 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
   }
 }
 
-/// Mirrors the yearly plan tile on `PremiumScreen`: the same
-/// `PriceFraming.effectivePerMonth` figure as the headline, the same
-/// `SiteBadge.lapis` savings badge (`PriceFraming.annualDiscountPercent`),
-/// and the real billed amount kept underneath rather than hidden - it is a
-/// teaser for the actual paywall, not the purchase button itself, so the per
-/// month figure earns the top spot (guideline 3.1.2(c) governs the screen
-/// where the purchase is actually made, `PremiumScreen`, which still leads
-/// with the billed amount).
+/// Mirrors the yearly plan tile on `PremiumScreen`: the real billed amount
+/// ("€ 99,99 per jaar") as the headline, the `PriceFraming.yearlyPerWeek`
+/// figure (yearly store price / 52) smaller underneath, and the same
+/// `SiteBadge.lapis` savings badge (`PriceFraming.annualDiscountPercent`).
+///
+/// Guideline 3.1.2(c): the amount actually billed is the most clear and
+/// conspicuous price wherever a derived figure appears beside it. This block
+/// used to lead with a per-month figure and shrink the billed amount to a
+/// caption; it no longer does.
 ///
 /// Never rendered with placeholder digits - the parent only builds this when
 /// a real annual `StoreProduct` was found. The monthly product is optional:
@@ -155,8 +165,9 @@ class _PriceBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final perMonth = PriceFraming.effectivePerMonth(yearlyProduct);
-    final billedLabel = '${yearlyProduct.priceString} per jaar, in één keer gefactureerd';
+    final billedLabel = '${yearlyProduct.priceString} per jaar';
+    final perWeekLabel =
+        '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week, in één keer per jaar gefactureerd';
     final monthly = monthlyProduct;
     final discountPercent =
         monthly != null ? PriceFraming.annualDiscountPercent(monthly, yearlyProduct) : null;
@@ -168,13 +179,13 @@ class _PriceBlock extends StatelessWidget {
           const SizedBox(height: 6),
         ],
         Text(
-          '$perMonth per maand',
+          billedLabel,
           textAlign: TextAlign.center,
           style: AppTheme.bodyStrong.copyWith(fontSize: 15, color: AppTheme.ink),
         ),
         const SizedBox(height: 2),
         Text(
-          billedLabel,
+          perWeekLabel,
           textAlign: TextAlign.center,
           style: AppTheme.caption.copyWith(fontSize: 10, color: AppTheme.inkFaint),
         ),

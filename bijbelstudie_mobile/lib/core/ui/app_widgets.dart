@@ -888,7 +888,7 @@ class AppSegmentedControl extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
                   decoration: BoxDecoration(
-                    color: i == selectedIndex ? AppTheme.teal : Colors.transparent,
+                    color: i == selectedIndex ? AppTheme.tealFill : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

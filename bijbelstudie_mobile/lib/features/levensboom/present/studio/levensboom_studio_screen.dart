@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
+import '../../../premium/present/pro_access_provider.dart';
 import '../../../../core/ui/skeleton.dart';
 import '../../../../core/ui/timed_snack_bar.dart';
 import '../../domain/catalog.dart';
@@ -101,7 +102,7 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
       SnackBar(
         content: Text(text),
         behavior: SnackBarBehavior.floating,
-        action: pro
+        action: pro && !ref.read(hasProProvider)
             ? SnackBarAction(
                 label: 'Bekijk Pro',
                 onPressed: () => context.push('/premium?source=app_levensboom'),

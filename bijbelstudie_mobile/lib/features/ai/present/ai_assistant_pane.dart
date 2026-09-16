@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
@@ -193,7 +194,9 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     // question could not be sent at all.
     final notice = blocked ?? _error;
     final showLoginCta = blocked != null ? _blockedIsAuth : _errorIsAuth;
-    final showProCta = blocked == null && _errorIsQuota;
+    // A subscriber at their limit is not offered Pro again (3.1.1).
+    final showProCta =
+        blocked == null && _errorIsQuota && !ref.watch(hasProProvider);
 
     return Column(
       children: [

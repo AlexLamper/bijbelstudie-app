@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -54,6 +55,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   Future<void> _open(ResourceItem item) async {
     if (item.locked) {
       if (!mounted) return;
+      if (ref.read(hasProProvider)) {
+        // Pro already, but this list was served before the server knew it.
+        // Refetch instead of sending a subscriber to the paywall.
+        ref.invalidate(resourceLibraryProvider);
+        return;
+      }
       ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
         'surface': 'resources',
       });

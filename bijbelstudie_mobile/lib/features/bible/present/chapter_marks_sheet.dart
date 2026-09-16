@@ -138,7 +138,7 @@ class _MarkRow extends StatelessWidget {
                       height: 12,
                       margin: const EdgeInsets.only(top: 3),
                       decoration: BoxDecoration(
-                        color: note.color.swatch,
+                        color: note.color.fill(Theme.of(context).brightness),
                         borderRadius: BorderRadius.circular(2),
                         border: Border.all(color: AppTheme.rule),
                       ),

@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../auth/domain/display_name.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../levensboom/present/levensboom_avatar.dart';
@@ -20,6 +21,7 @@ import 'badge_medallion.dart';
 import 'profile_activity_feed.dart';
 import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
+import '../../premium/present/pro_access_provider.dart';
 import 'profile_stats_provider.dart';
 
 /// Profiel: who you are, what you have read, and what you have done with it.
@@ -270,7 +272,7 @@ class _ProfileHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = profile.name.trim().isEmpty
+    final name = displayFirstName(profile.name, profile.email) == null
         ? 'Gebruiker'
         : profile.name.trim();
     final stats = ref.watch(profileStatsProvider).value;
@@ -308,10 +310,16 @@ class _ProfileHeader extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (profile.isPro)
-                    SiteBadge.positive(
-                      profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
-                      icon: Icons.workspace_premium_outlined,
+                  if (profile.isPro || ref.watch(hasProProvider))
+                    // Opens the subscriber's status and the manage-
+                    // subscription link; /premium never shows them prices.
+                    InkWell(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                      onTap: () => context.push('/premium'),
+                      child: SiteBadge.positive(
+                        profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
+                        icon: Icons.workspace_premium_outlined,
+                      ),
                     )
                   else
                     // Guideline 3.1.1: only a non-subscriber is offered the

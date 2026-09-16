@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../commentary/present/commentary_jump.dart';
 import '../../study/present/study_pane_controller.dart';
-import '../domain/bible_models.dart';
 import 'bible_providers.dart';
 import 'source_picker_sheet.dart';
 
@@ -43,54 +43,44 @@ class ReaderTitleBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
     final location = ref.watch(readerLocationProvider);
-    final versions = ref.watch(bibleVersionsProvider).value ?? const <BibleSource>[];
-    final version = versions.where((v) => v.id == location.versionId).firstOrNull;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // Only the chapter: the translation has its own pill in the Bijbel
+        // tool row, and a subtitle here would make this row taller than the
+        // same row on the Studie side.
         Expanded(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => showBookPickerSheet(context, ref),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          '${location.book} ${location.chapter}',
-                          style: AppTheme.displayTitle.copyWith(
-                            fontSize: 19,
-                            letterSpacing: -0.3,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Semantics(
+                header: true,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${location.book} ${location.chapter}',
+                        style: AppTheme.displayTitle.copyWith(
+                          fontSize: 19,
+                          letterSpacing: -0.3,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 7),
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 15,
-                        color: AppTheme.inkMuted,
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 7),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 15,
+                      color: AppTheme.inkMuted,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 1),
-                Text(
-                  version?.name ?? location.versionId,
-                  style: AppTheme.caption.copyWith(
-                    fontSize: 11.5,
-                    color: AppTheme.inkFaint,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -103,6 +93,12 @@ class ReaderTitleBar extends ConsumerWidget {
             if (index == 0) {
               controller.showReader();
               return;
+            }
+            // Line the commentary up with where the reader is - only if the
+            // reader moved since the last time, so flipping back and forth
+            // never pulls the commentary away from where it was left.
+            if (!(embedded && showMaterials)) {
+              ref.read(pendingCommentaryVerseProvider.notifier).syncToReader();
             }
             controller.showMaterials();
             // The standalone reader has no materials pane to reveal, so the

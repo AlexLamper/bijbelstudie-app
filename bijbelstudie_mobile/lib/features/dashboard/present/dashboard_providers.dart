@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
+import '../../auth/domain/display_name.dart';
 
 import '../data/dashboard_models.dart';
 import '../data/dashboard_repository.dart';
@@ -45,17 +46,17 @@ final dashboardProvider =
 /// The website recomputes its greeting every minute so it stays correct as the
 /// clock rolls over; the app does the same on each build, which is cheaper and
 /// just as accurate because the tab rebuilds on focus.
-String greetingFor(String fullName, {DateTime? now}) {
-  final firstName = fullName.trim().isEmpty
-      ? 'Gebruiker'
-      : fullName.trim().split(' ').first;
+String greetingFor(String fullName, {String email = '', DateTime? now}) {
+  final firstName = displayFirstName(fullName, email);
   final hour = (now ?? DateTime.now()).hour;
 
-  if (hour < 6) return 'Goedenacht, $firstName';
-  if (hour < 12) return 'Goedemorgen, $firstName';
-  if (hour < 18) return 'Goedemiddag, $firstName';
-  if (hour < 22) return 'Goedenavond, $firstName';
-  return 'Goedenacht, $firstName';
+  String greet(String base) => firstName == null ? base : '$base, $firstName';
+
+  if (hour < 6) return greet('Goedenacht');
+  if (hour < 12) return greet('Goedemorgen');
+  if (hour < 18) return greet('Goedemiddag');
+  if (hour < 22) return greet('Goedenavond');
+  return greet('Goedenacht');
 }
 
 const _weekdays = [

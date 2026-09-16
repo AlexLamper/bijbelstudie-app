@@ -55,10 +55,14 @@ class PriceFraming {
     return formatLike(product, yearly / _weeksPerYear);
   }
 
-  /// Effective monthly cost of an annual product, formatted in its currency.
-  static String effectivePerMonth(StoreProduct annual) {
-    return formatLike(annual, annual.price / _monthsPerYear);
-  }
+  /// What the annual product works out to per week: the real billed yearly
+  /// price divided by 52, in the product's own currency and number format
+  /// (e.g. "€ 99,99" per year becomes "€ 1,92").
+  ///
+  /// This is a subordinate reference only. Guideline 3.1.2(c) requires the
+  /// billed amount ("€ 99,99 per jaar") to stay the most prominent price
+  /// wherever this figure is shown next to it.
+  static String yearlyPerWeek(StoreProduct annual) => perWeek(annual, isAnnual: true);
 
   /// What a year of the monthly plan costs - the honest anchor for the annual
   /// plan, because it is a tariff we genuinely charge rather than a former price.

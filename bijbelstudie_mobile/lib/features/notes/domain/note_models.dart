@@ -20,6 +20,27 @@ extension HighlightColorX on HighlightColor {
     HighlightColor.orange => const Color(0xFFF3CDB0),
   };
 
+  /// Dark-mode fill: deep, muted variants of [swatch] chosen so the reader's
+  /// light body text (`AppTheme.darkInk`, `0xFFE5E5E5`) keeps >=4.5:1
+  /// contrast against them. `swatch` itself is a light pastel meant to sit
+  /// under *dark* text — used as-is in dark mode it made the (light) reader
+  /// text nearly invisible. This never touches `id`/`swatch`, only how a
+  /// highlight is painted, so the synced colour value is unchanged.
+  Color get _darkFill => switch (this) {
+    HighlightColor.yellow => const Color(0xFF4A3F17),
+    HighlightColor.blue => const Color(0xFF1E3A5F),
+    HighlightColor.green => const Color(0xFF1F4A33),
+    HighlightColor.pink => const Color(0xFF5C2A3A),
+    HighlightColor.purple => const Color(0xFF3C2A5C),
+    HighlightColor.orange => const Color(0xFF5C3517),
+  };
+
+  /// The colour to actually paint a highlight fill with, for the given
+  /// [brightness]. Use this everywhere a highlight is rendered (reader,
+  /// notes list, marks sheet, colour picker) instead of [swatch] directly.
+  Color fill(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkFill : swatch;
+
   String get label => switch (this) {
     HighlightColor.yellow => 'Geel',
     HighlightColor.blue => 'Blauw',

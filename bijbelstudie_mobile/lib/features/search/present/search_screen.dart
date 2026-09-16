@@ -110,6 +110,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (context.canPop())
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Semantics(
+                        button: true,
+                        label: 'Terug',
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => context.pop(),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
                   const Eyebrow('Zoeken'),
                   const SizedBox(height: 10),
                   TextField(

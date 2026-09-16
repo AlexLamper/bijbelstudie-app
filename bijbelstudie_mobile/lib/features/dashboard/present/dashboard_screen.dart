@@ -136,7 +136,7 @@ class _DashboardBody extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      greetingFor(data.name),
+                      greetingFor(data.name, email: data.email),
                       style: AppTheme.displaySmall.copyWith(
                         color: scheme.onSurface,
                       ),
@@ -264,29 +264,13 @@ class _BookMapCardState extends State<_BookMapCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const IconChip(icon: Icons.menu_book_outlined),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bijbelboeken',
-                      style: AppTheme.displayBase.copyWith(
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      '${widget.booksStarted} van 66 '
-                      '${widget.booksStarted == 1 ? 'boek' : 'boeken'} geopend',
-                      style: AppTheme.caption,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          // Same header as "Aanbevolen studies", and like it without a
+          // leading icon chip: the title sits flush with the grid below.
+          SectionHeader(
+            title: 'Bijbelboeken',
+            description:
+                '${widget.booksStarted} van 66 '
+                '${widget.booksStarted == 1 ? 'boek' : 'boeken'} geopend',
           ),
           const SizedBox(height: 14),
 
@@ -468,7 +452,6 @@ class _RecommendedStudiesCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(
-            icon: Icons.lightbulb_outline,
             title: 'Aanbevolen studies',
             actionLabel: 'Bekijk alle',
             onAction: () => context.go('/studies'),

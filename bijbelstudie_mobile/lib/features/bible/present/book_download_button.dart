@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../profile/present/profile_provider.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../data/bible_repository.dart';
 import 'bible_providers.dart';
 
@@ -126,7 +126,8 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
-    final isPro = ref.watch(profileProvider).value?.isPro ?? false;
+    // Store or server: flips the moment a purchase completes.
+    final isPro = ref.watch(hasProProvider);
     final status = ref
         .watch(bookOfflineStatusProvider(BookRef(widget.versionId, widget.book)))
         .value;

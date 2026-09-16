@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/paywall_goal.dart';
+import 'pro_access_provider.dart';
 
 /// The three screens before the price.
 ///
@@ -34,6 +35,22 @@ class PaywallFunnelScreen extends ConsumerStatefulWidget {
 class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
   static const _steps = 3;
   int _step = 0;
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Second half of the paywall guard; the `/pro-intro` redirect is the
+    // first. The redirect can only see Pro that is already known, so if it
+    // becomes known while the pitch is open - the profile finishing loading -
+    // skip straight on to /premium, which shows a subscriber their status.
+    ref.listenManual<bool>(hasProProvider, (previous, next) {
+      if (!next) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _toPaywall();
+      });
+    }, fireImmediately: true);
+  }
 
   void _next() {
     if (_step < _steps - 1) {
@@ -46,6 +63,8 @@ class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
   /// `replace`, not `push`: backing out of the price should leave the app, not
   /// walk the reader back through the pitch.
   void _toPaywall() {
+    if (_leaving) return;
+    _leaving = true;
     final source = widget.source ?? 'app_funnel';
     context.replace('/premium?source=$source');
   }

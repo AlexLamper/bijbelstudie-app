@@ -21,7 +21,8 @@ Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
   `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/levensboom/*.ts` in the
   website repo line for line; `test/levensboom_parity_test.dart` asserts the same
   counts as the website's fixtures. Edit both repos in one pass.
-- `test/` — 16 test files plus `screenshot_fixtures.dart`.
+- `test/` — test files plus `screenshot_fixtures.dart`. **Gitignored** (local-only,
+  not on GitHub); keep writing tests there, they just are not committed.
 
 Screen ↔ file mapping is 1:1 by feature name: the Start tab is
 `features/dashboard/present/dashboard_screen.dart`, the split reader is

@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../auth/domain/display_name.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
@@ -179,7 +180,9 @@ class _MetaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final name = profile.name.trim().isEmpty ? 'Jij' : profile.name.trim();
+    final name = displayFirstName(profile.name, profile.email) == null
+        ? 'Jij'
+        : profile.name.trim();
     final at = entry.at;
 
     return Row(
@@ -275,7 +278,9 @@ class _VerseBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final swatch = note.color.swatch;
+    final fill = note.color.fill(brightness);
     final verse = note.verseText.trim();
     final body = note.noteText.trim();
 
@@ -296,7 +301,9 @@ class _VerseBody extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
               color: highlighted
-                  ? swatch.withValues(alpha: 0.35)
+                  ? (brightness == Brightness.dark
+                        ? fill
+                        : swatch.withValues(alpha: 0.35))
                   : Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               border: Border(

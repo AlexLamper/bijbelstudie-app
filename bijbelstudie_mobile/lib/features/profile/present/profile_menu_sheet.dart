@@ -8,10 +8,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../admin/present/admin_providers.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../dashboard/present/dashboard_providers.dart';
 import '../../feedback/present/feedback_sheet.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import 'profile_provider.dart';
+import '../../premium/present/pro_access_provider.dart';
 
 /// The hamburger menu: everything the profile screen used to list as sections.
 ///
@@ -24,6 +26,7 @@ Future<void> showProfileMenuSheet(
   ProfileModel profile,
 ) {
   final isAdmin = ref.read(isAdminProvider);
+  final isPro = profile.isPro || ref.read(hasProProvider);
 
   return showModalBottomSheet<void>(
     context: context,
@@ -98,12 +101,20 @@ Future<void> showProfileMenuSheet(
                   _MenuRow(
                     icon: Icons.search,
                     label: 'Zoeken',
-                    showRule: profile.isPro,
-                    onTap: () => go(() => context.go('/search')),
+                    onTap: () => go(() => context.push('/search')),
                   ),
                   // Guideline 3.1.1: a subscriber - certainly a web
-                  // subscriber - is never pointed at the paywall.
-                  if (!profile.isPro)
+                  // subscriber - is never pointed at the paywall. They get
+                  // their status instead: /premium shows a subscriber that
+                  // Pro is active, with the manage-subscription link.
+                  if (isPro)
+                    _MenuRow(
+                      icon: Icons.workspace_premium_outlined,
+                      label: 'BijbelStudie Pro actief',
+                      showRule: false,
+                      onTap: () => go(() => context.push('/premium')),
+                    )
+                  else
                     _MenuRow(
                       icon: Icons.workspace_premium_outlined,
                       label: 'BijbelStudie Pro',
@@ -279,6 +290,7 @@ Future<void> showProfileNameDialog(
   try {
     await ref.read(profileRepositoryProvider).updateProfile(name: name);
     ref.invalidate(profileProvider);
+    ref.invalidate(dashboardProvider);
   } catch (_) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

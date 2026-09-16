@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
 import '../../auth/present/auth_controller.dart';
+import '../../auth/domain/display_name.dart';
+import '../../dashboard/present/dashboard_providers.dart';
 import '../../levensboom/domain/catalog.dart';
 import '../../levensboom/domain/species.dart';
 import '../../levensboom/present/levensboom_providers.dart';
@@ -14,11 +18,28 @@ import '../../levensboom/present/tree_view.dart';
 import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
+import '../../profile/data/profile_repository.dart';
+import '../../profile/present/profile_provider.dart';
 import '../../settings/data/notification_prefs.dart';
 import '../../settings/data/reading_settings.dart';
 import '../../settings/present/theme_mode_provider.dart';
 import '../data/onboarding_storage.dart';
 import '../data/preferences_repository.dart';
+
+/// Draft text for the optional name step, kept above the screen for the same
+/// reason [setupStepProvider] is: a Weergave answer can remount this screen
+/// mid-flow, and a name someone just typed must survive that.
+class SetupNameDraftController extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void set(String value) => state = value;
+}
+
+final setupNameDraftProvider =
+    NotifierProvider<SetupNameDraftController, String>(
+      SetupNameDraftController.new,
+    );
 
 /// Which step the wizard is on, kept above the screen.
 ///
@@ -56,7 +77,27 @@ class SetupFlowScreen extends ConsumerStatefulWidget {
 }
 
 class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
-  static const _totalSteps = 5;
+  /// Only true when the account's own name (from the just-completed sign-in,
+  /// not yet necessarily reflected in `profileProvider`) is a placeholder -
+  /// see `display_name.dart`. A signed-out render (no test override, no auth
+  /// state yet) never shows the step.
+  late final bool _showNameStep = () {
+    final user = ref.read(authControllerProvider).value;
+    return user != null && isPlaceholderName(user.name, user.email);
+  }();
+
+  /// The name step, when shown, is first - it is what everything else in the
+  /// app greets by, so it comes before any cosmetic choice.
+  List<Widget> get _steps => [
+    if (_showNameStep) const _NameStep(),
+    const _TranslationStep(),
+    const _ReadingPrefsStep(),
+    const _ThemeStep(),
+    const _PlantStep(),
+    const _ReminderStep(),
+  ];
+
+  int get _totalSteps => _steps.length;
 
   late final PageController _controller = PageController(initialPage: _index);
   late int _index = ref.read(setupStepProvider);
@@ -71,6 +112,12 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
   }
 
   void _next() {
+    if (_showNameStep && _index == 0) {
+      // Fire-and-forget: a failed save must not block the wizard, it only
+      // means the greeting keeps saying nothing until the profile screen's
+      // own name dialog is used instead.
+      unawaited(_persistNameDraft());
+    }
     if (_isLast) {
       _finish(plant: true);
       return;
@@ -79,6 +126,23 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  Future<void> _persistNameDraft() async {
+    final name = ref.read(setupNameDraftProvider).trim();
+    if (name.isEmpty) return; // Same as tapping Overslaan.
+    try {
+      await ref.read(profileRepositoryProvider).updateProfile(name: name);
+      ref.invalidate(profileProvider);
+      ref.invalidate(dashboardProvider);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Naam opslaan mislukt. Je kunt dit later bij je profiel doen.'),
+        ),
+      );
+    }
   }
 
   void _back() {
@@ -167,13 +231,7 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
                   ref.read(setupStepProvider.notifier).moveTo(i);
                   setState(() => _index = i);
                 },
-                children: const [
-                  _TranslationStep(),
-                  _ReadingPrefsStep(),
-                  _ThemeStep(),
-                  _PlantStep(),
-                  _ReminderStep(),
-                ],
+                children: _steps,
               ),
             ),
             // Hairline step indicator, matching the marketing intro's.
@@ -218,6 +276,64 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Optional step - only shown when the signed-in account's name is a
+/// placeholder (`display_name.dart`): Apple/Google Hide-My-Email sign-ins
+/// that returned no name land with the relay address's local-part as `name`,
+/// which greets the reader with something like "Goedemorgen, drwddsspn".
+///
+/// Deliberately does not prefill the field with that local-part - it would
+/// look like a suggestion rather than the noise it is.
+class _NameStep extends ConsumerStatefulWidget {
+  const _NameStep();
+
+  @override
+  ConsumerState<_NameStep> createState() => _NameStepState();
+}
+
+class _NameStepState extends ConsumerState<_NameStep> {
+  late final TextEditingController _controller = TextEditingController(
+    text: ref.read(setupNameDraftProvider),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('Naam'),
+          const SizedBox(height: 16),
+          Text('Wat is je naam?', style: AppTheme.displayLarge),
+          const SizedBox(height: 12),
+          Text(
+            'Zo kunnen we je persoonlijk begroeten. Helemaal optioneel - je '
+            'kunt dit ook altijd later instellen bij je profiel.',
+            style: AppTheme.bodyLead,
+          ),
+          const SizedBox(height: 28),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.givenName],
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(labelText: 'Je naam'),
+            onChanged: (value) =>
+                ref.read(setupNameDraftProvider.notifier).set(value),
+          ),
+        ],
       ),
     );
   }

@@ -230,11 +230,16 @@ class BibleRepository {
       chapter: chapter,
     );
 
+    // A cached preview (`locked`) is never revalidated by ETag: it was served
+    // to a free account, and after an upgrade a 304 would keep the paywall
+    // on a chapter the reader has just paid for.
+    final etag = cached?.payload['locked'] == true ? null : cached?.etag;
+
     try {
       final response = await _apiClient.dio.get(
         path,
         options: Options(
-          headers: cached?.etag == null ? null : {'If-None-Match': cached!.etag},
+          headers: etag == null ? null : {'If-None-Match': etag},
           // 304 is a success here, not an error.
           validateStatus: (status) => status != null && status < 400,
         ),

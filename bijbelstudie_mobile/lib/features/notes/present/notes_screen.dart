@@ -377,7 +377,9 @@ class _NoteRow extends ConsumerWidget {
           _MetaLine(
             reference: note.reference,
             date: dutchRelativeDate(note.updatedAt),
-            swatch: note.isHighlight ? note.color.swatch : null,
+            swatch: note.isHighlight
+                ? note.color.fill(Theme.of(context).brightness)
+                : null,
           ),
           if (note.noteText.trim().isNotEmpty) ...[
             const SizedBox(height: 8),

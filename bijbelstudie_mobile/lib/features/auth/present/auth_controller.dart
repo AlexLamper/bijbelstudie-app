@@ -14,6 +14,7 @@ import '../domain/user.dart';
 import '../../levensboom/data/levensboom_repository.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../notes/data/notes_repository.dart';
+import '../../premium/present/premium_controller.dart';
 import '../../profile/data/profile_repository.dart';
 
 // Provides shared access
@@ -120,6 +121,9 @@ class AuthController extends AsyncNotifier<User?> {
     // re-created), so it is fetched again rather than shown as if it were
     // this reader's.
     ref.invalidate(treeStateProvider);
+    // Likewise the RevenueCat CustomerInfo, which hides every upsell while it
+    // reports Pro - it must describe this account, not the previous one.
+    ref.invalidate(premiumControllerProvider);
     unawaited(_flushPendingAfterSignIn());
   }
 
@@ -365,6 +369,7 @@ class AuthController extends AsyncNotifier<User?> {
         await Purchases.logOut();
       } catch (_) {}
     }
+    ref.invalidate(premiumControllerProvider);
 
     state = const AsyncValue.data(null);
   }
