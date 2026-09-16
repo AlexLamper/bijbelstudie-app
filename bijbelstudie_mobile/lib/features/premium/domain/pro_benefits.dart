@@ -7,5 +7,8 @@ const List<(String, String)> kProBenefits = [
   ('Offline lezen', 'Bewaar hele bijbelboeken op je toestel en lees zonder verbinding.'),
   ('Alle commentaren', 'Matthew Henry en Dachsel bij elk hoofdstuk.'),
   ('Grondtekst', 'Hebreeuws en Grieks met transliteratie en Strong-nummers.'),
-  ('Onbeperkt notities', 'Markeringen, notities en bladwijzers, gesynchroniseerd met de website.'),
+  // Not "Onbeperkt notities": the app's /api/v1 notes have no free limit, so
+  // selling that would be a paid benefit free readers already have - exactly
+  // what store review rejects as a misleading subscription.
+  ('Meer AI-vragen', 'Tot 200 vragen per dag in plaats van 5.'),
 ];
