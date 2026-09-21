@@ -12,7 +12,7 @@ import '../../../settings/data/reading_settings.dart';
 import '../../data/lesson_repository.dart';
 import '../../domain/lesson_models.dart';
 
-/// Step 1 - the written introduction.
+/// The Inleiding step - the written introduction.
 ///
 /// Only reached when the study has authored prose for this lesson; the server
 /// leaves `intro` out of the step list otherwise, so there is no empty state.
@@ -78,7 +78,7 @@ class LessonIntroStep extends StatelessWidget {
   }
 }
 
-/// Step 2 - the passage itself.
+/// The Lezen step - the passage itself.
 ///
 /// Shows only the verses this lesson covers. The chapter comes from the same
 /// cached repository the reader uses, so a chapter already read offline needs
@@ -247,16 +247,22 @@ class _TranslationRow extends StatelessWidget {
   }
 }
 
-/// Step 4 - the reflection.
+/// The last step - Toepassing.
 ///
-/// Autosaves as the reader types, because the alternative is a Save button
-/// nobody presses and an answer lost when the phone rings.
+/// Named after the wire key, which stays `reflection` (see
+/// [StudyStep.reflection]). Two things are saved here and they save
+/// differently: the written answer autosaves as the reader types, because the
+/// alternative is a Save button nobody presses and an answer lost when the
+/// phone rings; a ticked practice is sent the moment it is ticked, as the whole
+/// set, because the server $sets the list rather than toggling one entry.
 class LessonReflectionStep extends ConsumerStatefulWidget {
   const LessonReflectionStep({
     super.key,
     required this.lesson,
     required this.initialText,
     required this.onChanged,
+    this.practicesDone = const {},
+    this.onPracticesChanged,
   });
 
   final LessonPayload lesson;
@@ -265,6 +271,13 @@ class LessonReflectionStep extends ConsumerStatefulWidget {
   /// Reports every keystroke up to the shell so the completing write carries
   /// the latest text even if the debounce has not fired yet.
   final ValueChanged<String> onChanged;
+
+  /// The practices already ticked, by their exact text.
+  final Set<String> practicesDone;
+
+  /// Reports the whole ticked set up to the shell, which holds it so walking
+  /// away from this step and back does not lose it.
+  final ValueChanged<Set<String>>? onPracticesChanged;
 
   @override
   ConsumerState<LessonReflectionStep> createState() =>
@@ -276,6 +289,7 @@ class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
   static const _maxChars = 8000;
 
   late final TextEditingController _controller;
+  late Set<String> _practicesDone;
   Timer? _debounce;
   bool _saving = false;
   bool _saved = false;
@@ -284,6 +298,7 @@ class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
+    _practicesDone = {...widget.practicesDone};
   }
 
   @override
@@ -323,14 +338,37 @@ class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
         });
   }
 
+  /// A tick is sent straight away rather than debounced: there is no half-typed
+  /// state to wait for, and the write is the whole set, so the last one to land
+  /// is right.
+  void _togglePractice(String practice) {
+    final next = {..._practicesDone};
+    if (!next.remove(practice)) next.add(practice);
+    setState(() => _practicesDone = next);
+    widget.onPracticesChanged?.call(next);
+
+    final lesson = widget.lesson;
+    unawaited(
+      ref
+          .read(lessonRepositoryProvider)
+          .patch(
+            lesson.studyId,
+            lesson.day,
+            practicesDone: next.toList(growable: false),
+          )
+          .then((_) {}, onError: (_, _) {}),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
     final reflection = widget.lesson.content.reflection;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        const Eyebrow('Reflectie'),
+        const Eyebrow('Toepassing'),
         const SizedBox(height: 10),
         Text(reflection.question, style: AppTheme.displaySmall),
         if (reflection.prompts.isNotEmpty) ...[
@@ -390,7 +428,102 @@ class _LessonReflectionStepState extends ConsumerState<LessonReflectionStep> {
           'terug te vinden bij Notities.',
           style: AppTheme.caption,
         ),
+
+        // Below the answer on purpose: the question is what the step is for,
+        // and the practices are what to do with it afterwards.
+        if (reflection.practices.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const SectionHeader(
+            eyebrow: 'Deze week',
+            title: 'Doe er iets mee',
+            description: 'Vink af wat je oppakt. Je keuze wordt bewaard.',
+          ),
+          const SizedBox(height: 10),
+          for (final practice in reflection.practices)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _PracticeTile(
+                practice: practice,
+                done: _practicesDone.contains(practice),
+                onTap: () => _togglePractice(practice),
+              ),
+            ),
+        ],
+
+        if (reflection.memoryVerse != null) ...[
+          const SizedBox(height: 18),
+          AppCard(
+            color: AppTheme.tealTint,
+            borderColor: AppTheme.teal,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Neem mee deze week',
+                  style: AppTheme.metaLabel.copyWith(
+                    color: AppTheme.tealStrong,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  reflection.memoryVerse!,
+                  style: AppTheme.bodyStrong.copyWith(
+                    color: AppTheme.tealStrong,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// One practice, ticked or not. The checkbox is the control, so it keeps its
+/// icon; nothing else on the row is decorative.
+class _PracticeTile extends StatelessWidget {
+  const _PracticeTile({
+    required this.practice,
+    required this.done,
+    required this.onTap,
+  });
+
+  final String practice;
+  final bool done;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Semantics(
+      checked: done,
+      child: AppCard(
+        onTap: onTap,
+        color: done ? AppTheme.tealTint : null,
+        borderColor: done ? AppTheme.teal : null,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              done ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 20,
+              color: done ? AppTheme.teal : AppTheme.inkMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                practice,
+                style: done
+                    ? AppTheme.bodyStrong.copyWith(color: AppTheme.tealStrong)
+                    : AppTheme.bodyMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

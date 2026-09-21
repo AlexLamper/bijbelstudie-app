@@ -19,7 +19,6 @@ import '../../../settings/data/reading_settings.dart';
 import '../../../studies/data/enrollment_models.dart';
 import '../../../studies/data/enrollment_repository.dart';
 import '../../../studies/present/studies_providers.dart';
-import '../../data/context_repository.dart';
 import '../../data/chapter_study_repository.dart';
 import '../../data/lesson_repository.dart';
 import '../../domain/chapter_study_models.dart';
@@ -39,14 +38,14 @@ import 'step_quiz.dart';
 /// X, which asks first if you are mid-lesson.
 ///
 /// The server decides which steps exist ([LessonPayload.steps]) and this screen
-/// renders them in that order - it never reorders or skips one, and never sends
-/// back a key the server did not define. That is why a study with no authored
-/// intro simply opens on Het Woord.
+/// renders them in that order - it never reorders, skips or adds one, and never
+/// sends back a key the server did not define. That is why a study with no
+/// authored intro simply opens on the first step the server did send.
 ///
-/// The one screen the client adds is [LessonSlot.context] - the images and the
-/// book's background - inserted before Verdieping when there is something to put
-/// on it. It exists in the rail, the counter and the Vorige/Volgende walk only;
-/// every write names the nearest step the server actually knows.
+/// Bijbelse context used to be the exception: a screen the client inserted
+/// itself wherever it found photographs or a book summary to put on it. The
+/// server owns that step now, so the rail, the counter and the Vorige/Volgende
+/// walk are all just [LessonPayload.steps].
 class LessonScreen extends ConsumerStatefulWidget {
   const LessonScreen({
     super.key,
@@ -82,11 +81,6 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   /// survives walking to another step and back.
   String? _commentaryId;
 
-  /// Latched the moment the background screen has something to show. Sticky on
-  /// purpose: a rail that grows a step while the reader is walking it is odd,
-  /// but one that loses a step under their feet is worse.
-  bool _hasContext = false;
-
   LessonRef get _ref => LessonRef(widget.studyId, widget.day);
 
   bool get _chapterMode => widget.chapter != null;
@@ -112,7 +106,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     // The website writes the cursor on open, not on first move, so "waar was
     // ik" is right even for a reader who opens a lesson and puts the phone
     // down. Fire and forget: a failed cursor write must not block the lesson.
-    Future.microtask(() => _bestEffort(currentStep: cursor.slot.serverStep));
+    Future.microtask(() => _bestEffort(currentStep: cursor.step));
 
     // Opening a lesson reads its chapter, in both modes, exactly as the
     // website's StudyFlowShell records it: marked read and "verder lezen"
@@ -140,8 +134,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     String? viewTranslation,
     String? depthPanel,
   }) {
-    // The background screen has no server step, so moving on to it can leave
-    // nothing worth writing. Sending an empty patch would only cost a request.
+    // Every caller has something to say in practice; an empty patch would only
+    // cost a request.
     if (currentStep == null &&
         completeStep == null &&
         viewTranslation == null &&
@@ -164,54 +158,35 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     );
   }
 
-  void _goToSlot(LessonSlot slot) {
-    setState(() => _cursor = _cursor!.copyWith(slot: slot));
-    _bestEffort(currentStep: slot.serverStep);
+  void _goToStep(StudyStep step) {
+    setState(() => _cursor = _cursor!.copyWith(step: step));
+    _bestEffort(currentStep: step);
   }
 
-  Future<void> _next(LessonPayload lesson, List<LessonSlot> slots) async {
+  Future<void> _next(LessonPayload lesson, List<StudyStep> steps) async {
     final cursor = _cursor!;
-    final index = slots.indexOf(cursor.slot);
-    final isLast = index >= slots.length - 1;
+    final index = steps.indexOf(cursor.step);
+    final isLast = index >= steps.length - 1;
 
     if (!isLast) {
-      final next = slots[index + 1];
+      final next = steps[index + 1];
       setState(
         () => _cursor = cursor.copyWith(
-          slot: next,
-          completed: {...cursor.completed, cursor.slot},
+          step: next,
+          completed: {...cursor.completed, cursor.step},
         ),
       );
-      // Only the steps the server defined are reported: leaving Het Woord for
-      // the background screen completes Het Woord and says nothing more.
-      _bestEffort(
-        completeStep: cursor.slot.serverStep,
-        currentStep: next.serverStep,
-      );
+      _bestEffort(completeStep: cursor.step, currentStep: next);
       return;
     }
 
-    await _finish(lesson, slots);
-  }
-
-  /// The step the server should hear about for [slot]: itself, or - for the
-  /// client-only background screen - the last real step before it.
-  StudyStep _serverStepFor(List<LessonSlot> slots, LessonSlot slot) {
-    for (var i = slots.indexOf(slot); i >= 0; i--) {
-      final step = slots[i].serverStep;
-      if (step != null) return step;
-    }
-    return slots
-            .map((entry) => entry.serverStep)
-            .whereType<StudyStep>()
-            .lastOrNull ??
-        StudyStep.word;
+    await _finish(lesson);
   }
 
   /// The completing write. Sent once, from the last step only - it is the
   /// branch that grants XP, keeps the reflection as a note and rolls the
   /// enrollment on.
-  Future<void> _finish(LessonPayload lesson, List<LessonSlot> slots) async {
+  Future<void> _finish(LessonPayload lesson) async {
     final cursor = _cursor!;
     setState(() => _busy = true);
     try {
@@ -220,7 +195,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           .complete(
             widget.studyId,
             widget.day,
-            completeStep: _serverStepFor(slots, cursor.slot),
+            completeStep: cursor.step,
             reflectionText: cursor.reflectionText,
             entry: _entry,
           );
@@ -251,7 +226,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       setState(() {
         _busy = false;
         _cursor = cursor.copyWith(
-          completed: {...cursor.completed, cursor.slot},
+          completed: {...cursor.completed, cursor.step},
           summary:
               result.completion ??
               const CompletionSummary(recorded: true, studyCompleted: false),
@@ -325,10 +300,10 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     );
   }
 
-  void _previous(List<LessonSlot> slots) {
-    final index = slots.indexOf(_cursor!.slot);
+  void _previous(List<StudyStep> steps) {
+    final index = steps.indexOf(_cursor!.step);
     if (index <= 0) return;
-    _goToSlot(slots[index - 1]);
+    _goToStep(steps[index - 1]);
   }
 
   /// Leaving mid-lesson loses nothing - every step is saved as it happens - but
@@ -386,27 +361,6 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     final lesson = lessonAsync.value;
     final state = stateAsync.value;
     if (lesson != null && state != null) _seed(lesson, state);
-
-    // Watched from the shell rather than from the screen itself: it decides
-    // whether the slot exists at all, and warming both requests here means the
-    // screen opens on its content instead of on a spinner.
-    if (lesson != null) {
-      final passage = lesson.passage;
-      final images = ref
-          .watch(geoImagesProvider(GeoRef(passage.book, passage.chapter)))
-          .value;
-      // Only where the introduction is actually shown - see
-      // [lessonShowsBookSummary]. Past lesson 1 the photographs have to carry
-      // the step on their own, and a chapter with none simply has no
-      // background step rather than one that opens onto a heading and air.
-      final summary = lessonShowsBookSummary(lesson.day)
-          ? ref.watch(bookSummaryProvider(passage.book)).value
-          : null;
-      if ((images != null && images.isNotEmpty) ||
-          (summary != null && summary.trim().isNotEmpty)) {
-        _hasContext = true;
-      }
-    }
 
     return Scaffold(
       backgroundColor: AppTheme.paper,
@@ -475,22 +429,15 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
   }
 
   Widget _shell(LessonPayload lesson, LessonCursor cursor) {
-    final slots = lessonSlots(
-      lesson.steps,
-      withContext: _hasContext && lesson.steps.contains(StudyStep.depth),
-    );
-    if (slots.isEmpty) {
+    final steps = lesson.steps;
+    if (steps.isEmpty) {
       return _error(const LessonException('Deze les heeft nog geen stappen.'));
     }
-    // The slot can vanish under the cursor only if the content behind it did;
-    // falling back to the step it follows beats rendering nothing.
-    final cursorIndex = slots.indexOf(cursor.slot);
-    final index = cursorIndex >= 0
-        ? cursorIndex
-        : slots
-              .indexWhere((slot) => slot.serverStep == StudyStep.depth)
-              .clamp(0, slots.length - 1);
-    final isLast = index >= slots.length - 1;
+    // The step under the cursor can only disappear if a refetched payload
+    // stopped sending it; opening on the first step beats rendering nothing.
+    final cursorIndex = steps.indexOf(cursor.step);
+    final index = cursorIndex >= 0 ? cursorIndex : 0;
+    final isLast = index >= steps.length - 1;
 
     if (cursor.isFinished) {
       // No top bar on the finished state: the tree runs to the top of the
@@ -500,6 +447,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         summary: cursor.summary!,
         quizScore: ref.watch(lessonQuizProvider(_ref)).value?.savedScore,
         quizTotal: ref.watch(lessonQuizProvider(_ref)).value?.savedTotal,
+        practicesDone: cursor.practicesDone.length,
         onClose: () => _close(lesson),
         onOpenAssistant: _openAssistant,
         chapter: widget.chapter,
@@ -513,8 +461,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
               ? '${widget.chapter!.ref.label} · Losse studie'
               : lesson.title,
           subtitle: widget.chapter != null
-              ? 'stap ${index + 1} van ${slots.length}'
-              : 'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${slots.length}',
+              ? 'stap ${index + 1} van ${steps.length}'
+              : 'Les ${lesson.day} van ${lesson.lessonsTotal} · stap ${index + 1} van ${steps.length}',
           onClose: () => _close(lesson),
           onTapTitle: widget.chapter != null
               ? () => _openChapterNavigator(widget.chapter!)
@@ -523,40 +471,39 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           onOpenSettings: () => _openSettings(lesson),
         ),
         _StepRail(
-          slots: slots,
-          current: slots[index],
+          steps: steps,
+          current: steps[index],
           completed: cursor.completed,
-          onTap: (slot) {
+          onTap: (step) {
             // Forward jumps are only allowed into ground already covered,
             // otherwise the rail becomes a way to skip the reading.
-            final target = slots.indexOf(slot);
+            final target = steps.indexOf(step);
             if (cursor.previouslyCompleted ||
-                cursor.completed.contains(slot) ||
+                cursor.completed.contains(step) ||
                 target <= index) {
-              _goToSlot(slot);
+              _goToStep(step);
             }
           },
         ),
         Expanded(child: _stepBody(lesson, cursor)),
         _Footer(
-          stepLabel: slots[index].label,
+          stepLabel: steps[index].label,
           canGoBack: index > 0,
           isLast: isLast,
           busy: _busy,
-          onPrevious: () => _previous(slots),
-          onNext: () => _next(lesson, slots),
+          onPrevious: () => _previous(steps),
+          onNext: () => _next(lesson, steps),
         ),
       ],
     );
   }
 
   Widget _stepBody(LessonPayload lesson, LessonCursor cursor) {
-    final step = cursor.slot.serverStep;
-    if (step == null) return LessonContextStep(lesson: lesson);
-
-    switch (step) {
+    switch (cursor.step) {
       case StudyStep.intro:
         return LessonIntroStep(lesson: lesson);
+      case StudyStep.context:
+        return LessonContextStep(lesson: lesson);
       case StudyStep.word:
         return LessonWordStep(
           lesson: lesson,
@@ -586,8 +533,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         return LessonReflectionStep(
           lesson: lesson,
           initialText: cursor.reflectionText,
+          practicesDone: cursor.practicesDone,
           onChanged: (text) =>
               _cursor = _cursor!.copyWith(reflectionText: text),
+          onPracticesChanged: (done) =>
+              setState(() => _cursor = _cursor!.copyWith(practicesDone: done)),
         );
       case StudyStep.quiz:
         return LessonQuizStep(lesson: lesson, lessonRef: _ref);
@@ -598,9 +548,9 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
   /// Translation and type size, from any step.
   ///
-  /// The translation chips on Het Woord stay where they are - they are useful
+  /// The translation chips on Lezen stay where they are - they are useful
   /// exactly where the passage is - but they were the only way to change it,
-  /// and they are invisible from the other four steps. Both surfaces write the
+  /// and they are invisible from every other step. Both surfaces write the
   /// same lesson-scoped `viewTranslation`, so they cannot disagree.
   Future<void> _openSettings(LessonPayload lesson) {
     final cursor = _cursor!;
@@ -910,16 +860,16 @@ class _TopBar extends StatelessWidget {
 /// The segmented progress bar over the lesson's steps.
 class _StepRail extends StatelessWidget {
   const _StepRail({
-    required this.slots,
+    required this.steps,
     required this.current,
     required this.completed,
     required this.onTap,
   });
 
-  final List<LessonSlot> slots;
-  final LessonSlot current;
-  final Set<LessonSlot> completed;
-  final ValueChanged<LessonSlot> onTap;
+  final List<StudyStep> steps;
+  final StudyStep current;
+  final Set<StudyStep> completed;
+  final ValueChanged<StudyStep> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -929,16 +879,16 @@ class _StepRail extends StatelessWidget {
       color: AppTheme.paperRaised,
       child: Row(
         children: [
-          for (final slot in slots) ...[
+          for (final step in steps) ...[
             Expanded(
               child: InkWell(
-                onTap: () => onTap(slot),
+                onTap: () => onTap(step),
                 child: Column(
                   children: [
                     Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: completed.contains(slot) || slot == current
+                        color: completed.contains(step) || step == current
                             ? AppTheme.teal
                             : AppTheme.rule,
                         borderRadius: BorderRadius.circular(2),
@@ -946,9 +896,9 @@ class _StepRail extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      slot.label,
+                      step.label,
                       style: AppTheme.overline.copyWith(
-                        color: slot == current
+                        color: step == current
                             ? AppTheme.tealStrong
                             : AppTheme.inkFaint,
                       ),
@@ -961,7 +911,7 @@ class _StepRail extends StatelessWidget {
                 ),
               ),
             ),
-            if (slot != slots.last) const SizedBox(width: 6),
+            if (step != steps.last) const SizedBox(width: 6),
           ],
         ],
       ),

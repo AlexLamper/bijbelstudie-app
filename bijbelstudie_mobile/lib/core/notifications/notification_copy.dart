@@ -146,7 +146,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
     VariantTemplate('lh4', 'Halverwege is een goed startpunt',
         'Open {lesson} weer; je hoeft niet opnieuw te beginnen.'),
     VariantTemplate('lh5', 'Je gedachten bij {lesson}',
-        'De reflectie die je begon, staat er nog. Maak het af wanneer het uitkomt.'),
+        'Wat je opschreef staat er nog. Maak het af wanneer het uitkomt.'),
     VariantTemplate('lh6', 'Een paar minuten scheelt het',
         '{lesson} in {study} is bijna klaar.'),
     VariantTemplate('lh7', 'Verder waar je was',

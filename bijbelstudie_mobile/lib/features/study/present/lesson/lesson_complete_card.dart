@@ -46,6 +46,7 @@ class LessonCompleteCard extends ConsumerWidget {
     required this.summary,
     this.quizScore,
     this.quizTotal,
+    this.practicesDone = 0,
     this.onClose,
     this.onOpenAssistant,
     this.chapter,
@@ -60,6 +61,10 @@ class LessonCompleteCard extends ConsumerWidget {
   final CompletionSummary summary;
   final int? quizScore;
   final int? quizTotal;
+
+  /// How many practices the reader ticked on Toepassing. Named on the note
+  /// card because they are the half of that step the note does not carry.
+  final int practicesDone;
 
   /// Leaves the lesson. The finished state has no top bar of its own - the
   /// hero runs to the top of the screen - so the close sits on the hero.
@@ -253,7 +258,7 @@ class LessonCompleteCard extends ConsumerWidget {
       ),
 
       // Everything below is state the mock does not show but the screen still
-      // has to be able to say: badges earned, the reflection that was saved,
+      // has to be able to say: badges earned, the toepassing that was saved,
       // and what the next lesson actually is.
       if (summary.levelledUp || summary.newBadges.isNotEmpty)
         Padding(
@@ -299,11 +304,25 @@ class LessonCompleteCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'Je reflectie is bewaard als notitie',
-                    style: AppTheme.bodyStrong.copyWith(
-                      color: AppTheme.tealStrong,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Je toepassing is bewaard als notitie',
+                        style: AppTheme.bodyStrong.copyWith(
+                          color: AppTheme.tealStrong,
+                        ),
+                      ),
+                      if (practicesDone > 0)
+                        Text(
+                          practicesDone == 1
+                              ? 'Plus één voornemen voor deze week'
+                              : 'Plus $practicesDone voornemens voor deze week',
+                          style: AppTheme.caption.copyWith(
+                            color: AppTheme.tealStrong,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Icon(Icons.chevron_right, size: 18, color: AppTheme.tealStrong),

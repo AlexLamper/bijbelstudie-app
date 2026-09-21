@@ -49,11 +49,16 @@ enum StudyDepth {
 /// Where the reader is inside a lesson. `done` is a cursor value only - it is
 /// never one of the steps a lesson renders.
 enum StudyStep {
-  intro('intro', 'Intro'),
-  word('word', 'Het Woord'),
+  intro('intro', 'Inleiding'),
+  context('context', 'Bijbelse context'),
+  word('word', 'Lezen'),
   depth('depth', 'Verdieping'),
-  reflection('reflection', 'Reflectie'),
   quiz('quiz', 'Toetsing'),
+  // The label moved to Toepassing but the id stays `reflection`: it is the key
+  // every stored `stepsCompleted` row is written with, and [tryFromId] drops
+  // ids it does not know - so renaming it would silently delete the step from
+  // every build already installed.
+  reflection('reflection', 'Toepassing'),
   done('done', 'Afgerond');
 
   const StudyStep(this.id, this.label);
@@ -62,7 +67,14 @@ enum StudyStep {
   final String label;
 
   /// The steps a lesson can actually show, in order. `done` is excluded.
-  static const List<StudyStep> renderable = [intro, word, depth, reflection, quiz];
+  static const List<StudyStep> renderable = [
+    intro,
+    context,
+    word,
+    depth,
+    quiz,
+    reflection,
+  ];
 
   static StudyStep? tryFromId(String? id) {
     for (final step in StudyStep.values) {

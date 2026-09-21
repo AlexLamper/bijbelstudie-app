@@ -154,6 +154,7 @@ class LessonTranslation {
 class LessonContent {
   const LessonContent({
     this.intro,
+    this.context,
     this.readingCue,
     this.depth,
     required this.reflection,
@@ -161,6 +162,11 @@ class LessonContent {
   });
 
   final LessonIntro? intro;
+
+  /// The orientation step. Null for a lesson the server has no context for,
+  /// and absent altogether from a server that predates the step - in both
+  /// cases `steps` leaves `context` out too, so nothing renders it.
+  final LessonContextContent? context;
 
   /// One line telling the reader what to watch for while reading.
   final String? readingCue;
@@ -171,15 +177,19 @@ class LessonContent {
 
   factory LessonContent.fromJson(Map<String, dynamic> json) {
     final intro = json['intro'];
+    final context = json['context'];
     final depth = json['depth'];
     return LessonContent(
-      // `intro` and `depth` are hand-authored prose blocks - a shape mistake
-      // in one lesson's `watchFor` or `terms` must not blank the whole
-      // lesson, so a bad block is dropped rather than left to throw out of
-      // this constructor. The step list still comes from the server's own
+      // `intro`, `context` and `depth` are hand-authored prose blocks - a
+      // shape mistake in one lesson's `watchFor` or `terms` must not blank the
+      // whole lesson, so a bad block is dropped rather than left to throw out
+      // of this constructor. The step list still comes from the server's own
       // `steps` array, so dropping `intro` here simply loses that one step,
       // exactly as it would for a study with no authored intro at all.
       intro: intro is Map<String, dynamic> ? _tryParse(LessonIntro.fromJson, intro) : null,
+      context: context is Map<String, dynamic>
+          ? _tryParse(LessonContextContent.fromJson, context)
+          : null,
       readingCue: _safeString(json['readingCue']),
       depth: depth is Map<String, dynamic> ? _tryParse(LessonDepth.fromJson, depth) : null,
       reflection: LessonReflection.fromJson(
@@ -216,6 +226,14 @@ List<String> _safeStringList(Object? value) {
   return value.whereType<String>().toList(growable: false);
 }
 
+/// The same for a list of JSON objects. Used where one malformed field should
+/// cost that field only - dropping the whole block would take the step's prose
+/// down with a mistyped `terms`.
+List<Map<String, dynamic>> _safeMapList(Object? value) {
+  if (value is! List) return const [];
+  return value.whereType<Map<String, dynamic>>().toList(growable: false);
+}
+
 class LessonIntro {
   const LessonIntro({required this.headline, required this.body, this.watchFor = const []});
 
@@ -232,6 +250,144 @@ class LessonIntro {
       headline: _safeString(json['headline']) ?? '',
       body: _safeStringList(json['body']),
       watchFor: _safeStringList(json['watchFor']),
+    );
+  }
+}
+
+/// The Bijbelse context step, composed server-side: orientation prose, the
+/// book's hard facts, where this chapter sits in the book, and the words worth
+/// knowing before reading.
+///
+/// The client used to build this screen itself out of `/summary` and the place
+/// photographs, and had to guess whether there was enough to justify a step.
+/// The server owns that decision now - it sends the step in `steps` only when
+/// this block has something on it.
+class LessonContextContent {
+  const LessonContextContent({
+    this.book,
+    this.body = const [],
+    this.facts = const [],
+    this.placement,
+    this.outline = const [],
+    this.terms = const [],
+    this.showMedia = true,
+  });
+
+  final LessonContextBook? book;
+
+  /// Orientation prose, already split into paragraphs: authored where a lesson
+  /// has it, otherwise the book's own summary.
+  final List<String> body;
+
+  /// Schrijver / Geschreven / Soort boek / Kern, as label-value pairs. The
+  /// labels come from the server, so a new one needs no app release.
+  final List<LessonFact> facts;
+
+  /// The outline section this chapter falls in, or null when the book has no
+  /// outline.
+  final LessonBookSection? placement;
+
+  /// The whole book outline, with [LessonBookSection.current] set on the
+  /// section [placement] names.
+  final List<LessonBookSection> outline;
+
+  final List<LessonTerm> terms;
+
+  /// False when the passage names no place, so the photographs are left off
+  /// rather than shown as an empty strip.
+  final bool showMedia;
+
+  /// Nothing but photographs left to show. The step still renders - the server
+  /// would not have sent it without a reason - but the layout gives the
+  /// photographs the room instead of leaving a heading over air.
+  bool get hasText =>
+      body.isNotEmpty ||
+      facts.isNotEmpty ||
+      outline.isNotEmpty ||
+      terms.isNotEmpty ||
+      placement != null;
+
+  factory LessonContextContent.fromJson(Map<String, dynamic> json) {
+    final book = json['book'];
+    final placement = json['placement'];
+    return LessonContextContent(
+      book: book is Map<String, dynamic> ? LessonContextBook.fromJson(book) : null,
+      body: _safeStringList(json['body']),
+      facts: _safeMapList(json['facts'])
+          .map(LessonFact.fromJson)
+          .where((fact) => fact.value.isNotEmpty)
+          .toList(growable: false),
+      placement: placement is Map<String, dynamic>
+          ? LessonBookSection.fromJson(placement)
+          : null,
+      outline: _safeMapList(json['outline'])
+          .map(LessonBookSection.fromJson)
+          .toList(growable: false),
+      terms: _safeMapList(json['terms'])
+          .map(LessonTerm.fromJson)
+          .toList(growable: false),
+      showMedia: json['showMedia'] is bool ? json['showMedia'] as bool : true,
+    );
+  }
+}
+
+class LessonContextBook {
+  const LessonContextBook({required this.slug, required this.name, this.href});
+
+  final String slug;
+  final String name;
+
+  /// The website's book page. Kept because the server sends it, but this app
+  /// routes by book name rather than by that path.
+  final String? href;
+
+  factory LessonContextBook.fromJson(Map<String, dynamic> json) {
+    return LessonContextBook(
+      slug: _safeString(json['slug']) ?? '',
+      name: _safeString(json['name']) ?? '',
+      href: _safeString(json['href']),
+    );
+  }
+}
+
+class LessonFact {
+  const LessonFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  factory LessonFact.fromJson(Map<String, dynamic> json) {
+    return LessonFact(
+      label: _safeString(json['label']) ?? '',
+      value: _safeString(json['value']) ?? '',
+    );
+  }
+}
+
+/// One stretch of a book's outline. The same shape reads both `placement` -
+/// where this chapter sits, which carries a summary - and the `outline` rows,
+/// which carry the `current` flag instead; neither field is required, so one
+/// class covers both without inventing a difference the server does not make.
+class LessonBookSection {
+  const LessonBookSection({
+    required this.range,
+    required this.title,
+    this.summary,
+    this.current = false,
+  });
+
+  /// Chapter range, as the server writes it: `1-6`, or `7` for a single one.
+  final String range;
+  final String title;
+  final String? summary;
+  final bool current;
+
+  factory LessonBookSection.fromJson(Map<String, dynamic> json) {
+    return LessonBookSection(
+      range: _safeString(json['range']) ?? '',
+      title: _safeString(json['title']) ?? '',
+      summary: _safeString(json['summary']),
+      current: json['current'] is bool ? json['current'] as bool : false,
     );
   }
 }
@@ -268,17 +424,21 @@ class LessonTerm {
 
   factory LessonTerm.fromJson(Map<String, dynamic> json) {
     return LessonTerm(
-      term: json['term'] as String? ?? '',
-      meaning: json['meaning'] as String? ?? '',
+      term: _safeString(json['term']) ?? '',
+      meaning: _safeString(json['meaning']) ?? '',
     );
   }
 }
 
+/// The Toepassing step. The key stays `reflection` on the wire - see
+/// [StudyStep.reflection] - so this name follows it rather than the label.
 class LessonReflection {
   const LessonReflection({
     required this.question,
     this.prompts = const [],
     this.placeholder,
+    this.practices = const [],
+    this.memoryVerse,
   });
 
   /// Falls back server-side to the lesson's `focus`, so this is never empty for
@@ -287,13 +447,22 @@ class LessonReflection {
   final List<String> prompts;
   final String? placeholder;
 
+  /// Concrete things to do with this passage this week. Empty on a server that
+  /// predates them, and the checklist then simply is not drawn.
+  final List<String> practices;
+
+  /// A verse to carry through the week, as a reference. Optional.
+  final String? memoryVerse;
+
   factory LessonReflection.fromJson(Map<String, dynamic> json) {
     return LessonReflection(
       question: json['question'] as String? ?? '',
       prompts: (json['prompts'] as List? ?? const [])
           .whereType<String>()
           .toList(growable: false),
-      placeholder: json['placeholder'] as String?,
+      placeholder: _safeString(json['placeholder']),
+      practices: _safeStringList(json['practices']),
+      memoryVerse: _safeString(json['memoryVerse']),
     );
   }
 }
@@ -346,6 +515,7 @@ class LessonState {
     this.reflectionText = '',
     this.reflectionUpdatedAt,
     this.reflectionNoteId,
+    this.practicesDone = const [],
     this.quizScore,
     this.quizTotal,
     this.quizAttempts = 0,
@@ -366,6 +536,11 @@ class LessonState {
   final DateTime? reflectionUpdatedAt;
   final String? reflectionNoteId;
 
+  /// The practices the reader ticked on Toepassing, by their exact text - the
+  /// server identifies them that way rather than by index, so a reworded
+  /// practice reads as a new one instead of as a tick on the wrong line.
+  final List<String> practicesDone;
+
   final int? quizScore;
   final int? quizTotal;
   final int quizAttempts;
@@ -376,6 +551,7 @@ class LessonState {
 
   factory LessonState.fromJson(Map<String, dynamic> json) {
     final reflection = (json['reflection'] as Map<String, dynamic>?) ?? const {};
+    final application = (json['application'] as Map<String, dynamic>?) ?? const {};
     final quiz = (json['quiz'] as Map<String, dynamic>?) ?? const {};
 
     return LessonState(
@@ -390,6 +566,7 @@ class LessonState {
       reflectionText: reflection['text'] as String? ?? '',
       reflectionUpdatedAt: _date(reflection['updatedAt']),
       reflectionNoteId: reflection['noteId'] as String?,
+      practicesDone: _safeStringList(application['practicesDone']),
       quizScore: (quiz['score'] as num?)?.toInt(),
       quizTotal: (quiz['total'] as num?)?.toInt(),
       quizAttempts: (quiz['attempts'] as num?)?.toInt() ?? 0,

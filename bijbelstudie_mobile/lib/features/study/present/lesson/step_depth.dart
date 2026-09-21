@@ -8,13 +8,13 @@ import '../../../commentary/present/commentary_pane.dart';
 import '../../../settings/data/reading_settings.dart';
 import '../../domain/lesson_models.dart';
 
-/// Step 3 - the uitleg, and the words behind it.
+/// The Verdieping step - the uitleg, and the words behind it.
 ///
 /// Two panes and nothing else. This step used to carry the commentary, a
 /// three-way panel switcher over images, grondtekst and notes, *and* the
 /// assistant, all on one scroll - a direct port of the website's two-column
 /// layout that on a phone became a page nobody could find anything on. The
-/// images and the book's background now have a screen of their own, notes are
+/// images and the book's background now have a server step of their own, notes are
 /// reachable from the reader where they are written, and the assistant lives
 /// behind the icon in the top bar so it is available on every step instead of
 /// taking up room on this one.

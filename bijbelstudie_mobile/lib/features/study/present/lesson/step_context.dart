@@ -9,31 +9,18 @@ import '../../domain/lesson_models.dart';
 import '../../domain/summary_format.dart';
 import '../geo_image_view.dart';
 
-/// Whether this lesson's background screen carries the book's introduction.
+/// Bijbelse context: who wrote this book, where this chapter sits in it, the
+/// words worth knowing, and the places it names.
 ///
-/// Only the first one does. The introduction is a property of the *book*, not
-/// of the lesson, so `GET /summary` answers every lesson in a study with the
-/// same text - and a fourteen-lesson study showed the reader that same page of
-/// prose fourteen times, under a heading promising background. Reading it once
-/// is the point; re-reading it on every sitting is noise.
+/// Everything but the photographs comes from the server now
+/// ([LessonContextContent]). The client used to fetch `/summary` itself and
+/// repeat the same page of prose on every lesson of a fourteen-lesson study,
+/// with no way to tell orientation for *this* chapter from a description of the
+/// whole book. The server sends the section the chapter falls in instead, so
+/// the step says something different each sitting.
 ///
-/// The photographs are not treated this way on purpose: they are a different
-/// set per chapter, so they stay useful for the whole study.
-///
-/// [LessonScreen] applies the same rule when it decides whether the background
-/// screen has anything on it at all, so a later lesson with no photographs
-/// simply has no background step rather than an empty one.
-bool lessonShowsBookSummary(int day) => day <= 1;
-
-/// The background screen: where this happened, and what the book is about.
-///
-/// A step of its own rather than two more panels on Verdieping. Both halves are
-/// context rather than exposition - what you want in hand *before* the uitleg,
-/// not something to read while working through it - so they get their own stop
-/// on the rail, ahead of Verdieping.
-///
-/// The shell only puts this on the rail when there is something to show, so
-/// neither half needs to justify an empty screen.
+/// The photographs stay a client fetch: they come from Wikimedia by place name,
+/// not from the lesson payload.
 class LessonContextStep extends ConsumerWidget {
   const LessonContextStep({super.key, required this.lesson});
 
@@ -41,80 +28,214 @@ class LessonContextStep extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
     final passage = lesson.passage;
-    final images = ref.watch(
-      geoImagesProvider(GeoRef(passage.book, passage.chapter)),
-    );
-    final summary = ref.watch(bookSummaryProvider(passage.book));
+    final content = lesson.content.context;
+
+    // An older server sends the step with no block behind it, and a lesson
+    // whose passage names no place asks for the photographs to be left off.
+    final hasText = content?.hasText ?? false;
+    final images = (content?.showMedia ?? true)
+        ? ref.watch(geoImagesProvider(GeoRef(passage.book, passage.chapter)))
+        : null;
+
+    // The server names the book in Dutch; the passage's own name is the
+    // fallback for a payload that carries no context block at all.
+    final bookName = switch (content?.book?.name.trim()) {
+      final String name when name.isNotEmpty => name,
+      _ => passage.book,
+    };
+
+    final paragraphs = formatSummary(content?.body.join('\n\n'));
+    final facts = content?.facts ?? const <LessonFact>[];
+    final outline = content?.outline ?? const <LessonBookSection>[];
+    final placement = content?.placement;
+    final terms = content?.terms ?? const <LessonTerm>[];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        const Eyebrow('Achtergrond'),
+        const Eyebrow('Bijbelse context'),
         const SizedBox(height: 6),
-        Text('${passage.book} in beeld', style: AppTheme.displaySmall),
+        Text(bookName, style: AppTheme.displaySmall),
         const SizedBox(height: 16),
 
-        images.when(
-          loading: () =>
-              const SkeletonCard(height: 126, child: SkeletonText(lines: 2)),
-          // Context is a bonus; a failure to fetch it says nothing worth
-          // interrupting the lesson for.
-          error: (_, _) => const SizedBox.shrink(),
-          data: (list) {
-            if (list.isEmpty) return const SizedBox.shrink();
-            // The strip is sized for a row above the book's introduction; once
-            // that introduction is gone (every lesson but the first, see
-            // [lessonShowsBookSummary]) nothing else fills this screen, so the
-            // photographs get the gallery treatment instead.
-            final hasIntro = lessonShowsBookSummary(lesson.day);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                hasIntro ? _PlaceStrip(images: list) : _PlaceGallery(images: list),
-                SizedBox(height: hasIntro ? 8 : 14),
-                Text(
-                  list.any((image) => image.fromBook)
-                      ? 'Deze plaatsen horen bij ${passage.book}, niet per se bij '
-                            'dit hoofdstuk. Tik op een foto voor een grote weergave.'
-                      : 'Tik op een foto voor een grote weergave.',
-                  style: AppTheme.caption,
-                ),
-                SizedBox(height: hasIntro ? 20 : 4),
-              ],
-            );
-          },
-        ),
-
-        if (!lessonShowsBookSummary(lesson.day))
-          const SizedBox.shrink()
-        else
-          summary.when(
+        if (images != null)
+          images.when(
             loading: () =>
-                const SkeletonText(lines: 5, lineHeight: 13, gap: 10),
+                const SkeletonCard(height: 126, child: SkeletonText(lines: 2)),
+            // Context is a bonus; a failure to fetch it says nothing worth
+            // interrupting the lesson for.
             error: (_, _) => const SizedBox.shrink(),
-            data: (text) {
-              final paragraphs = formatSummary(text);
-              if (paragraphs.isEmpty) return const SizedBox.shrink();
-
+            data: (list) {
+              if (list.isEmpty) return const SizedBox.shrink();
+              // The strip is sized for a row above the prose. With no prose to
+              // sit above, a row of small tiles would leave the screen empty,
+              // so the photographs become the point instead.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SectionHeader(
-                    eyebrow: 'Algemene informatie',
-                    title: 'Over ${passage.book}',
+                  hasText
+                      ? _PlaceStrip(images: list)
+                      : _PlaceGallery(images: list),
+                  SizedBox(height: hasText ? 8 : 14),
+                  Text(
+                    list.any((image) => image.fromBook)
+                        ? 'Deze plaatsen horen bij ${passage.book}, niet per se bij '
+                              'dit hoofdstuk. Tik op een foto voor een grote weergave.'
+                        : 'Tik op een foto voor een grote weergave.',
+                    style: AppTheme.caption,
                   ),
-                  const SizedBox(height: 10),
-                  for (final paragraph in paragraphs)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _SummaryText(paragraph: paragraph),
-                    ),
+                  SizedBox(height: hasText ? 20 : 4),
                 ],
               );
             },
           ),
+
+        for (final paragraph in paragraphs)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _SummaryText(paragraph: paragraph),
+          ),
+
+        if (facts.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _FactList(facts: facts),
+        ],
+
+        if (placement != null || outline.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          SectionHeader(
+            eyebrow: 'Waar je bent',
+            title: 'Dit gedeelte in $bookName',
+          ),
+          const SizedBox(height: 10),
+          if (outline.isEmpty)
+            _SectionRow(section: placement!, current: true)
+          else
+            for (final section in outline)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _SectionRow(
+                  section: section,
+                  current: section.current,
+                  // Only the section the reader is in gets its summary; the
+                  // rest are there to show the shape of the book.
+                  summary: section.current ? placement?.summary : null,
+                ),
+              ),
+        ],
+
+        if (terms.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          const SectionHeader(eyebrow: 'Woorden', title: 'Goed om te weten'),
+          const SizedBox(height: 10),
+          for (final term in terms)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(term.term, style: AppTheme.bodyStrong),
+                  const SizedBox(height: 2),
+                  Text(term.meaning, style: AppTheme.bodyMuted),
+                ],
+              ),
+            ),
+        ],
       ],
+    );
+  }
+}
+
+/// Schrijver, Geschreven, Soort boek, Kern - as rows rather than as a
+/// paragraph, because they are looked up rather than read.
+class _FactList extends StatelessWidget {
+  const _FactList({required this.facts});
+
+  final List<LessonFact> facts;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final fact in facts) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 96,
+                  child: Text(fact.label, style: AppTheme.metaLabel),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(fact.value, style: AppTheme.bodyMuted)),
+              ],
+            ),
+            if (fact != facts.last) const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One stretch of the book's outline. The section the reader is in carries the
+/// brand tint, so "waar je bent" is answered by looking rather than by reading.
+class _SectionRow extends StatelessWidget {
+  const _SectionRow({
+    required this.section,
+    required this.current,
+    this.summary,
+  });
+
+  final LessonBookSection section;
+  final bool current;
+  final String? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final text = summary ?? (current ? section.summary : null);
+    return AppCard(
+      color: current ? AppTheme.tealTint : null,
+      borderColor: current ? AppTheme.teal : null,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 52,
+                child: Text(
+                  section.range,
+                  style: AppTheme.metaLabel.copyWith(
+                    color: current ? AppTheme.tealStrong : AppTheme.inkFaint,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  section.title,
+                  style: current
+                      ? AppTheme.bodyStrong.copyWith(color: AppTheme.tealStrong)
+                      : AppTheme.bodyMuted,
+                ),
+              ),
+            ],
+          ),
+          if (text != null && text.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(text, style: AppTheme.caption),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -123,10 +244,10 @@ class LessonContextStep extends ConsumerWidget {
 /// cards.
 ///
 /// A 16:9 card per place turned three photographs into three screens of
-/// scrolling before the book's introduction - the part of this step actually
-/// worth reading - came into view at all. Tiles put several places side by
-/// side, keep the introduction near the top, and the photograph at full size is
-/// one tap away in [openGeoImageLightbox], where it can be looked at properly.
+/// scrolling before the prose - the part of this step actually worth reading -
+/// came into view at all. Tiles put several places side by side, keep the text
+/// near the top, and the photograph at full size is one tap away in
+/// [openGeoImageLightbox], where it can be looked at properly.
 class _PlaceStrip extends StatelessWidget {
   const _PlaceStrip({required this.images});
 
@@ -190,7 +311,7 @@ class _PlaceStrip extends StatelessWidget {
   }
 }
 
-/// The photographs for a background step with no book introduction: a strip
+/// The photographs for a context step with no text on it: a strip
 /// of small tiles would leave the rest of the screen empty, so the
 /// photographs become the point instead - one hero card, or a hero plus a
 /// mosaic of the rest, edge to edge within the page's own margins.

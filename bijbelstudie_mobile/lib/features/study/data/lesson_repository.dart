@@ -88,6 +88,7 @@ class LessonRepository {
     String? viewTranslation,
     String? depthPanel,
     String? reflectionText,
+    List<String>? practicesDone,
     bool? complete,
     String? entry,
     Options? options,
@@ -104,6 +105,9 @@ class LessonRepository {
           if (viewTranslation != null) 'viewTranslation': viewTranslation,
           if (depthPanel != null) 'depthPanel': depthPanel,
           if (reflectionText != null) 'reflectionText': reflectionText,
+          // The whole ticked set, never a toggle: the server \$sets it, so a
+          // request that lost a race cannot leave a half-ticked list behind.
+          if (practicesDone != null) 'practicesDone': practicesDone,
           if (complete != null) 'complete': complete,
           // `chapter` for a single-chapter study: the server then never moves
           // a resume cursor and never creates an enrollment.

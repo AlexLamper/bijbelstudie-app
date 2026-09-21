@@ -12,7 +12,7 @@ import '../../domain/lesson_models.dart';
 ///
 /// The study flow is a full-screen route outside the tab shell, so nothing the
 /// rest of the app offers for this was reachable from it: the translation
-/// could only be changed from the chips on Het Woord - invisible from every
+/// could only be changed from the chips on Lezen - invisible from every
 /// other step - and the type controls not at all, because they live on the
 /// reader bar and on Instellingen, both of which are behind the X. A reader
 /// who wanted larger text had to abandon the lesson to get it.
