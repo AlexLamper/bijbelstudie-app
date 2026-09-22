@@ -491,3 +491,31 @@ Na goedkeuring (meestal 1–3 dagen) staat de app op `https://play.google.com/st
 
 **iOS**
 - [ ] App Store 1.1.1-screenshots geüpload
+
+---
+
+## AAB automatisch ophalen na een push naar main
+
+De workflow `android-release.yml` bouwt bij elke push naar `main` een ondertekende
+AAB, maar zet die alleen als **artifact** bij de run. Sinds 22 sep haalt een
+pre-push hook dat bestand automatisch op en zet het in
+`store-assets/google-play/builds/`. Die map staat in `.gitignore` — een AAB van
+52 MB hoort niet in git, hij blijft dus alleen op deze pc staan.
+
+**Eenmalig per kloon aanzetten:**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Daarna: `git push` → de hook start losgekoppeld `scripts/fetch-play-aab.sh`, die
+wacht tot de CI-run klaar is en de AAB neerzet. Voortgang staat in
+`store-assets/google-play/builds/fetch-play-aab.log`.
+
+- Handmatig ophalen: `scripts/fetch-play-aab.sh` (voor HEAD) of
+  `scripts/fetch-play-aab.sh <sha>`.
+- Een specifieke run: `RUN_ID=<id> scripts/fetch-play-aab.sh`.
+- Eén push overslaan: `SKIP_AAB_FETCH=1 git push`.
+
+Een push met alleen markdown/docs start geen run (`paths-ignore`); het script
+stopt dan na 5 minuten zonder fout.

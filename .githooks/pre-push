@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# On a push to main, kick off a detached watcher that downloads the AAB that CI
+# is about to build into store-assets/google-play/builds/.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip for one push:      SKIP_AAB_FETCH=1 git push
+set -euo pipefail
+
+[ -n "${SKIP_AAB_FETCH:-}" ] && exit 0
+command -v gh >/dev/null 2>&1 || exit 0
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+LOG="$REPO_ROOT/store-assets/google-play/builds/fetch-play-aab.log"
+
+# stdin: <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in refs/heads/main) ;; *) continue ;; esac
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  mkdir -p "$(dirname "$LOG")"
+  echo "=== $(date '+%Y-%m-%d %H:%M:%S') push ${local_sha:0:7} ===" >> "$LOG"
+  nohup "$REPO_ROOT/scripts/fetch-play-aab.sh" "$local_sha" >> "$LOG" 2>&1 &
+  disown 2>/dev/null || true
+  echo "pre-push: watching CI for the AAB of ${local_sha:0:7}; log -> ${LOG#$REPO_ROOT/}"
+done
+
+exit 0
