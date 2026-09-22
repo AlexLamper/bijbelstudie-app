@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/levensboom/domain/tree_state.dart';
 import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/levensboom/present/mini_tree.dart';
 import '../../features/settings/data/notification_prefs.dart';
@@ -120,7 +121,6 @@ Future<void> maybeAskAfterReading(BuildContext context, WidgetRef ref) async {
 
 /// The Dutch pre-permission bottom sheet (`RETENTION_PLAN.md` §4.6, extended by
 /// §7). Shown in-app before the OS dialog; "Nu niet" only sets the guard, it
-/// never re-prompts - Settings is the way back.
 Future<bool?> _showSheet(
   BuildContext context,
   WidgetRef ref,
@@ -130,83 +130,142 @@ Future<bool?> _showSheet(
   return showModalBottomSheet<bool>(
     context: context,
     showDragHandle: true,
+    // Without this the sheet is capped at half the screen and the buttons fall
+    // off the bottom on a small phone or at a large text scale.
     isScrollControlled: true,
-    builder: (sheetContext) {
-      final theme = Theme.of(sheetContext);
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          8,
-          24,
-          24 + MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // The tree is in the sheet because the tree is what the
-                // notification will show: the ask and the reward look alike.
-                if (tree != null && !tree.disabled) ...[
-                  MiniTree(
-                    tree: tree,
-                    badge: '${tree.level}',
-                    semanticsLabel: 'Je Levensboom, niveau ${tree.level}',
-                    size: 56,
-                  ),
-                  const SizedBox(width: 14),
-                ],
-                Expanded(
+    builder: (sheetContext) => NotificationPermissionSheet(
+      moment: moment,
+      tree: tree != null && !tree.disabled ? tree : null,
+    ),
+  );
+}
+
+/// The body of the pre-permission sheet, split out so it can be rendered at a
+/// small viewport in a widget test.
+///
+/// It is built to never clip: the copy scrolls, the two buttons stay pinned
+/// under it, and the whole thing is held inside the visible part of the screen
+/// (`SafeArea` for the home indicator, `viewInsets` for anything that opens on
+/// top of it).
+class NotificationPermissionSheet extends StatelessWidget {
+  const NotificationPermissionSheet({
+    super.key,
+    required this.moment,
+    this.tree,
+  });
+
+  final PermissionMoment moment;
+
+  /// The reader's tree, or null when there is none to show.
+  final TreeState? tree;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final media = MediaQuery.of(context);
+    final tree = this.tree;
+
+    // The drag handle and the sheet's own rounding eat a little of the screen,
+    // so the content asks for at most ~88% of it and scrolls inside that.
+    final maxHeight = media.size.height * 0.88;
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + media.viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: SingleChildScrollView(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        moment.lead,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // The tree is in the sheet because the tree is what
+                          // the notification will show: the ask and the reward
+                          // look alike.
+                          if (tree != null) ...[
+                            MiniTree(
+                              tree: tree,
+                              badge: '${tree.level}',
+                              semanticsLabel:
+                                  'Je Levensboom, niveau ${tree.level}',
+                              size: 56,
+                            ),
+                            const SizedBox(width: 14),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  moment.lead,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Wil je een rustig zetje op je studiedag?',
+                                  style: theme.textTheme.titleLarge,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 12),
                       Text(
-                        'Wil je een rustig zetje op je studiedag?',
-                        style: theme.textTheme.titleLarge,
+                        "We sturen je hooguit één herinnering per dag, op het "
+                        "moment dat jij kiest - nooit 's avonds laat, nooit "
+                        "als je die dag al bezig bent geweest. Je zet het met "
+                        "één tik weer uit.",
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "We sturen je hooguit één herinnering per dag, op het moment dat "
-              "jij kiest - nooit 's avonds laat, nooit als je die dag al bezig "
-              "bent geweest. Je zet het met één tik weer uit.",
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(false),
-                    child: const Text('Nu niet'),
+              ),
+              const SizedBox(height: 20),
+              // Pinned below the scroll view, so "Herinner me" is reachable
+              // however tall the copy renders.
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text(
+                        'Nu niet',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(true),
-                    child: const Text('Herinner me'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text(
+                        'Herinner me',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }

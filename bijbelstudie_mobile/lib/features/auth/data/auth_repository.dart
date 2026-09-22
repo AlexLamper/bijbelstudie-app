@@ -51,11 +51,32 @@ class AuthRepository {
     }, 'Apple-login mislukt');
   }
 
-  Future<User?> loginWithGoogle(String idToken) async {
+  /// Signs in with Google **and registers a first-time user in the same call**.
+  ///
+  /// `/api/v1/auth/google` is a find-link-or-create endpoint (website repo,
+  /// `lib/oauthUsers.ts` → `provisionOAuthUser`): it matches on `googleId`,
+  /// then case-insensitively on the verified e-mail address, and otherwise
+  /// creates the account with one atomic upsert. That is the same "find or
+  /// create" the website's NextAuth `signIn` callback does, so there is no
+  /// separate mobile "registreren met Google" route and `/auth/register` must
+  /// not be called first — it wants a password this user does not have.
+  ///
+  /// [email] and [name] are what Google handed the *client*. The server
+  /// derives both from the verified ID token and ignores what we send; they
+  /// ride along so a token minted without the `email`/`profile` claims can
+  /// still be turned into an account server-side (see the note in the report)
+  /// rather than dead-ending on `NO_EMAIL`.
+  Future<User?> loginWithGoogle({
+    required String idToken,
+    String? email,
+    String? name,
+  }) async {
     return _post('/auth/google', {
       'idToken': idToken,
+      if (email != null && email.trim().isNotEmpty) 'email': _normaliseEmail(email),
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
       ..._deviceInfo(),
-    }, 'Google-login mislukt');
+    }, 'Inloggen met Google mislukt');
   }
 
   /// Revokes the refresh token server-side, then clears local storage.
@@ -95,8 +116,24 @@ class AuthRepository {
       case 'INTERNAL_ERROR':
         return '$fallbackMessage door een storing. Probeer het zo opnieuw.';
       case 'UNAUTHORIZED':
-      case 'INVALID_TOKEN':
         return '$fallbackMessage: de inloggegevens werden niet geaccepteerd.';
+      // The OAuth routes answer this when the ID token's signature, issuer or
+      // audience does not check out. "Inloggegevens" is the wrong word for it:
+      // the user typed nothing, so telling them their gegevens are wrong sends
+      // them looking for a mistake they did not make.
+      case 'INVALID_TOKEN':
+        return '$fallbackMessage: de aanmelding werd niet geaccepteerd. '
+            'Probeer het opnieuw.';
+      case 'MISSING_FIELDS':
+        return '$fallbackMessage: er zijn niet genoeg gegevens meegestuurd. '
+            'Probeer het opnieuw.';
+      // `/auth/google` cannot create an account without a verified address.
+      case 'NO_EMAIL':
+        return 'Google deelde geen e-mailadres. Geef toestemming voor je '
+            'e-mailadres of maak een account met je e-mailadres en wachtwoord.';
+      case 'EMAIL_TAKEN':
+        return 'Er bestaat al een account met dit e-mailadres. Log in met je '
+            'wachtwoord; Google wordt daarna vanzelf aan dat account gekoppeld.';
       case 'RATE_LIMITED':
         return 'Te veel pogingen. Wacht even en probeer het opnieuw.';
       case null:

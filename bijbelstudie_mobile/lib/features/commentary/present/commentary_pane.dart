@@ -928,8 +928,8 @@ class _OriginalTextPaywall extends StatelessWidget {
         title: 'Bekijk de volledige grondtekst',
         body:
             'Je ziet nu het begin van het hoofdstuk. Met Pro open je het hele '
-            'hoofdstuk woord voor woord, in het Hebreeuws en Grieks, met '
-            'transliteratie en Strong-nummers.',
+            'hoofdstuk woord voor woord in de originele grondtekst, in het '
+            'Hebreeuws en Grieks, met uitspraak en betekenis.',
         cta: 'Verder lezen met Pro',
       ),
     );

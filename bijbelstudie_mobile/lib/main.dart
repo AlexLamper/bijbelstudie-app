@@ -16,6 +16,7 @@ import 'core/ui/environment_badge.dart';
 import 'features/feedback/present/review_prompt_host.dart';
 import 'features/onboarding/present/tour_overlay.dart';
 import 'features/settings/present/theme_mode_provider.dart';
+import 'core/platform/android_sdk.dart';
 
 Future<void> _initRevenueCat() async {
   if (kIsWeb) return;
@@ -88,6 +89,10 @@ void main() async {
   // what put a mismatched band above every header and below every bottom bar.
   // Each screen's header and footer now paint into the inset themselves.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Before the first overlay style is pushed: the API level decides whether
+  // the bar colours are sent at all. Android 15 ignores them and deprecated
+  // the setters, Android 14 and below still need them. See AndroidSdk.
+  await AndroidSdk.load();
   SystemChrome.setSystemUIOverlayStyle(AppTheme.overlayStyle);
 
   if (PreviewConfig.enabled) {

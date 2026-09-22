@@ -35,8 +35,22 @@ class TourHost extends ConsumerWidget {
 
 /// Padding around the spotlight hole, matching `guided-tour.tsx`'s PADDING.
 const double _spotlightPadding = 8;
-const double _tooltipGap = 14;
 const double _screenMargin = 16;
+
+/// The card does not move.
+///
+/// It used to be placed in whichever gap around the spotlight was larger, so
+/// it jumped from below the target to above it and back again between steps,
+/// and readers lost the buttons they were just about to tap. It now sits in
+/// one place for the whole tour - just above the tab bar - and only the
+/// spotlight moves. [_navBarReserve] is the tab bar's own height from
+/// `MainShell`; keeping the card clear of it means a step can still spotlight
+/// a tab icon without the card covering it.
+const double _navBarReserve = 60;
+const double _cardGap = 12;
+
+/// How much of the screen the card may take before it scrolls inside itself.
+const double _maxCardFraction = 0.5;
 
 /// How much of the screen one spotlight may take.
 ///
@@ -46,11 +60,6 @@ const double _screenMargin = 16;
 /// at the bottom of the screen. Cutting the hole off at the top of the anchor
 /// still frames the thing being talked about and keeps a usable gap below it.
 const double _maxSpotlightFraction = 0.45;
-
-/// The gap a step needs before the card is placed beside the spotlight rather
-/// than floated over it. Roughly the card at its shortest: heading, two lines,
-/// the dots and the button row.
-const double _minCardSpace = 240;
 
 /// Where the reader is left once the tour has been walked to the end.
 ///
@@ -189,7 +198,9 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
     try {
       await Scrollable.ensureVisible(
         anchorContext,
-        alignment: 0.5,
+        // Upper third rather than centred: the card is parked against the
+        // bottom of the screen now, so a centred anchor can end up behind it.
+        alignment: 0.3,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
       );
@@ -251,7 +262,7 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
       );
     }
 
-    return Material(
+    final overlay = Material(
       type: MaterialType.transparency,
       child: Stack(
         children: [
@@ -287,76 +298,50 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
                 ),
               ),
             ),
-          _positionCard(
-            media: media,
-            spotlight: spotlight,
-            card: _TourCard(
-              step: step,
-              index: index,
-              total: steps.length,
-              onSkip: controller.finish,
-              onBack: index == 0 ? null : controller.back,
-              onNext: () => index + 1 >= steps.length
-                  ? _endTour()
-                  : controller.next(steps.length),
-              onJump: (i) => controller.goTo(i, steps.length),
+          // Fixed position: the same left, right and bottom on every step.
+          Positioned(
+            left: _screenMargin,
+            right: _screenMargin,
+            bottom: media.padding.bottom + _navBarReserve + _cardGap,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: media.size.height * _maxCardFraction,
+              ),
+              child: SingleChildScrollView(
+                child: _TourCard(
+                  step: step,
+                  index: index,
+                  total: steps.length,
+                  onSkip: controller.finish,
+                  onBack: index == 0 ? null : controller.back,
+                  onNext: () => index + 1 >= steps.length
+                      ? _endTour()
+                      : controller.next(steps.length),
+                  onJump: (i) => controller.goTo(i, steps.length),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
-  }
 
-  /// Places the card in whichever gap around the spotlight is larger, capped
-  /// to that gap so a tall card scrolls inside itself rather than running off
-  /// the screen. With no spotlight it simply centres.
-  Widget _positionCard({
-    required MediaQueryData media,
-    required Rect? spotlight,
-    required Widget card,
-  }) {
-    final topInset = media.padding.top + _screenMargin;
-    final bottomInset = media.padding.bottom + _screenMargin;
-
-    if (spotlight == null) {
-      return Positioned(
-        left: _screenMargin,
-        right: _screenMargin,
-        top: topInset,
-        bottom: bottomInset,
-        child: Center(child: SingleChildScrollView(child: card)),
+    // The system back button ends the tour instead of popping the route the
+    // tour happens to have navigated to, which would leave the overlay running
+    // over a screen no step points at. Guarded because a harness can mount the
+    // overlay without a Router above it.
+    if (Router.maybeOf(context)?.backButtonDispatcher != null) {
+      return BackButtonListener(
+        onBackButtonPressed: () async {
+          controller.finish();
+          return true;
+        },
+        child: overlay,
       );
     }
-
-    final spaceAbove = spotlight.top - topInset - _tooltipGap;
-    final spaceBelow = media.size.height - spotlight.bottom - bottomInset - _tooltipGap;
-    final below = spaceBelow >= spaceAbove;
-    final available = (below ? spaceBelow : spaceAbove).clamp(0.0, media.size.height);
-
-    // Neither gap can hold the card. Float it over the spotlight instead of
-    // squeezing it into a scrollable sliver: the card carries the explanation
-    // and the buttons, so it being readable beats it being out of the way.
-    if (available < _minCardSpace) {
-      return Positioned(
-        left: _screenMargin,
-        right: _screenMargin,
-        top: topInset,
-        bottom: bottomInset,
-        child: Center(child: SingleChildScrollView(child: card)),
-      );
-    }
-
-    return Positioned(
-      left: _screenMargin,
-      right: _screenMargin,
-      top: below ? spotlight.bottom + _tooltipGap : null,
-      bottom: below ? null : media.size.height - spotlight.top + _tooltipGap,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: available),
-        child: SingleChildScrollView(child: card),
-      ),
-    );
+    return overlay;
   }
+
 }
 
 /// The dimmed screen with a rounded hole punched in it.

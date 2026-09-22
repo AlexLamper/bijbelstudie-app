@@ -31,6 +31,7 @@ import '../../features/premium/present/premium_screen.dart';
 import '../../features/premium/present/pro_access_provider.dart';
 import '../../features/premium/present/pro_celebration_screen.dart';
 import '../../features/profile/present/badges_screen.dart';
+import '../../features/profile/present/favorite_verses_screen.dart';
 import '../../features/profile/present/bible_progress_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
 import '../../features/resources/present/resources_screen.dart';
@@ -326,6 +327,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/profile/badges',
             builder: (context, state) => const BadgesScreen(),
+          ),
+          // The hearted teksten van de dag, from the card on Profiel. Local
+          // to the device, like the archive they are hearted from.
+          GoRoute(
+            path: '/profile/favorieten',
+            builder: (context, state) => const FavoriteVersesScreen(),
           ),
           // "Bijbel gelezen": every book and chapter read, from the
           // Bijbelboeken tile on Profiel and the book map on Start.

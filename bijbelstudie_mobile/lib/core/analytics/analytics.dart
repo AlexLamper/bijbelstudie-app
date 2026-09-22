@@ -22,6 +22,13 @@ class AnalyticsEvents {
   static const purchasesRestored = 'purchases_restored';
   static const paywallHit = 'paywall_hit';
   static const paywallCtaClicked = 'paywall_cta_clicked';
+
+  /// Cross-references. `surface` says where the list was opened, `action`
+  /// what was done with it and `testament` which direction the reader moved
+  /// in. Book, chapter and verse are deliberately absent: the server allowlist
+  /// refuses that cardinality, so an event carrying them is dropped in silence.
+  static const crossRefOpened = 'crossref_opened';
+  static const crossRefFollowed = 'crossref_followed';
 }
 
 /// Fire-and-forget funnel tracking for the mobile app.

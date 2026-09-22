@@ -68,97 +68,59 @@ class TourAnchorIds {
   static const profilePro = 'profile-pro';
 }
 
+/// The walkthrough, kept deliberately short.
+///
+/// It used to be ten steps that marched the reader through every pane of the
+/// study screen, each with a paragraph of copy. People did not finish it. The
+/// list below is one step per place worth knowing about - Start, Bijbel,
+/// Studies, Notities/Profiel, and the Pro pitch for a free account - so the
+/// whole thing is five taps for a free reader and four for a subscriber.
+///
+/// Every step anchors on the bottom tab bar or on the Start hero, both of
+/// which are present the moment the route lands, so no step can stall hunting
+/// for a widget deep inside a screen that is still loading.
 const List<TourStep> _allSteps = [
   TourStep(
     anchorId: TourAnchorIds.dashboardHero,
     route: '/dashboard',
-    title: 'Je dashboard',
+    title: 'Je startpunt',
     description:
-        'Hier zie je in één oogopslag waar je gebleven was. Tik op deze kaart '
-        'om direct verder te lezen in je laatste hoofdstuk.',
+        'Op Start zie je meteen waar je gebleven was. Tik op de kaart om '
+        'verder te lezen.',
   ),
   TourStep(
     anchorId: TourAnchorIds.navStudy,
-    route: '/dashboard',
-    title: 'Bijbelstudie',
-    description:
-        'Via deze tab kom je bij de bijbeltekst en alle studiematerialen die '
-        'erbij horen: commentaar, grondtekst en je notities bij het '
-        'hoofdstuk.',
-  ),
-  TourStep(
-    anchorId: TourAnchorIds.readerText,
     route: '/study',
     showMaterials: false,
-    title: 'De bijbeltekst',
+    title: 'Bijbel lezen',
     description:
-        'Hier lees je. Houd een vers ingedrukt om het te markeren, er een '
-        'notitie bij te schrijven, een bladwijzer te plaatsen of het te delen.',
-  ),
-  TourStep(
-    anchorId: TourAnchorIds.readerBar,
-    route: '/study',
-    showMaterials: false,
-    title: 'Vertaling, boek en hoofdstuk',
-    description:
-        'Tik op de titel om van boek en hoofdstuk te wisselen, en op het '
-        'vertaalicoon rechts om een andere vertaling te kiezen. Met het '
-        'downloadicoon zet je een boek offline klaar.',
-  ),
-  TourStep(
-    anchorId: TourAnchorIds.studyPaneSwitcher,
-    route: '/study',
-    showMaterials: true,
-    title: 'Van lezen naar studeren',
-    description:
-        'Met deze twee knoppen wissel je tussen de bijbeltekst en de '
-        'studiematerialen bij hetzelfde hoofdstuk. Je leespositie blijft staan.',
-  ),
-  TourStep(
-    anchorId: TourAnchorIds.studyMaterialsTabs,
-    route: '/study',
-    showMaterials: true,
-    materialsTab: 0,
-    title: 'Commentaar en grondtekst',
-    description:
-        'Commentaar, de Hebreeuwse en Griekse grondtekst met Strong-nummers, '
-        'achtergrondinformatie, je notities bij dit hoofdstuk en de '
-        'AI-assistent - allemaal bij het hoofdstuk dat je open hebt.',
+        'Hier lees je de bijbeltekst. Houd een vers ingedrukt om te markeren '
+        'of er een notitie bij te schrijven, en wissel bovenin naar '
+        'commentaar en grondtekst.',
   ),
   TourStep(
     anchorId: TourAnchorIds.navStudies,
     route: '/studies',
     title: 'Begeleide studies',
     description:
-        'Dit is het hart van de app. Uitgewerkte studies leiden je stap voor '
-        'stap door een persoon, thema of bijbelgedeelte, met gerichte vragen '
-        'per les. Je voortgang wordt onthouden.',
+        'Uitgewerkte studies nemen je stap voor stap mee door een thema of '
+        'bijbelgedeelte. Je voortgang wordt onthouden.',
   ),
   TourStep(
-    anchorId: TourAnchorIds.notesTabs,
+    anchorId: TourAnchorIds.navNotes,
     route: '/notes',
-    title: 'Je notities',
+    title: 'Notities en profiel',
     description:
-        'Alles wat je tijdens het lezen maakt komt hier terug, gesplitst in '
-        'notities, markeringen en bladwijzers. Tik op een regel om terug te '
-        'springen naar het hoofdstuk.',
-  ),
-  TourStep(
-    anchorId: TourAnchorIds.navProfile,
-    route: '/profile',
-    title: 'Je profiel',
-    description:
-        'Je leesreeks, bladwijzers, badges en activiteit staan hier bij '
-        'elkaar. Met het tandwiel stel je lezen en meldingen in; achter het '
-        'menu vind je hulpbronnen, zoeken, feedback en deze rondleiding.',
+        'Je notities, markeringen en bladwijzers komen hier samen. Onder '
+        'Profiel staan je voortgang, instellingen en hulp.',
   ),
   TourStep(
     anchorId: TourAnchorIds.profilePro,
     route: '/profile',
     title: 'Upgrade naar Pro',
     description:
-        'Pro ontgrendelt alle commentaren en de grondtekst bij elk '
-        'hoofdstuk. Het gratis plan blijft altijd beschikbaar.',
+        'Met Pro lees je alle commentaren en de grondtekst bij elk '
+        'hoofdstuk. Het gratis plan blijft gewoon beschikbaar.',
     hideForPro: true,
   ),
 ];

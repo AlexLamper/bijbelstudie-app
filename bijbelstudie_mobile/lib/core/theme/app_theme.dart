@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/android_sdk.dart';
+
 /// Design tokens copied 1:1 from www.bijbelstudie.io (`app/globals.css`).
 ///
 /// The site is a shadcn/Tailwind "Slate & Teal" system: a light grey page,
@@ -384,19 +386,61 @@ class AppTheme {
   /// `systemNavigationBarContrastEnforced: false` matters as much as the
   /// colour: left on, Android paints its own translucent scrim over a
   /// transparent nav bar and the band comes straight back.
+  ///
+  /// All three of those are set **only below Android 15**. From API 35 the
+  /// platform draws both bars transparent itself and ignores the setters,
+  /// which it deprecated in the same release; Flutter forwards them only when
+  /// they are non-null, so leaving them null there is what stops the app
+  /// calling a deprecated API. See [AndroidSdk].
   static SystemUiOverlayStyle get overlayStyle => SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
+    statusBarColor: _legacyBarColor(Colors.transparent),
     // The icon brightness is the brightness of the *icons*, so it is the
-    // opposite of the surface they sit on.
+    // opposite of the surface they sit on. This one goes through
+    // WindowInsetsController on every release, so it is never gated.
     statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarDividerColor: Colors.transparent,
-    systemNavigationBarContrastEnforced: false,
+    systemNavigationBarColor: _legacyBarColor(Colors.transparent),
+    systemNavigationBarDividerColor: _legacyBarColor(Colors.transparent),
+    systemNavigationBarContrastEnforced: AndroidSdk.enforcesEdgeToEdge
+        ? null
+        : false,
     systemNavigationBarIconBrightness: isDark
         ? Brightness.light
         : Brightness.dark,
   );
+
+  /// [color] on Android 14 and below, null from Android 15 on.
+  static Color? _legacyBarColor(Color color) =>
+      AndroidSdk.enforcesEdgeToEdge ? null : color;
+
+  /// The app bar's overlay style. Identical to [overlayStyle] except that
+  /// below Android 15 the navigation bar is painted the page background, so
+  /// the strip behind the gesture bar matches the screen it sits under. On
+  /// Android 15+ that is the platform's job and the field stays null - which
+  /// is also why this cannot use `copyWith`, since copyWith treats null as
+  /// "keep the current value" and would put the deprecated call back.
+  ///
+  /// Takes the brightness explicitly rather than reading [isDark]: both themes
+  /// are built up front, so the static flag can describe the other one.
+  static SystemUiOverlayStyle _appBarOverlayStyle(
+    Brightness brightness,
+    Color background,
+  ) {
+    final dark = brightness == Brightness.dark;
+    return SystemUiOverlayStyle(
+      statusBarColor: _legacyBarColor(Colors.transparent),
+      statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: _legacyBarColor(background),
+      systemNavigationBarDividerColor: _legacyBarColor(Colors.transparent),
+      systemNavigationBarContrastEnforced: AndroidSdk.enforcesEdgeToEdge
+          ? null
+          : false,
+      systemNavigationBarIconBrightness: dark
+          ? Brightness.light
+          : Brightness.dark,
+    );
+  }
 
   static TextStyle monoTextStyle([TextStyle? baseStyle]) {
     return (baseStyle ?? const TextStyle()).copyWith(
@@ -703,14 +747,7 @@ class AppTheme {
           color: fg,
         ),
         iconTheme: IconThemeData(color: fgMuted, size: 20),
-        systemOverlayStyle: brightness == Brightness.light
-            ? overlayStyle.copyWith(systemNavigationBarColor: bg)
-            : overlayStyle.copyWith(
-                statusBarIconBrightness: Brightness.light,
-                statusBarBrightness: Brightness.dark,
-                systemNavigationBarColor: bg,
-                systemNavigationBarIconBrightness: Brightness.light,
-              ),
+        systemOverlayStyle: _appBarOverlayStyle(brightness, bg),
       ),
       // `bg-white border border-gray-200 rounded-2xl` — no shadow.
       cardTheme: CardThemeData(

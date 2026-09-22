@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
@@ -186,7 +187,8 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
               expanded: false,
               onLike: () =>
                   ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
-              onShare: () => _share(text, reference, version),
+              onShare: (buttonContext) =>
+                  _share(buttonContext, text, reference, version),
               onMore: () => _showMore(book, chapter, verseNumber),
             ),
           ),
@@ -230,7 +232,8 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
           text: text,
           reference: reference,
           version: version,
-          onShare: () => _share(text, reference, version),
+          onShare: (buttonContext) =>
+                  _share(buttonContext, text, reference, version),
           onReadChapter: () {
             Navigator.of(routeContext).pop();
             _openChapterAtVerse(book, chapter, verseNumber);
@@ -251,9 +254,38 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     );
   }
 
-  Future<void> _share(String text, String reference, String version) {
+  /// Shares the verse through the system share sheet.
+  ///
+  /// Anchored on the share button's own on-screen rect: on iPad share_plus
+  /// pops the sheet from [sharePositionOrigin] and has nothing to anchor to
+  /// without it, which is how this used to fail silently - the same fault
+  /// `shareRowText` in the notes list already carries a fix for. The call is
+  /// awaited rather than fired and forgotten, so a platform failure lands as
+  /// a SnackBar instead of nothing happening at all.
+  Future<void> _share(
+    BuildContext buttonContext,
+    String text,
+    String reference,
+    String version,
+  ) async {
     final attribution = version.isEmpty ? reference : '$reference ($version)';
-    return Share.share('"$text"\n\n$attribution', subject: reference);
+    final box = buttonContext.findRenderObject() as RenderBox?;
+    final origin = box != null && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    final messenger = ScaffoldMessenger.maybeOf(buttonContext);
+    try {
+      await Share.share(
+        '"$text"\n\n$attribution\n\n'
+        'Tekst van de dag op BijbelStudie - ${AppConfig.baseUrl}',
+        subject: 'Tekst van de dag - $reference',
+        sharePositionOrigin: origin,
+      );
+    } on Exception {
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Delen is niet gelukt.')),
+      );
+    }
   }
 
   Future<void> _showMore(String book, int chapter, int? verseNumber) async {
@@ -336,7 +368,7 @@ class _VerseFace extends StatelessWidget {
   final bool expanded;
 
   final VoidCallback onLike;
-  final VoidCallback onShare;
+  final void Function(BuildContext buttonContext) onShare;
 
   /// Card only — the "…" sheet that holds what the modal spells out.
   final VoidCallback? onMore;
@@ -489,7 +521,7 @@ class _VerseActions extends StatelessWidget {
 
   final bool liked;
   final VoidCallback onLike;
-  final VoidCallback onShare;
+  final void Function(BuildContext buttonContext) onShare;
   final VoidCallback? onMore;
   final VoidCallback? onReadChapter;
   final VoidCallback? onHistory;
@@ -501,10 +533,14 @@ class _VerseActions extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _AnimatedHeartButton(liked: liked, onPressed: onLike),
-        _PhotoAction(
-          icon: Icons.ios_share,
-          tooltip: 'Delen',
-          onPressed: onShare,
+        // Builder so the button's own context - and with it its RenderBox -
+        // is available to anchor the iPad share popover on.
+        Builder(
+          builder: (buttonContext) => _PhotoAction(
+            icon: Icons.ios_share,
+            tooltip: 'Delen',
+            onPressed: () => onShare(buttonContext),
+          ),
         ),
         if (onMore != null)
           _PhotoAction(
@@ -616,7 +652,7 @@ class _ExpandedVerseScreen extends ConsumerStatefulWidget {
   final String text;
   final String reference;
   final String version;
-  final VoidCallback onShare;
+  final void Function(BuildContext buttonContext) onShare;
   final VoidCallback onReadChapter;
   final VoidCallback onHistory;
 

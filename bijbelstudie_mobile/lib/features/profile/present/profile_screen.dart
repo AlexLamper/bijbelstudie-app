@@ -18,6 +18,7 @@ import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import '../domain/profile_stats.dart';
 import 'badge_medallion.dart';
+import 'favorite_verses_screen.dart';
 import 'profile_activity_feed.dart';
 import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
@@ -135,6 +136,11 @@ class _ProfileBody extends ConsumerWidget {
         const SectionHeader(title: 'Badges'),
         const SizedBox(height: 12),
         const _BadgesCard(),
+
+        const SizedBox(height: 28),
+        const SectionHeader(title: 'Favoriete teksten'),
+        const SizedBox(height: 12),
+        const _FavoritesCard(),
 
         const SizedBox(height: 28),
         const SectionHeader(title: 'Activiteit'),
@@ -502,6 +508,84 @@ class _QuickCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The way in to the hearted teksten van de dag ([FavoriteVersesScreen] at
+/// `/profile/favorieten`).
+///
+/// The newest favourite is quoted on the card, so the section shows what is
+/// behind it rather than only a tally. With nothing hearted yet it says where
+/// the heart is instead of hiding: the control on the dashboard card is easy
+/// to miss.
+class _FavoritesCard extends ConsumerWidget {
+  const _FavoritesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final favorites = ref.watch(favoriteVersesProvider);
+    final newest = favorites.isEmpty ? null : favorites.first;
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      onTap: () => context.push('/profile/favorieten'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite_border, size: 18, color: AppTheme.teal),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  newest == null
+                      ? 'Nog geen favorieten'
+                      : newest.referenceWithVersion,
+                  style: AppTheme.bodyStrong,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (favorites.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Text(
+                  '${favorites.length}',
+                  style: AppTheme.statNumber.copyWith(fontSize: 24),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            newest == null
+                ? 'Tik op het hartje bij de tekst van de dag om hem hier te '
+                      'bewaren.'
+                : newest.text,
+            style: AppTheme.bodyMuted,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          const RuleLine(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Bekijk favorieten',
+                style: AppTheme.caption.copyWith(
+                  color: AppTheme.teal,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 3),
+              Icon(Icons.chevron_right, size: 14, color: AppTheme.teal),
+            ],
           ),
         ],
       ),

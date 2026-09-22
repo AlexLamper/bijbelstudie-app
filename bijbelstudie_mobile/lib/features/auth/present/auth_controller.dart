@@ -191,6 +191,12 @@ class AuthController extends AsyncNotifier<User?> {
     }
   }
 
+  /// Signs in with Google — and registers the account when there isn't one.
+  ///
+  /// This is deliberately a single entry point for both: `/api/v1/auth/google`
+  /// finds, links or creates (see [AuthRepository.loginWithGoogle]), exactly
+  /// like the website. So the button on `/login` and the one on `/register`
+  /// call this same method and a first-time user needs no second step.
   Future<void> signInWithGoogle() async {
     try {
       await ensureGoogleSignInInitialized();
@@ -201,29 +207,76 @@ class AuthController extends AsyncNotifier<User?> {
       await _completeGoogleSignIn(account);
     } on google_auth.GoogleSignInException catch (e, st) {
       if (e.code == google_auth.GoogleSignInExceptionCode.canceled) {
-        return; // User canceled the sign in dialog.
+        return; // User dismissed the Google dialog: not an error.
       }
-      if (e.code == google_auth.GoogleSignInExceptionCode.interrupted) {
-        // Android can report interrupted when UI flow closed unexpectedly.
-        final current = await google_auth.GoogleSignIn.instance
-            .attemptLightweightAuthentication();
-        if (current != null) {
-          try {
-            await _completeGoogleSignIn(current);
-            return;
-          } catch (_) {}
-        }
-        state = AsyncValue.error(
-          Exception(
-            'Google-login onderbroken op Android. Controleer SHA-1/SHA-256 van de release key in Google Cloud OAuth client.',
-          ),
-          st,
-        );
+      if (e.code == google_auth.GoogleSignInExceptionCode.interrupted &&
+          await _retryGoogleAfterInterrupt()) {
         return;
       }
-      state = AsyncValue.error(e, st);
+      // `GoogleSignInException.toString()` is English and names the plugin's
+      // own enum; it was going straight into the snackbar.
+      state = AsyncValue.error(Exception(_googleErrorMessage(e)), st);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// One silent retry after Android reports `interrupted`.
+  ///
+  /// Credential Manager reports that when its sheet closes unexpectedly even
+  /// though a credential is available, and retrying the lightweight path
+  /// recovers it. Returns whether this method has dealt with the failure.
+  ///
+  /// What it must *not* do is swallow a failure that happened after the retry
+  /// found a credential. That is no longer an interrupted dialog — it is the
+  /// server or the network answering — and it used to be caught and replaced
+  /// with "controleer SHA-1/SHA-256 van de release key in Google Cloud", which
+  /// is advice about signing certificates aimed at a developer. A first-time
+  /// user reading that had no idea their account simply had not been created.
+  Future<bool> _retryGoogleAfterInterrupt() async {
+    google_auth.GoogleSignInAccount? current;
+    try {
+      current = await google_auth.GoogleSignIn.instance
+          .attemptLightweightAuthentication();
+    } catch (_) {
+      return false; // Nothing recovered; report the original interruption.
+    }
+    if (current == null) return false;
+    try {
+      await _completeGoogleSignIn(current);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+    return true;
+  }
+
+  /// Dutch copy for every way `google_sign_in` can fail, in words that say
+  /// what the reader can do next.
+  static String _googleErrorMessage(google_auth.GoogleSignInException e) {
+    switch (e.code) {
+      case google_auth.GoogleSignInExceptionCode.canceled:
+        return 'Inloggen met Google is geannuleerd.';
+      case google_auth.GoogleSignInExceptionCode.interrupted:
+        return 'Inloggen met Google werd onderbroken. Probeer het opnieuw.';
+      case google_auth.GoogleSignInExceptionCode.clientConfigurationError:
+      case google_auth.GoogleSignInExceptionCode.providerConfigurationError:
+        return 'Inloggen met Google is op dit apparaat niet beschikbaar. '
+            'Maak een account met je e-mailadres en wachtwoord.';
+      case google_auth.GoogleSignInExceptionCode.uiUnavailable:
+        return 'Het Google-venster kon niet worden geopend. Probeer het opnieuw.';
+      case google_auth.GoogleSignInExceptionCode.userMismatch:
+        return 'Dit is een ander Google-account dan het vorige. Log uit bij '
+            'Google en probeer het opnieuw.';
+      case google_auth.GoogleSignInExceptionCode.unknownError:
+        // The Android plugin reports "no Google account on this device" as an
+        // unknownError with this description, and it is the one case a reader
+        // can actually fix themselves.
+        if (e.description?.contains('No credential available') ?? false) {
+          return 'Er is geen Google-account op dit apparaat. Voeg er een toe '
+              'bij Instellingen, of maak een account met je e-mailadres.';
+        }
+        return 'Inloggen met Google mislukt. Probeer het opnieuw of gebruik je '
+            'e-mailadres en wachtwoord.';
     }
   }
 
@@ -232,13 +285,20 @@ class AuthController extends AsyncNotifier<User?> {
     final String? idToken = auth.idToken;
     if (idToken == null || idToken.isEmpty) {
       throw Exception(
-        'Google gaf geen idToken terug. Probeer opnieuw of kies een ander account.',
+        'Google gaf geen inlogtoken terug. Probeer het opnieuw of kies een '
+        'ander Google-account.',
       );
     }
 
     state = const AsyncValue.loading();
     final repository = ref.read(authRepositoryProvider);
-    final user = await repository.loginWithGoogle(idToken);
+    // Registration and login are the same request: the server creates the
+    // account when it does not recognise this Google identity yet.
+    final user = await repository.loginWithGoogle(
+      idToken: idToken,
+      email: account.email,
+      name: account.displayName,
+    );
     await _completeSignIn(user);
   }
 

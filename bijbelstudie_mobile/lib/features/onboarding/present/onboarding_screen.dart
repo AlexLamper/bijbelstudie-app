@@ -53,10 +53,10 @@ const List<_OnboardingPageData> _pages = [
     accent: 'staat',
     body:
         'Lees bij elk hoofdstuk het commentaar van Matthew Henry, of ga naar '
-        'de grondtekst met transliteratie en Strong-nummers.',
+        'de originele grondtekst in het Hebreeuws en Grieks, woord voor woord.',
     highlights: [
       'Commentaren bij elk hoofdstuk',
-      'Hebreeuws en Grieks met Strong-nummers',
+      'De originele grondtekst, woord voor woord',
     ],
   ),
   _OnboardingPageData(

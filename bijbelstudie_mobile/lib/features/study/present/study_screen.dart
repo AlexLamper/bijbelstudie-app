@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/skeleton.dart';
 import '../../ai/present/ai_assistant_pane.dart';
 import '../../bible/present/read_screen.dart';
 import '../../bible/present/reader_chrome.dart';
 import '../../bible/present/reader_header.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_pane.dart';
+import '../../notes/present/note_row.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
@@ -538,10 +540,9 @@ class _ChapterNotesPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notes = ref.watch(notesListProvider);
-    final scheme = Theme.of(context).colorScheme;
 
     return notes.when(
-      loading: () => const AppLoader(),
+      loading: () => const SkeletonList(),
       error: (_, __) => const AppEmptyState(
         icon: Icons.wifi_off_outlined,
         title: 'Notities niet geladen',
@@ -573,40 +574,15 @@ class _ChapterNotesPane extends ConsumerWidget {
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        // The same rows as the Notities screen: reference, date and menu on
+        // one meta line, the note under it, the verse it hangs off at a rule.
+        // Tapping does not leave for the reader here - the chapter is already
+        // open in the pane next to this tab.
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 40),
           itemCount: mine.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final note = mine[index];
-            return AppCard(
-              radius: AppTheme.radiusMd,
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    note.verse == null
-                        ? '$book $chapter'
-                        : '$book $chapter:${note.verse}',
-                    style: AppTheme.caption.copyWith(
-                      color: AppTheme.teal,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (note.noteText.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      note.noteText,
-                      style: AppTheme.bodyMuted.copyWith(
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          },
+          itemBuilder: (context, index) =>
+              NoteRow(note: mine[index], tapOpensReader: false),
         );
       },
     );

@@ -8,6 +8,8 @@ import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_jump.dart';
+import '../../crossrefs/present/crossref_providers.dart';
+import '../../crossrefs/present/crossref_sheet.dart';
 import '../../study/present/study_pane_controller.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
@@ -15,7 +17,7 @@ import 'notes_providers.dart';
 
 /// What the sheet was dismissed with. Only the note needs one: everything else
 /// the sheet offers is done before it closes.
-enum _VerseSheetResult { note, commentary }
+enum _VerseSheetResult { note, commentary, crossRefs }
 
 /// Long-press on a verse: highlight, commentary, note, bookmark, share, copy.
 ///
@@ -57,6 +59,20 @@ Future<void> showVerseActionSheet({
 
   if (result == _VerseSheetResult.commentary) {
     if (context.mounted) onOpenCommentary?.call();
+    return;
+  }
+  if (result == _VerseSheetResult.crossRefs) {
+    // Opened from the reader's context, not the sheet's, for the same reason
+    // the note editor is: following a reference navigates and shows a
+    // snackbar seconds later, by which time this sheet is long gone.
+    if (context.mounted) {
+      await showCrossRefSheet(
+        context: context,
+        ref: ref,
+        chapter: chapter,
+        verse: verse,
+      );
+    }
     return;
   }
   if (result != _VerseSheetResult.note || !context.mounted) return;
@@ -311,6 +327,17 @@ class _VerseActionSheet extends ConsumerWidget {
     final highlights = ref.watch(highlightIndexProvider);
     final existing =
         highlights[VerseKey(chapter.book, chapter.chapter, verse.number)];
+    // The count is a courtesy, not a gate. It reads the cache only, so a
+    // long-press costs no request: the row opens either way and simply says
+    // nothing until this chapter's references have been fetched once.
+    final crossRefCount = ref
+        .watch(
+          cachedCrossRefChapterProvider(
+            ChapterRef(chapter.sourceId, chapter.book, chapter.chapter),
+          ),
+        )
+        .value
+        ?.countFor(verse.number);
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -355,6 +382,16 @@ class _VerseActionSheet extends ConsumerWidget {
                   child: const _ActionRow(
                     icon: Icons.bookmark_add_outlined,
                     label: 'Bladwijzer plaatsen',
+                  ),
+                ),
+                RuleListTile(
+                  onTap: () => _openCrossRefs(context),
+                  child: _ActionRow(
+                    icon: Icons.link,
+                    label: 'Kruisverwijzingen',
+                    trailing: crossRefCount == null || crossRefCount == 0
+                        ? null
+                        : '$crossRefCount',
                   ),
                 ),
                 RuleListTile(
@@ -446,6 +483,11 @@ class _VerseActionSheet extends ConsumerWidget {
   /// editor here — see the note on that function for why.
   void _addNote(BuildContext context) {
     Navigator.of(context).pop(_VerseSheetResult.note);
+  }
+
+  /// Same hand-back as the note: the cross-reference sheet outlives this one.
+  void _openCrossRefs(BuildContext context) {
+    Navigator.of(context).pop(_VerseSheetResult.crossRefs);
   }
 
   Future<void> _addBookmark(BuildContext context, WidgetRef ref) async {
@@ -540,10 +582,15 @@ class _ColorRow extends StatelessWidget {
 }
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.icon, required this.label});
+  const _ActionRow({required this.icon, required this.label, this.trailing});
 
   final IconData icon;
   final String label;
+
+  /// A count at the end of the row, or null while there is nothing to say.
+  /// Never a placeholder: a row that reads "0" or "—" invites a tap that
+  /// leads nowhere.
+  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -556,6 +603,10 @@ class _ActionRow extends StatelessWidget {
         Flexible(
           child: Text(label, style: Theme.of(context).textTheme.titleMedium),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: 12),
+          Text(trailing!, style: AppTheme.caption),
+        ],
       ],
     );
   }

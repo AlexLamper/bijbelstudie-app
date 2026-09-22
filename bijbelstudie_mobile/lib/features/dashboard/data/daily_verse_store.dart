@@ -11,7 +11,8 @@ import 'dashboard_models.dart';
 /// out today's verse and nothing else — no archive, no favourites. So the app
 /// keeps both on the device, the same way [ReadingSettings] keeps the reader's
 /// typography: every verse that arrives is appended to a capped history, and
-/// the references the reader has hearted are stored as a flat set.
+/// every verse the reader hearts is stored whole, so "Favoriete teksten" can
+/// show it back to them.
 ///
 /// Both are best-effort. A device with no preferences plugin (tests, an
 /// unusual platform) simply gets an empty history and no likes rather than an
@@ -73,41 +74,121 @@ class DailyVerseEntry {
       version.isEmpty ? reference : '$reference $version';
 }
 
-/// The stored state: newest day first, plus the set of liked references.
+/// A verse the reader hearted, kept whole rather than as a bare reference.
+///
+/// The heart is tapped on a card that already has the text, the book and the
+/// translation label in hand, so the like stores a snapshot of all of it. The
+/// favourites screen can then show the verse itself even after the day has
+/// dropped out of the capped archive.
+class LikedVerse {
+  const LikedVerse({
+    required this.reference,
+    required this.text,
+    required this.book,
+    required this.chapter,
+    required this.verse,
+    required this.version,
+    required this.likedAt,
+  });
+
+  final String reference;
+  final String text;
+  final String book;
+  final int chapter;
+  final int verse;
+  final String version;
+
+  /// When the heart was tapped. Favourites are listed newest first on this.
+  final DateTime likedAt;
+
+  /// The reference as it is printed, with the translation label when known.
+  String get referenceWithVersion =>
+      version.isEmpty ? reference : '$reference $version';
+
+  Map<String, dynamic> toJson() => {
+    'reference': reference,
+    'text': text,
+    'book': book,
+    'chapter': chapter,
+    'verse': verse,
+    'version': version,
+    'likedAt': likedAt.toIso8601String(),
+  };
+
+  static LikedVerse? fromJson(Map<String, dynamic> json) {
+    final reference = json['reference'] as String?;
+    if (reference == null || reference.isEmpty) return null;
+    return LikedVerse(
+      reference: reference,
+      text: json['text'] as String? ?? '',
+      book: json['book'] as String? ?? '',
+      chapter: (json['chapter'] as num?)?.toInt() ?? 1,
+      verse: (json['verse'] as num?)?.toInt() ?? 1,
+      version: json['version'] as String? ?? '',
+      likedAt:
+          DateTime.tryParse(json['likedAt'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+
+  /// The like as it is made from the archived day the heart was tapped on.
+  factory LikedVerse.fromEntry(DailyVerseEntry entry, {DateTime? likedAt}) {
+    return LikedVerse(
+      reference: entry.reference,
+      text: entry.text,
+      book: entry.book,
+      chapter: entry.chapter,
+      verse: entry.verse,
+      version: entry.version,
+      likedAt: likedAt ?? DateTime.now(),
+    );
+  }
+}
+
+/// The stored state: newest day first, plus the verses that were hearted.
 class DailyVerseMemory {
   const DailyVerseMemory({
     this.history = const [],
-    this.liked = const {},
+    this.likes = const [],
     this.loaded = false,
   });
 
   /// Newest first, at most [DailyVerseStore.maxDays] entries.
   final List<DailyVerseEntry> history;
 
-  /// References (without the version suffix) the reader has hearted.
-  final Set<String> liked;
+  /// The hearted verses, newest like first.
+  final List<LikedVerse> likes;
+
+  /// The references (without the version suffix) that are hearted.
+  Set<String> get liked => {for (final like in likes) like.reference};
 
   /// False until the first read from disk has finished, so the card can show a
   /// skeleton instead of a heart that flips a moment later.
   final bool loaded;
 
-  bool isLiked(String reference) => liked.contains(reference);
+  bool isLiked(String reference) =>
+      likes.any((like) => like.reference == reference);
 
   DailyVerseMemory copyWith({
     List<DailyVerseEntry>? history,
-    Set<String>? liked,
+    List<LikedVerse>? likes,
     bool? loaded,
   }) {
     return DailyVerseMemory(
       history: history ?? this.history,
-      liked: liked ?? this.liked,
+      likes: likes ?? this.likes,
       loaded: loaded ?? this.loaded,
     );
   }
 }
 
 const _kHistory = 'daytext.history';
+
+/// The pre-1.2 store: a flat list of hearted references, with no text and no
+/// date. Still read once, to migrate it into [_kLikes].
 const _kLiked = 'daytext.liked';
+
+/// The likes as whole verses, JSON encoded, newest like first.
+const _kLikes = 'daytext.likes';
 
 final dailyVerseStoreProvider =
     NotifierProvider<DailyVerseStore, DailyVerseMemory>(DailyVerseStore.new);
@@ -145,9 +226,10 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
       // The read outlives the provider when the app (or a test) tears down
       // mid-launch; writing state then throws rather than being ignored.
       if (!ref.mounted) return;
+      final history = _decode(prefs.getString(_kHistory));
       state = DailyVerseMemory(
-        history: _decode(prefs.getString(_kHistory)),
-        liked: (prefs.getStringList(_kLiked) ?? const <String>[]).toSet(),
+        history: history,
+        likes: _decodeLikes(prefs, history),
         loaded: true,
       );
     } catch (_) {
@@ -171,6 +253,67 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// The likes off disk, newest first, migrating the old flat set if that is
+  /// all this install has.
+  ///
+  /// A migrated like has no timestamp of its own - the old store kept only the
+  /// reference - so it is dated from the archived day it was hearted on, and
+  /// falls back to the epoch-less "onbekend" path in the UI when even that is
+  /// gone.
+  List<LikedVerse> _decodeLikes(
+    SharedPreferences prefs,
+    List<DailyVerseEntry> history,
+  ) {
+    final raw = prefs.getString(_kLikes);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          final likes = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(LikedVerse.fromJson)
+              .whereType<LikedVerse>()
+              .toList()
+            ..sort((a, b) => b.likedAt.compareTo(a.likedAt));
+          return List.unmodifiable(likes);
+        }
+      } catch (_) {
+        // Fall through to the legacy list rather than losing every like.
+      }
+    }
+
+    final legacy = prefs.getStringList(_kLiked) ?? const <String>[];
+    if (legacy.isEmpty) return const [];
+
+    final byReference = <String, DailyVerseEntry>{
+      for (final entry in history.reversed) entry.reference: entry,
+    };
+    final migrated = <LikedVerse>[];
+    for (final reference in legacy) {
+      final entry = byReference[reference];
+      migrated.add(
+        entry == null
+            ? LikedVerse(
+                reference: reference,
+                text: '',
+                book: '',
+                chapter: 1,
+                verse: 1,
+                version: '',
+                likedAt: DateTime.fromMillisecondsSinceEpoch(0),
+              )
+            : LikedVerse.fromEntry(
+                entry,
+                likedAt:
+                    DateTime.tryParse(entry.date) ??
+                    DateTime.fromMillisecondsSinceEpoch(0),
+              ),
+      );
+    }
+    migrated.sort((a, b) => b.likedAt.compareTo(a.likedAt));
+    return List.unmodifiable(migrated);
   }
 
   /// Records [verse] as today's entry, if today is not already recorded.
@@ -240,16 +383,80 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     await _persistHistory(capped);
   }
 
+  /// Hearts [reference], or un-hearts it when it is already a favourite.
+  ///
+  /// The verse itself is taken from the archive the card has just written, so
+  /// the favourites list keeps the text and the translation label even once
+  /// the day has aged out of [maxDays]. A reference with no archived day - a
+  /// heart tapped before the archive was written - is still stored, and simply
+  /// shows as a reference on its own.
   Future<void> toggleLike(String reference) async {
     if (reference.isEmpty) return;
     await _ready;
-    final next = {...state.liked};
-    if (!next.remove(reference)) next.add(reference);
 
-    state = state.copyWith(liked: next, loaded: true);
+    final next = [...state.likes];
+    final at = next.indexWhere((like) => like.reference == reference);
+    if (at >= 0) {
+      next.removeAt(at);
+    } else {
+      DailyVerseEntry? source;
+      for (final entry in state.history) {
+        if (entry.reference == reference) {
+          source = entry;
+          break;
+        }
+      }
+      final like = source == null
+          ? LikedVerse(
+              reference: reference,
+              text: '',
+              book: '',
+              chapter: 1,
+              verse: 1,
+              version: '',
+              likedAt: DateTime.now(),
+            )
+          : LikedVerse.fromEntry(source);
+      next.insert(0, like);
+    }
+
+    await _setLikes(next);
+  }
+
+  /// Drops [reference] from the favourites. What the Favoriete teksten screen
+  /// calls; a reference that is not hearted is left alone.
+  Future<void> removeLike(String reference) async {
+    await _ready;
+    if (!state.isLiked(reference)) return;
+    await _setLikes(
+      state.likes.where((like) => like.reference != reference).toList(),
+    );
+  }
+
+  /// Puts [reference] back where it was, for "Ongedaan maken" after a remove.
+  Future<void> restoreLike(LikedVerse like) async {
+    await _ready;
+    if (state.isLiked(like.reference)) return;
+    final next = [...state.likes, like]
+      ..sort((a, b) => b.likedAt.compareTo(a.likedAt));
+    await _setLikes(next);
+  }
+
+  Future<void> _setLikes(List<LikedVerse> likes) async {
+    final capped = List<LikedVerse>.unmodifiable(likes);
+    state = state.copyWith(likes: capped, loaded: true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_kLiked, next.toList(growable: false));
+      await prefs.setString(
+        _kLikes,
+        jsonEncode(capped.map((like) => like.toJson()).toList(growable: false)),
+      );
+      // The legacy list is kept in step so an older build installed over this
+      // one still shows the right hearts.
+      await prefs.setStringList(
+        _kLiked,
+        capped.map((like) => like.reference).toList(growable: false),
+      );
     } catch (_) {
       // Best effort; the heart still reflects the tap for this session.
     }
