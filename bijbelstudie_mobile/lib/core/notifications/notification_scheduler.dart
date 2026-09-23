@@ -7,6 +7,7 @@ import '../../features/auth/domain/display_name.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
+import '../../features/feedback/data/review_prompt.dart';
 import '../../features/levensboom/data/tree_image.dart';
 import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/settings/data/notification_prefs.dart';
@@ -687,6 +688,20 @@ class NotificationScheduler {
       'name': data == null ? null : displayFirstName(data.name, data.email),
     });
     await store.markMilestone(id);
+
+    // A streak milestone is the clearest "this app is working for me" moment
+    // there is, so it counts towards the rating gate. Recorded only - the
+    // native review sheet is never fired from here; `ReviewPromptHost` picks
+    // it up on the next calm screen. Badges are left out: several are handed
+    // out for one-off actions rather than for sticking with it.
+    if (id.startsWith('streak-')) {
+      unawaited(
+        ref
+            .read(reviewPromptProvider.notifier)
+            .recordSuccess(ReviewSignal.streakMilestone),
+      );
+    }
+
     if (!foregrounded) {
       final service = ref.read(notificationServiceProvider);
       // A milestone carries the grown tree - the thing the streak or badge

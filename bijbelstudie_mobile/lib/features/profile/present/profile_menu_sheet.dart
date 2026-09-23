@@ -10,6 +10,8 @@ import '../../admin/present/admin_providers.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../feedback/present/feedback_sheet.dart';
+import '../../feedback/present/rate_app.dart';
+import '../../premium/domain/store_copy.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import 'profile_provider.dart';
@@ -148,8 +150,19 @@ Future<void> showProfileMenuSheet(
                   _MenuRow(
                     icon: Icons.chat_bubble_outline,
                     label: 'Feedback geven',
-                    showRule: false,
                     onTap: () => go(() => showFeedbackSheet(context, ref)),
+                  ),
+                  // The one place the app may send someone to the store
+                  // listing. A row the reader taps themselves is not a
+                  // prompt, so this is allowed where an automatic hand-off
+                  // would not be - and it is the only way in for someone
+                  // whose system quota for the native sheet is spent. The
+                  // store is named because the row leaves the app.
+                  _MenuRow(
+                    icon: Icons.star_outline,
+                    label: 'Beoordeel de app in ${StoreCopy.storeInSentence}',
+                    showRule: false,
+                    onTap: () => go(() => openStoreListingForReview(ref)),
                   ),
                 ],
               ),

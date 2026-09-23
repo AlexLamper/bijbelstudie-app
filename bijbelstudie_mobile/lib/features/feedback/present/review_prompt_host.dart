@@ -7,12 +7,11 @@ import 'package:in_app_review/in_app_review.dart';
 
 import '../../../core/config/preview_config.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../onboarding/present/tour_controller.dart';
-import '../../premium/domain/store_copy.dart';
 import '../data/review_prompt.dart';
 
-/// Routes the prompt may appear over: the two calm "you have arrived" screens.
+/// Routes the review sheet may be requested over: the two calm "you have
+/// arrived" screens.
 ///
 /// Anything else is either a flow the reader is in the middle of (the reader,
 /// the note editor, checkout) or a screen that owns the whole window
@@ -21,6 +20,10 @@ const Set<String> _safeRoutes = {'/dashboard', '/profile'};
 
 /// Routes whose visit counts as real engagement once the reader has stayed
 /// [ReviewPromptThresholds.engagementDwell] on one of them.
+///
+/// Dwell is only one of the signals; the stronger ones — a finished lesson, a
+/// passed quiz, a streak milestone — are recorded where they happen and land
+/// in the same counter. See [ReviewSignal].
 const Set<String> _engagementRoutes = {
   '/read',
   '/study',
@@ -28,13 +31,29 @@ const Set<String> _engagementRoutes = {
   '/notes',
 };
 
-/// Hosts the App Store rating prompt above the router's Navigator.
+/// Picks the moment to ask the OS for a rating prompt.
 ///
-/// Renders nothing at all until the gate in [ReviewPromptState.shouldAsk]
-/// opens and the app is sitting still on a safe screen — mirroring how
-/// `TourHost` paints its spotlight from the same position. It sits above the
-/// Navigator, so it draws its own scrim and card instead of pushing a route:
-/// there is no `Navigator` in scope this high in the tree.
+/// It paints nothing. There is no card, no scrim, no stars, no "do you like
+/// the app?" — that shape of pre-prompt is banned outright: App Store Review
+/// Guideline 5.6.1 requires the provided API and disallows custom review
+/// prompts, and Play's in-app review guidelines forbid both the "do you like
+/// the app" question and any overlay around the review card. Stars we drew
+/// ourselves were dishonest on top of that, since one star and five did the
+/// same thing and neither was recorded anywhere.
+///
+/// What is allowed — and encouraged by both stores — is choosing *when* to
+/// call the API. That is all this widget does: it counts launches and
+/// engagement, waits until the app is sitting still on a safe screen, and then
+/// calls [InAppReview.requestReview] once. The OS decides the rest: the sheet
+/// is rate-limited by the system, the reader can switch it off in Settings,
+/// and a call that returns normally is no evidence anything appeared. Nothing
+/// downstream may read "asked" as "rated".
+///
+/// There is deliberately no automatic fall-back to the store listing when
+/// `requestReview` is unavailable: throwing the reader out of the app and into
+/// the store, unasked, is worse than staying quiet. The store listing is
+/// reachable only from the explicit "Beoordeel de app" row in the profile
+/// menu (`rate_app.dart`).
 class ReviewPromptHost extends ConsumerStatefulWidget {
   const ReviewPromptHost({super.key, required this.child, this.enabled = true});
 
@@ -55,7 +74,10 @@ class _ReviewPromptHostState extends ConsumerState<ReviewPromptHost> {
   Timer? _dwellTimer;
   Timer? _settleTimer;
   String? _location;
-  bool _visible = false;
+
+  /// One attempt per process, so a reader who walks in and out of /dashboard
+  /// does not get the API called at them on every return.
+  bool _askedThisSession = false;
 
   bool get _active => widget.enabled && !PreviewConfig.enabled;
 
@@ -103,162 +125,50 @@ class _ReviewPromptHostState extends ConsumerState<ReviewPromptHost> {
     _dwellTimer?.cancel();
     _settleTimer?.cancel();
 
-    // Leaving a safe screen closes an open prompt rather than letting it hover
-    // over whatever the reader navigated to.
-    if (_visible && !_safeRoutes.contains(location)) {
-      setState(() => _visible = false);
-    }
-
     if (location != null && _engagementRoutes.contains(location)) {
       _dwellTimer = Timer(ReviewPromptThresholds.engagementDwell, () {
         if (!mounted || _currentLocation() != location) return;
-        ref.read(reviewPromptProvider.notifier).recordEngagement();
+        ref
+            .read(reviewPromptProvider.notifier)
+            .recordSuccess(ReviewSignal.dwell);
       });
       return;
     }
 
-    if (location != null && _safeRoutes.contains(location) && !_visible) {
-      _settleTimer = Timer(ReviewPromptThresholds.settleDelay, _maybeShow);
+    if (location != null &&
+        _safeRoutes.contains(location) &&
+        !_askedThisSession) {
+      _settleTimer = Timer(ReviewPromptThresholds.settleDelay, _maybeAsk);
     }
   }
 
-  void _maybeShow() {
-    if (!mounted || !_active || _visible) return;
+  Future<void> _maybeAsk() async {
+    if (!mounted || !_active || _askedThisSession) return;
     if (!_safeRoutes.contains(_currentLocation())) return;
-    // Never over the guided tour: it owns the window and eats every gesture.
+    // Never during the guided tour: it owns the window and eats every gesture.
     if (ref.read(tourControllerProvider).active) return;
     if (!ref.read(reviewPromptProvider).shouldAsk(now: DateTime.now())) return;
 
-    ref.read(reviewPromptProvider.notifier).markAsked();
-    setState(() => _visible = true);
-  }
+    // Claimed before the await, so a second settle timer cannot slip past the
+    // gate while this one is waiting on the plugin.
+    _askedThisSession = true;
 
-  void _dismiss() {
-    if (!mounted) return;
-    setState(() => _visible = false);
-  }
-
-  Future<void> _rate() async {
-    _dismiss();
-    await ref.read(reviewPromptProvider.notifier).markRated();
     try {
       final review = InAppReview.instance;
-      if (await review.isAvailable()) {
-        // iOS decides whether the native sheet actually appears; it is capped
-        // per device per year and silently does nothing when spent.
-        await review.requestReview();
-      } else if (kAppStoreId.isNotEmpty) {
-        await review.openStoreListing(appStoreId: kAppStoreId);
-      }
+      if (!await review.isAvailable()) return;
+      if (!mounted) return;
+      // The reader may have walked off the safe screen while the plugin was
+      // answering; the sheet belongs over the calm screen or nowhere.
+      if (!_safeRoutes.contains(_currentLocation())) return;
+
+      await ref.read(reviewPromptProvider.notifier).markAsked();
+      await review.requestReview();
     } catch (_) {
-      // A store that will not open is not worth an error message: the reader
-      // asked to leave a rating, not to be told about a plugin.
+      // A prompt that will not open is not worth an error message: the reader
+      // did not ask for anything and has nothing to act on.
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
-      textDirection: TextDirection.ltr,
-      children: [
-        widget.child,
-        if (_visible)
-          Positioned.fill(
-            child: _ReviewPromptOverlay(onRate: _rate, onDismiss: _dismiss),
-          ),
-      ],
-    );
-  }
-}
-
-/// The card itself — a scrim, five taps, and a way out.
-class _ReviewPromptOverlay extends StatelessWidget {
-  const _ReviewPromptOverlay({required this.onRate, required this.onDismiss});
-
-  final Future<void> Function() onRate;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.45),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onDismiss,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _card(context),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _card(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      decoration: BoxDecoration(
-        color: AppTheme.paperRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: AppTheme.rule),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Vind je BijbelStudie leuk?',
-            style: AppTheme.displayTitle.copyWith(color: AppTheme.ink),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Tik op een ster om de app te beoordelen in ${StoreCopy.storeInSentence}.',
-            style: AppTheme.bodyMuted,
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 1; i <= 5; i++)
-                  IconButton(
-                    onPressed: onRate,
-                    tooltip: '$i ${i == 1 ? 'ster' : 'sterren'}',
-                    icon: Icon(
-                      Icons.star_rounded,
-                      size: 34,
-                      color: AppTheme.flame,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onDismiss,
-              style: TextButton.styleFrom(foregroundColor: AppTheme.inkMuted),
-              child: const Text('Niet nu'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => widget.child;
 }
