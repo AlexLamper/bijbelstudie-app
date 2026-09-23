@@ -8,6 +8,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
+import '../../levensboom/domain/palette.dart' show DayPhase, timeOfDayForHour;
 import '../../levensboom/domain/verse_scene.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_store.dart';
@@ -185,8 +186,9 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
               version: version,
               liked: liked,
               expanded: false,
-              onLike: () =>
-                  ref.read(dailyVerseStoreProvider.notifier).toggleLike(reference),
+              onLike: () => ref
+                  .read(dailyVerseStoreProvider.notifier)
+                  .toggleLike(reference),
               onShare: (buttonContext) =>
                   _share(buttonContext, text, reference, version),
               onMore: () => _showMore(book, chapter, verseNumber),
@@ -233,7 +235,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
           reference: reference,
           version: version,
           onShare: (buttonContext) =>
-                  _share(buttonContext, text, reference, version),
+              _share(buttonContext, text, reference, version),
           onReadChapter: () {
             Navigator.of(routeContext).pop();
             _openChapterAtVerse(book, chapter, verseNumber);
@@ -623,10 +625,7 @@ Widget dailyVerseFlightShuttle(
         // one, every Text in the card falls back to Flutter's "missing style"
         // default - yellow double underlines - for the length of the flight.
         // Transparency, so this adds a text style and nothing else.
-        child: Material(
-          type: MaterialType.transparency,
-          child: hero.child,
-        ),
+        child: Material(type: MaterialType.transparency, child: hero.child),
       );
     },
   );
@@ -727,35 +726,50 @@ class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
 
 /// The dark wash between photo and text.
 ///
-/// A flat layer plus a top-and-bottom gradient: the flat part is what
-/// guarantees contrast over a bright sky, the gradient is what keeps the
-/// eyebrow and the action row legible over a light patch at either edge.
+/// A top-and-bottom gradient keeps the eyebrow and the action row legible over
+/// a light patch at either edge. Under it sits a flat layer that follows the
+/// clock, because the backdrop does: the painted sky is bright through the
+/// day and the white serif washed out over it, while at night the sky is dark
+/// enough on its own and more wash would only cost the scene.
 ///
-/// The two compose, so what the reader sees is the product of both: roughly
-/// 71% dark at the eyebrow, 58% across the middle where the verse sits, and
-/// 75% behind the action row. That middle figure is the one that matters and
-/// the one that moved - it was 48%, which held up over the darker photographs
-/// and left the serif text washy over the bright ones. Going further starts
-/// costing the photograph, which is half of what the card is for.
+/// Two layers on purpose. This used to be one [BoxDecoration] with both a
+/// `color` and a `gradient`, and a gradient silently replaces the colour - so
+/// the flat layer, the part meant to carry contrast, was never painted.
+///
+/// Daytime composes to roughly 66% dark at the eyebrow, 51% across the middle
+/// where the verse sits and 70% behind the action row; night is the gradient
+/// alone (50 / 28 / 56).
 class _PhotoScrim extends StatelessWidget {
   const _PhotoScrim();
 
+  static double _flatAlpha(DayPhase phase) => switch (phase) {
+    DayPhase.day => 0.32,
+    DayPhase.dawn || DayPhase.dusk => 0.18,
+    DayPhase.night => 0,
+  };
+
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.50),
-            Colors.black.withValues(alpha: 0.28),
-            Colors.black.withValues(alpha: 0.56),
-          ],
-          stops: const [0, 0.45, 1],
+    final flat = _flatAlpha(timeOfDayForHour(DateTime.now().hour));
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (flat > 0) ColoredBox(color: Colors.black.withValues(alpha: flat)),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.50),
+                Colors.black.withValues(alpha: 0.28),
+                Colors.black.withValues(alpha: 0.56),
+              ],
+              stops: const [0, 0.45, 1],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -984,10 +998,8 @@ class _HistorySheet extends ConsumerWidget {
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: memory.history.length,
-                  separatorBuilder: (_, _) => Divider(
-                    height: 24,
-                    color: scheme.outline,
-                  ),
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 24, color: scheme.outline),
                   itemBuilder: (context, index) {
                     final entry = memory.history[index];
                     return InkWell(

@@ -130,7 +130,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     return [
       const SliverToBoxAdapter(child: _FilterRow()),
       if (continueStudy != null)
-        SliverToBoxAdapter(child: _ContinueRow(study: continueStudy)),
+        SliverToBoxAdapter(child: _ContinueRow(study: continueStudy.study)),
       const SliverToBoxAdapter(child: _ChapterPickerEntry()),
       if (featured.isNotEmpty)
         SliverToBoxAdapter(child: _NewThisMonth(studies: featured)),

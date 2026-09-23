@@ -69,7 +69,11 @@ class _ReaderSettingsSheet extends ConsumerWidget {
 /// whatever is behind the sheet reflows live and the choice is already
 /// persisted when the sheet closes.
 class ReaderTypographyControls extends ConsumerWidget {
-  const ReaderTypographyControls({super.key});
+  const ReaderTypographyControls({super.key, this.showPreview = true});
+
+  /// The sample verse on top. Off on Instellingen, where the chips alone are
+  /// the control and there is no text behind them to judge by anyway.
+  final bool showPreview;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -80,8 +84,10 @@ class ReaderTypographyControls extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Preview(settings: settings),
-        const SizedBox(height: 20),
+        if (showPreview) ...[
+          _Preview(settings: settings),
+          const SizedBox(height: 20),
+        ],
         _ChipRow<ReaderFontSize>(
           label: 'Tekstgrootte',
           values: ReaderFontSize.values,

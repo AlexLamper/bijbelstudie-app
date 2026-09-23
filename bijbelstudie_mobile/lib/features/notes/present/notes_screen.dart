@@ -31,7 +31,10 @@ class NotesScreen extends ConsumerStatefulWidget {
 
 class _NotesScreenState extends ConsumerState<NotesScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 3, vsync: this);
+  late final TabController _tabController = TabController(
+    length: 3,
+    vsync: this,
+  );
 
   @override
   void dispose() {
@@ -75,7 +78,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: const [_NotesTab(), _HighlightsTab(), _BookmarksTab()],
+                children: const [
+                  _NotesTab(),
+                  _HighlightsTab(),
+                  _BookmarksTab(),
+                ],
               ),
             ),
           ],
@@ -160,25 +167,31 @@ class _NotesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notesAsync = ref.watch(notesListProvider);
 
-    return notesAsync.when(
-      loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
-      data: (notes) {
-        if (notes.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.edit_note,
-            title: 'Nog geen notities',
-            description:
-                'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven.',
+    return _Refreshable(
+      child: notesAsync.when(
+        loading: () => const SkeletonList(),
+        error: (_, _) => const _Fill(child: _LoadError()),
+        data: (notes) {
+          if (notes.isEmpty) {
+            return const _Fill(
+              child: AppEmptyState(
+                icon: Icons.edit_note,
+                title: 'Nog geen notities',
+                description:
+                    'Houd een vers ingedrukt in de lezer om er een notitie bij te schrijven.',
+              ),
+            );
+          }
+          final sorted = [...notes]
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) => NoteRow(note: sorted[index]),
           );
-        }
-        final sorted = [...notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) => NoteRow(note: sorted[index]),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -190,25 +203,30 @@ class _HighlightsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final highlightsAsync = ref.watch(highlightsListProvider);
 
-    return highlightsAsync.when(
-      loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
-      data: (highlights) {
-        if (highlights.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.brush_outlined,
-            title: 'Nog geen markeringen',
-            description: 'Houd een vers ingedrukt en kies een kleur.',
+    return _Refreshable(
+      child: highlightsAsync.when(
+        loading: () => const SkeletonList(),
+        error: (_, _) => const _Fill(child: _LoadError()),
+        data: (highlights) {
+          if (highlights.isEmpty) {
+            return const _Fill(
+              child: AppEmptyState(
+                icon: Icons.brush_outlined,
+                title: 'Nog geen markeringen',
+                description: 'Houd een vers ingedrukt en kies een kleur.',
+              ),
+            );
+          }
+          final sorted = [...highlights]
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) => NoteRow(note: sorted[index]),
           );
-        }
-        final sorted = [...highlights]
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) => NoteRow(note: sorted[index]),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -221,59 +239,64 @@ class _BookmarksTab extends ConsumerWidget {
     AppTheme.dependOn(context);
     final bookmarksAsync = ref.watch(bookmarksProvider);
 
-    return bookmarksAsync.when(
-      loading: () => const SkeletonList(),
-      error: (_, _) => const _LoadError(),
-      data: (bookmarks) {
-        if (bookmarks.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.bookmark_outline,
-            title: 'Nog geen bladwijzers',
-            description: 'Bewaar een vers om er later snel bij te komen.',
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: bookmarks.length,
-          itemBuilder: (context, index) {
-            final bookmark = bookmarks[index];
-            return NoteListRow(
-              onMenu: () => _handleMenu(context, ref, bookmark),
-              onTap: () {
-                ref
-                    .read(readerLocationProvider.notifier)
-                    .openChapter(
-                      versionId: bookmark.version,
-                      book: bookmark.book,
-                      chapter: bookmark.chapter,
-                    );
-                context.go('/read');
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  NoteMetaLine(
-                    reference: bookmark.reference,
-                    date: dutchRelativeDate(bookmark.updatedAt),
-                  ),
-                  if (bookmark.label != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      bookmark.label!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.bodyMuted.copyWith(
-                        height: 1.6,
-                        color: AppTheme.ink,
-                      ),
-                    ),
-                  ],
-                ],
+    return _Refreshable(
+      child: bookmarksAsync.when(
+        loading: () => const SkeletonList(),
+        error: (_, _) => const _Fill(child: _LoadError()),
+        data: (bookmarks) {
+          if (bookmarks.isEmpty) {
+            return const _Fill(
+              child: AppEmptyState(
+                icon: Icons.bookmark_outline,
+                title: 'Nog geen bladwijzers',
+                description: 'Bewaar een vers om er later snel bij te komen.',
               ),
             );
-          },
-        );
-      },
+          }
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 96),
+            itemCount: bookmarks.length,
+            itemBuilder: (context, index) {
+              final bookmark = bookmarks[index];
+              return NoteListRow(
+                onMenu: () => _handleMenu(context, ref, bookmark),
+                onTap: () {
+                  ref
+                      .read(readerLocationProvider.notifier)
+                      .openChapter(
+                        versionId: bookmark.version,
+                        book: bookmark.book,
+                        chapter: bookmark.chapter,
+                      );
+                  context.go('/read');
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    NoteMetaLine(
+                      reference: bookmark.reference,
+                      date: dutchRelativeDate(bookmark.updatedAt),
+                    ),
+                    if (bookmark.label != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        bookmark.label!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.bodyMuted.copyWith(
+                          height: 1.6,
+                          color: AppTheme.ink,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -300,7 +323,8 @@ class _BookmarksTab extends ConsumerWidget {
     final confirmed = await confirmNoteDelete(
       context,
       title: 'Bladwijzer verwijderen',
-      message: 'Weet je zeker dat je de bladwijzer bij ${bookmark.reference} wilt verwijderen?',
+      message:
+          'Weet je zeker dat je de bladwijzer bij ${bookmark.reference} wilt verwijderen?',
     );
     if (!confirmed || !context.mounted) return;
 
@@ -325,17 +349,19 @@ class _BookmarksTab extends ConsumerWidget {
               try {
                 // A fresh id: the server tombstoned the old one on delete and
                 // answers 409 to anything that tries to bring it back.
-                await container.read(notesRepositoryProvider).saveBookmark(
-                  Bookmark(
-                    id: newClientId(),
-                    book: bookmark.book,
-                    chapter: bookmark.chapter,
-                    verse: bookmark.verse,
-                    version: bookmark.version,
-                    label: bookmark.label,
-                    updatedAt: DateTime.now(),
-                  ),
-                );
+                await container
+                    .read(notesRepositoryProvider)
+                    .saveBookmark(
+                      Bookmark(
+                        id: newClientId(),
+                        book: bookmark.book,
+                        chapter: bookmark.chapter,
+                        verse: bookmark.verse,
+                        version: bookmark.version,
+                        label: bookmark.label,
+                        updatedAt: DateTime.now(),
+                      ),
+                    );
                 container.invalidate(bookmarksProvider);
               } on SyncRejectedException catch (e) {
                 messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -352,6 +378,64 @@ class _BookmarksTab extends ConsumerWidget {
   }
 }
 
+/// Pull to refresh, from any of the three tabs.
+///
+/// All three lists are fetched again, not just the visible one: the header
+/// counts read two of them, and a reader who pulls expects the whole screen to
+/// be current. Offline edits are pushed first so the fresh lists include them.
+/// A failed request keeps the list already on screen.
+class _Refreshable extends ConsumerWidget {
+  const _Refreshable({required this.child});
+
+  final Widget child;
+
+  Future<void> _refresh(WidgetRef ref) async {
+    Future<void> quiet(Future<Object?> request) async {
+      try {
+        await request;
+      } catch (_) {}
+    }
+
+    await quiet(ref.read(notesRepositoryProvider).flushPendingChanges());
+    await Future.wait<void>([
+      quiet(ref.refresh(notesListProvider.future)),
+      quiet(ref.refresh(highlightsListProvider.future)),
+      quiet(ref.refresh(bookmarksProvider.future)),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    return RefreshIndicator(
+      color: AppTheme.teal,
+      backgroundColor: AppTheme.paperRaised,
+      onRefresh: () => _refresh(ref),
+      child: child,
+    );
+  }
+}
+
+/// A non-scrolling state - empty, or failed to load - made scrollable at full
+/// height, so it can be pulled down like the list it stands in for.
+class _Fill extends StatelessWidget {
+  const _Fill({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: child),
+        ),
+      ),
+    );
+  }
+}
 
 class _LoadError extends StatelessWidget {
   const _LoadError();

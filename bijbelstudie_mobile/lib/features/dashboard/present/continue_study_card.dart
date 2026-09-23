@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../studies/data/study_models.dart';
 import '../../studies/present/studies_providers.dart';
 import '../../studies/present/study_banner.dart';
 import '../data/dashboard_models.dart';
@@ -164,44 +163,4 @@ class ContinueStudyCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// The study [ContinueStudyCard] renders, or null. Derived from cached
-/// providers only (§3): no new repository code.
-final continueStudyProvider = Provider.autoDispose<ContinuePick?>((ref) {
-  final studies = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
-  if (studies.isEmpty) return null;
-
-  ContinuePick? best;
-  DateTime bestActivity = DateTime.fromMillisecondsSinceEpoch(0);
-
-  for (final study in studies) {
-    final status = ref.watch(studyStatusProvider(study));
-    if (status.completed) continue;
-    if (!status.started) continue;
-    final activity = status.enrollment?.lastActivityAt ??
-        status.enrollment?.startedAt ??
-        DateTime.fromMillisecondsSinceEpoch(1);
-    if (best == null || activity.isAfter(bestActivity)) {
-      best = ContinuePick(
-        study: study,
-        resumeDay: status.resumeDay(study),
-        completed: status.done,
-      );
-      bestActivity = activity;
-    }
-  }
-  return best;
-});
-
-class ContinuePick {
-  const ContinuePick({
-    required this.study,
-    required this.resumeDay,
-    required this.completed,
-  });
-
-  final CuratedStudy study;
-  final int resumeDay;
-  final int completed;
 }

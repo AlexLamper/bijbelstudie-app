@@ -40,8 +40,9 @@ import 'source_picker_sheet.dart';
 ///
 /// Consumed (reset to null) the moment it is acted on, so a later chapter
 /// change (next-chapter button, book picker) never re-triggers it.
-final pendingVerseAnchorProvider =
-    NotifierProvider<PendingVerseAnchor, int?>(PendingVerseAnchor.new);
+final pendingVerseAnchorProvider = NotifierProvider<PendingVerseAnchor, int?>(
+  PendingVerseAnchor.new,
+);
 
 class PendingVerseAnchor extends Notifier<int?> {
   @override
@@ -212,7 +213,9 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   void _persistPosition() {
     if (!mounted || !_scrollController.hasClients) return;
     final max = _scrollController.position.maxScrollExtent;
-    final progress = max <= 0 ? 0.0 : (_scrollController.offset / max).clamp(0.0, 1.0);
+    final progress = max <= 0
+        ? 0.0
+        : (_scrollController.offset / max).clamp(0.0, 1.0);
     final location = ref.read(readerLocationProvider);
 
     unawaited(
@@ -271,17 +274,14 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
       // (RETENTION_PLAN §2) - mirror it locally and re-derive the ladder so a
       // reminder for today is cancelled.
       unawaited(
-        ref.read(retentionStoreProvider.notifier).markCompleted().then(
-          (_) {
-            if (!mounted) return;
-            ref.invalidate(notificationRecomputeProvider);
-            // The reader who never opens a study still earns the ask here
-            // (`AVATAR_NOTIFICATIONS_PLAN.md` §7). Both moments are no-ops
-            // until they are earned, and the ask is only ever spent once.
-            unawaited(maybeAskAfterReading(context, ref));
-          },
-          onError: (_) {},
-        ),
+        ref.read(retentionStoreProvider.notifier).markCompleted().then((_) {
+          if (!mounted) return;
+          ref.invalidate(notificationRecomputeProvider);
+          // The reader who never opens a study still earns the ask here
+          // (`AVATAR_NOTIFICATIONS_PLAN.md` §7). Both moments are no-ops
+          // until they are earned, and the ask is only ever spent once.
+          unawaited(maybeAskAfterReading(context, ref));
+        }, onError: (_) {}),
       );
     });
   }
@@ -293,7 +293,10 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   /// would spend the single attempt this mount gets and leave anyone who tabs
   /// away and back at the top of the chapter, so the key is only recorded once
   /// there is an answer to act on.
-  void _restoreScrollIfNeeded(ReaderLocation location, List<ReadingPosition>? positions) {
+  void _restoreScrollIfNeeded(
+    ReaderLocation location,
+    List<ReadingPosition>? positions,
+  ) {
     if (positions == null) return;
 
     final key = '${location.versionId}/${location.book}/${location.chapter}';
@@ -351,8 +354,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
         controller: _scrollController,
         index: index,
         itemCount: chapter.verses.length,
-        contextFor: (i) =>
-            _verseKeys[chapter.verses[i].number]?.currentContext,
+        contextFor: (i) => _verseKeys[chapter.verses[i].number]?.currentContext,
         alignment: 0.2,
         animate: !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
         duration: const Duration(milliseconds: 420),
@@ -396,9 +398,12 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
     // shell Scaffold has a bottomNavigationBar, so it strips the bottom padding
     // from its body even while that bar is collapsed - the context says 0 and
     // on Android 15+ edge-to-edge the nav row sat under the system buttons.
-    final bottomInset = MediaQueryData.fromView(View.of(context)).padding.bottom;
+    final bottomInset = MediaQueryData.fromView(
+      View.of(context),
+    ).padding.bottom;
     // Reduced motion: the padding snaps, exactly as the bars themselves do.
-    final chromeDuration = MediaQuery.maybeOf(context)?.disableAnimations ?? false
+    final chromeDuration =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false
         ? Duration.zero
         : ReaderChromeReveal.duration;
 
@@ -416,7 +421,10 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                 children: [
                   TourAnchor(
                     id: TourAnchorIds.readerBar,
-                    child: _ReaderBar(location: location, embedded: widget.embedded),
+                    child: _ReaderBar(
+                      location: location,
+                      embedded: widget.embedded,
+                    ),
                   ),
                   RuleLine(color: AppTheme.rule),
                 ],
@@ -447,7 +455,8 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                         chapter: chapter,
                         settings: settings,
                         scrollController: _scrollController,
-                        onVerseLongPress: (verse) => _openVerseActions(chapter, verse),
+                        onVerseLongPress: (verse) =>
+                            _openVerseActions(chapter, verse),
                         verseKey: (number) => _verseKey(locationKey, number),
                         pulsingVerse: _pulsingVerse,
                       );
@@ -503,8 +512,11 @@ class _ReaderBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
-    final versions = ref.watch(bibleVersionsProvider).value ?? const <BibleSource>[];
-    final version = versions.where((v) => v.id == location.versionId).firstOrNull;
+    final versions =
+        ref.watch(bibleVersionsProvider).value ?? const <BibleSource>[];
+    final version = versions
+        .where((v) => v.id == location.versionId)
+        .firstOrNull;
 
     // A translation can leave the app between releases - Luther 1912 was
     // dropped from the mobile allowlist - and the id the reader last used is
@@ -561,28 +573,44 @@ class _ReaderBar extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _ToolButton(
-                      icon: Icons.search,
-                      tooltip: 'Zoeken in de Bijbel',
-                      onTap: () => context.push(
-                        '/search?book=${Uri.encodeComponent(location.book)}',
+                    // Lined up by their 34px boxes, the tools stop well short of
+                    // the edge the Bijbel/Studie switch above them ends on: the
+                    // last one is "meer", three narrow dots in the middle of its
+                    // box. Shifted as one group so the dots end on that edge and
+                    // the gaps between the tools stay even.
+                    Transform.translate(
+                      offset: const Offset(_ToolSlot.trailingGlyphInset, 0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ToolButton(
+                            icon: Icons.search,
+                            tooltip: 'Zoeken in de Bijbel',
+                            onTap: () => context.push(
+                              '/search?book=${Uri.encodeComponent(location.book)}',
+                            ),
+                          ),
+                          _ToolButton(
+                            glyph: 'Aa',
+                            tooltip: 'Weergave',
+                            onTap: () => showReaderSettingsSheet(context, ref),
+                          ),
+                          if (canStudyChapter(location.book))
+                            _ToolButton(
+                              icon: Icons.school_outlined,
+                              tooltip: 'Bestudeer dit hoofdstuk',
+                              onTap: () => context.push(
+                                chapterStudyRoute(
+                                  location.book,
+                                  location.chapter,
+                                ),
+                              ),
+                            ),
+                          _OfflineButton(location: location),
+                          _MoreButton(location: location),
+                        ],
                       ),
                     ),
-                    _ToolButton(
-                      glyph: 'Aa',
-                      tooltip: 'Weergave',
-                      onTap: () => showReaderSettingsSheet(context, ref),
-                    ),
-                    if (canStudyChapter(location.book))
-                      _ToolButton(
-                        icon: Icons.school_outlined,
-                        tooltip: 'Bestudeer dit hoofdstuk',
-                        onTap: () => context.push(
-                          chapterStudyRoute(location.book, location.chapter),
-                        ),
-                      ),
-                    _OfflineButton(location: location),
-                    _MoreButton(location: location),
                   ],
                 ),
               ),
@@ -665,7 +693,11 @@ class _VersionPill extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Icon(Icons.keyboard_arrow_down, size: 12, color: AppTheme.inkMuted),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 12,
+                    color: AppTheme.inkMuted,
+                  ),
                 ],
               ),
             ),
@@ -741,10 +773,16 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
-/// The 36x44 slot a tool sits in, its 34x34 box flush right so the last box
-/// lines up with the header's 16px edge and every gap is exactly 2.
+/// The 36x44 slot a tool sits in, its 34x34 box flush right so every gap is
+/// exactly 2. The header shifts the whole group by [trailingGlyphInset], so the
+/// last glyph - not its box - meets the header's 16px edge.
 class _ToolSlot extends StatelessWidget {
   const _ToolSlot({required this.child, this.active = false});
+
+  /// How far inside its box the right edge of the "meer" dots is drawn: the
+  /// 19px icon is centred in the 34px box, and `more_vert`'s dots end at 14 of
+  /// its 24 units.
+  static const double trailingGlyphInset = (34 - 19) / 2 + 19 * (24 - 14) / 24;
 
   final Widget child;
   final bool active;
@@ -787,7 +825,9 @@ class _OfflineButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref
-        .watch(bookOfflineStatusProvider(BookRef(location.versionId, location.book)))
+        .watch(
+          bookOfflineStatusProvider(BookRef(location.versionId, location.book)),
+        )
         .value;
     final complete = status?.isComplete ?? false;
 
@@ -883,7 +923,10 @@ class _ChapterBody extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 48),
       children: [
-        if (chapter.fromCache) ...[const _OfflineNotice(), const SizedBox(height: 16)],
+        if (chapter.fromCache) ...[
+          const _OfflineNotice(),
+          const SizedBox(height: 16),
+        ],
         for (final verse in chapter.verses)
           _VerseRow(
             key: verseKey(verse.number),
@@ -899,16 +942,21 @@ class _ChapterBody extends StatelessWidget {
           // A plain OutlinedButton rather than SiteOutlineButton: its label
           // must be free to wrap at large text sizes instead of overflowing.
           OutlinedButton(
-            onPressed: () => context.push(
-              chapterStudyRoute(chapter.book, chapter.chapter),
+            onPressed: () =>
+                context.push(chapterStudyRoute(chapter.book, chapter.chapter)),
+            child: const Text(
+              'Bestudeer dit hoofdstuk',
+              textAlign: TextAlign.center,
             ),
-            child: const Text('Bestudeer dit hoofdstuk', textAlign: TextAlign.center),
           ),
           const SizedBox(height: 24),
         ],
         const RuleLine(),
         const SizedBox(height: 12),
-        Text(chapter.attribution, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
+        Text(
+          chapter.attribution,
+          style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+        ),
       ],
     );
   }

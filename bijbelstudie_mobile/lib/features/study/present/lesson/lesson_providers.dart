@@ -60,6 +60,7 @@ class LessonCursor {
     required this.depthPanel,
     required this.reflectionText,
     this.practicesDone = const {},
+    this.quizAnswers = const {},
     this.previouslyCompleted = false,
     this.summary,
   });
@@ -133,6 +134,13 @@ class LessonCursor {
   /// than in the step so a tick survives walking away and back.
   final Set<String> practicesDone;
 
+  /// The quiz picks made in this session, question id → answer id. Toetsing
+  /// is rebuilt every time the reader walks away and back - typically to
+  /// re-read the passage mid-quiz - so its own state does not survive; this
+  /// does, and the step resumes on the question it was left on without
+  /// waiting for the server's copy.
+  final Map<String, String> quizAnswers;
+
   /// Set once the lesson is finished; the shell then shows the summary card
   /// instead of a step.
   final CompletionSummary? summary;
@@ -146,6 +154,7 @@ class LessonCursor {
     String? depthPanel,
     String? reflectionText,
     Set<String>? practicesDone,
+    Map<String, String>? quizAnswers,
     CompletionSummary? summary,
   }) {
     return LessonCursor(
@@ -156,6 +165,7 @@ class LessonCursor {
       depthPanel: depthPanel ?? this.depthPanel,
       reflectionText: reflectionText ?? this.reflectionText,
       practicesDone: practicesDone ?? this.practicesDone,
+      quizAnswers: quizAnswers ?? this.quizAnswers,
       summary: summary ?? this.summary,
     );
   }

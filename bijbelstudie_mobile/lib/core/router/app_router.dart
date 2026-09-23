@@ -431,11 +431,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/studie/:studyId/:day',
-        builder: (context, state) => LessonScreen(
-          studyId: state.pathParameters['studyId']!,
-          day: int.tryParse(state.pathParameters['day'] ?? '') ?? 1,
-          initialStep: state.uri.queryParameters['stap'],
-        ),
+        builder: (context, state) {
+          final studyId = state.pathParameters['studyId']!;
+          final day = int.tryParse(state.pathParameters['day'] ?? '') ?? 1;
+          return LessonScreen(
+            // Keyed by lesson because every lesson-to-lesson move - "Verder
+            // met les N", the lesson navigator - is a `context.replace`, and
+            // go_router reuses the page for a replace. Without the key the
+            // screen kept the previous lesson's state: after finishing les 1
+            // the completion card stayed up over les 2's payload, and its
+            // "Verder met les 2" replaced /2 with /2 - a tap with no reaction.
+            key: ValueKey('lesson:$studyId:$day'),
+            studyId: studyId,
+            day: day,
+            initialStep: state.uri.queryParameters['stap'],
+          );
+        },
       ),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       // Beheer. The screen hides itself for a non-admin and every call it

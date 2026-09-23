@@ -13,6 +13,7 @@ import '../../../../core/ui/skeleton.dart';
 import '../../../ai/present/ai_assistant_pane.dart';
 import '../../../dashboard/data/dashboard_repository.dart';
 import '../../../dashboard/present/dashboard_providers.dart';
+import '../../../feedback/data/review_prompt.dart';
 import '../../../levensboom/present/levensboom_celebration.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
 import '../../../settings/data/reading_settings.dart';
@@ -163,6 +164,21 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     _bestEffort(currentStep: step);
   }
 
+  /// A tap on the rail. Leaving a step that way counts it as done, exactly as
+  /// Volgende does - otherwise the segment the reader was just on, lit only
+  /// because it was current, goes grey the moment they tap away from it.
+  void _jumpToStep(StudyStep step) {
+    final cursor = _cursor!;
+    if (step == cursor.step) return;
+    setState(
+      () => _cursor = cursor.copyWith(
+        step: step,
+        completed: {...cursor.completed, cursor.step},
+      ),
+    );
+    _bestEffort(completeStep: cursor.step, currentStep: step);
+  }
+
   Future<void> _next(LessonPayload lesson, List<StudyStep> steps) async {
     final cursor = _cursor!;
     final index = steps.indexOf(cursor.step);
@@ -221,6 +237,16 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         }, onError: (_, __) {}),
       );
       ref.invalidate(notificationRecomputeProvider);
+
+      // A finished lesson is the app working as promised, so it counts towards
+      // the rating gate. Silent on purpose: nothing is shown here, and the
+      // native sheet is left to `ReviewPromptHost` to fire later on a calm
+      // screen rather than over the celebration the reader just earned.
+      unawaited(
+        ref
+            .read(reviewPromptProvider.notifier)
+            .recordSuccess(ReviewSignal.lessonCompleted),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -481,7 +507,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             if (cursor.previouslyCompleted ||
                 cursor.completed.contains(step) ||
                 target <= index) {
-              _goToStep(step);
+              _jumpToStep(step);
             }
           },
         ),
@@ -540,7 +566,14 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
               setState(() => _cursor = _cursor!.copyWith(practicesDone: done)),
         );
       case StudyStep.quiz:
-        return LessonQuizStep(lesson: lesson, lessonRef: _ref);
+        return LessonQuizStep(
+          lesson: lesson,
+          lessonRef: _ref,
+          answers: cursor.quizAnswers,
+          onAnswersChanged: (answers) =>
+              _cursor = _cursor!.copyWith(quizAnswers: answers),
+          onSkip: _busy ? null : () => _next(lesson, lesson.steps),
+        );
       case StudyStep.done:
         return const SizedBox.shrink();
     }

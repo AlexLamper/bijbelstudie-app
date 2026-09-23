@@ -234,20 +234,50 @@ final studyStatusProvider = Provider.autoDispose.family<StudyStatus, CuratedStud
   );
 });
 
-/// The study the "verder waar je was" row on Studies · Ontdek offers.
+/// The study to pick up again: the most recently active one that is started
+/// and not finished, or null.
 ///
-/// Derived, not stored: the first study in catalogue order that is started and
-/// not finished. The enrollment carries no "last opened" timestamp, so there is
-/// nothing more recent to sort on — catalogue order at least keeps the answer
-/// stable between builds instead of shuffling under the reader.
-final continueStudyProvider = Provider.autoDispose<CuratedStudy?>((ref) {
+/// One answer for every "waar je gebleven was" surface - the Start tab's card,
+/// the streak sheet and the row on Studies · Ontdek - so they cannot disagree.
+/// Sorted on the enrollment's `lastActivityAt`, which the server bumps on every
+/// cursor write, falling back to `startedAt`. A study known only from the device
+/// copy has neither and loses to any enrollment; among those, catalogue order
+/// breaks the tie so the answer stays stable between builds.
+final continueStudyProvider = Provider.autoDispose<ContinuePick?>((ref) {
   final all = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
+
+  ContinuePick? best;
+  DateTime bestActivity = DateTime.fromMillisecondsSinceEpoch(0);
+
   for (final study in all) {
     final status = ref.watch(studyStatusProvider(study));
-    if (status.started && !status.completed) return study;
+    if (!status.started || status.completed) continue;
+    final activity = status.enrollment?.lastActivityAt ??
+        status.enrollment?.startedAt ??
+        DateTime.fromMillisecondsSinceEpoch(1);
+    if (best == null || activity.isAfter(bestActivity)) {
+      best = ContinuePick(
+        study: study,
+        resumeDay: status.resumeDay(study),
+        completed: status.done,
+      );
+      bestActivity = activity;
+    }
   }
-  return null;
+  return best;
 });
+
+class ContinuePick {
+  const ContinuePick({
+    required this.study,
+    required this.resumeDay,
+    required this.completed,
+  });
+
+  final CuratedStudy study;
+  final int resumeDay;
+  final int completed;
+}
 
 /// How far along a single bible book is, for the tiles on Alle studies.
 enum BookProgress {

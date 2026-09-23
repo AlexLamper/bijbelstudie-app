@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
+import '../../bible/present/reader_settings_sheet.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
@@ -20,9 +21,9 @@ import '../data/reading_settings.dart';
 import 'theme_mode_provider.dart';
 
 /// Settings, as one ruled list: titled groups divided by full-bleed rules, each
-/// a run of [_SettingsRow]s - label left, value / switch / chevron right.
-/// Multi-choice options open a bottom sheet with the same choices instead of
-/// spreading chips through the list.
+/// a run of [_SettingsRow]s - label left, control / switch / chevron right.
+/// Choices are made in place: Thema is a segmented control on its row, and the
+/// reading preferences are the same chip rows the reader's Weergave sheet uses.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -91,11 +92,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // and resolves AppTheme's brightness from it.
               _SettingsRow(
                 label: 'Thema',
-                value: settings.themeMode.label,
-                onTap: () => _pickThemeMode(
-                  context,
-                  current: settings.themeMode,
-                  onChanged: controller.setThemeMode,
+                trailing: AppSegmentedControl(
+                  labels: [
+                    for (final mode in ThemeModeLabelX.pickerOrder) mode.label,
+                  ],
+                  selectedIndex: ThemeModeLabelX.pickerOrder.indexOf(
+                    settings.themeMode,
+                  ),
+                  onChanged: (index) {
+                    final picked = ThemeModeLabelX.pickerOrder[index];
+                    if (picked != settings.themeMode) {
+                      controller.setThemeMode(picked);
+                    }
+                  },
                 ),
               ),
             ],
@@ -103,62 +112,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingsGroup(
             title: 'Leesweergave',
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: _SamplePreview(settings: settings),
-              ),
-              _SettingsRow(
-                label: 'Tekstgrootte',
-                value: settings.fontSize.label,
-                onTap: () => _pickReaderOption<ReaderFontSize>(
-                  context,
-                  title: 'Tekstgrootte',
-                  values: ReaderFontSize.values,
-                  selectedOf: (s) => s.fontSize,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setFontSize,
-                ),
-              ),
-              _SettingsRow(
-                label: 'Regelafstand',
-                value: settings.lineHeight.label,
-                onTap: () => _pickReaderOption<ReaderLineHeight>(
-                  context,
-                  title: 'Regelafstand',
-                  values: ReaderLineHeight.values,
-                  selectedOf: (s) => s.lineHeight,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setLineHeight,
-                ),
-              ),
-              _SettingsRow(
-                label: 'Lettertype',
-                value: settings.fontFamily.label,
-                onTap: () => _pickReaderOption<ReaderFontFamily>(
-                  context,
-                  title: 'Lettertype',
-                  values: ReaderFontFamily.values,
-                  selectedOf: (s) => s.fontFamily,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setFontFamily,
-                ),
-              ),
-              _SettingsRow(
-                label: 'Letterafstand',
-                value: settings.letterSpacing.label,
-                onTap: () => _pickReaderOption<ReaderLetterSpacing>(
-                  context,
-                  title: 'Letterafstand',
-                  values: ReaderLetterSpacing.values,
-                  selectedOf: (s) => s.letterSpacing,
-                  labelOf: (v) => v.label,
-                  onChanged: controller.setLetterSpacing,
-                ),
-              ),
-              _SettingsRow(
-                label: 'Versnummers tonen',
-                switchValue: settings.showVerseNumbers,
-                onSwitchChanged: controller.setShowVerseNumbers,
+              // The same chips the reader's Weergave sheet shows, so the two
+              // places that set these cannot drift apart.
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: ReaderTypographyControls(showPreview: false),
               ),
             ],
           ),
@@ -210,43 +168,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-}
-
-Future<void> _pickThemeMode(
-  BuildContext context, {
-  required ThemeMode current,
-  required ValueChanged<ThemeMode> onChanged,
-}) async {
-  final picked = await showModalBottomSheet<ThemeMode>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => _ThemeModeSheet(selected: current),
-  );
-  // Applied only once the sheet has been popped: the switch rekeys the whole
-  // app, and a sheet still on screen would be repainted mid-dismissal.
-  if (picked != null && picked != current) onChanged(picked);
-}
-
-void _pickReaderOption<T>(
-  BuildContext context, {
-  required String title,
-  required List<T> values,
-  required T Function(ReadingSettings settings) selectedOf,
-  required String Function(T value) labelOf,
-  required ValueChanged<T> onChanged,
-}) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (_) => _ReaderOptionSheet<T>(
-      title: title,
-      values: values,
-      selectedOf: selectedOf,
-      labelOf: labelOf,
-      onChanged: onChanged,
-    ),
-  );
 }
 
 /// OS-truth notification state for the master row - never taken from the stored
@@ -609,124 +530,6 @@ class _TimeButton extends StatelessWidget {
   }
 }
 
-/// The reader's own text, set the way the current preferences say.
-class _SamplePreview extends StatelessWidget {
-  const _SamplePreview({required this.settings});
-
-  final ReadingSettings settings;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Text.rich(
-        TextSpan(
-          children: [
-            if (settings.showVerseNumbers)
-              TextSpan(
-                text: '1 ',
-                style: TextStyle(
-                  fontFamily: AppTheme.sansFontName,
-                  fontSize: settings.fontSize.points * 0.62,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.inkMuted,
-                ),
-              ),
-            const TextSpan(text: 'In den beginne schiep God den hemel en de aarde.'),
-          ],
-        ),
-        style: TextStyle(
-          fontFamily: settings.fontFamily.fontName,
-          fontSize: settings.fontSize.points,
-          height: settings.lineHeight.factor,
-          letterSpacing: settings.letterSpacing.points,
-          color: Theme.of(context).textTheme.bodyLarge?.color,
-        ),
-      ),
-    );
-  }
-}
-
-/// Licht / Donker / Systeem as a picker sheet. Returns the choice through
-/// `Navigator.pop` so the caller applies it after the sheet is gone.
-class _ThemeModeSheet extends StatelessWidget {
-  const _ThemeModeSheet({required this.selected});
-
-  final ThemeMode selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _SettingsGroup(
-          title: 'Thema',
-          first: true,
-          children: [
-            for (final mode in ThemeModeLabelX.pickerOrder)
-              _SettingsRow(
-                icon: mode.icon,
-                label: mode.label,
-                selected: mode == selected,
-                onTap: () => Navigator.of(context).pop(mode),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One reading preference as a picker sheet, with the sample text above the
-/// choices so a tap shows its effect right away. The sheet stays open while
-/// the reader compares options; the drag handle closes it.
-class _ReaderOptionSheet<T> extends ConsumerWidget {
-  const _ReaderOptionSheet({
-    required this.title,
-    required this.values,
-    required this.selectedOf,
-    required this.labelOf,
-    required this.onChanged,
-  });
-
-  final String title;
-  final List<T> values;
-  final T Function(ReadingSettings settings) selectedOf;
-  final String Function(T value) labelOf;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watched here rather than passed in: the sheet outlives the tap, so the
-    // sample and the check mark have to follow the store.
-    final settings = ref.watch(readingSettingsProvider);
-    final selected = selectedOf(settings);
-
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _SettingsGroup(
-          title: title,
-          first: true,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: _SamplePreview(settings: settings),
-            ),
-            for (final value in values)
-              _SettingsRow(
-                label: labelOf(value),
-                selected: value == selected,
-                onTap: () => onChanged(value),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Marker for widgets that render as a [_SettingsRow]; [_SettingsGroup] only
 /// draws a hairline between two neighbours that both carry it, so cards and
 /// paragraphs inside a group are never underlined.
@@ -779,32 +582,26 @@ class _SettingsGroup extends StatelessWidget {
 }
 
 /// One row of a [_SettingsGroup]: label and optional subtitle on the left; on
-/// the right - only the ones that apply, in this order - a muted value, a
-/// custom trailing widget, a switch, a check mark (picker sheets) or a chevron
-/// (rows that open something). A switch row flips its switch when tapped.
+/// the right - only the ones that apply, in this order - a custom trailing
+/// widget, a switch or a chevron (rows that open something). A switch row flips
+/// its switch when tapped.
 class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
   const _SettingsRow({
     required this.label,
     this.subtitle,
-    this.icon,
-    this.value,
     this.trailing,
     this.onTap,
     this.switchValue,
     this.onSwitchChanged,
-    this.selected,
   }) : assert(switchValue == null || onTap == null,
             'a switch row toggles on tap; it cannot also open something');
 
   final String label;
   final String? subtitle;
-  final IconData? icon;
-  final String? value;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool? switchValue;
   final ValueChanged<bool>? onSwitchChanged;
-  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -816,7 +613,7 @@ class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
             ? () => onSwitchChanged!(!switchValue!)
             : null);
     final showChevron =
-        onTap != null && !isSwitch && selected == null && trailing == null;
+        onTap != null && !isSwitch && trailing == null;
     final inkColor = dimmed ? AppTheme.inkFaint : AppTheme.ink;
 
     final content = ConstrainedBox(
@@ -825,10 +622,6 @@ class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Row(
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 20, color: dimmed ? AppTheme.inkFaint : AppTheme.inkMuted),
-              const SizedBox(width: 14),
-            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,18 +641,6 @@ class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
                 ],
               ),
             ),
-            if (value != null) ...[
-              const SizedBox(width: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 150),
-                child: Text(
-                  value!,
-                  style: AppTheme.bodyMuted,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
             if (trailing != null) ...[const SizedBox(width: 8), trailing!],
             if (isSwitch) ...[
               const SizedBox(width: 8),
@@ -867,14 +648,6 @@ class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
                 value: switchValue!,
                 onChanged: onSwitchChanged,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ],
-            if (selected != null) ...[
-              const SizedBox(width: 8),
-              Icon(
-                Icons.check,
-                size: 20,
-                color: selected! ? AppTheme.teal : Colors.transparent,
               ),
             ],
             if (showChevron) ...[

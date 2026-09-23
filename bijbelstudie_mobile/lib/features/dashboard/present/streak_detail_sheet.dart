@@ -10,8 +10,8 @@ import '../../levensboom/domain/tree_state.dart';
 import '../../levensboom/present/levensboom_avatar.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../levensboom/present/mini_tree.dart';
+import '../../studies/present/studies_providers.dart';
 import '../data/dashboard_models.dart';
-import 'continue_study_card.dart';
 
 /// The detail panel behind the header streak/week-goal ring
 /// (`HomeStreakIndicator`). Explains, in plain Dutch, what the ring is

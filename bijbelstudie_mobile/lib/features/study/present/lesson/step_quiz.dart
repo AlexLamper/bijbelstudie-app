@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
+import '../../../feedback/data/review_prompt.dart';
 import '../../data/lesson_repository.dart';
 import '../../domain/lesson_models.dart';
 import 'lesson_providers.dart';
@@ -22,10 +23,25 @@ class LessonQuizStep extends ConsumerStatefulWidget {
     super.key,
     required this.lesson,
     required this.lessonRef,
+    this.answers = const {},
+    this.onAnswersChanged,
+    this.onSkip,
   });
 
   final LessonPayload lesson;
   final LessonRef lessonRef;
+
+  /// Picks already made in this session, kept by the shell so they outlive
+  /// this step being rebuilt. Laid over the server's saved picks, which may
+  /// not have caught up with the last tap yet.
+  final Map<String, String> answers;
+
+  /// Every pick, with the full set so far.
+  final ValueChanged<Map<String, String>>? onAnswersChanged;
+
+  /// Moves on past Toetsing without finishing it - the same walk as Volgende.
+  /// Null hides the link.
+  final VoidCallback? onSkip;
 
   @override
   ConsumerState<LessonQuizStep> createState() => _LessonQuizStepState();
@@ -41,11 +57,14 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
   bool _seeded = false;
 
   /// Reopening the step should show what the reader already answered, not a
-  /// blank quiz - the server keeps every pick.
+  /// blank quiz - the server keeps every pick, and the shell keeps the ones
+  /// made since the quiz was fetched.
   void _seed(LessonQuiz quiz) {
     if (_seeded) return;
     _seeded = true;
-    _answers.addAll(quiz.savedAnswers);
+    _answers
+      ..addAll(quiz.savedAnswers)
+      ..addAll(widget.answers);
     if (quiz.isGraded) {
       _result = QuizResult(score: quiz.savedScore!, total: quiz.savedTotal!);
       _index = quiz.questions.length;
@@ -67,16 +86,17 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     String answerId,
   ) async {
     setState(() => _answers[question.id] = answerId);
+    widget.onAnswersChanged?.call(Map.of(_answers));
 
     final repository = ref.read(lessonRepositoryProvider);
     final lessonRef = widget.lessonRef;
 
     // Save on every tap so a half-finished quiz survives leaving the lesson.
+    // The full set, not just this pick: an older server replaces the saved
+    // answers with whatever the request carries.
     unawaited(
       repository
-          .saveQuizAnswers(lessonRef.studyId, lessonRef.day, {
-            question.id: answerId,
-          })
+          .saveQuizAnswers(lessonRef.studyId, lessonRef.day, Map.of(_answers))
           .then((_) {}, onError: (_, _) {}),
     );
 
@@ -102,6 +122,20 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
         _result = result;
         _index = quiz.questions.length;
       });
+
+      // A passed quiz is a success moment worth counting towards the rating
+      // gate - the reader read the passage and it stuck. Recorded only; the
+      // native review sheet is fired much later, by `ReviewPromptHost`, on a
+      // calm screen. A poor score sends them back to re-read, which is the
+      // opposite of a moment to ask about.
+      if (result.total > 0 &&
+          result.score / result.total >= ReviewPromptThresholds.quizPassRatio) {
+        unawaited(
+          ref
+              .read(reviewPromptProvider.notifier)
+              .recordSuccess(ReviewSignal.quizPassed),
+        );
+      }
     } on LessonException catch (e) {
       if (!mounted) return;
       setState(() => _grading = false);
@@ -182,6 +216,35 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
                   : () => _pick(quiz, question, answer.id),
             ),
           ),
+        // Quiet on purpose: not knowing an answer after one reading is normal,
+        // and the reader should know they can move on without feeling pushed.
+        if (widget.onSkip != null) ...[
+          const SizedBox(height: 14),
+          Center(
+            child: InkWell(
+              onTap: widget.onSkip,
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Text.rich(
+                  TextSpan(
+                    text: 'Niet verplicht · ',
+                    children: [
+                      TextSpan(
+                        text: 'Toetsing overslaan',
+                        style: TextStyle(
+                          decoration: TextDecoration.underline,
+                          decorationColor: AppTheme.inkFaint,
+                        ),
+                      ),
+                    ],
+                  ),
+                  style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -203,9 +266,20 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
         AppCard(
           child: Column(
             children: [
-              Text(
-                '${result.score}/${result.total}',
-                style: AppTheme.displayLarge.copyWith(color: AppTheme.teal),
+              Text.rich(
+                TextSpan(
+                  text: '${result.score}/${result.total}',
+                  style: AppTheme.displayLarge.copyWith(color: AppTheme.teal),
+                  children: [
+                    TextSpan(
+                      text: result.total == 1 ? ' vraag goed' : ' vragen goed',
+                      style: AppTheme.displaySmall.copyWith(
+                        color: AppTheme.teal,
+                      ),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
               Text(
@@ -223,6 +297,11 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
         if (quiz.questions.isNotEmpty) ...[
           const SizedBox(height: 20),
           const SectionHeader(eyebrow: 'Nakijken', title: 'Jouw antwoorden'),
+          const SizedBox(height: 4),
+          Text(
+            'Tik op een vraag voor je antwoord en de uitleg.',
+            style: AppTheme.caption,
+          ),
           const SizedBox(height: 10),
           for (final question in quiz.questions)
             Padding(
@@ -290,7 +369,11 @@ class _AnswerRow extends StatelessWidget {
 }
 
 /// One question, after marking.
-class _ReviewCard extends StatelessWidget {
+///
+/// Folded by default to right or wrong and the question itself, so the list
+/// reads as a tally first; a tap opens the rest - the reader's own pick, the
+/// correct answer when they missed it, the explanation and the verse it is in.
+class _ReviewCard extends StatefulWidget {
   const _ReviewCard({
     required this.question,
     required this.pickedAnswerId,
@@ -301,9 +384,16 @@ class _ReviewCard extends StatelessWidget {
   final String? pickedAnswerId;
   final QuizGrade? grade;
 
+  @override
+  State<_ReviewCard> createState() => _ReviewCardState();
+}
+
+class _ReviewCardState extends State<_ReviewCard> {
+  bool _expanded = false;
+
   String? _answerText(String? id) {
     if (id == null) return null;
-    for (final answer in question.answers) {
+    for (final answer in widget.question.answers) {
       if (answer.id == id) return answer.text;
     }
     return null;
@@ -312,13 +402,15 @@ class _ReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    final grade = widget.grade;
     // An unmarked question says nothing about right or wrong - the grader did
     // not recognise it, so claiming either way would be a guess.
-    final marked = grade != null && grade!.known;
-    final correct = marked && grade!.correct;
+    final marked = grade != null && grade.known;
+    final correct = marked && grade.correct;
 
-    final picked = _answerText(pickedAnswerId);
+    final picked = _answerText(widget.pickedAnswerId);
     final rightAnswer = _answerText(grade?.correctAnswerId);
+    final reference = grade?.bibleReference ?? widget.question.bibleReference;
 
     final tone = !marked
         ? AppTheme.inkMuted
@@ -329,53 +421,94 @@ class _ReviewCard extends StatelessWidget {
     return AppCard(
       radius: AppTheme.radiusMd,
       padding: const EdgeInsets.all(14),
+      onTap: () => setState(() => _expanded = !_expanded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                !marked
-                    ? Icons.help_outline
-                    : correct
-                    ? Icons.check_circle
-                    : Icons.cancel,
-                size: 16,
-                color: tone,
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(
+                  !marked
+                      ? Icons.help_outline
+                      : correct
+                      ? Icons.check_circle
+                      : Icons.cancel,
+                  size: 16,
+                  color: tone,
+                  semanticLabel: !marked
+                      ? 'Niet nagekeken'
+                      : correct
+                      ? 'Goed'
+                      : 'Fout',
+                ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(question.text, style: AppTheme.bodyStrong)),
+              Expanded(
+                child: Text(
+                  widget.question.text,
+                  style: AppTheme.bodyStrong,
+                  maxLines: _expanded ? null : 2,
+                  overflow: _expanded ? null : TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedRotation(
+                turns: _expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Icon(
+                  Icons.expand_more,
+                  size: 20,
+                  color: AppTheme.inkFaint,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          if (picked != null)
-            _ReviewLine(
-              label: 'Jouw antwoord',
-              value: picked,
-              color: marked ? tone : null,
-            ),
-          // Only worth stating when they missed it; repeating their own
-          // correct answer back at them is noise.
-          if (marked && !correct && rightAnswer != null) ...[
-            const SizedBox(height: 6),
-            _ReviewLine(
-              label: 'Juiste antwoord',
-              value: rightAnswer,
-              color: AppTheme.positive,
-            ),
-          ],
-          if (grade?.explanation != null) ...[
-            const SizedBox(height: 10),
-            Text(grade!.explanation!, style: AppTheme.bodyMuted),
-          ],
-          if (grade?.bibleReference != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              grade!.bibleReference!,
-              style: AppTheme.caption.copyWith(color: AppTheme.teal),
-            ),
-          ],
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: !_expanded
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(left: 26, top: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ReviewLine(
+                          label: 'Jouw antwoord',
+                          value: picked ?? 'Niet beantwoord',
+                          color: marked ? tone : null,
+                        ),
+                        // Only worth stating when they missed it; repeating
+                        // their own correct answer back at them is noise.
+                        if (marked && !correct && rightAnswer != null) ...[
+                          const SizedBox(height: 6),
+                          _ReviewLine(
+                            label: 'Juiste antwoord',
+                            value: rightAnswer,
+                            color: AppTheme.positive,
+                          ),
+                        ],
+                        if (grade?.explanation != null) ...[
+                          const SizedBox(height: 10),
+                          Text(grade!.explanation!, style: AppTheme.bodyMuted),
+                        ],
+                        if (reference != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            reference,
+                            style: AppTheme.caption.copyWith(
+                              color: AppTheme.teal,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
         ],
       ),
     );
