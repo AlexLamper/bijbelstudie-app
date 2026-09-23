@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,14 +49,41 @@ class GroupsScreen extends ConsumerWidget {
     );
 
     if (created != true || nameController.text.trim().isEmpty) return;
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final router = GoRouter.maybeOf(context);
 
-    await ref
-        .read(groupsRepositoryProvider)
-        .createGroup(
-          name: nameController.text.trim(),
-          description: descriptionController.text.trim(),
-        );
-    ref.invalidate(groupsProvider);
+    try {
+      await ref
+          .read(groupsRepositoryProvider)
+          .createGroup(
+            name: nameController.text.trim(),
+            description: descriptionController.text.trim(),
+          );
+      ref.invalidate(groupsProvider);
+    } on DioException catch (e) {
+      // One group can be led for free; a second is Pro. The server says so
+      // (`GROUP_LIMIT_REACHED`, same rule as the website) - joining a group
+      // is never limited.
+      final data = e.response?.data;
+      final limit = data is Map && data['error'] == 'GROUP_LIMIT_REACHED';
+      final message = data is Map ? data['message'] : null;
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            limit && message is String && message.isNotEmpty
+                ? message
+                : 'De groep kon niet worden aangemaakt. Probeer het opnieuw.',
+          ),
+          action: limit && router != null
+              ? SnackBarAction(
+                  label: 'Bekijk Pro',
+                  onPressed: () => router.push('/pro-intro?source=app_groups'),
+                )
+              : null,
+        ),
+      );
+    }
   }
 
   @override

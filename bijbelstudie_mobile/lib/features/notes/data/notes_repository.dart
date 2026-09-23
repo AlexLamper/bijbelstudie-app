@@ -28,9 +28,14 @@ String newClientId() => _uuid.v4();
 /// user never told their note was never saved. [message] is Dutch and ready
 /// to put in a SnackBar.
 class SyncRejectedException implements Exception {
-  SyncRejectedException(this.message);
+  SyncRejectedException(this.message, {this.proRequired = false});
 
   final String message;
+
+  /// The server refused a new note because the free note limit is reached
+  /// (`NOTE_LIMIT_REACHED`, the same limit the website enforces). The caller
+  /// offers Pro instead of "try again", which would only be refused again.
+  final bool proRequired;
 
   @override
   String toString() => message;
@@ -43,6 +48,23 @@ class SyncRejectedException implements Exception {
 bool _isRetryable(DioException e) {
   final status = e.response?.statusCode;
   return status == null || status >= 500;
+}
+
+/// The exception for a write the server refused. The free note limit carries
+/// the server's own Dutch message (which names the number) and asks for the
+/// Pro offer; every other refusal keeps the generic wording.
+SyncRejectedException _rejection(DioException e, String action) {
+  final data = e.response?.data;
+  if (data is Map && data['error'] == 'NOTE_LIMIT_REACHED') {
+    final message = data['message'];
+    return SyncRejectedException(
+      message is String && message.isNotEmpty
+          ? message
+          : 'Je hebt je gratis notities gebruikt. Met Pro schrijf je onbeperkt notities.',
+      proRequired: true,
+    );
+  }
+  return SyncRejectedException(_rejectionMessage(e, action));
 }
 
 String _rejectionMessage(DioException e, String action) {
@@ -106,7 +128,7 @@ class NotesRepository {
       unawaitedFlush();
       return StudyNote.fromSyncRecord(item);
     } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'opgeslagen'));
+      if (!_isRetryable(e)) throw _rejection(e, 'opgeslagen');
       await _cache?.enqueueChange(
         kind: kind,
         clientId: note.id,
@@ -124,7 +146,7 @@ class NotesRepository {
       await _apiClient.dio.delete('$path/${note.id}');
       unawaitedFlush();
     } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'verwijderd'));
+      if (!_isRetryable(e)) throw _rejection(e, 'verwijderd');
       await _cache?.enqueueChange(kind: kind, clientId: note.id, deleted: true);
     }
   }
@@ -152,7 +174,7 @@ class NotesRepository {
       unawaitedFlush();
       return Bookmark.fromSyncRecord(item);
     } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'opgeslagen'));
+      if (!_isRetryable(e)) throw _rejection(e, 'opgeslagen');
       await _cache?.enqueueChange(
         kind: 'bookmark',
         clientId: bookmark.id,
@@ -167,7 +189,7 @@ class NotesRepository {
       await _apiClient.dio.delete('/bookmarks/$id');
       unawaitedFlush();
     } on DioException catch (e) {
-      if (!_isRetryable(e)) throw SyncRejectedException(_rejectionMessage(e, 'verwijderd'));
+      if (!_isRetryable(e)) throw _rejection(e, 'verwijderd');
       await _cache?.enqueueChange(kind: 'bookmark', clientId: id, deleted: true);
     }
   }

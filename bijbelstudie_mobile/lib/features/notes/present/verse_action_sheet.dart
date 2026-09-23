@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -114,6 +115,9 @@ Future<void> showAddNoteDialog({
   final repository = ref.read(notesRepositoryProvider);
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.maybeOf(context);
+  // Captured with the rest: the free-note-limit SnackBar opens the paywall
+  // after the editor has closed, when this context may be gone.
+  final router = GoRouter.maybeOf(context);
 
   final reference = verse == null ? '$book $chapter' : '$book $chapter:$verse';
   final text = await showModalBottomSheet<String>(
@@ -148,7 +152,17 @@ Future<void> showAddNoteDialog({
     container.invalidate(notesListProvider);
     await HapticFeedback.lightImpact();
   } on SyncRejectedException catch (e) {
-    messenger?.showSnackBar(SnackBar(content: Text(e.message)));
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(e.message),
+        action: e.proRequired && router != null
+            ? SnackBarAction(
+                label: 'Bekijk Pro',
+                onPressed: () => router.push('/pro-intro?source=app_notes'),
+              )
+            : null,
+      ),
+    );
   } catch (e) {
     // Anything else - a malformed response, a plugin blowing up - is still a
     // note the reader believes they saved. Say so rather than letting it
