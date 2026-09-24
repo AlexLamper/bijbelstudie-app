@@ -23,15 +23,16 @@
 /// the TypeScript would carry a NaN into `Math.floor`, Dart would throw, so
 /// those few spots read NaN as position 1 instead.
 ///
-/// Two names differ because Dart has one namespace for constants and
+/// A few names differ because Dart has one namespace for constants and
 /// functions: the tables `FILL_SCENE` / `FILL_PORTRAIT` are
 /// [fillSceneTable] / [fillPortraitTable], next to the functions [fillScene]
-/// and [fillPortrait].
+/// and [fillPortrait]; `FORM_TABLES`, `GEOMETRY`, `SEEDLING`, `MATURE` and
+/// `PALM_FROND_FAN` are [formTables], [geometry], [seedling], [mature] and
+/// [palmFrondFan].
 library;
 
 import 'dart:math' as math;
 
-import 'growth_ref.dart';
 import 'species.dart';
 import 'stages.dart';
 
@@ -387,31 +388,49 @@ GrowthInfo growthInfo(int level, double frac, [GrowthFloor? floor]) {
 }
 
 // ---------------------------------------------------------------------------
-// The design table (placeholder numbers until the design pass - plan §10)
+// The design table (plan §10; spec §10)
 // ---------------------------------------------------------------------------
 
 class FormTable {
   const FormTable({
     required this.size,
+    required this.width,
     required this.sizeMax,
     required this.sizeMatureHalf,
     required this.birth,
     required this.birthSpread,
     required this.thirdDelay,
     required this.thirdChance,
+    required this.twigFrom,
+    required this.twigChance,
     required this.leavesPerTip,
+    required this.twigLeafDrop,
     required this.leafBonusAt,
+    required this.leafScatter,
     required this.innerKeep,
+    required this.innerLeaves,
+    required this.innerMinDepth,
+    required this.innerMaxDepth,
     required this.cotyledons,
     required this.cotyledonDeath,
     required this.seedlingPairs,
+    required this.pairLeaves,
     required this.pairDeath,
-    required this.palmSegments,
-    required this.palmFronds,
+    this.leaderLen = 1,
+    this.tierLen = 0,
+    this.tierTaper = 0,
+    this.tierFork = const [],
+    this.tierForkSpread = 1,
+    this.tierDeepUntil = 0,
+    this.palmSegments = const [],
+    this.palmFronds = const [],
   });
 
   /// Continuous size 0..1 at steps 1..20 (index = step - 1); linear in between.
   final List<double> size;
+
+  /// Trunk width 0..1 at steps 1..20, on its own slower curve: a seedling is slender, girth comes late.
+  final List<double> width;
 
   /// Where size tends to past step 20 (maturing, asymptotic).
   final double sizeMax;
@@ -419,7 +438,10 @@ class FormTable {
   /// Steps past 20 at which half the remaining size is reached.
   final double sizeMatureHalf;
 
-  /// Base birth step per depth (index = depth). Deeper nodes never exist.
+  /// Base birth step per depth (index = depth). Branching: the depth table;
+  /// nodes one depth past its end are the maturing twigs ([twigFrom], by
+  /// chance), deeper ones never exist. Conical: the leader schedule - segment
+  /// d of the spine, and the tier (side whorl) at its foot, appear at birth[d].
   final List<int> birth;
 
   /// A node is born up to `floor(birthJitter * spread)` steps late, per depth.
@@ -431,22 +453,58 @@ class FormTable {
   /// Chance of a third child at step k (index = k - 1, the last value holds). Non-decreasing.
   final List<double> thirdChance;
 
+  /// Maturing twigs: a tip at the depth past [birth] forks from step
+  /// [twigFrom] once its parent's reserve draw (slot 8) falls under
+  /// twigChance[k - twigFrom] (the last value holds). Non-decreasing, so a
+  /// twig that exists keeps existing. Branching only; a twin at
+  /// `twinMaxDepth` uses the same rule.
+  final int twigFrom;
+  final List<double> twigChance;
+
   /// Leaves on a tip at step k before `leafCountMul` (index = k - 1, the last value holds).
   final List<double> leavesPerTip;
+
+  /// A maturing twig carries this many leaves fewer than a tip (fine outer growth).
+  final int twigLeafDrop;
 
   /// Steps at which every tip gains one more leaf (maturing density).
   final List<int> leafBonusAt;
 
-  /// Steps a node keeps its own leaves after its first child appears.
+  /// How far leaves scatter from their tip, as a share of the branching form's reach.
+  final double leafScatter;
+
+  /// Steps a node keeps its full tuft after its first child appears.
   final int innerKeep;
+
+  /// After that, a forked node at depth [innerMinDepth]..[innerMaxDepth] keeps its first [innerLeaves] leaves for good.
+  final int innerLeaves;
+  final int innerMinDepth;
+  final int innerMaxDepth;
 
   /// Seed leaves: how many, and the step at which they are gone.
   final int cotyledons;
   final int cotyledonDeath;
 
-  /// Seedling leaf pairs on the stem: pair j appears at step j + 1; all are gone at [pairDeath].
+  /// Seedling leaf whorls on the stem: whorl j (1-based) of [pairLeaves]
+  /// leaves appears at step j + 1 and is gone at `pairDeath - (seedlingPairs - j)`,
+  /// so the lowest whorl falls first and the last one at [pairDeath].
   final int seedlingPairs;
+  final int pairLeaves;
   final int pairDeath;
+
+  /// Conical only: each spine segment's length as a share of the one below it.
+  final double leaderLen;
+
+  /// Conical only: a tier's root length as a share of the trunk, and how much it shortens up the spine (times min(1, segment / conicalDepth)).
+  final double tierLen;
+  final double tierTaper;
+
+  /// Conical only: a tier branch forks `tierFork[t]` steps after the tier was born (t = its depth inside the tier), up to `tierForkSpread - 1` late.
+  final List<int> tierFork;
+  final int tierForkSpread;
+
+  /// Conical only: a tier born at or before this step forks twice; later tiers fork once (the crown stays pointed).
+  final int tierDeepUntil;
 
   /// Palm only: the step each trunk segment appears (index = segment).
   final List<int> palmSegments;
@@ -460,6 +518,13 @@ const List<double> _sizeV2 = [
   0.674, 0.71, 0.745, 0.78,
 ];
 
+/// About size^1.4: a slender scheut, a young tree that is still slim, and most of the girth after step 12.
+const List<double> _widthV2 = [
+  0.0, 0.016, 0.04, 0.065, 0.095, 0.125, 0.16, 0.195, 0.23, 0.27, 0.31, 0.35, 0.39, 0.43, 0.47, 0.515, 0.56, 0.605,
+  0.65, 0.7,
+];
+
+/// Rises through the named growth; flat from step 20 (maturing adds twigs, not limbs).
 const List<double> _thirdChanceV2 = [
   0.15, 0.163, 0.173, 0.182, 0.191, 0.2, 0.209, 0.217, 0.225, 0.233, 0.24, 0.248, 0.256, 0.263, 0.27, 0.278, 0.285,
   0.292, 0.299, 0.306,
@@ -467,68 +532,116 @@ const List<double> _thirdChanceV2 = [
 
 /// Conifers fork three ways far less often: their tiers are shelves, not crowns.
 const List<double> _thirdChanceConical = [
-  0.06, 0.065, 0.069, 0.073, 0.076, 0.08, 0.084, 0.087, 0.09, 0.093, 0.096, 0.099, 0.102, 0.105, 0.108, 0.111, 0.114,
-  0.117, 0.12, 0.122,
+  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,
 ];
 
+/// A young tree's few twigs carry big tufts (a sapling is all leaf); a grown
+/// tree gets full through more tips, not through more leaves per tip. Step 20
+/// adds one more leaf to every tip: the "volgroeid" finale.
 const List<double> _leavesV2 = [
-  2, 2.07, 2.28, 2.48, 2.67, 2.86, 3.03, 3.2, 3.37, 3.53, 3.7, 3.86, 4.02, 4.18, 4.33, 4.48, 4.63, 4.78, 4.93, 5.08,
+  2, 2, 2, 2, 4.4, 4.6, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 4.9, 5.85,
 ];
 
+/// Needle tufts: fewer per tip, but every forked tier node keeps most of its tuft.
+const List<double> _leavesConical = [
+  2, 2, 2, 2, 3, 3, 3.2, 3.4, 3.6, 3.8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4.4,
+];
+
+/// Share of tips that have forked into maturing twigs, from `twigFrom` (index = k - twigFrom): 30 % by step 30, 33 % by 40, 40 % by 60.
+const List<double> _twigChanceV2 = [
+  0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.3, 0.303, 0.306, 0.309, 0.312, 0.315, 0.318, 0.321, 0.324,
+  0.327, 0.33, 0.3335, 0.337, 0.3405, 0.344, 0.3475, 0.351, 0.3545, 0.358, 0.3615, 0.365, 0.3685, 0.372, 0.3755, 0.379,
+  0.3825, 0.386, 0.3895, 0.393, 0.3965, 0.4,
+];
+
+/// The website's `FORM_TABLES`. The conical and palm-only fields default to
+/// the website's `NO_CONICAL` / `NO_PALM` values.
 const Map<TreeForm, FormTable> formTables = {
   TreeForm.branching: FormTable(
     size: _sizeV2,
+    width: _widthV2,
     sizeMax: 1.05,
     sizeMatureHalf: 12,
-    birth: [1, 5, 8, 11, 14, 18],
-    birthSpread: [0, 2, 2, 2, 3, 3],
+    // Windows: d1 5-6, d2 6-7, d3 8-10, d4 11-13, d5 14-19 - some depth is
+    // being born at every step from 5 to 19; step 20 adds a leaf to every tip.
+    birth: [1, 5, 6, 8, 11, 14],
+    birthSpread: [0, 2, 2, 3, 3, 6],
     thirdDelay: 2,
     thirdChance: _thirdChanceV2,
+    twigFrom: 21,
+    twigChance: _twigChanceV2,
     leavesPerTip: _leavesV2,
-    leafBonusAt: [30],
+    twigLeafDrop: 1,
+    leafBonusAt: [],
+    leafScatter: 1,
     innerKeep: 3,
+    innerLeaves: 2,
+    innerMinDepth: 2,
+    innerMaxDepth: 4,
     cotyledons: 2,
     cotyledonDeath: 5,
-    seedlingPairs: 4,
-    pairDeath: 9,
-    palmSegments: [],
-    palmFronds: [],
+    seedlingPairs: 5,
+    pairLeaves: 2,
+    pairDeath: 11,
   ),
   TreeForm.conical: FormTable(
     size: _sizeV2,
+    width: _widthV2,
     sizeMax: 1.05,
     sizeMatureHalf: 12,
-    birth: [1, 4, 8, 12, 16, 20],
-    birthSpread: [0, 1, 2, 2, 2, 2],
+    // The leader: a segment and a whorl at each of these steps.
+    birth: [1, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 24, 28, 34],
+    birthSpread: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     thirdDelay: 2,
     thirdChance: _thirdChanceConical,
-    leavesPerTip: _leavesV2,
-    leafBonusAt: [30],
-    innerKeep: 1,
+    twigFrom: 99,
+    twigChance: [0],
+    leavesPerTip: _leavesConical,
+    twigLeafDrop: 0,
+    leafBonusAt: [],
+    leafScatter: 0.5,
+    innerKeep: 2,
+    innerLeaves: 3,
+    innerMinDepth: 1,
+    innerMaxDepth: 99,
     cotyledons: 5,
     cotyledonDeath: 6,
     seedlingPairs: 3,
-    pairDeath: 8,
-    palmSegments: [],
-    palmFronds: [],
+    pairLeaves: 4,
+    pairDeath: 10,
+    leaderLen: 0.82,
+    tierLen: 1.1,
+    tierTaper: 0.8,
+    tierFork: [2, 4],
+    tierForkSpread: 2,
+    tierDeepUntil: 12,
   ),
   TreeForm.palm: FormTable(
     size: _sizeV2,
+    width: _widthV2,
     sizeMax: 1.05,
     sizeMatureHalf: 12,
     birth: [1],
     birthSpread: [0],
     thirdDelay: 0,
     thirdChance: [0],
+    twigFrom: 99,
+    twigChance: [0],
     leavesPerTip: [0],
+    twigLeafDrop: 0,
     leafBonusAt: [25, 30, 35],
+    leafScatter: 1,
     innerKeep: 0,
+    innerLeaves: 0,
+    innerMinDepth: 0,
+    innerMaxDepth: 0,
     cotyledons: 0,
     cotyledonDeath: 1,
     seedlingPairs: 0,
+    pairLeaves: 0,
     pairDeath: 1,
-    palmSegments: [1, 8, 9, 10, 12, 14],
-    palmFronds: [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11],
+    palmSegments: [1, 7, 8, 9, 10, 12, 14, 16, 18],
+    palmFronds: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16],
   ),
 };
 
@@ -540,11 +653,16 @@ class GrowthGeometry {
   final double minBud = 0.25;
   final double rampSteps = 1.5;
 
-  /// Trunk: length (4 + 36·size) and width (0.8 + 6.2·size), times the species multipliers.
+  /// Trunk: length (4 + 36·size) and width (0.8 + 6.2·width), times the species multipliers.
   final double trunkLenBase = 4;
   final double trunkLenGrow = 36;
   final double trunkWidthBase = 0.8;
   final double trunkWidthGrow = 6.2;
+
+  /// Leaf size by the depth of its tip: a sapling's shallow shoots carry big leaves, the outer twigs of a crown small ones.
+  final double leafSizeDepthBase = 1.5;
+  final double leafSizeDepthDrop = 0.07;
+  final double leafSizeDepthMin = 0.9;
 
   /// Green stem to bark: the trunk starts turning at [woodStart], other wood [woodDelay] steps after it appears.
   final double woodStart = 3;
@@ -552,7 +670,7 @@ class GrowthGeometry {
   final double woodSteps = 3;
 
   /// How much of a species' `leafCountMul` reaches the leaves per tip (the rest would blow the leaf budget).
-  final double leafMulWeight = 0.6;
+  final double leafMulWeight = 0.5;
 
   /// Degrees of seeded jitter per child slot.
   final double slotJitter = 8;
@@ -560,18 +678,45 @@ class GrowthGeometry {
   /// Degrees of seeded trunk lean, times the species' `leanMul`.
   final double lean = 6;
 
+  /// A child is born at least this many steps after its parent, so a late limb grows out depth by depth instead of popping in whole.
+  final int childDelay = 1;
+
   /// Droop (wilt + weeping) grows with depth up to this depth.
   final int droopDepth = 5;
 
-  /// Conical side branches shorten with depth up to this depth.
-  final int conicalDepth = 6;
+  /// Conical tiers shorten up the spine until this segment.
+  final int conicalDepth = 12;
+
+  /// Conical: the leader's width share per segment, its angle jitter share, and a tier root's width share of its spine segment.
+  final double leaderWidth = 0.8;
+  final double leaderJitter = 0.35;
+  final double tierWidth = 0.5;
+
+  /// Conical: a tier leaves the spine at ±spread × tierAngle degrees - the ceder's shelves lie nearly flat, the cipres' narrow spread makes it a column.
+  final double tierAngle = 2.5;
+
+  /// Conical: a tier branch's children - length and width share, and the fan (share of spread) and jitter share they open with.
+  final double tierChildLen = 0.66;
+  final double tierChildWidth = 0.66;
+  final double tierChildSpread = 0.55;
+  final double tierChildJitter = 0.6;
+
+  /// Maturing girth: every width grows by this share per step past 20, for this many steps.
+  final double matureGirth = 0.015;
+  final double matureGirthSteps = 20;
+
+  /// A blossom never outgrows this leaf size (a seedling's leaves are bigger than a crown's).
+  final double blossomMaxSize = 0.9;
+
+  /// A palm's date bunch, as a fruit size (each is drawn as a cluster of three).
+  final double dateSize = 0.95;
 
   /// Twin trunk (trait `twin`): offset, angle, length and width share, and how fast its depths follow.
   final double twinOffset = 6;
   final double twinAngle = 14;
   final double twinLen = 0.62;
   final double twinWidth = 0.55;
-  final double twinDepthSteps = 1;
+  final int twinDepthSteps = 1;
 
   /// A twin node is born up to `twinBirthSpread - 1` steps late.
   final int twinBirthSpread = 2;
@@ -582,7 +727,7 @@ const GrowthGeometry geometry = GrowthGeometry._();
 
 /// The seedling (steps 1-6, plan §4.4; the website's `SEEDLING`). Seed leaves
 /// sit where the step-1 stem ended and stay at that height while the stem
-/// grows past them; leaf pair j appears at step j + 1, at [pairHeight] of the
+/// grows past them; leaf whorl j appears at step j + 1, at [pairHeight] of the
 /// stem's length at that step. Angles are degrees off the stem's heading.
 class GrowthSeedling {
   const GrowthSeedling._();
@@ -594,8 +739,11 @@ class GrowthSeedling {
   final double cotyledonDistance = 1.4;
   final double cotyledonSize = 1.6;
 
-  /// Seed-leaf size factor per step (index = step - 1, the last value holds): they yellow and shrink.
-  final List<double> cotyledonShrink = const [1, 1, 0.85, 0.7];
+  /// Seed leaves shrink to [cotyledonFadeMin] of their size over the last [cotyledonFadeSteps] positions before `cotyledonDeath` (they yellow in paint).
+  final double cotyledonFadeSteps = 2.5;
+  final double cotyledonFadeMin = 0.4;
+
+  /// A whorl's leaves fan evenly over ±[pairAngle] off the stem, each nudged by its own jitter.
   final double pairAngle = 50;
   final double pairAngleJitter = 15;
   final double pairDistance = 0.9;
@@ -603,8 +751,12 @@ class GrowthSeedling {
   final double pairSizeJitter = 0.4;
   final double pairHeight = 0.92;
 
+  /// A whorl shrinks to [pairFadeMin] over the last [pairFadeSteps] positions before it falls.
+  final double pairFadeSteps = 2;
+  final double pairFadeMin = 0.45;
+
   /// A palm's first segment stays a stub ([palmEmergeMin] of its length) until it emerges over these steps.
-  final double palmEmergeSteps = 7;
+  final double palmEmergeSteps = 6;
   final double palmEmergeMin = 0.15;
 }
 
@@ -617,7 +769,8 @@ const List<double> palmFrondFan = [
   -0.3, 0.3, -0.75, 0.75, 0, -0.55, 0.55, -1, 1, -0.15, 0.15, -0.9, 0.9, -0.4, 0.4, 0.05,
 ];
 
-/// Render-only maturing details, by position (plan §4.5; the website's `MATURE`).
+/// Render-only maturing details, by position (plan §4.5; the website's
+/// `MATURE`). Girth and twigs are geometry: [girthAt], [twigChanceAt].
 class GrowthMature {
   const GrowthMature._();
 
@@ -628,25 +781,71 @@ class GrowthMature {
 
 const GrowthMature mature = GrowthMature._();
 
-T _tableAt<T extends num>(List<T> table, int step, T empty) {
+T _tableAt<T extends num>(List<T> table, num step, T empty) {
   if (table.isEmpty) return empty;
-  return table[math.min(table.length, math.max(1, step)) - 1];
+  final s = step.floor();
+  return table[(s < 1 ? 1 : (s > table.length ? table.length : s)) - 1];
+}
+
+/// A table that starts at step [from] (index = step - from); 0 before it, the last value after it.
+double _tableFrom(List<double> table, num step, int from) {
+  if (table.isEmpty || step < from) return 0;
+  return table[math.min(table.length - 1, step.floor() - from)];
+}
+
+double twigChanceAt(TreeForm form, num step) {
+  final t = formTables[form]!;
+  return _tableFrom(t.twigChance, step, t.twigFrom);
+}
+
+/// Maturing girth: the width factor at position e (1 up to step 20).
+double girthAt(double e) {
+  return 1 + geometry.matureGirth * _clamp(e - stepsTotal, 0, geometry.matureGirthSteps);
+}
+
+/// The step whorl [j] (1-based) of the seedling falls.
+int pairDeath(TreeForm form, int j) {
+  final t = formTables[form]!;
+  return t.pairDeath - (t.seedlingPairs - j);
+}
+
+/// Size factor of a temporary leaf that falls at [death], at position e: 1 until [fadeSteps] before, then down to [fadeMin].
+double fadeAt(double e, num death, double fadeSteps, double fadeMin) {
+  final left = _clamp((death - e) / fadeSteps, 0, 1);
+  return fadeMin + (1 - fadeMin) * left;
+}
+
+double _curveWithTail(List<double> table, double e, double max, double half) {
+  final n = table.length;
+  // TypeScript would carry a NaN through; Dart's floor() would throw.
+  final p = e.isNaN ? 1.0 : math.max(1.0, e);
+  if (p >= n) {
+    final top = table[n - 1];
+    final past = p - n;
+    return top + (max - top) * (past / (past + half));
+  }
+  final i = p.floor();
+  final a = table[i - 1];
+  final b = table[i];
+  return a + (b - a) * (p - i);
 }
 
 /// Continuous size 0..sizeMax at position e.
 double sizeAt(TreeForm form, double e) {
   final t = formTables[form]!;
-  final n = t.size.length;
-  final p = e.isNaN ? 1.0 : math.max(1.0, e);
-  if (p >= n) {
-    final top = t.size[n - 1];
-    final past = p - n;
-    return top + (t.sizeMax - top) * (past / (past + t.sizeMatureHalf));
-  }
-  final i = p.floor();
-  final a = t.size[i - 1];
-  final b = t.size[i];
-  return a + (b - a) * (p - i);
+  return _curveWithTail(t.size, e, t.sizeMax, t.sizeMatureHalf);
+}
+
+/// Continuous trunk width share at position e; past step 20 it tends to
+/// `sizeMax` like size does (girth on top: [girthAt]).
+double widthAt(TreeForm form, double e) {
+  final t = formTables[form]!;
+  return _curveWithTail(t.width, e, t.sizeMax, t.sizeMatureHalf);
+}
+
+/// Leaf size factor for a tip at [depth].
+double leafSizeAtDepth(int depth) {
+  return math.max(geometry.leafSizeDepthMin, geometry.leafSizeDepthBase - geometry.leafSizeDepthDrop * depth);
 }
 
 /// Size at a whole step: the only size topology may read. A literal, so exact on both platforms.
@@ -667,10 +866,13 @@ int bonusLeaves(TreeForm form, int step) {
   return n;
 }
 
-int leavesPerTip(TreeForm form, int step, double leafCountMul) {
-  final base = _tableAt(formTables[form]!.leavesPerTip, step, 0.0);
+int leavesPerTip(TreeForm form, int step, double leafCountMul, [bool twig = false]) {
+  final t = formTables[form]!;
+  final base = _tableAt(t.leavesPerTip, step, 0.0);
   final mul = 1 + (leafCountMul - 1) * geometry.leafMulWeight;
-  return math.max(2, (base * mul).round()) + bonusLeaves(form, step);
+  // `round` rounds half away from zero, `Math.round` half up: the same for
+  // these positive counts.
+  return math.max(2, (base * mul).round() - (twig ? t.twigLeafDrop : 0)) + bonusLeaves(form, step);
 }
 
 int palmFronds(int step) {
@@ -688,7 +890,7 @@ double ramp(double e, num birth) {
 }
 
 // ---------------------------------------------------------------------------
-// Camera (plan §4.8)
+// Camera (plan §4.8; the framing itself is `camera.dart`)
 // ---------------------------------------------------------------------------
 
 /// Scene framing: on-screen tree height as a share of the height above the earth band, steps 1..20.
@@ -722,23 +924,4 @@ double fillScene(double e) {
 
 double fillPortrait(double e) {
   return _curveAt(fillPortraitTable, e);
-}
-
-/// The reference height (tree units above the ground line) of a species at
-/// position e: the median over sampled seeds, tabled by `npm run
-/// tree:calibrate` on the website. The camera divides by this and not by the
-/// user's own bounds, so it never jitters per user and a level-up zooms the
-/// same way for everyone.
-double referenceHeight(double e, TreeSpecies? species) {
-  final row = hRef[kSpeciesIds[species ?? kDefaultSpecies]] ?? hRef[kSpeciesIds[kDefaultSpecies]]!;
-  final n = refPositions.length;
-  if (e <= refPositions[0]) return row[0];
-  for (var i = 1; i < n; i += 1) {
-    if (e <= refPositions[i]) {
-      final x0 = refPositions[i - 1];
-      final t = (e - x0) / (refPositions[i] - x0);
-      return row[i - 1] + (row[i] - row[i - 1]) * t;
-    }
-  }
-  return row[n - 1];
 }

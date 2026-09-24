@@ -127,7 +127,8 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
     frac: widget.frac,
     health: widget.health,
     species: widget.species,
-    fracBucket: widget.framing == TreeFraming.portrait ? 20 : 0,
+    // Portraits tell 20 positions per step apart, scenes 50 (scene_cache.dart).
+    bucket: widget.framing == TreeFraming.portrait ? 20 : kPositionBucket,
   );
 
   bool get _still =>

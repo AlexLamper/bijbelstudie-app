@@ -169,7 +169,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 18,
     childLenRatio: 0.7,
     childWidthRatio: 0.7,
-    thirdChildBias: 0.1,
+    // Growth v2: was 0.1 (leaf budget).
+    thirdChildBias: 0.06,
     leanMul: 1.4,
     leafCountMul: 1.15,
     leafSizeMul: 0.85,
@@ -189,7 +190,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 12,
     childLenRatio: 0.72,
     childWidthRatio: 0.75,
-    thirdChildBias: 0.15,
+    // Growth v2: was 0.15 (leaf budget).
+    thirdChildBias: 0.12,
     leafCountMul: 0.55,
     leafSizeMul: 1.35,
     leafShape: LeafShape.large,
@@ -239,7 +241,9 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
   ),
   TreeSpecies.ceder: SpeciesParams(
     form: TreeForm.conical,
-    trunkLenMul: 1.15,
+    // Growth v2: the trunk is the spine's first segment; the leader chain
+    // (`formTables[TreeForm.conical].leaderLen`) supplies the height.
+    trunkLenMul: 0.5,
     trunkWidthMul: 1.1,
     spreadBase: 30,
     spreadJitter: 8,
@@ -249,7 +253,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     thirdChildBias: 0.2,
     leanMul: 0.5,
     leafCountMul: 1.6,
-    leafSizeMul: 0.8,
+    // Growth v2: 0.8 drew hairline needles at the new camera's scale.
+    leafSizeMul: 1.15,
     leafShape: LeafShape.needle,
     fruitStyle: FruitStyle.cone,
     blossom: BlossomMode.never,
@@ -269,9 +274,11 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 14,
     childLenRatio: 0.72,
     childWidthRatio: 0.62,
-    thirdChildBias: 0.3,
+    // Growth v2: 0.3 / 1.3 put a maturing mosterd past the leaf budget; the
+    // twigs still outnumber every other species'.
+    thirdChildBias: 0.06,
     leanMul: 1.1,
-    leafCountMul: 1.3,
+    leafCountMul: 1.05,
     leafSizeMul: 0.6,
     leafShape: LeafShape.oval,
     fruitStyle: FruitStyle.pod,
@@ -290,7 +297,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 10,
     childLenRatio: 0.72,
     childWidthRatio: 0.68,
-    thirdChildBias: 0.12,
+    // Growth v2: was 0.12 (leaf budget).
+    thirdChildBias: 0.06,
     leanMul: 0.9,
     leafCountMul: 1.05,
     leafSizeMul: 0.95,
@@ -310,7 +318,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 14,
     childLenRatio: 0.7,
     childWidthRatio: 0.66,
-    thirdChildBias: 0.2,
+    // Growth v2: was 0.2 (leaf budget).
+    thirdChildBias: 0.06,
     leafCountMul: 1.2,
     leafSizeMul: 0.75,
     leafShape: LeafShape.narrow,
@@ -330,7 +339,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 12,
     childLenRatio: 0.7,
     childWidthRatio: 0.74,
-    thirdChildBias: 0.2,
+    // Growth v2: was 0.2 (leaf budget).
+    thirdChildBias: 0.12,
     leafCountMul: 0.75,
     leafSizeMul: 1.2,
     leafShape: LeafShape.large,
@@ -349,7 +359,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 12,
     childLenRatio: 0.8,
     childWidthRatio: 0.6,
-    thirdChildBias: 0.15,
+    // Growth v2: was 0.15 (leaf budget).
+    thirdChildBias: 0.06,
     leanMul: 1.2,
     droopBase: 0.5,
     leafCountMul: 1.2,
@@ -371,7 +382,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     curveAmp: 6,
     childLenRatio: 0.6,
     childWidthRatio: 0.62,
-    thirdChildBias: 0.25,
+    // Growth v2: 0.25 put the worst seeds past the leaf budget at step 40.
+    thirdChildBias: 0.06,
     leanMul: 1.3,
     leafCountMul: 1.2,
     leafSizeMul: 0.7,
@@ -386,7 +398,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
   // The ceder's narrow cousin: same spine, a much tighter fan.
   TreeSpecies.cipres: SpeciesParams(
     form: TreeForm.conical,
-    trunkLenMul: 1.3,
+    // Growth v2: see ceder. Taller and narrower than the ceder.
+    trunkLenMul: 0.42,
     trunkWidthMul: 0.8,
     spreadBase: 12,
     spreadJitter: 6,
@@ -396,7 +409,8 @@ const Map<TreeSpecies, SpeciesParams> kSpecies = {
     thirdChildBias: 0.2,
     leanMul: 0.3,
     leafCountMul: 1.5,
-    leafSizeMul: 0.7,
+    // Growth v2: see ceder.
+    leafSizeMul: 1.0,
     leafShape: LeafShape.scale,
     fruitStyle: FruitStyle.berry,
     blossom: BlossomMode.never,

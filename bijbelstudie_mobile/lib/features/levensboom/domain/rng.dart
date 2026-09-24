@@ -43,3 +43,16 @@ class Mulberry32 {
 
 /// The stream a given user's tree is drawn from.
 Mulberry32 seededRng(String seed) => Mulberry32(fnv1a32(seed));
+
+/// Growth v2: one stream per node of the tree, keyed by its path ("T", "T01",
+/// "T01L2", "C0", "PF3" ...). Adding a branch, a leaf or a whole subtree can
+/// never shift another node's numbers, which is what lets a tree grow instead
+/// of being redrawn at every level-up. Paths are plain ASCII, so this hashes
+/// exactly the code units the website's `nodeRng` hashes.
+Mulberry32 nodeRng(String seed, String path) => Mulberry32(fnv1a32('$seed|$path'));
+
+/// The first [count] values of a node's stream.
+List<double> nodeDraws(String seed, String path, int count) {
+  final rand = nodeRng(seed, path);
+  return List<double>.generate(count, (_) => rand(), growable: false);
+}

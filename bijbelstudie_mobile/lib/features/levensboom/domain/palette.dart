@@ -6,6 +6,8 @@
 /// table in `docs/levensboom-spec.md` §7.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 import 'scenes.dart';
@@ -126,6 +128,32 @@ const _winterMix = Color(0xFF8A9A8A);
 
 Color _mix(Color a, Color b, double amount) =>
     Color.lerp(a, b, amount.clamp(0.0, 1.0))!;
+
+int _channel8(double unit) => (unit * 255.0).round().clamp(0, 255);
+
+/// [amount] of [b] mixed into [a], exactly as the website's `mix` does it: on
+/// 8-bit channels, rounded back to 8 bits, opaque. The growth v2 primitives
+/// (`woodColor`, `paint_spec.dart`) use this so their colours are the web's
+/// hex values to the last bit, whatever [Color.lerp] does in between.
+Color mixColor(Color a, Color b, double amount) {
+  final t = math.min(1.0, math.max(0.0, amount));
+  int channel(double from, double to) {
+    final f = _channel8(from);
+    final v = f + (_channel8(to) - f) * t;
+    return math.min(255.0, math.max(0.0, v)).round();
+  }
+
+  return Color.fromARGB(255, channel(a.r, b.r), channel(a.g, b.g), channel(a.b, b.b));
+}
+
+/// Growth v2: a branch's colour from green stem (wood 0) to bark (wood 1). The
+/// green is the canopy's own leaf colour a third of the way to bark, so a
+/// seedling's stem belongs to its leaves; no new colour token. The website's
+/// `woodColor`; a renderer buckets [wood] to tenths.
+Color woodColor(TreePalette palette, double wood) {
+  if (wood >= 1) return palette.bark;
+  return mixColor(mixColor(palette.leaf, palette.bark, 0.35), palette.bark, wood);
+}
 
 /// `month` is 1-based, as `DateTime.month` gives it.
 Season seasonForMonth(int month) {

@@ -3,12 +3,15 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../domain/camera.dart';
 import '../domain/catalog.dart';
 import '../domain/palette.dart';
 import '../domain/rng.dart';
 import '../domain/scenes.dart';
 import '../domain/species.dart';
 import '../domain/tree_generator.dart';
+
+export '../domain/camera.dart' show TreeFraming;
 
 /// The scene a tree stands in, painted without the tree.
 ///
@@ -20,11 +23,8 @@ import '../domain/tree_generator.dart';
 /// changed when it moved, and the generator was not touched, so the website
 /// parity fixtures are unaffected.
 
-/// Two framings. [TreeFraming.scene] is the landscape: sky, backdrop, a band
-/// of earth the trunk stands *in*, animals. [TreeFraming.portrait] is the
-/// avatar: the tree alone on a sky disc, cropped to its own bounds, for the
-/// tab bar and every other place a 24 px face has to read.
-enum TreeFraming { scene, portrait }
+/// The two framings ([TreeFraming], scene and portrait) live with the camera
+/// in `domain/camera.dart` and are re-exported from here.
 
 /// The `seasons` trait (docs/levensboom-spec.md §6) arrives here.
 
@@ -139,12 +139,16 @@ class TreeFrame {
     required this.pivotX,
     required this.pivotY,
     required this.groundTop,
+    this.guarded = false,
   });
 
   final double width, height, scale, originX, originY, pivotX, pivotY;
 
   /// Top edge of the earth band (scene) or of the shadow (portrait).
   final double groundTop;
+
+  /// True when a ground animal forced the camera out past the designed fill.
+  final bool guarded;
 }
 
 const double kDeg = math.pi / 180;
@@ -190,6 +194,35 @@ void fillEllipse(
   return (minX: minX, maxX: maxX);
 }
 
+/// What a ground animal needs in frame, in tree units beside the trunk and
+/// above the ground, for the camera's guard (`camera.dart` [FrameExtents]).
+/// Widths are the old frame margins; heights are each animal's drawn height at
+/// world size. The website's `animalExtents` in `TreeCanvas.tsx`, minus its
+/// last case (a perching bird waiting on the ground while the crown has no
+/// perch), which needs the ground-bird spot the app's [TreeDecor] does not
+/// draw yet.
+FrameExtents? animalExtents(TreeAnimal animal, TreeDecor decor) {
+  switch (animal) {
+    case TreeAnimal.schaap:
+      return FrameExtents(left: -decor.sheep.$1 + 5, right: decor.sheep.$2 + 5, top: 4);
+    case TreeAnimal.hert:
+      return FrameExtents(right: decor.deer + 6, top: 10);
+    case TreeAnimal.vos:
+      return FrameExtents(left: -decor.fox + 5, top: 6);
+    case TreeAnimal.ezel:
+      return FrameExtents(right: decor.donkey + 7, top: 8);
+    case TreeAnimal.ooievaar:
+      return FrameExtents(right: decor.stork + 4, top: 8);
+    case TreeAnimal.leeuw:
+      return FrameExtents(right: decor.lion + 8, top: 5);
+    default:
+      return null;
+  }
+}
+
+/// The growth v2 camera (`domain/camera.dart`, the website's `measureFrame`):
+/// the landscape stays put and the tree takes a designed share of it, centred
+/// on the trunk base. Ground animals only guard the scene framing.
 TreeFrame measureTreeFrame(
   Size size,
   TreeScene scene,
@@ -197,56 +230,18 @@ TreeFrame measureTreeFrame(
   TreeAnimal animal,
   TreeDecor decor,
 ) {
-  final extent = extentWithAnimals(scene, animal, decor);
-  final minX = extent.minX;
-  final maxX = extent.maxX;
-  final minY = scene.bounds.minY;
-  final contentW = math.max(1.0, maxX - minX);
-  final treeH = math.max(1.0, kGroundY - minY);
-  final width = size.width;
-  final height = size.height;
-
-  if (framing == TreeFraming.portrait) {
-    // The tree alone, centred, standing on a soft shadow near the bottom.
-    final padX = width * 0.1;
-    final padY = height * 0.1;
-    final scale = math.min((width - 2 * padX) / contentW, (height - 2 * padY) / treeH);
-    final originX = width / 2 - ((minX + maxX) / 2) * scale;
-    final pivotY = height - padY * 1.15;
-    final originY = pivotY - kGroundY * scale;
-    return TreeFrame(
-      width: width,
-      height: height,
-      scale: scale,
-      originX: originX,
-      originY: originY,
-      pivotX: originX + kTrunkX * scale,
-      pivotY: pivotY,
-      groundTop: pivotY,
-    );
-  }
-
-  // The scene: a fixed earth band (never scaled from the tree, which for a
-  // kiem swallowed the whole frame), a minimum framed extent so a small tree
-  // stands small in a real landscape, and the trunk base just below the band's
-  // top edge so the tree stands in the ground rather than on a line above it.
-  final band = height * 0.12;
-  final sceneW = math.max(contentW, kMinSceneWidth);
-  final sceneH = math.max(treeH, kMinSceneHeight);
-  final scale = math.min((width * 0.9) / sceneW, ((height - band) * 0.84) / sceneH);
-  final groundTop = height - band;
-  final pivotY = groundTop + 0.6 * scale;
-  final originX = width / 2 - ((minX + maxX) / 2) * scale;
-  final originY = pivotY - kGroundY * scale;
+  final extents = framing == TreeFraming.scene ? animalExtents(animal, decor) : null;
+  final frame = measureFrame(size.width, size.height, scene, framing, extents);
   return TreeFrame(
-    width: width,
-    height: height,
-    scale: scale,
-    originX: originX,
-    originY: originY,
-    pivotX: originX + kTrunkX * scale,
-    pivotY: pivotY,
-    groundTop: groundTop,
+    width: size.width,
+    height: size.height,
+    scale: frame.scale,
+    originX: frame.originX,
+    originY: frame.originY,
+    pivotX: frame.pivotX,
+    pivotY: frame.pivotY,
+    groundTop: frame.groundTop,
+    guarded: frame.guarded,
   );
 }
 

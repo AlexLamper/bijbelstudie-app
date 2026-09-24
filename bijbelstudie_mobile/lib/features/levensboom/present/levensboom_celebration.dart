@@ -11,9 +11,9 @@ import '../domain/catalog.dart';
 import '../domain/chime.dart';
 import '../domain/growth_copy.dart';
 import '../domain/palette.dart';
+import '../domain/scene_cache.dart';
 import '../domain/stages.dart';
 import '../domain/traits.dart';
-import '../domain/tree_generator.dart';
 import '../domain/tree_state.dart';
 import 'levensboom_providers.dart';
 import 'tree_analytics.dart';
@@ -131,8 +131,10 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
   /// Where the previous level's silhouette ended, so what the reader watches
   /// grow is the new wood rather than the whole tree replaying.
   late final double _from = () {
-    final previous = maxDepthForLevel(widget.level - 1);
-    final now = maxDepthForLevel(widget.level) + 1;
+    int depthAt(int level) =>
+        cachedTree(seed: widget.seed, level: level, frac: 0, species: widget.avatar.species).maxDepth;
+    final previous = depthAt(widget.level - 1);
+    final now = depthAt(widget.level) + 1;
     final ratio = previous / now;
     return ratio > 0.92 ? 0.92 : ratio;
   }();
