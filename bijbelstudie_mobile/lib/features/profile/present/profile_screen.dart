@@ -24,6 +24,8 @@ import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
 import '../../premium/domain/store_copy.dart';
 import '../../premium/present/pro_access_provider.dart';
+import '../../referral/data/referral_repository.dart';
+import '../../referral/present/invite_section.dart';
 import 'profile_stats_provider.dart';
 
 /// Profiel: who you are, what you have read, and what you have done with it.
@@ -104,6 +106,7 @@ class ProfileScreen extends ConsumerWidget {
       quiet(ref.refresh(notesListProvider.future)),
       quiet(ref.refresh(highlightsListProvider.future)),
       quiet(ref.refresh(bookmarksProvider.future)),
+      quiet(ref.refresh(referralOverviewProvider.future)),
       // The tree's own refresh keeps what is on screen if the fetch fails.
       ref.read(treeStateProvider.notifier).refresh(),
     ]);
@@ -141,6 +144,10 @@ class _ProfileBody extends ConsumerWidget {
         const SectionHeader(title: 'Favoriete teksten'),
         const SizedBox(height: 12),
         const _FavoritesCard(),
+
+        // Brings its own header and spacing, and renders nothing when the
+        // invite data is unavailable.
+        const InviteSection(),
 
         const SizedBox(height: 28),
         const SectionHeader(title: 'Activiteit'),
