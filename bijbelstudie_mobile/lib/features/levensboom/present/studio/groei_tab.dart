@@ -25,9 +25,9 @@ import 'groei_thumbnails.dart';
 /// thumbnail is a cached image (`groei_thumbnails.dart`), because twenty trees
 /// in a list is the heaviest thing on this screen on a low-end Android.
 ///
-/// Thumbnails use the level at which the account reaches each step, drawn by
-/// today's generator; the growth-v2 generator port switches them to exact
-/// positions.
+/// Thumbnails draw the tree at each step (`TreeAt`, with the account's floor),
+/// the current row at the reader's own position, and the level at which the
+/// account stands on that step for traits and fruit - as the website's ladder.
 class GroeiTab extends ConsumerStatefulWidget {
   const GroeiTab({super.key, required this.tree});
 
@@ -220,6 +220,10 @@ class _StepRow extends StatelessWidget {
       thumb = GroeiThumbnail(
         seed: tree.seed,
         level: level,
+        step: n,
+        // The current row shows the tree where it stands now, like the website.
+        position: current ? tree.position : null,
+        floor: floor,
         species: tree.avatar.species,
         scene: tree.avatar.scene,
         size: _thumb,
@@ -228,6 +232,8 @@ class _StepRow extends StatelessWidget {
       thumb = GroeiThumbnail(
         seed: tree.seed,
         level: level,
+        step: n,
+        floor: floor,
         species: tree.avatar.species,
         scene: tree.avatar.scene,
         size: _thumb,

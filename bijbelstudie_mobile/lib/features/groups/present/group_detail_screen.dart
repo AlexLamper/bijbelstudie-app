@@ -239,6 +239,9 @@ class _GroupHeader extends StatelessWidget {
                               // the server, or the old half-way point from
                               // a server that predates it.
                               frac: card.frac,
+                              // With the owner's floor, so this is the tree
+                              // its owner sees.
+                              floor: card.floor,
                               health: card.health,
                               species: card.avatar.species,
                               scene: card.avatar.scene,

@@ -1,14 +1,18 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import '../domain/growth.dart';
+import '../domain/paint_spec.dart';
 import '../domain/palette.dart';
 import '../domain/scene_cache.dart';
 import '../domain/scenes.dart';
 import '../domain/species.dart';
 import '../domain/tree_generator.dart';
+import '../domain/tween.dart';
 import 'backdrop_painter.dart';
 
 export 'backdrop_painter.dart' show TreeFrame, TreeFraming, TreeDecor, measureTreeFrame;
@@ -23,12 +27,41 @@ export 'backdrop_painter.dart' show TreeFrame, TreeFraming, TreeDecor, measureTr
 ///
 /// Two framings. [TreeFraming.scene] is the landscape: sky, backdrop, a band
 /// of earth the trunk stands *in*, animals. [TreeFraming.portrait] is the
-/// avatar: the tree alone on a sky disc, cropped to its own bounds, for the
-/// tab bar and every other place a 24 px face has to read.
+/// avatar: the tree alone on a sky disc, for the tab bar and every other place
+/// a 24 px face has to read. Both come from `domain/camera.dart` (growth v2):
+/// the landscape stays put and the tree takes a designed share of it, so
+/// growth shows as size.
+///
+/// Growth v2 tween: with [TreeView.from], the view plays the tree growing from
+/// that position to the current one - [lerpScenes] each frame, with the camera
+/// measured on the in-between scene so it eases along. The branch layer is
+/// re-recorded every frame while that runs, and only then.
 ///
 /// Honours `MediaQuery.disableAnimations`, the account's own "minder beweging"
-/// pref and [TreeView.still]: one static frame, no particles, no sway. Species,
-/// scene and animal never touch the generator - they are paint.
+/// pref and [TreeView.still]: one static frame, no particles, no sway, and a
+/// tween shows its end state at once. Species, scene and animal never touch
+/// the generator - they are paint.
+
+/// Where a growth tween starts: the website's TreeCanvas `from`.
+class TreeFrom {
+  /// On the view's own [TreeView.floor] (the website's `floor` left out).
+  const TreeFrom({required this.level, required this.frac})
+      : floor = null,
+        ownFloor = false;
+
+  /// On an explicit floor; null means none.
+  const TreeFrom.withFloor({required this.level, required this.frac, required this.floor})
+      : ownFloor = true;
+
+  final int level;
+  final double frac;
+  final GrowthFloor? floor;
+
+  /// True when [floor] is used rather than the view's.
+  final bool ownFloor;
+
+  GrowthFloor? floorFor(GrowthFloor? current) => ownFloor ? floor : current;
+}
 
 class TreeView extends StatefulWidget {
   const TreeView({
@@ -47,6 +80,11 @@ class TreeView extends StatefulWidget {
     this.palette,
     this.celebration = false,
     this.bloomFruit,
+    this.floor,
+    this.at,
+    this.from,
+    this.tweenMs,
+    this.onTweenEnd,
   });
 
   final String seed;
@@ -63,7 +101,10 @@ class TreeView extends StatefulWidget {
   final TreeAnimal animal;
   final TreeFraming framing;
 
-  /// 0..1. Below 1 the tree is mid grow-in - the celebration drives this.
+  /// 0..1. Below 1 the tree is mid grow-in, by depth.
+  ///
+  /// Deprecated in spirit, as on the website: growth v2 grows the tree with
+  /// [from] instead. Kept working for anything that still sets it.
   final double reveal;
 
   final bool reducedMotion;
@@ -80,11 +121,48 @@ class TreeView extends StatefulWidget {
   /// Index of a fruit to swell with a soft bloom, when a level-up unlocked one.
   final int? bloomFruit;
 
+  /// Growth v2: the account's never-shrink floor (`levensboom.growth.floor`,
+  /// or a public card's `growth.floor`).
+  final GrowthFloor? floor;
+
+  /// Growth v2: draw at this position instead of [level]/[frac] (the Groei
+  /// ladder's thumbnails).
+  final TreeAt? at;
+
+  /// Growth v2: tween from this earlier position to the current one (plan
+  /// §9.2, §9.3) - the level-up and the in-level lesson growth. Paths in both
+  /// scenes lengthen in place, newborn wood grows out of its parent's tip, the
+  /// camera eases. Under reduced motion the end state shows at once.
+  ///
+  /// Plays once per distinct start (by value). If only the target moves while
+  /// it runs, it retargets without restarting; once it has ended, a new
+  /// target just shows.
+  final TreeFrom? from;
+
+  /// Tween length; defaults to `tween.levelUpMs` (1800) when the step
+  /// changes, else `tween.growMs` (1200).
+  final int? tweenMs;
+
+  /// Called once when the tween has finished - also when it was skipped
+  /// (reduced motion, [still]) and when the view was off screen for its whole
+  /// length.
+  final VoidCallback? onTweenEnd;
+
   @override
   State<TreeView> createState() => _TreeViewState();
 }
 
-class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin {
+/// The running growth tween: scene A, how long, and whether it is over.
+class _Tween {
+  _Tween(this.key, this.from, this.ms);
+
+  final String key;
+  TreeScene from;
+  int ms;
+  bool ended = false;
+}
+
+class _TreeViewState extends State<TreeView> with TickerProviderStateMixin {
   /// One clock for everything, so the layers cannot drift apart. A minute per
   /// turn keeps the value coarse enough to avoid float noise in the sines.
   static const Duration _period = Duration(seconds: 60);
@@ -94,16 +172,32 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
     duration: _period,
   );
 
+  /// Drives the growth tween, 0 → 1 linear over its length; [tweenEase] shapes it.
+  late final AnimationController _tweenClock = AnimationController(vsync: this);
+
+  late final Listenable _ticks = Listenable.merge([_clock, _tweenClock]);
+
   final BranchLayer _layer = BranchLayer();
 
   late TreeScene _scene;
   late TreeDecor _decor;
+
+  _Tween? _tween;
+
+  /// A new tween waits for [_syncClock] to start it, where the motion
+  /// preferences can be read.
+  bool _tweenPending = false;
+
+  /// Ends a tween on time even when no frame is drawn (the route is covered,
+  /// the ticker muted): the website's end timer.
+  Timer? _endTimer;
 
   @override
   void initState() {
     super.initState();
     _scene = _build();
     _decor = TreeDecor(widget.seed);
+    _syncTween();
   }
 
   @override
@@ -114,12 +208,20 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
         old.frac != widget.frac ||
         old.health != widget.health ||
         old.species != widget.species ||
-        old.framing != widget.framing) {
+        old.framing != widget.framing ||
+        old.floor != widget.floor ||
+        old.at?.position != widget.at?.position ||
+        old.at?.step != widget.at?.step) {
       _scene = _build();
     }
     if (old.seed != widget.seed) _decor = TreeDecor(widget.seed);
+    _syncTween();
     _syncClock();
   }
+
+  /// Portraits tell 20 positions per step apart, scenes 50 (scene_cache.dart):
+  /// an XP tick never regenerates a tree nobody could see change.
+  int get _bucket => widget.framing == TreeFraming.portrait ? 20 : kPositionBucket;
 
   TreeScene _build() => cachedTree(
     seed: widget.seed,
@@ -127,9 +229,50 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
     frac: widget.frac,
     health: widget.health,
     species: widget.species,
-    // Portraits tell 20 positions per step apart, scenes 50 (scene_cache.dart).
-    bucket: widget.framing == TreeFraming.portrait ? 20 : kPositionBucket,
+    floor: widget.floor,
+    at: widget.at,
+    bucket: _bucket,
   );
+
+  /// Scene A of the tween, and one tween per distinct start: the same `from`
+  /// again only retargets (an ended tween stays ended).
+  void _syncTween() {
+    final from = widget.from;
+    if (from == null) {
+      _tween = null;
+      _tweenPending = false;
+      _endTimer?.cancel();
+      if (_tweenClock.isAnimating) _tweenClock.stop();
+      return;
+    }
+    final floor = from.floorFor(widget.floor);
+    final key = '${widget.seed}|${kSpeciesIds[widget.species]}|${from.level}|${from.frac}|'
+        '${floor?.from ?? '-'},${floor?.to ?? '-'}';
+    final fromScene = cachedTree(
+      seed: widget.seed,
+      level: from.level,
+      frac: from.frac,
+      health: widget.health,
+      species: widget.species,
+      floor: floor,
+      bucket: _bucket,
+    );
+    final ms = math.max(0, widget.tweenMs ?? tweenMsFor(fromScene, _scene));
+    final running = _tween;
+    if (running != null && running.key == key) {
+      running.from = fromScene;
+      if (running.ms != ms && !running.ended && _tweenClock.isAnimating) {
+        // Same start, new length: finish the rest at the new pace.
+        _tweenClock
+          ..duration = Duration(milliseconds: math.max(1, ms))
+          ..forward(from: _tweenClock.value);
+      }
+      running.ms = ms;
+      return;
+    }
+    _tween = _Tween(key, fromScene, ms);
+    _tweenPending = true;
+  }
 
   bool get _still =>
       widget.still ||
@@ -139,9 +282,48 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
   void _syncClock() {
     if (_still) {
       if (_clock.isAnimating) _clock.stop();
+      if (_tweenClock.isAnimating) _tweenClock.stop();
     } else if (!_clock.isAnimating) {
       _clock.repeat();
     }
+    final tween = _tween;
+    if (_tweenPending && tween != null) {
+      _tweenPending = false;
+      _endTimer?.cancel();
+      // Still: the first frame is the end state (see [_sceneNow]).
+      if (!_still && tween.ms > 0) {
+        _tweenClock
+          ..duration = Duration(milliseconds: tween.ms)
+          ..forward(from: 0);
+        _endTimer = Timer(Duration(milliseconds: tween.ms + 50), () {
+          if (!mounted || tween.ended || !identical(_tween, tween)) return;
+          setState(() => _endTween(tween));
+        });
+      }
+    }
+  }
+
+  /// The scene to draw now: B, or A→B while the tween runs. Ends the tween
+  /// once its time is up.
+  TreeScene _sceneNow() {
+    final tween = _tween;
+    if (tween == null || tween.ended) return _scene;
+    final u = _still || tween.ms <= 0 ? 1.0 : _tweenClock.value;
+    if (u >= 1) {
+      _endTween(tween);
+      return _scene;
+    }
+    return lerpScenes(tween.from, _scene, tweenEase(u));
+  }
+
+  void _endTween(_Tween tween) {
+    if (tween.ended) return;
+    tween.ended = true;
+    _endTimer?.cancel();
+    // After the paint, so the caller's next step never races the end state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onTweenEnd?.call();
+    });
   }
 
   @override
@@ -152,7 +334,9 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
+    _endTimer?.cancel();
     _clock.dispose();
+    _tweenClock.dispose();
     _layer.dispose();
     super.dispose();
   }
@@ -168,17 +352,19 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
 
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: _clock,
+        animation: _ticks,
         builder: (context, _) {
+          final still = _still;
           return CustomPaint(
             painter: TreePainter(
-              scene: _scene,
+              scene: _sceneNow(),
+              seed: widget.seed,
               palette: palette,
               decor: _decor,
               layer: _layer,
               reveal: widget.reveal,
-              timeMs: _still ? 0 : _clock.value * _period.inMilliseconds,
-              still: _still,
+              timeMs: still ? 0 : _clock.value * _period.inMilliseconds,
+              still: still,
               level: widget.level,
               celebration: widget.celebration,
               bloomFruit: widget.bloomFruit,
@@ -194,36 +380,49 @@ class _TreeViewState extends State<TreeView> with SingleTickerProviderStateMixin
 }
 
 
-/// The recorded branch layer plus the key it was recorded for.
+/// The recorded branch layer plus what it was recorded for.
 class BranchLayer {
   ui.Picture? picture;
   String? key;
 
+  /// The scene it was recorded from, by identity: every frame of a tween is a
+  /// new scene, so the layer is re-recorded then and almost never otherwise.
+  TreeScene? scene;
+
   void dispose() {
     picture?.dispose();
     picture = null;
+    scene = null;
   }
 }
 
+/// A blossom's radius as a share of its (capped) leaf size times the leaf
+/// scale: smaller than a leaf. The website's `BLOSSOM_RADIUS`.
+const double _blossomRadius = 0.7;
 
 class TreePainter extends CustomPainter with SceneLayers {
   TreePainter({
     required this.scene,
+    required this.seed,
     required this.palette,
     required this.decor,
     required this.layer,
-    required this.reveal,
+    this.reveal = 1,
     required this.timeMs,
     required this.still,
     required this.level,
-    required this.celebration,
-    required this.bloomFruit,
+    this.celebration = false,
+    this.bloomFruit,
     this.framing = TreeFraming.scene,
     this.animal = kDefaultAnimal,
   });
 
+  /// What is drawn: during a tween, the in-between scene.
   @override
   final TreeScene scene;
+
+  /// The account's seed, for the maturing details' own stream (`<seed>:mature`).
+  final String seed;
   @override
   final TreePalette palette;
   @override
@@ -244,9 +443,7 @@ class TreePainter extends CustomPainter with SceneLayers {
   @override
   final TreeAnimal animal;
 
-
-
-  /// How much of a branch at [depth] is grown, for the celebration sequence.
+  /// How much of a branch at [depth] is grown, for the (deprecated) reveal.
   double _revealAt(int depth) {
     if (reveal >= 1) return 1;
     final t = reveal * (scene.maxDepth + 1) - depth;
@@ -282,30 +479,71 @@ class TreePainter extends CustomPainter with SceneLayers {
 
   void _paintBranches(Canvas canvas, TreeFrame frame) {
     final key =
-        '${scene.level}:${scene.health}:${kSpeciesIds[scene.species]}:'
-        '${frame.width}x${frame.height}:${framing.name}:${animal.name}:'
-        '${palette.bark.toARGB32()}:${reveal.toStringAsFixed(3)}';
+        '${frame.width}x${frame.height}:${frame.scale}:${frame.originX}:${frame.originY}:'
+        '${palette.leaf.toARGB32()}:${palette.leafAlt.toARGB32()}:${palette.bark.toARGB32()}:'
+        '${palette.barkLit.toARGB32()}:${palette.groundDeep.toARGB32()}:${reveal.toStringAsFixed(3)}';
 
-    if (layer.picture == null || layer.key != key) {
+    if (layer.picture == null || layer.key != key || !identical(layer.scene, scene)) {
       final recorder = ui.PictureRecorder();
       final scratch = Canvas(recorder);
       recordBranches(scratch, frame);
       layer.picture?.dispose();
       layer.picture = recorder.endRecording();
       layer.key = key;
+      layer.scene = scene;
     }
     canvas.drawPicture(layer.picture!);
   }
 
-  /// The branch outlines, drawn straight (no layer): the notification image
-  /// renderer uses this directly.
+  /// The branch layer, drawn straight (no picture): root flare behind the
+  /// trunk, the wood, then knots and moss on the bark (`paint_spec.dart` has
+  /// their numbers). Each branch is lit from the upper left, from its `wood`
+  /// colour's lit tone to its own: bark (barkLit → bark) for old wood, the
+  /// green-stem mix for young wood. The website's `drawBranches`.
   void recordBranches(Canvas canvas, TreeFrame frame) {
     final originX = frame.originX;
     final originY = frame.originY;
     final scale = frame.scale;
+    double px(double x) => originX + x * scale;
+    double py(double y) => originY + y * scale;
+    final mature = matureDetails(scene, seed);
+    // Old details show once the trunk has grown in, never half-drawn.
+    final trunkShown = _revealAt(0) >= 1;
+
+    if (trunkShown) {
+      for (final foot in mature.roots) {
+        canvas.drawPath(
+          Path()
+            ..moveTo(px(foot.top.x), py(foot.top.y))
+            ..quadraticBezierTo(px(foot.ctrl.x), py(foot.ctrl.y), px(foot.toe.x), py(foot.toe.y))
+            ..lineTo(px(foot.toe.x), py(foot.bottomY))
+            ..lineTo(px(foot.baseX), py(foot.bottomY))
+            ..lineTo(px(foot.baseX), py(foot.top.y))
+            ..close(),
+          Paint()..color = rootColor(palette, foot.side),
+        );
+      }
+    }
+
+    // Wood colours per twentieth, as the website's canvas buckets them: a
+    // tree is a handful of distinct mixes.
+    final tones = <int, List<Color>>{};
+    List<Color> toneOf(double wood) {
+      final bucket = (math.min(1.0, math.max(0.0, wood)) * 20).round();
+      return tones.putIfAbsent(
+        bucket,
+        () => [
+          woodMix(palette.leafAlt, palette.barkLit, bucket / 20),
+          woodMix(palette.leaf, palette.bark, bucket / 20),
+        ],
+      );
+    }
+
     for (final branch in scene.branches) {
       final t = _revealAt(branch.depth);
       if (t <= 0) continue;
+      // A newborn twig at the start of a tween has no length yet.
+      if (branch.w0 <= 0 && branch.x1 == branch.x0 && branch.y1 == branch.y0) continue;
 
       final x0 = originX + branch.x0 * scale;
       final y0 = originY + branch.y0 * scale;
@@ -332,15 +570,39 @@ class TreePainter extends CustomPainter with SceneLayers {
         ..close();
 
       // Lit from the upper left, like the glow behind the canopy.
+      final tone = toneOf(branch.wood);
       canvas.drawPath(
         path,
         Paint()
           ..shader = ui.Gradient.linear(
             Offset(x0 - w0, y0),
             Offset(x0 + w0, y0),
-            [palette.barkLit, palette.bark],
+            tone,
           ),
       );
+    }
+
+    if (!trunkShown) return;
+    if (mature.knots.isNotEmpty) {
+      final colours = knotColors(palette);
+      final rim = Paint()..color = colours.rim.withValues(alpha: 0.55);
+      final knot = Paint()..color = colours.knot.withValues(alpha: 0.9);
+      for (final k in mature.knots) {
+        final centre = Offset(px(k.x), py(k.y));
+        final angle = k.angle * kDeg;
+        fillEllipse(canvas, centre, k.rx * 1.3 * scale, k.ry * 1.4 * scale, rim, rotation: angle);
+        fillEllipse(canvas, centre, k.rx * scale, k.ry * scale, knot, rotation: angle);
+      }
+    }
+    if (mature.moss.isNotEmpty) {
+      final paint = Paint();
+      for (final tuft in mature.moss) {
+        canvas.drawCircle(
+          Offset(px(tuft.x), py(tuft.y)),
+          math.max(0.5, tuft.r * scale),
+          paint..color = mossColor(palette, tuft.alt).withValues(alpha: 0.85),
+        );
+      }
     }
   }
 
@@ -366,9 +628,14 @@ class TreePainter extends CustomPainter with SceneLayers {
         // by the caller where there is room to see them.
         path.addOval(Rect.fromCenter(center: Offset(size * 0.7, 0), width: size * 2.2, height: size * 0.6));
       case LeafShape.needle:
-        // A tuft of needles; a single stroke at avatar sizes.
+        // A tuft of needles. At avatar sizes a single stroke is all that
+        // survives the downsample, so the fan collapses to three, then one.
         final length = size * 1.6;
-        final fan = scale > 1.6 ? const [-40.0, -20.0, 0.0, 20.0, 40.0] : const [0.0];
+        final fan = scale > 1.6
+            ? const [-40.0, -20.0, 0.0, 20.0, 40.0]
+            : scale > 1
+            ? const [-30.0, 0.0, 30.0]
+            : const [0.0];
         for (final a in fan) {
           path
             ..moveTo(0, 0)
@@ -400,13 +667,16 @@ class TreePainter extends CustomPainter with SceneLayers {
     final stroke = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = math.max(0.8, 0.32 * scale);
+      ..strokeWidth = math.max(1.0, 0.42 * scale);
     final rib = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
+    // Seed leaves: two colours per frame, yellowing as the seedling ages (paint_spec.dart).
+    final seedLeaf = cotyledonColor(palette, false, step: scene.step, position: scene.position);
+    final seedLeafAlt = cotyledonColor(palette, true, step: scene.step, position: scene.position);
 
     for (final leaf in scene.leaves) {
-      if (!leaf.visible) continue;
+      if (!leaf.visible || !(leaf.size > 0)) continue;
       final grown = _revealAt(leaf.depth);
       if (grown <= 0) continue;
 
@@ -417,13 +687,28 @@ class TreePainter extends CustomPainter with SceneLayers {
       // size change rather than a pop-in.
       final size = leaf.size * leafScale * grown * (leaf.open ? 1 : 0.45);
       final angle = leaf.angle + shimmer * (shape == LeafShape.frond ? 2 : 6);
-      final colour = (leaf.phase > 0.5 ? palette.leafAlt : palette.leaf)
-          .withValues(alpha: leaf.open ? 1 : 0.75);
-      final down = Offset(math.cos((90 - angle) * kDeg), math.sin((90 - angle) * kDeg));
+      // A bud is translucent; a seed leaf or whorl fades as it goes.
+      final alpha = (leaf.open ? 1.0 : 0.75) * leafFadeAlpha(leaf.fade);
 
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(angle * kDeg);
+      if (leaf.kind == LeafKind.cotyledon) {
+        // Rounder and fleshier than any species leaf (a conifer's are needles).
+        final c = cotyledonShape(scene.form, size);
+        fillEllipse(
+          canvas,
+          Offset(c.cx, 0),
+          c.rx,
+          c.ry,
+          fill..color = (leaf.phase > 0.5 ? seedLeafAlt : seedLeaf).withValues(alpha: alpha),
+        );
+        canvas.restore();
+        continue;
+      }
+      final alt = leaf.phase > 0.5;
+      final colour = (alt ? palette.leafAlt : palette.leaf).withValues(alpha: alpha);
+      final down = Offset(math.cos((90 - angle) * kDeg), math.sin((90 - angle) * kDeg));
       final path = _leafPath(shape, size, scale, down);
       if (shape == LeafShape.needle) {
         canvas.drawPath(path, stroke..color = colour);
@@ -433,7 +718,7 @@ class TreePainter extends CustomPainter with SceneLayers {
         final feather = shape == LeafShape.feather;
         if (frond || feather || shape == LeafShape.large) {
           rib
-            ..color = leaf.phase > 0.5 ? palette.leaf : palette.leafAlt
+            ..color = (alt ? palette.leaf : palette.leafAlt).withValues(alpha: alpha)
             ..strokeWidth = math.max(0.5, size * 0.08);
           canvas.drawLine(
             Offset.zero,
@@ -478,6 +763,7 @@ class TreePainter extends CustomPainter with SceneLayers {
           paint,
         );
       case FruitStyle.dates:
+        // A bunch of three under the crown (spec §10.6a): radii (0.42, 0.6)·s.
         for (final (ox, oy) in const [(-0.5, 0.1), (0.5, 0.1), (0.0, 0.75)]) {
           canvas.drawOval(
             Rect.fromCenter(
@@ -586,15 +872,18 @@ class TreePainter extends CustomPainter with SceneLayers {
     if (blossomColor != null) {
       final paint = Paint()..color = blossomColor;
       for (final blossom in scene.blossoms) {
+        if (!(blossom.size > 0)) continue;
         canvas.drawCircle(
           Offset(originX + blossom.x * scale, originY + blossom.y * scale),
-          blossom.size * leafScale * 0.8,
+          blossom.size * leafScale * _blossomRadius,
           paint,
         );
       }
     }
 
     for (final fruit in scene.fruits) {
+      // A fruit arriving in a tween swells in; the 1.4 px floor must not pop it.
+      if (!(fruit.size > 0)) continue;
       final centre = Offset(originX + fruit.x * scale, originY + fruit.y * scale);
       // The fruit a level-up just unlocked swells and carries a soft bloom, so
       // the eye is told which one is new.
@@ -623,7 +912,7 @@ class TreePainter extends CustomPainter with SceneLayers {
     if (level >= kSeasonsTraitLevel && palette.season == Season.winter) {
       final snow = Paint()..color = const Color(0xE6F2F6FA);
       for (final branch in scene.branches) {
-        if (branch.depth < scene.maxDepth - 2) continue;
+        if (branch.depth < scene.maxDepth - 2 || !(branch.w0 > 0)) continue;
         if (_revealAt(branch.depth) <= 0) continue;
         final n = _normal(branch.x1 - branch.cx, branch.y1 - branch.cy);
         // Only the upward-facing side carries snow.
@@ -643,168 +932,16 @@ class TreePainter extends CustomPainter with SceneLayers {
       }
     }
 
-    final perch = scene.perch;
-    if (perch != null && _perchAnimals.contains(animal)) {
-      final p = Offset(originX + perch.x * scale, originY + perch.y * scale);
-      switch (animal) {
-        case TreeAnimal.vogel:
-          _drawBird(canvas, p, scale);
-        case TreeAnimal.duif:
-          _drawPerchBird(canvas, p, scale, _dove);
-        case TreeAnimal.raaf:
-          _drawPerchBird(canvas, p, scale, _raven);
-        default:
-          _drawOwl(canvas, p, scale);
-      }
-    }
-  }
-
-  /// The animals that sit on the perch rather than on the ground.
-  static const _perchAnimals = {TreeAnimal.vogel, TreeAnimal.duif, TreeAnimal.raaf, TreeAnimal.uil};
-
-  // ------------------------------------------------------------- animals
-
-  void _drawBird(Canvas canvas, Offset p, double scale) {
-    final s = math.max(2.0, 2.6 * scale);
-    canvas.drawPath(
-      Path()
-        ..moveTo(p.dx - s, p.dy)
-        ..quadraticBezierTo(p.dx - s * 0.4, p.dy - s * 0.7, p.dx, p.dy)
-        ..quadraticBezierTo(p.dx + s * 0.4, p.dy - s * 0.7, p.dx + s, p.dy),
-      Paint()
-        ..color = palette.bark
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = math.max(1.0, 0.45 * scale),
-    );
-  }
-
-  static const _dove = (
-    body: Color(0xFFF4F4F0),
-    wing: Color(0xFFE2E2D8),
-    beak: Color(0xFFE0A458),
-    eye: Color(0xFF2B2B2B),
-  );
-  static const _raven = (
-    body: Color(0xFF26262B),
-    wing: Color(0xFF3A3A42),
-    beak: Color(0xFF5A5A60),
-    eye: Color(0xFFDADAE0),
-  );
-
-  /// The dove and the raven: one bird, two coats.
-  void _drawPerchBird(
-    Canvas canvas,
-    Offset p,
-    double scale,
-    ({Color body, Color wing, Color beak, Color eye}) coat,
-  ) {
-    final s = math.max(2.5, 2.4 * scale);
-    final flap = still ? 0.0 : math.sin(timeMs * 0.004) * 0.25;
-    final x = p.dx;
-    final y = p.dy;
-    final body = Paint()..color = coat.body;
-    canvas.save();
-    canvas.translate(x, y - s * 0.4);
-    canvas.rotate(-0.15);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: s * 2, height: s * 1.1), body);
-    canvas.restore();
-    canvas.drawPath(
-      Path()
-        ..moveTo(x - s * 0.8, y - s * 0.3)
-        ..lineTo(x - s * 1.5, y - s * 0.05)
-        ..lineTo(x - s * 1.35, y - s * 0.55)
-        ..close(),
-      body,
-    );
-    canvas.drawCircle(Offset(x + s * 0.85, y - s * 0.8), s * 0.38, body);
-    canvas.drawPath(
-      Path()
-        ..moveTo(x - s * 0.1, y - s * 0.55)
-        ..quadraticBezierTo(x - s * 0.2, y - s * (1.35 + flap), x + s * 0.7, y - s * (1.05 + flap))
-        ..lineTo(x + s * 0.4, y - s * 0.45)
-        ..close(),
-      Paint()..color = coat.wing,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(x + s * 1.2, y - s * 0.82)
-        ..lineTo(x + s * 1.5, y - s * 0.72)
-        ..lineTo(x + s * 1.18, y - s * 0.66)
-        ..close(),
-      Paint()..color = coat.beak,
-    );
-    canvas.drawCircle(
-      Offset(x + s * 0.95, y - s * 0.86),
-      math.max(0.5, s * 0.08),
-      Paint()..color = coat.eye,
-    );
-  }
-
-  /// Asleep by day, eyes open at night - with the odd blink.
-  void _drawOwl(Canvas canvas, Offset p, double scale) {
-    final s = math.max(2.5, 2.2 * scale);
-    final x = p.dx;
-    final y = p.dy;
-    const dark = Color(0xFF4A3A28);
-    final awake = palette.night && (still || math.sin(timeMs * 0.0009) < 0.97);
-    final brown = Paint()..color = const Color(0xFF8A6A48);
-    fillEllipse(canvas, Offset(x, y - s * 0.7), s * 0.7, s * 0.95, brown);
-    // Ear tufts.
-    for (final side in const [-1.0, 1.0]) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(x + side * s * 0.5, y - s * 1.55)
-          ..lineTo(x + side * s * 0.6, y - s * 2.05)
-          ..lineTo(x + side * s * 0.2, y - s * 1.65)
-          ..close(),
-        brown,
-      );
-    }
-    // Folded wings.
-    final wing = Paint()..color = dark.withValues(alpha: 0.35);
-    for (final side in const [-1.0, 1.0]) {
-      fillEllipse(canvas, Offset(x + side * s * 0.45, y - s * 0.6), s * 0.25, s * 0.55, wing, rotation: side * 0.2);
-    }
-    // Face.
-    fillEllipse(canvas, Offset(x, y - s * 1.2), s * 0.55, s * 0.45, Paint()..color = const Color(0xFFD9C4A0));
-    final darkFill = Paint()..color = dark;
-    for (final side in const [-1.0, 1.0]) {
-      final ex = x + side * s * 0.22;
-      final ey = y - s * 1.22;
-      if (awake) {
-        canvas.drawCircle(Offset(ex, ey), s * 0.16, Paint()..color = const Color(0xFFF2C14E));
-        canvas.drawCircle(Offset(ex, ey), s * 0.07, darkFill);
-      } else {
-        canvas.drawArc(
-          Rect.fromCircle(center: Offset(ex, ey - s * 0.04), radius: s * 0.14),
-          0.2,
-          math.pi - 0.4,
-          false,
-          Paint()
-            ..color = dark
-            ..style = PaintingStyle.stroke
-            ..strokeCap = StrokeCap.round
-            ..strokeWidth = math.max(0.6, s * 0.06),
-        );
-      }
-    }
-    // Beak.
-    canvas.drawPath(
-      Path()
-        ..moveTo(x - s * 0.07, y - s * 1.08)
-        ..lineTo(x + s * 0.07, y - s * 1.08)
-        ..lineTo(x, y - s * 0.94)
-        ..close(),
-      darkFill,
-    );
+    // In the crown once it has a twig that holds a bird; until then the bird
+    // waits on the ground (paintForeground).
+    paintCrownBird(canvas, frame);
   }
 
 
   @override
   bool shouldRepaint(TreePainter old) =>
       old.timeMs != timeMs ||
-      old.scene != scene ||
+      !identical(old.scene, scene) ||
       old.reveal != reveal ||
       old.palette != palette ||
       old.celebration != celebration ||

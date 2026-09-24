@@ -42,13 +42,6 @@ const double kTrunkX = 50;
 /// How much earth the bounds include under the ground line.
 const double kGroundPad = 8;
 
-/// v1 camera minimums. Deprecated on the website too: the v2 camera
-/// (`camera.dart`) frames by position.
-@Deprecated('The v2 camera (camera.dart) frames by position.')
-const double kMinSceneHeight = 26;
-@Deprecated('The v2 camera (camera.dart) frames by position.')
-const double kMinSceneWidth = 34;
-
 /// Fruit hangs from a twig but must not inherit a frond's or a fig leaf's size.
 const double kMaxFruitSize = 1.6;
 

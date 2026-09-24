@@ -311,6 +311,7 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
                   seed: tree.seed,
                   level: tree.level,
                   frac: tree.progress,
+                  floor: tree.floor,
                   health: tree.health,
                   species: draw.species,
                   scene: draw.scene,

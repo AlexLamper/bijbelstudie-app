@@ -669,7 +669,9 @@ class _PlantCard extends StatelessWidget {
                   aspectRatio: 4 / 3,
                   child: TreeView(
                     seed: seed,
-                    level: 7,
+                    // A young crown under growth v2, where the v1 pick (7) is
+                    // now a sapling; the website's onboarding picked 12 too.
+                    level: 12,
                     frac: 0.6,
                     species: species,
                     still: true,

@@ -183,6 +183,9 @@ class _Subject {
         frac: tree.progress,
         health: health,
         species: tree.avatar.species,
+        // The account's never-shrink floor, so the picture is the tree the
+        // reader sees in the app.
+        floor: tree.floor,
       ),
       paletteForNow(
         health: health,
@@ -220,6 +223,7 @@ Future<void> _paintToFile(
     layer = BranchLayer();
     TreePainter(
       scene: subject.scene!,
+      seed: subject.tree!.seed,
       palette: subject.palette,
       decor: subject.decor!,
       layer: layer,

@@ -149,10 +149,16 @@ Color mixColor(Color a, Color b, double amount) {
 /// Growth v2: a branch's colour from green stem (wood 0) to bark (wood 1). The
 /// green is the canopy's own leaf colour a third of the way to bark, so a
 /// seedling's stem belongs to its leaves; no new colour token. The website's
-/// `woodColor`; a renderer buckets [wood] to tenths.
-Color woodColor(TreePalette palette, double wood) {
-  if (wood >= 1) return palette.bark;
-  return mixColor(mixColor(palette.leaf, palette.bark, 0.35), palette.bark, wood);
+/// `woodColor`; a renderer may bucket [wood] (the website's canvas and the
+/// app's `TreeView` to twentieths, the SVG to tenths).
+Color woodColor(TreePalette palette, double wood) => woodMix(palette.leaf, palette.bark, wood);
+
+/// [woodColor] on any leaf/bark pair: the painter's lit edge uses
+/// `woodMix(leafAlt, barkLit, wood)`, exactly as the website's canvas passes
+/// `{ leaf: leafAlt, bark: barkLit }`.
+Color woodMix(Color leaf, Color bark, double wood) {
+  if (wood >= 1) return bark;
+  return mixColor(mixColor(leaf, bark, 0.35), bark, wood);
 }
 
 /// `month` is 1-based, as `DateTime.month` gives it.

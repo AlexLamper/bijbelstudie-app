@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -5,13 +6,14 @@ import 'package:flutter/scheduler.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/catalog.dart';
+import '../../domain/growth.dart';
 import '../../domain/palette.dart';
 import '../../domain/scenes.dart';
 import '../../domain/species.dart';
 import '../../domain/tree_generator.dart';
 import '../tree_view.dart';
 
-/// A small still portrait of the reader's own tree at one level, for the rows
+/// A small still portrait of the reader's own tree at one step, for the rows
 /// of the Groei ladder.
 ///
 /// Twenty live [TreeView]s in a scrolling list are twenty generator runs and
@@ -25,6 +27,11 @@ import '../tree_view.dart';
 /// Daylight and full health on purpose: the ladder shows how the tree grows,
 /// not how it looks tonight or after a week away.
 ///
+/// Growth v2, as the website's ladder draws it: the tree *at* step [step]
+/// (`TreeAt`), at [position] (the reader's own position on the current row,
+/// else the start of the step), with the account's [floor] and [level] - the
+/// level at which this account stands on the step - for traits and fruit.
+///
 /// [silhouette] greys the picture out: the step the tree reaches next is a
 /// shape to look forward to, not a finished portrait.
 class GroeiThumbnail extends StatefulWidget {
@@ -32,6 +39,9 @@ class GroeiThumbnail extends StatefulWidget {
     super.key,
     required this.seed,
     required this.level,
+    required this.step,
+    this.position,
+    this.floor,
     required this.species,
     required this.scene,
     this.size = 44,
@@ -39,7 +49,17 @@ class GroeiThumbnail extends StatefulWidget {
   });
 
   final String seed;
+
+  /// The level at which the account stands on [step]: traits and fruit.
   final int level;
+
+  /// The step drawn (which branches exist).
+  final int step;
+
+  /// Where on [step] the tree is drawn; null means the step's start.
+  final double? position;
+
+  final GrowthFloor? floor;
   final TreeSpecies species;
   final TreeSceneId scene;
   final double size;
@@ -70,6 +90,10 @@ class _GroeiThumbnailState extends State<GroeiThumbnail> {
     final spec = _ThumbSpec(
       seed: widget.seed,
       level: widget.level,
+      step: widget.step,
+      // Bucketed to 1/20 of a step, as the website's portraits are.
+      position: math.max(1.0, ((widget.position ?? widget.step.toDouble()) * 20).round() / 20),
+      floor: widget.floor,
       species: widget.species,
       scene: widget.scene,
       size: widget.size,
@@ -161,6 +185,9 @@ class _ThumbSpec {
   const _ThumbSpec({
     required this.seed,
     required this.level,
+    required this.step,
+    required this.position,
+    required this.floor,
     required this.species,
     required this.scene,
     required this.size,
@@ -170,6 +197,9 @@ class _ThumbSpec {
 
   final String seed;
   final int level;
+  final int step;
+  final double position;
+  final GrowthFloor? floor;
   final TreeSpecies species;
   final TreeSceneId scene;
   final double size;
@@ -179,7 +209,9 @@ class _ThumbSpec {
   int get pixels => (size * dpr).round().clamp(1, 512);
 
   String get key =>
-      '$seed|${kSpeciesIds[species]}|${scene.name}|$level|$pixels|${season.name}';
+      'v$growthModel|$seed|${kSpeciesIds[species]}|${scene.name}|$level|@$step|'
+      '${position.toStringAsFixed(2)}|${floor == null ? '-' : '${floor!.from},${floor!.to}'}|'
+      '$pixels|${season.name}';
 }
 
 class _Request {
@@ -261,6 +293,8 @@ class _GroeiThumbnailCache {
         frac: 0,
         health: 1,
         species: spec.species,
+        floor: spec.floor,
+        at: TreeAt(position: spec.position, step: spec.step),
       );
       final palette = buildPalette(
         spec.season,
@@ -273,6 +307,7 @@ class _GroeiThumbnailCache {
       canvas.scale(spec.dpr);
       TreePainter(
         scene: scene,
+        seed: spec.seed,
         palette: palette,
         decor: TreeDecor(spec.seed),
         layer: layer,

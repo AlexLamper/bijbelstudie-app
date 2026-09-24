@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/camera.dart';
 import '../domain/catalog.dart';
+import '../domain/paint_spec.dart';
 import '../domain/palette.dart';
 import '../domain/rng.dart';
 import '../domain/scenes.dart';
@@ -98,6 +99,13 @@ class TreeDecor {
     donkey = 14 + scene() * 6;
     stork = 12 + scene() * 5;
     lion = 15 + scene() * 5;
+    // Growth v2, appended so nothing above moved: a bird on a tree too young to
+    // perch on stands 6-11 units beside the trunk, on the ground or a stone.
+    // Three draws in this order, as the website's `buildDecor`.
+    final side = scene() < 0.5 ? -1 : 1;
+    final distance = 6 + scene() * 5;
+    final stone = scene() < 0.5;
+    groundBird = (side: side, distance: distance, stone: stone);
   }
 
   late final List<({double x, double y, double r, double speed, double phase})> motes;
@@ -124,7 +132,28 @@ class TreeDecor {
   late final double donkey;
   late final double stork;
   late final double lion;
+
+  /// Growth v2: where a perching bird waits while the tree has no twig that
+  /// can hold it (`scene.perch` null) - beside the trunk on the ground, or on a
+  /// small stone. [side] is -1 (left) or +1 (right); [distance] in tree units.
+  late final ({int side, double distance, bool stone}) groundBird;
 }
+
+/// The animals that sit on the perch rather than on the ground. While the
+/// crown has no perch (`scene.perch` null) they wait beside the tree.
+const Set<TreeAnimal> kPerchingAnimals = {
+  TreeAnimal.vogel,
+  TreeAnimal.duif,
+  TreeAnimal.raaf,
+  TreeAnimal.uil,
+};
+
+/// Bees and butterflies orbit the tree's bounds, but never tighter than this
+/// (tree units), so they visit a seedling instead of swarming its bare stem.
+/// The orbit's centre rises when the minimum applies, so it never dips into
+/// the ground: centreY = min(boundsMidY, GROUND_Y − ry). The website's
+/// `ORBIT_MIN`.
+const ({double rx, double ry}) kOrbitMin = (rx: 9, ry: 7);
 
 const int kSeasonsTraitLevel = 25;
 
@@ -174,34 +203,12 @@ void fillEllipse(
   canvas.restore();
 }
 
-/// Ground animals stand beside the trunk; the frame has to hold them too.
-({double minX, double maxX}) extentWithAnimals(
-  TreeScene scene,
-  TreeAnimal animal,
-  TreeDecor decor,
-) {
-  var minX = scene.bounds.minX;
-  var maxX = scene.bounds.maxX;
-  if (animal == TreeAnimal.schaap) {
-    minX = math.min(minX, kTrunkX + decor.sheep.$1 - 5);
-    maxX = math.max(maxX, kTrunkX + decor.sheep.$2 + 5);
-  }
-  if (animal == TreeAnimal.hert) maxX = math.max(maxX, kTrunkX + decor.deer + 6);
-  if (animal == TreeAnimal.vos) minX = math.min(minX, kTrunkX + decor.fox - 5);
-  if (animal == TreeAnimal.ezel) maxX = math.max(maxX, kTrunkX + decor.donkey + 7);
-  if (animal == TreeAnimal.ooievaar) maxX = math.max(maxX, kTrunkX + decor.stork + 4);
-  if (animal == TreeAnimal.leeuw) maxX = math.max(maxX, kTrunkX + decor.lion + 8);
-  return (minX: minX, maxX: maxX);
-}
-
 /// What a ground animal needs in frame, in tree units beside the trunk and
 /// above the ground, for the camera's guard (`camera.dart` [FrameExtents]).
 /// Widths are the old frame margins; heights are each animal's drawn height at
-/// world size. The website's `animalExtents` in `TreeCanvas.tsx`, minus its
-/// last case (a perching bird waiting on the ground while the crown has no
-/// perch), which needs the ground-bird spot the app's [TreeDecor] does not
-/// draw yet.
-FrameExtents? animalExtents(TreeAnimal animal, TreeDecor decor) {
+/// world size. A perching bird counts only while it waits on the ground
+/// ([perched] false). The website's `animalExtents` in `TreeCanvas.tsx`.
+FrameExtents? animalExtents(TreeAnimal animal, TreeDecor decor, {required bool perched}) {
   switch (animal) {
     case TreeAnimal.schaap:
       return FrameExtents(left: -decor.sheep.$1 + 5, right: decor.sheep.$2 + 5, top: 4);
@@ -216,13 +223,18 @@ FrameExtents? animalExtents(TreeAnimal animal, TreeDecor decor) {
     case TreeAnimal.leeuw:
       return FrameExtents(right: decor.lion + 8, top: 5);
     default:
-      return null;
+      if (!kPerchingAnimals.contains(animal) || perched) return null;
+      final reach = decor.groundBird.distance + 4;
+      return decor.groundBird.side < 0
+          ? FrameExtents(left: reach, top: 7)
+          : FrameExtents(right: reach, top: 7);
   }
 }
 
 /// The growth v2 camera (`domain/camera.dart`, the website's `measureFrame`):
 /// the landscape stays put and the tree takes a designed share of it, centred
-/// on the trunk base. Ground animals only guard the scene framing.
+/// on the trunk base. Ground animals only guard the scene framing. During a
+/// growth tween [scene] is the in-between scene, so the camera eases with it.
 TreeFrame measureTreeFrame(
   Size size,
   TreeScene scene,
@@ -230,7 +242,9 @@ TreeFrame measureTreeFrame(
   TreeAnimal animal,
   TreeDecor decor,
 ) {
-  final extents = framing == TreeFraming.scene ? animalExtents(animal, decor) : null;
+  final extents = framing == TreeFraming.scene
+      ? animalExtents(animal, decor, perched: scene.perch != null)
+      : null;
   final frame = measureFrame(size.width, size.height, scene, framing, extents);
   return TreeFrame(
     width: size.width,
@@ -360,20 +374,17 @@ mixin SceneLayers {
     final pivot = Offset(frame.pivotX, frame.pivotY);
 
     if (framing == TreeFraming.portrait) {
-      // A soft shadow and a thin arc of ground: enough to stand on, not a
-      // landscape.
-      final extent = extentWithAnimals(scene, animal, decor);
-      final rx = math.max(6.0, ((extent.maxX - extent.minX) / 2) * scale * 0.55);
-      canvas.drawOval(
-        Rect.fromCenter(center: pivot, width: rx * 2, height: math.max(3.0, 3.2 * scale)),
-        Paint()..color = palette.ground.withValues(alpha: 0.9),
-      );
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: pivot.translate(0, 0.4 * scale),
-          width: rx * 1.4,
-          height: math.max(2.0, 2.2 * scale),
-        ),
+      // A soft shadow and a thin arc of ground sized to the trunk
+      // (paint_spec.dart MOUND): enough to stand on, not a landscape.
+      final disc = portraitDiscFor(trunkWidthOf(scene));
+      final rx = math.max(3.0, disc.rx * scale);
+      final ry = math.max(1.2, disc.ry * scale);
+      fillEllipse(canvas, pivot, rx, ry, Paint()..color = palette.ground.withValues(alpha: 0.9));
+      fillEllipse(
+        canvas,
+        pivot.translate(0, 0.4 * scale),
+        rx * 0.7,
+        math.max(0.8, ry * 0.7),
         Paint()..color = palette.bark.withValues(alpha: 0.25),
       );
       return;
@@ -396,7 +407,8 @@ mixin SceneLayers {
 
     paintFarBackdrop(canvas, frame);
 
-    // The earth band, with a low mound where the trunk goes in.
+    // The earth band, with a low mound where the trunk goes in - sized to the
+    // trunk (paint_spec.dart MOUND), so a kiem stands on a handful of earth.
     final top = frame.groundTop;
     canvas.drawRect(
       Rect.fromLTRB(0, top, frame.width, frame.height),
@@ -406,25 +418,32 @@ mixin SceneLayers {
           palette.groundDeep,
         ]),
     );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(frame.pivotX, top + 0.2 * scale),
-        width: math.max(16.0, 28 * scale),
-        height: math.max(4.0, 4.4 * scale),
-      ),
+    final heap = moundFor(trunkWidthOf(scene));
+    // The upper half only, closed along its diameter: the website's
+    // `ellipse(…, Math.PI, 0)`.
+    canvas.drawPath(
+      Path()
+        ..addArc(
+          Rect.fromCenter(
+            center: Offset(frame.pivotX, top + 0.2 * scale),
+            width: math.max(3.0, heap.rx * scale) * 2,
+            height: math.max(1.0, heap.ry * scale) * 2,
+          ),
+          math.pi,
+          math.pi,
+        )
+        ..close(),
       Paint()..color = palette.ground,
     );
 
     paintNearBackdrop(canvas, frame);
 
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: pivot.translate(0, 0.6 * scale),
-        width: math.max(12.0, 22 * scale),
-        height: math.max(2.4, 3.2 * scale),
-      ),
-      Paint()
-        ..color = Color.lerp(palette.groundDeep, palette.bark, 0.5)!.withValues(alpha: 0.28),
+    fillEllipse(
+      canvas,
+      pivot.translate(0, 0.6 * scale),
+      math.max(2.0, heap.shadowRx * scale),
+      math.max(0.8, heap.shadowRy * scale),
+      Paint()..color = mixColor(palette.groundDeep, palette.bark, 0.5).withValues(alpha: 0.28),
     );
   }
 
@@ -1278,13 +1297,25 @@ mixin SceneLayers {
     }
   }
 
-  void _drawBees(Canvas canvas, TreeFrame frame) {
+  /// The ellipse bees and butterflies fly on, in pixels: the bounds, or
+  /// [kOrbitMin] round a small tree.
+  ({double cx, double cy, double rx, double ry}) _orbit(TreeFrame frame) {
     final b = scene.bounds;
     final scale = frame.scale;
-    final cx = frame.originX + ((b.minX + b.maxX) / 2) * scale;
-    final cy = frame.originY + ((b.minY + kGroundY) / 2) * scale;
-    final rx = ((b.maxX - b.minX) / 2) * scale;
-    final ry = ((kGroundY - b.minY) / 2) * scale;
+    final rx = math.max((b.maxX - b.minX) / 2, kOrbitMin.rx);
+    final ry = math.max((kGroundY - b.minY) / 2, kOrbitMin.ry);
+    final cy = math.min((b.minY + kGroundY) / 2, kGroundY - ry);
+    return (
+      cx: frame.originX + ((b.minX + b.maxX) / 2) * scale,
+      cy: frame.originY + cy * scale,
+      rx: rx * scale,
+      ry: ry * scale,
+    );
+  }
+
+  void _drawBees(Canvas canvas, TreeFrame frame) {
+    final scale = frame.scale;
+    final (:cx, :cy, :rx, :ry) = _orbit(frame);
     final size = math.max(1.2, 0.6 * scale);
     final wing = Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7);
     final body = Paint()..color = const Color(0xFFF2C744);
@@ -1345,12 +1376,8 @@ mixin SceneLayers {
   }
 
   void _drawButterflies(Canvas canvas, TreeFrame frame) {
-    final b = scene.bounds;
     final scale = frame.scale;
-    final cx = frame.originX + ((b.minX + b.maxX) / 2) * scale;
-    final cy = frame.originY + ((b.minY + kGroundY) / 2) * scale;
-    final rx = ((b.maxX - b.minX) / 2) * scale;
-    final ry = ((kGroundY - b.minY) / 2) * scale;
+    final (:cx, :cy, :rx, :ry) = _orbit(frame);
     const colours = [Color(0xFFF6C453), Color(0xFFF28CB1), Color(0xFF7EC8E3)];
     final size = math.max(2.0, 1.1 * scale);
     final wing = Paint();
@@ -1374,6 +1401,221 @@ mixin SceneLayers {
       }
       canvas.drawLine(Offset(x, y - size * 0.45), Offset(x, y + size * 0.45), bodyPaint);
     }
+  }
+
+  // ------------------------------------------------------------- birds
+
+  /// A perching bird in the crown, once it has a twig that holds one
+  /// (`scene.perch`). The tree painter calls this inside its sway transform;
+  /// until then the bird waits on the ground ([paintForeground]).
+  void paintCrownBird(Canvas canvas, TreeFrame frame) {
+    final perch = scene.perch;
+    if (perch == null || !kPerchingAnimals.contains(animal)) return;
+    final scale = frame.scale;
+    final p = Offset(frame.originX + perch.x * scale, frame.originY + perch.y * scale);
+    switch (animal) {
+      case TreeAnimal.vogel:
+        _drawBird(canvas, p, scale);
+      case TreeAnimal.duif:
+        _drawPerchBird(canvas, p, scale, _dove);
+      case TreeAnimal.raaf:
+        _drawPerchBird(canvas, p, scale, _raven);
+      default:
+        _drawOwl(canvas, p, scale);
+    }
+  }
+
+  /// A perching bird on the ground beside a tree too young to hold it (growth
+  /// v2, plan §4.7): feet on the earth line or on a small stone, facing the
+  /// trunk. The `vogel` is drawn as a small songbird here - its flying "v"
+  /// belongs in a crown, not on the ground.
+  ///
+  /// Stone: an upper half-ellipse, radii (1.4, 0.8) tree units (at least 2 ×
+  /// 1.2 px), in mix(farAlt, groundDeep, 0.35) with a lit cap mix(stone, light,
+  /// 0.25) of radii (0.8, 0.35) at its top; the bird stands on its crown.
+  /// Songbird: the dove/raven body at 0.75 of their size, coat body
+  /// mix(barkLit, light, 0.3), wing bark, the dove's beak and eye. The
+  /// website's `drawGroundBird`.
+  void _paintGroundBird(Canvas canvas, TreeFrame frame, double groundY) {
+    final scale = frame.scale;
+    final spot = decor.groundBird;
+    final x = frame.pivotX + spot.side * spot.distance * scale;
+    var y = groundY;
+    if (spot.stone) {
+      final rx = math.max(2.0, 1.4 * scale);
+      final ry = math.max(1.2, 0.8 * scale);
+      final stone = mixColor(palette.farAlt, palette.groundDeep, 0.35);
+      canvas.drawPath(
+        Path()
+          ..addArc(Rect.fromCenter(center: Offset(x, groundY), width: rx * 2, height: ry * 2), math.pi, math.pi)
+          ..close(),
+        Paint()..color = stone,
+      );
+      fillEllipse(
+        canvas,
+        Offset(x - rx * 0.15, groundY - ry * 0.72),
+        math.max(1.0, 0.8 * scale),
+        math.max(0.5, 0.35 * scale),
+        Paint()..color = mixColor(stone, palette.light, 0.25),
+      );
+      y = groundY - ry;
+    }
+    canvas.save();
+    canvas.translate(x, y);
+    // Every bird is drawn facing right; turn the one on the right to face the trunk.
+    if (spot.side > 0) canvas.scale(-1, 1);
+    switch (animal) {
+      case TreeAnimal.duif:
+        _drawPerchBird(canvas, Offset.zero, scale, _dove);
+      case TreeAnimal.raaf:
+        _drawPerchBird(canvas, Offset.zero, scale, _raven);
+      case TreeAnimal.uil:
+        _drawOwl(canvas, Offset.zero, scale);
+      default:
+        _drawPerchBird(canvas, Offset.zero, scale * 0.75, (
+          body: mixColor(palette.barkLit, palette.light, 0.3),
+          wing: palette.bark,
+          beak: _dove.beak,
+          eye: _dove.eye,
+        ));
+    }
+    canvas.restore();
+  }
+
+  void _drawBird(Canvas canvas, Offset p, double scale) {
+    final s = math.max(2.0, 2.6 * scale);
+    canvas.drawPath(
+      Path()
+        ..moveTo(p.dx - s, p.dy)
+        ..quadraticBezierTo(p.dx - s * 0.4, p.dy - s * 0.7, p.dx, p.dy)
+        ..quadraticBezierTo(p.dx + s * 0.4, p.dy - s * 0.7, p.dx + s, p.dy),
+      Paint()
+        ..color = palette.bark
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(1.0, 0.45 * scale),
+    );
+  }
+
+  static const _dove = (
+    body: Color(0xFFF4F4F0),
+    wing: Color(0xFFE2E2D8),
+    beak: Color(0xFFE0A458),
+    eye: Color(0xFF2B2B2B),
+  );
+  static const _raven = (
+    body: Color(0xFF26262B),
+    wing: Color(0xFF3A3A42),
+    beak: Color(0xFF5A5A60),
+    eye: Color(0xFFDADAE0),
+  );
+
+  /// The dove and the raven: one bird, two coats.
+  void _drawPerchBird(
+    Canvas canvas,
+    Offset p,
+    double scale,
+    ({Color body, Color wing, Color beak, Color eye}) coat,
+  ) {
+    final s = math.max(2.5, 2.4 * scale);
+    final flap = still ? 0.0 : math.sin(timeMs * 0.004) * 0.25;
+    final x = p.dx;
+    final y = p.dy;
+    final body = Paint()..color = coat.body;
+    canvas.save();
+    canvas.translate(x, y - s * 0.4);
+    canvas.rotate(-0.15);
+    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: s * 2, height: s * 1.1), body);
+    canvas.restore();
+    canvas.drawPath(
+      Path()
+        ..moveTo(x - s * 0.8, y - s * 0.3)
+        ..lineTo(x - s * 1.5, y - s * 0.05)
+        ..lineTo(x - s * 1.35, y - s * 0.55)
+        ..close(),
+      body,
+    );
+    canvas.drawCircle(Offset(x + s * 0.85, y - s * 0.8), s * 0.38, body);
+    canvas.drawPath(
+      Path()
+        ..moveTo(x - s * 0.1, y - s * 0.55)
+        ..quadraticBezierTo(x - s * 0.2, y - s * (1.35 + flap), x + s * 0.7, y - s * (1.05 + flap))
+        ..lineTo(x + s * 0.4, y - s * 0.45)
+        ..close(),
+      Paint()..color = coat.wing,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(x + s * 1.2, y - s * 0.82)
+        ..lineTo(x + s * 1.5, y - s * 0.72)
+        ..lineTo(x + s * 1.18, y - s * 0.66)
+        ..close(),
+      Paint()..color = coat.beak,
+    );
+    canvas.drawCircle(
+      Offset(x + s * 0.95, y - s * 0.86),
+      math.max(0.5, s * 0.08),
+      Paint()..color = coat.eye,
+    );
+  }
+
+  /// Asleep by day, eyes open at night - with the odd blink.
+  void _drawOwl(Canvas canvas, Offset p, double scale) {
+    final s = math.max(2.5, 2.2 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    const dark = Color(0xFF4A3A28);
+    final awake = palette.night && (still || math.sin(timeMs * 0.0009) < 0.97);
+    final brown = Paint()..color = const Color(0xFF8A6A48);
+    fillEllipse(canvas, Offset(x, y - s * 0.7), s * 0.7, s * 0.95, brown);
+    // Ear tufts.
+    for (final side in const [-1.0, 1.0]) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(x + side * s * 0.5, y - s * 1.55)
+          ..lineTo(x + side * s * 0.6, y - s * 2.05)
+          ..lineTo(x + side * s * 0.2, y - s * 1.65)
+          ..close(),
+        brown,
+      );
+    }
+    // Folded wings.
+    final wing = Paint()..color = dark.withValues(alpha: 0.35);
+    for (final side in const [-1.0, 1.0]) {
+      fillEllipse(canvas, Offset(x + side * s * 0.45, y - s * 0.6), s * 0.25, s * 0.55, wing, rotation: side * 0.2);
+    }
+    // Face.
+    fillEllipse(canvas, Offset(x, y - s * 1.2), s * 0.55, s * 0.45, Paint()..color = const Color(0xFFD9C4A0));
+    final darkFill = Paint()..color = dark;
+    for (final side in const [-1.0, 1.0]) {
+      final ex = x + side * s * 0.22;
+      final ey = y - s * 1.22;
+      if (awake) {
+        canvas.drawCircle(Offset(ex, ey), s * 0.16, Paint()..color = const Color(0xFFF2C14E));
+        canvas.drawCircle(Offset(ex, ey), s * 0.07, darkFill);
+      } else {
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset(ex, ey - s * 0.04), radius: s * 0.14),
+          0.2,
+          math.pi - 0.4,
+          false,
+          Paint()
+            ..color = dark
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = math.max(0.6, s * 0.06),
+        );
+      }
+    }
+    // Beak.
+    canvas.drawPath(
+      Path()
+        ..moveTo(x - s * 0.07, y - s * 1.08)
+        ..lineTo(x + s * 0.07, y - s * 1.08)
+        ..lineTo(x, y - s * 0.94)
+        ..close(),
+      darkFill,
+    );
   }
 
   // ---------------------------------------------------------- foreground
@@ -1405,6 +1647,11 @@ mixin SceneLayers {
     if (animal == TreeAnimal.bijen) _drawBees(canvas, frame);
     // The eagle needs a sky: it circles in the scene framing only.
     if (animal == TreeAnimal.adelaar && framing == TreeFraming.scene) _drawEagle(canvas, frame);
+    // A bird with no twig to sit on yet waits beside the tree. Scene only: an
+    // avatar is about the tree, and its disc would cut the bird in half.
+    if (scene.perch == null && kPerchingAnimals.contains(animal) && framing == TreeFraming.scene) {
+      _paintGroundBird(canvas, frame, groundY);
+    }
 
     if (animal == TreeAnimal.vuurvliegjes && palette.night) {
       final b = scene.bounds;

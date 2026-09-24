@@ -67,6 +67,7 @@ class MiniTree extends StatelessWidget {
                     seed: tree?.seed ?? 'levensboom',
                     level: tree?.level ?? 2,
                     frac: tree?.progress ?? 0.3,
+                    floor: tree?.floor,
                     health: tree?.health ?? 1,
                     species: avatar.species,
                     scene: avatar.scene,

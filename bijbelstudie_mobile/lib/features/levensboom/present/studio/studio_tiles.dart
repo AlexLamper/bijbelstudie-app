@@ -262,6 +262,9 @@ class _Thumb extends StatelessWidget {
       seed: tree.seed,
       level: species && tree.level < 6 ? 6 : tree.level,
       frac: tree.progress,
+      // The reader's floor, so a floored account's tiles show the tree at the
+      // size it has everywhere else.
+      floor: tree.floor,
       health: tree.health,
       species: draw.species,
       scene: draw.scene,

@@ -291,7 +291,8 @@ TreeScene lerpScenes(TreeScene a, TreeScene b, double t) {
   final blossoms = <Ornament>[];
   Ornament blossomOn(Ornament o, double presence) {
     final leaf = leafAt[o.path];
-    if (leaf != null) return o.copyWith(x: leaf.x, y: leaf.y, size: leaf.size * presence);
+    // Capped like the generator caps it (`blossomMaxSize`), so it never snaps at t = 1.
+    if (leaf != null) return o.copyWith(x: leaf.x, y: leaf.y, size: math.min(leaf.size, o.size) * presence);
     return o.copyWith(size: o.size * presence);
   }
 

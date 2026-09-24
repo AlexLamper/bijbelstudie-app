@@ -21,9 +21,16 @@ class VerseSceneArt {
     if (cached != null) return cached;
     final art = VerseSceneArt._(
       verse,
+      // Level 20: under growth v2 (twenty steps, the landscape stays put) that
+      // is the fully grown tree at the v1 framing's 84 % of the height - what
+      // the butterflies and fireflies orbit - on a step-20 mound (about 14
+      // units, as the old fixed one). The mound comes out at ~96 % of its old
+      // pixel size and ground animals at ~93 %; the v1 pick, 18, is now a
+      // crown at 80 % on a smaller mound (~91 %). The website made the same
+      // pick for its fixed full-grown scenes.
       generateTree(
         seed: verse.seed,
-        level: 18,
+        level: 20,
         frac: 0.6,
         health: 1,
         species: verse.species,

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +11,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/catalog.dart';
 import '../domain/chime.dart';
+import '../domain/growth.dart';
 import '../domain/growth_copy.dart';
 import '../domain/palette.dart';
-import '../domain/scene_cache.dart';
 import '../domain/stages.dart';
 import '../domain/traits.dart';
 import '../domain/tree_state.dart';
@@ -63,6 +65,8 @@ Future<void> showLevensboomCelebration(
     builder: (_) => _CelebrationDialog(
       seed: seed,
       level: level,
+      fromLevel: _fromLevel(level, tree?.lastSeenLevel),
+      floor: floor,
       copy: copy,
       avatar: avatar,
       reducedMotion: reducedMotion,
@@ -70,6 +74,13 @@ Future<void> showLevensboomCelebration(
   );
 
   await ref.read(treeStateProvider.notifier).markSeen(level);
+}
+
+/// The level the growth tween starts from: the last one the reader was shown,
+/// or the one before this, never below 1. The website's `LevelUpDialog`.
+int _fromLevel(int level, int? lastSeenLevel) {
+  final previous = lastSeenLevel ?? level - 1;
+  return math.max(1, math.min(level - 1, previous));
 }
 
 /// Plays the chime, respecting the silent switch.
@@ -95,10 +106,12 @@ Future<void> _playChime() async {
   }
 }
 
-class _CelebrationDialog extends StatefulWidget {
+class _CelebrationDialog extends StatelessWidget {
   const _CelebrationDialog({
     required this.seed,
     required this.level,
+    required this.fromLevel,
+    required this.floor,
     required this.copy,
     required this.avatar,
     required this.reducedMotion,
@@ -106,70 +119,31 @@ class _CelebrationDialog extends StatefulWidget {
 
   final String seed;
   final int level;
+
+  /// Where the growth starts: the previous level, or the last level the reader
+  /// saw celebrated when this is a jump over several.
+  final int fromLevel;
+  final GrowthFloor? floor;
   final LevelUpCopy copy;
   final AvatarChoice avatar;
   final bool reducedMotion;
 
   @override
-  State<_CelebrationDialog> createState() => _CelebrationDialogState();
-}
-
-class _CelebrationDialogState extends State<_CelebrationDialog>
-    with TickerProviderStateMixin {
-  late final AnimationController _grow = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  );
-
-  /// Slower than the growth, so the push is still settling when the new wood
-  /// has finished arriving.
-  late final AnimationController _push = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-
-  /// Where the previous level's silhouette ended, so what the reader watches
-  /// grow is the new wood rather than the whole tree replaying.
-  late final double _from = () {
-    int depthAt(int level) =>
-        cachedTree(seed: widget.seed, level: level, frac: 0, species: widget.avatar.species).maxDepth;
-    final previous = depthAt(widget.level - 1);
-    final now = depthAt(widget.level) + 1;
-    final ratio = previous / now;
-    return ratio > 0.92 ? 0.92 : ratio;
-  }();
-
-  @override
-  void initState() {
-    super.initState();
-    if (!widget.reducedMotion) {
-      _grow.forward();
-      _push.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _grow.dispose();
-    _push.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final still =
-        widget.reducedMotion || MediaQuery.maybeDisableAnimationsOf(context) == true;
-    final fruit = fruitAtLevel(widget.level);
-    final copy = widget.copy;
-    final unlocked = itemsUnlockedAtLevel(widget.level);
+    final still = reducedMotion || MediaQuery.maybeDisableAnimationsOf(context) == true;
+    final fruit = fruitAtLevel(level);
+    // Everything the levels since the last card unlocked, not only the last one.
+    final unlocked = [
+      for (var at = fromLevel + 1; at <= level; at++) ...itemsUnlockedAtLevel(at),
+    ];
 
     // Night, always: the sequence dims to a night sky so the new growth reads
     // against something quiet. The reader's own scene keeps its backdrop.
     final palette = buildPalette(
       seasonForMonth(DateTime.now().month),
       DayPhase.night,
-      scene: widget.avatar.scene,
-      species: widget.avatar.species,
+      scene: avatar.scene,
+      species: avatar.species,
     );
 
     return Dialog(
@@ -186,35 +160,31 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
             height: 240,
             width: double.infinity,
             child: ClipRect(
-              child: AnimatedBuilder(
-                animation: _push,
-                builder: (context, child) => Transform.scale(
-                  // The slow camera push: the tree eases in and scales up a
-                  // hair, so the sequence reads as moving toward the tree
-                  // rather than as a dialog appearing over it.
-                  scale: still ? 1 : 1 + 0.08 * Curves.easeOutCubic.transform(_push.value),
-                  child: child,
+              // The reader's own tree growing from where it stood to where it
+              // stands now: branches that were there lengthen, new wood grows
+              // out of their tips and the camera eases out with it (the growth
+              // tween, spec §12). That replaces the depth reveal and the camera
+              // push, which replayed a newly generated tree. One level: from
+              // the very end of the previous one, so what grows is this
+              // level's new wood. A jump: from where the reader last saw it.
+              child: TreeView(
+                seed: seed,
+                level: level,
+                frac: 0,
+                floor: floor,
+                from: TreeFrom(
+                  level: fromLevel,
+                  frac: fromLevel == level - 1 ? 0.999 : 0,
                 ),
-                child: AnimatedBuilder(
-                  animation: _grow,
-                  builder: (context, _) => TreeView(
-                    seed: widget.seed,
-                    level: widget.level,
-                    frac: 0,
-                    species: widget.avatar.species,
-                    scene: widget.avatar.scene,
-                    animal: widget.avatar.animal,
-                    reveal: still
-                        ? 1
-                        : _from + (1 - _from) * Curves.easeOutCubic.transform(_grow.value),
-                    reducedMotion: still,
-                    palette: palette,
-                    celebration: !still,
-                    // The newest fruit is the last on the tree, and the scene
-                    // lists them in unlock order.
-                    bloomFruit: fruit == null ? null : fruitCount(widget.level) - 1,
-                  ),
-                ),
+                species: avatar.species,
+                scene: avatar.scene,
+                animal: avatar.animal,
+                reducedMotion: still,
+                palette: palette,
+                celebration: !still,
+                // The newest fruit is the last on the tree, and the scene
+                // lists them in unlock order.
+                bloomFruit: fruit == null ? null : fruitCount(level) - 1,
               ),
             ),
           ),

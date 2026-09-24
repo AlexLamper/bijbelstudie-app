@@ -108,6 +108,7 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
                     seed: tree.seed,
                     level: tree.level,
                     frac: tree.progress,
+                    floor: tree.floor,
                     health: tree.health,
                     species: tree.avatar.species,
                     scene: tree.avatar.scene,

@@ -9,7 +9,7 @@ import '../../../../core/notifications/retention_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../levensboom/domain/catalog.dart';
-import '../../../levensboom/domain/growth.dart' show positionForXp, taper;
+import '../../../levensboom/domain/growth.dart' show levelForXp, positionForXp, taper;
 import '../../../levensboom/domain/tree_state.dart';
 import '../../../levensboom/present/levensboom_avatar.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
@@ -556,9 +556,11 @@ class _Figure extends StatelessWidget {
 ///
 /// The XP grant has already reached the tree state through the animation bus
 /// by the time this builds, so the tree drawn is the result. When the lesson
-/// grew the tree, its outermost tips grow in over the first second - the same
-/// reveal the level-up sequence uses for the new wood - so the change is seen
-/// happening rather than found done.
+/// grew the tree, it grows from where it stood before this lesson's XP to
+/// where it stands now (growth v2, LEVENSBOOM_GROWTH_PLAN.md §9.2): within a
+/// level the young wood lengthens and the camera eases out a little; across a
+/// level-up the new wood grows out of its parent's tip. So the change is seen
+/// happening rather than found done. The website's `LessonTreeMoment`.
 ///
 /// It used to be a bordered card inset in the page with a headline and an XP
 /// bar under it. Run to the edges instead, the tree is the screen, and the
@@ -587,6 +589,11 @@ class _LevensboomHero extends ConsumerStatefulWidget {
 class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
   static const double _height = 300;
 
+  /// Where the tree stood before this lesson's XP. Captured once: a later
+  /// grant on the same screen (a streak, a note) must not replay the growth
+  /// under the reader; it only moves the target.
+  TreeFrom? _from;
+
   @override
   void initState() {
     super.initState();
@@ -596,6 +603,9 @@ class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
     final gained = widget.repeat ? 0 : widget.summary.xpAwarded;
     if (gained > 0) {
       final tree = widget.tree;
+      final xpBefore = math.max(0, tree.xp - gained);
+      final levelBefore = levelForXp(xpBefore);
+      _from = TreeFrom(level: levelBefore, frac: positionForXp(xpBefore) - levelBefore);
       final before = taper(positionForXp(tree.xp - gained), tree.floor);
       trackTree(ref, AnalyticsEvents.treeGrowthMoment, {
         'fromPos': before.toStringAsFixed(3),
@@ -608,8 +618,6 @@ class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final tree = widget.tree;
-    final summary = widget.summary;
-    final repeat = widget.repeat;
     final still = widget.still;
     final onClose = widget.onClose;
     final onOpenAssistant = widget.onOpenAssistant;
@@ -618,9 +626,6 @@ class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
     // worse than one that is a shade off.
     final gold = tree.avatar.ring == TreeRing.goud;
     final accent = gold ? kGoldRing : AppTheme.teal;
-
-    final gained = repeat ? 0 : summary.xpAwarded;
-    final growIn = gained > 0 && !still;
 
     return SizedBox(
       height: _height,
@@ -634,23 +639,20 @@ class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
             child: GestureDetector(
               // The same place the profile avatar leads: the tree in full.
               onTap: () => context.push('/profile/boom'),
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: growIn ? 0.84 : 1.0, end: 1.0),
-                duration: growIn
-                    ? const Duration(milliseconds: 1400)
-                    : Duration.zero,
-                curve: Curves.easeOutCubic,
-                builder: (context, reveal, _) => TreeView(
-                  seed: tree.seed,
-                  level: tree.level,
-                  frac: tree.progress,
-                  health: tree.health,
-                  species: tree.avatar.species,
-                  scene: tree.avatar.scene,
-                  animal: tree.avatar.animal,
-                  reveal: reveal,
-                  reducedMotion: still,
-                ),
+              // From the position before the grant to the one after it, over
+              // `tween.growMs` (1200 ms) within a level; under reduced motion
+              // the end state shows at once.
+              child: TreeView(
+                seed: tree.seed,
+                level: tree.level,
+                frac: tree.progress,
+                floor: tree.floor,
+                from: _from,
+                health: tree.health,
+                species: tree.avatar.species,
+                scene: tree.avatar.scene,
+                animal: tree.avatar.animal,
+                reducedMotion: still,
               ),
             ),
           ),
