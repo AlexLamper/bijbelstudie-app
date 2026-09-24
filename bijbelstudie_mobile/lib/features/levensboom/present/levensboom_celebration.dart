@@ -4,23 +4,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/catalog.dart';
 import '../domain/chime.dart';
+import '../domain/growth_copy.dart';
 import '../domain/palette.dart';
 import '../domain/stages.dart';
 import '../domain/traits.dart';
 import '../domain/tree_generator.dart';
+import '../domain/tree_state.dart';
 import 'levensboom_providers.dart';
+import 'tree_analytics.dart';
 import 'tree_view.dart';
 
 /// The level-up moment.
 ///
 /// Kept for level-ups and fruit unlocks only - rare enough to stay worth
-/// stopping for. There is nothing to collect and no "claim" button: one line
-/// about what grew, the items the level just unlocked, and a way out. The
-/// mirror of the website's `components/levensboom/LevelUpDialog.tsx`.
+/// stopping for. There is nothing to collect and no "claim" button: what grew
+/// (the growth-v2 copy rules, `growth_copy.dart`), the items the level just
+/// unlocked, and a way out. The mirror of the website's
+/// `components/levensboom/LevelUpDialog.tsx`.
+///
+/// [tree] carries the growth floor and the last level the reader was shown, so
+/// a jump over several levels is one card from there to here. Without it the
+/// card works from [level] alone, as an account without a floor.
 Future<void> showLevensboomCelebration(
   BuildContext context,
   WidgetRef ref, {
@@ -28,7 +37,18 @@ Future<void> showLevensboomCelebration(
   required int level,
   required bool reducedMotion,
   AvatarChoice avatar = AvatarChoice.defaults,
+  TreeState? tree,
 }) async {
+  final floor = tree?.floor;
+  final copy = levelUpCopy(level: level, fromLevel: tree?.lastSeenLevel, floor: floor);
+
+  trackTree(ref, AnalyticsEvents.treeLevelupSeen, {
+    'level': '$level',
+    'step': '${copy.step}',
+    'phase': phaseForStep(copy.step).id,
+    'floored': floor != null ? 'true' : 'false',
+  });
+
   if (!reducedMotion) {
     // Gentle, once. `mediumImpact` is the heaviest thing this app does, and it
     // is reserved for exactly this.
@@ -43,6 +63,7 @@ Future<void> showLevensboomCelebration(
     builder: (_) => _CelebrationDialog(
       seed: seed,
       level: level,
+      copy: copy,
       avatar: avatar,
       reducedMotion: reducedMotion,
     ),
@@ -78,12 +99,14 @@ class _CelebrationDialog extends StatefulWidget {
   const _CelebrationDialog({
     required this.seed,
     required this.level,
+    required this.copy,
     required this.avatar,
     required this.reducedMotion,
   });
 
   final String seed;
   final int level;
+  final LevelUpCopy copy;
   final AvatarChoice avatar;
   final bool reducedMotion;
 
@@ -135,9 +158,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
     final still =
         widget.reducedMotion || MediaQuery.maybeDisableAnimationsOf(context) == true;
     final fruit = fruitAtLevel(widget.level);
-    final trait = traitAtLevel(widget.level);
-    final stage = stageForLevel(widget.level);
-    final newStage = stage.from == widget.level ? stage : null;
+    final copy = widget.copy;
     final unlocked = itemsUnlockedAtLevel(widget.level);
 
     // Night, always: the sequence dims to a night sky so the new growth reads
@@ -148,15 +169,6 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
       scene: widget.avatar.scene,
       species: widget.avatar.species,
     );
-
-    final line = fruit != null
-        ? 'De ${fruit.name.toLowerCase()} hangt nu aan je boom — '
-              'een vrucht van de Geest, ${fruit.reference}.'
-        : newStage != null
-        ? '${newStage.blurb} Je boom is nu een ${newStage.name.toLowerCase()}.'
-        : trait != null
-        ? kTraitLabels[trait]!
-        : _encouragement(widget.level);
 
     return Dialog(
       backgroundColor: const Color(0xFF0B1027),
@@ -209,30 +221,27 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
             child: Column(
               children: [
                 Text(
-                  newStage != null
-                      ? 'JE BOOM IS NU EEN ${newStage.name.toUpperCase()}'
-                      : 'JE BOOM IS GEGROEID',
-                  textAlign: TextAlign.center,
-                  style: AppTheme.caption.copyWith(
-                    color: const Color(0xFF8FD694),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  fruit == null
-                      ? 'Niveau ${widget.level}'
-                      : 'Niveau ${widget.level} — ${fruit.name}',
+                  copy.title,
                   textAlign: TextAlign.center,
                   style: AppTheme.displayMedium.copyWith(color: Colors.white),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
-                  line,
+                  copy.subtitle,
                   textAlign: TextAlign.center,
-                  style: AppTheme.bodyMuted.copyWith(color: Colors.white70),
+                  style: AppTheme.bodyStrong.copyWith(
+                    color: const Color(0xFF8FD694),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                if (copy.line != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    copy.line!,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.bodyMuted.copyWith(color: Colors.white70),
+                  ),
+                ],
                 if (unlocked.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   Container(
@@ -305,14 +314,4 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
       ),
     );
   }
-}
-
-String _encouragement(int level) {
-  const lines = [
-    'Je boom staat er sterker bij dan gisteren.',
-    'Elke keer dat je leest, groeit er iets.',
-    'Rustig doorgaan is wat een boom groot maakt.',
-    'Een nieuwe tak - gegroeid uit wat je gelezen hebt.',
-  ];
-  return lines[level % lines.length];
 }

@@ -307,6 +307,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
       level: level,
       avatar: tree.avatar,
       reducedMotion: tree.reducedMotion,
+      tree: tree,
     );
   }
 

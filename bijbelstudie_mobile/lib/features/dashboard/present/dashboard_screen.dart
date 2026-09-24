@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../levensboom/present/growth_announcement_card.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
@@ -164,6 +165,10 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Once, for accounts from before growth v2: the tree now grows
+              // in twenty steps. Nothing at all once it has been dismissed.
+              const GrowthAnnouncementCard(),
+
               // "Waar je gebleven was" - a study lesson in progress, or else
               // the last Bible chapter read.
               TourAnchor(

@@ -320,7 +320,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           // own: it is one account's own thing to look at, not a section.
           GoRoute(
             path: '/profile/boom',
-            builder: (context, state) => const LevensboomStudioScreen(),
+            builder: (context, state) => LevensboomStudioScreen(
+              initialTab: state.uri.queryParameters['tab'],
+            ),
           ),
           // The badge cabinet, reached from the card on Profiel. Nested for the
           // same reason: it is the account's own collection, not a section.

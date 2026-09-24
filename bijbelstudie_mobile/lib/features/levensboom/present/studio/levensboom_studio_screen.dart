@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/analytics/analytics.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
@@ -12,9 +13,12 @@ import '../../../premium/present/pro_access_provider.dart';
 import '../../../../core/ui/skeleton.dart';
 import '../../../../core/ui/timed_snack_bar.dart';
 import '../../domain/catalog.dart';
+import '../../domain/growth.dart' show xpForLevel;
+import '../../domain/growth_copy.dart';
 import '../../domain/tree_state.dart';
 import '../levensboom_avatar.dart';
 import '../levensboom_providers.dart';
+import '../tree_analytics.dart';
 import '../tree_view.dart';
 import 'groei_tab.dart';
 import 'studio_tiles.dart';
@@ -28,13 +32,19 @@ import 'studio_tiles.dart';
 /// the reader to the app's own paywall - never to a web checkout. The mirror of
 /// the website's `components/levensboom/studio/LevensboomStudio.tsx`.
 class LevensboomStudioScreen extends ConsumerStatefulWidget {
-  const LevensboomStudioScreen({super.key});
+  const LevensboomStudioScreen({super.key, this.initialTab});
+
+  /// `?tab=groei` opens on the Groei ladder (the growth announcement's "Bekijk
+  /// je groei"); anything else opens on Boomsoort.
+  final String? initialTab;
 
   @override
   ConsumerState<LevensboomStudioScreen> createState() => _LevensboomStudioScreenState();
 }
 
 enum _StudioTab { species, scene, animal, ring, groei }
+
+_StudioTab _tabFromParam(String? param) => param == 'groei' ? _StudioTab.groei : _StudioTab.species;
 
 const Map<_StudioTab, String> _tabLabels = {
   _StudioTab.species: 'Boomsoort',
@@ -59,9 +69,15 @@ String publicProfileUrl(String seed) {
 }
 
 class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen> {
-  _StudioTab _tab = _StudioTab.species;
+  late _StudioTab _tab = _tabFromParam(widget.initialTab);
   AvatarChoice? _preview;
   Timer? _seenTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    trackTree(ref, AnalyticsEvents.treeStudioOpened);
+  }
 
   @override
   void dispose() {
@@ -219,8 +235,8 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
         ),
         if (kind == null)
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-            sliver: SliverToBoxAdapter(child: GroeiTab(tree: tree)),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+            sliver: GroeiTab(tree: tree),
           )
         else ...[
           SliverToBoxAdapter(
@@ -303,6 +319,7 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
                 ),
               Positioned(
                 left: 12,
+                right: 12,
                 bottom: 10,
                 child: Row(
                   children: [
@@ -311,7 +328,12 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
                       background: gold ? kGoldRing : AppTheme.teal,
                     ),
                     const SizedBox(width: 6),
-                    _Pill(text: tree.stage.name, background: Colors.black.withValues(alpha: 0.45)),
+                    Flexible(
+                      child: _Pill(
+                        text: growthPill(tree.phase.name, tree.step),
+                        background: Colors.black.withValues(alpha: 0.45),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -353,13 +375,20 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: AppTheme.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
 
-/// One line under the stage: the bar, and where it leads.
+/// Under the stage: the bar to the next step and where it leads (plan §9.5).
+///
+/// Line 1 is about the tree ("Stap 9 van 20 · nog 740 XP tot stap 10"). Line 2
+/// is the next level-gated unlock: as "nog 340 XP → Palmboom" when it arrives
+/// no later than the next step, otherwise as the level it arrives at. The two
+/// never share a sentence - the step is the tree's, the level the account's.
 class _ProgressStrip extends StatelessWidget {
   const _ProgressStrip({required this.tree});
 
@@ -369,36 +398,32 @@ class _ProgressStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final next = tree.nextUnlock;
-    final stage = tree.stage;
-    final target = next != null
-        ? (label: next.name, level: next.level)
-        : stage.nextLevel != null
-        ? (label: stage.nextName ?? '', level: stage.nextLevel!)
-        : null;
-    final soon = target != null && target.level == tree.level + 1;
+    final unlockFirst = next != null &&
+        nextUnlockInReach(unlockLevel: next.level, levelForNextStep: tree.levelForNextStep);
+    final style = AppTheme.caption.copyWith(color: AppTheme.inkFaint);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(child: SiteProgressBar(value: tree.progress)),
-              const SizedBox(width: 12),
-              Text(
-                soon
-                    ? 'nog ${tree.xpToNextLevel} XP → ${target.label}'
-                    : 'nog ${tree.xpToNextLevel} XP → niveau ${tree.level + 1}',
-                style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-              ),
-            ],
+          SiteProgressBar(value: tree.stepProgress),
+          const SizedBox(height: 6),
+          Text(
+            progressStripLine(
+              phaseName: tree.phase.name,
+              step: tree.step,
+              xpToNextStep: tree.xpToNextStep,
+            ),
+            style: style,
           ),
-          if (target != null && !soon) ...[
-            const SizedBox(height: 4),
+          if (next != null) ...[
+            const SizedBox(height: 2),
             Text(
-              'Volgende ontgrendeling: ${target.label} op niveau ${target.level}.',
-              style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+              unlockFirst
+                  ? nextUnlockLine(name: next.name, xp: xpForLevel(next.level) - tree.xp)
+                  : 'Volgende ontgrendeling: ${next.name} op niveau ${next.level}.',
+              style: style,
             ),
           ],
         ],

@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/analytics/analytics.dart';
 import '../../../../core/notifications/retention_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../levensboom/domain/catalog.dart';
+import '../../../levensboom/domain/growth.dart' show positionForXp, taper;
 import '../../../levensboom/domain/tree_state.dart';
 import '../../../levensboom/present/levensboom_avatar.dart';
 import '../../../levensboom/present/levensboom_providers.dart';
+import '../../../levensboom/present/tree_analytics.dart';
 import '../../../levensboom/present/tree_view.dart';
 import '../../../profile/domain/profile_stats.dart' show BadgeCatalog;
 import '../../domain/chapter_study_models.dart';
@@ -560,7 +563,7 @@ class _Figure extends StatelessWidget {
 /// It used to be a bordered card inset in the page with a headline and an XP
 /// bar under it. Run to the edges instead, the tree is the screen, and the
 /// numbers it was captioned with read better as the figure strip below.
-class _LevensboomHero extends StatelessWidget {
+class _LevensboomHero extends ConsumerStatefulWidget {
   const _LevensboomHero({
     required this.tree,
     required this.summary,
@@ -577,11 +580,39 @@ class _LevensboomHero extends StatelessWidget {
   final VoidCallback? onClose;
   final VoidCallback? onOpenAssistant;
 
+  @override
+  ConsumerState<_LevensboomHero> createState() => _LevensboomHeroState();
+}
+
+class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
   static const double _height = 300;
+
+  @override
+  void initState() {
+    super.initState();
+    // The in-level growth moment (LEVENSBOOM_GROWTH_PLAN.md §9.2, §13): where
+    // the tree stood before this lesson's XP and where it stands now. Once per
+    // finished lesson, and only when it actually grew the tree.
+    final gained = widget.repeat ? 0 : widget.summary.xpAwarded;
+    if (gained > 0) {
+      final tree = widget.tree;
+      final before = taper(positionForXp(tree.xp - gained), tree.floor);
+      trackTree(ref, AnalyticsEvents.treeGrowthMoment, {
+        'fromPos': before.toStringAsFixed(3),
+        'toPos': tree.position.toStringAsFixed(3),
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    final tree = widget.tree;
+    final summary = widget.summary;
+    final repeat = widget.repeat;
+    final still = widget.still;
+    final onClose = widget.onClose;
+    final onOpenAssistant = widget.onOpenAssistant;
     // kGoldRing rather than the design's #CA9A16: the same gold already rings
     // the avatar on Profiel and Mijn voortgang, and two golds a tab apart is
     // worse than one that is a shade off.
@@ -647,14 +678,14 @@ class _LevensboomHero extends StatelessWidget {
                     _HeroButton(
                       icon: Icons.close,
                       label: 'Les sluiten',
-                      onTap: onClose!,
+                      onTap: onClose,
                     ),
                   const Spacer(),
                   if (onOpenAssistant != null)
                     _HeroButton(
                       icon: Icons.auto_awesome,
                       label: 'AI-assistent',
-                      onTap: onOpenAssistant!,
+                      onTap: onOpenAssistant,
                     ),
                 ],
               ),

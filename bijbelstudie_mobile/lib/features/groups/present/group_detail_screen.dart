@@ -235,7 +235,10 @@ class _GroupHeader extends StatelessWidget {
                             child: TreeView(
                               seed: card.seed,
                               level: card.level,
-                              frac: 0.5,
+                              // The card's own frac (growth v2): served by
+                              // the server, or the old half-way point from
+                              // a server that predates it.
+                              frac: card.frac,
                               health: card.health,
                               species: card.avatar.species,
                               scene: card.avatar.scene,

@@ -60,6 +60,7 @@ class _LevensboomAvatarState extends ConsumerState<LevensboomAvatar> {
         level: pending,
         avatar: tree.avatar,
         reducedMotion: tree.reducedMotion,
+        tree: tree,
       );
       _celebrating = false;
     });

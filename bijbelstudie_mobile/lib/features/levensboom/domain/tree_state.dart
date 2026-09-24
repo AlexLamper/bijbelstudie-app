@@ -4,9 +4,15 @@
 /// the website cannot disagree about any of them. Nothing here describes the
 /// tree's shape - that is derived from [seed], [level], [progress], [health]
 /// and the species by `tree_generator.dart`.
+///
+/// Growth v2: how far the tree is comes from the served `levensboom.growth`
+/// block ([growth]: position, step, phase and the never-shrink floor). A
+/// server older than that block gets the same numbers computed locally,
+/// without a floor.
 library;
 
 import 'catalog.dart';
+import 'growth.dart';
 import 'stages.dart';
 import 'traits.dart';
 
@@ -107,7 +113,9 @@ class TreeState {
     this.introSeen = false,
     this.publicProfile = false,
     this.seenItems = const {},
-  });
+    this.announceGrowth = false,
+    GrowthInfo? growth,
+  }) : _growth = growth;
 
   final int xp;
   final int level;
@@ -149,6 +157,15 @@ class TreeState {
   final bool publicProfile;
   final Set<String> seenItems;
 
+  /// The server's `levensboom.announceGrowth`: this account existed before
+  /// growth v2 and may get the one-time card. Whether it was already dismissed
+  /// is `seenItems` (`growth-v2`), not this flag.
+  final bool announceGrowth;
+
+  /// The growth block as served (or as recomputed after a grant); null when the
+  /// server predates it, and then [growth] computes it locally.
+  final GrowthInfo? _growth;
+
   /// 0..1 within the current level; drives how many leaves are open.
   double get progress => xpForNextLevel > 0 ? xpIntoLevel / xpForNextLevel : 0;
 
@@ -159,8 +176,56 @@ class TreeState {
 
   bool get shouldCelebrate => level > lastSeenLevel;
 
-  /// Derived locally from the same table the server uses.
-  StageInfo get stage => stageForLevel(level);
+  /// Where the tree is: the server's `levensboom.growth`, or - from a server
+  /// that predates growth v2 - the same numbers from [level] and [progress]
+  /// without a floor.
+  GrowthInfo get growth => _growth ?? growthInfo(level, progress);
+
+  /// Effective position `e`: drives the continuous size and the camera.
+  double get position => growth.position;
+
+  /// The structural step, 1..20 and on: which branches exist. With a growth
+  /// floor it runs ahead of [level].
+  int get step => growth.step;
+
+  /// Jaarringen: steps past 20.
+  int get rings => growth.rings;
+
+  /// The legacy head start, or null. Kept across grants so a local
+  /// recomputation tapers exactly like the server.
+  GrowthFloor? get floor => growth.floor;
+
+  /// The phase the tree is in, by [step] (not by level), in the server's
+  /// words when it served them.
+  StageInfo get phase => growth.stage;
+
+  /// Same as [phase]; the name the callers used before growth v2.
+  StageInfo get stage => phase;
+
+  /// The level at which the tree stands on the next step. Usually
+  /// `level + 1`; with a floor a level-up can grow the tree without crossing
+  /// a whole step, so it can lie further out.
+  int get levelForNextStep => levelForStep(step + 1, floor);
+
+  /// XP still to earn before the tree stands on step [target]; 0 once it does.
+  int xpUntilStep(int target) {
+    if (target <= step) return 0;
+    final left = xpForLevel(levelForStep(target, floor)) - xp;
+    return left < 0 ? 0 : left;
+  }
+
+  /// XP still to earn before the next step.
+  int get xpToNextStep => xpUntilStep(step + 1);
+
+  /// 0..1 of the XP between the level that put the tree on [step] and the one
+  /// that puts it on the next. Equal to [progress] without a floor; with one a
+  /// step can span more than one level.
+  double get stepProgress {
+    final from = xpForLevel(levelForStep(step, floor));
+    final to = xpForLevel(levelForNextStep);
+    if (to <= from) return 0;
+    return ((xp - from) / (to - from)).clamp(0.0, 1.0);
+  }
 
   /// Whether the server considers this account Pro: it never serves the gold
   /// ring to anyone else.
@@ -177,11 +242,14 @@ class TreeState {
   /// Both sides use the same level curve, so this and the server agree. The
   /// unlocked set is widened locally by level; a real refresh follows a
   /// level-up so the server has the last word.
+  ///
+  /// The growth block is recomputed the same way, keeping the served floor
+  /// (plan §6.1), so the tree grows in place until the next fetch.
   TreeState applyGrant(XpGrant grant) {
-    final level = _levelForXp(grant.xp);
-    final floor = _xpForLevel(level);
-    final ceiling = _xpForLevel(level + 1);
-    final span = ceiling - floor < 1 ? 1 : ceiling - floor;
+    final level = levelForXp(grant.xp);
+    final floorXp = xpForLevel(level);
+    final ceiling = xpForLevel(level + 1);
+    final span = ceiling - floorXp < 1 ? 1 : ceiling - floorXp;
     final badges = {...this.badges, ...grant.newBadges}.toList();
     final ctx = UnlockContext(
       level: level,
@@ -192,9 +260,10 @@ class TreeState {
     return copyWith(
       xp: grant.xp,
       level: level,
-      xpIntoLevel: grant.xp - floor,
-      xpForNextLevel: ceiling - floor,
-      progressPercentage: (((grant.xp - floor) / span) * 100).round().clamp(0, 100),
+      xpIntoLevel: grant.xp - floorXp,
+      xpForNextLevel: ceiling - floorXp,
+      progressPercentage: (((grant.xp - floorXp) / span) * 100).round().clamp(0, 100),
+      growth: growthInfo(level, (grant.xp - floorXp) / span, floor),
       // Earning XP means the reader is here today, so the tree is healthy again
       // - the streak flow has already moved `lastStreakDate` server-side.
       health: 1,
@@ -206,10 +275,13 @@ class TreeState {
   }
 
   /// Replaces the tree block with what `/api/v1/levensboom` answered.
+  ///
+  /// A block without `growth` keeps the current one, so a studio write never
+  /// drops the floor.
   TreeState mergeTree(Map<String, dynamic> tree) {
     final parsed = TreeState.fromJson({
       ..._summaryJson(),
-      'levensboom': tree,
+      'levensboom': tree['growth'] is Map ? tree : {...tree, 'growth': growth.toJson()},
     });
     return parsed;
   }
@@ -238,7 +310,13 @@ class TreeState {
     bool? introSeen,
     bool? publicProfile,
     Set<String>? seenItems,
+    bool? announceGrowth,
+    GrowthInfo? growth,
   }) {
+    final moved = level != null || xpIntoLevel != null || xpForNextLevel != null;
+    final nextLevel = level ?? this.level;
+    final nextInto = xpIntoLevel ?? this.xpIntoLevel;
+    final nextFor = xpForNextLevel ?? this.xpForNextLevel;
     return TreeState(
       xp: xp ?? this.xp,
       level: level ?? this.level,
@@ -266,6 +344,13 @@ class TreeState {
       introSeen: introSeen ?? this.introSeen,
       publicProfile: publicProfile ?? this.publicProfile,
       seenItems: seenItems ?? this.seenItems,
+      announceGrowth: announceGrowth ?? this.announceGrowth,
+      // Moving the XP without a new block recomputes it with the kept floor;
+      // a state that never had a served block keeps computing it lazily.
+      growth: growth ??
+          (moved && _growth != null
+              ? growthInfo(nextLevel, nextFor > 0 ? nextInto / nextFor : 0, floor)
+              : _growth),
     );
   }
 
@@ -276,6 +361,8 @@ class TreeState {
     final streak = (json['streak'] as num?)?.toInt() ?? 0;
     final longestStreak = (tree['longestStreak'] as num?)?.toInt() ?? 0;
     final chosen = AvatarChoice.fromJson(tree['chosen']);
+    final xpIntoLevel = (json['xpIntoLevel'] as num?)?.toInt() ?? 0;
+    final xpForNextLevel = (json['xpForNextLevel'] as num?)?.toInt() ?? 100;
 
     // A server older than the studio serves no unlock list; derive one from
     // what it does serve, so the tree still draws and the tiles still lock.
@@ -296,8 +383,8 @@ class TreeState {
     return TreeState(
       xp: (json['xp'] as num?)?.toInt() ?? 0,
       level: level,
-      xpIntoLevel: (json['xpIntoLevel'] as num?)?.toInt() ?? 0,
-      xpForNextLevel: (json['xpForNextLevel'] as num?)?.toInt() ?? 100,
+      xpIntoLevel: xpIntoLevel,
+      xpForNextLevel: xpForNextLevel,
       progressPercentage: (json['progressPercentage'] as num?)?.toInt() ?? 0,
       streak: streak,
       freezes: (json['freezes'] as num?)?.toInt() ?? 0,
@@ -333,6 +420,15 @@ class TreeState {
       introSeen: tree['introSeen'] == true,
       publicProfile: tree['publicProfile'] == true,
       seenItems: (tree['seenItems'] as List?)?.whereType<String>().toSet() ?? const {},
+      announceGrowth: tree['announceGrowth'] == true,
+      // Only a served block is kept; without one [growth] computes it locally.
+      growth: tree['growth'] is Map
+          ? GrowthInfo.fromJson(
+              tree['growth'],
+              level: level,
+              frac: xpForNextLevel > 0 ? xpIntoLevel / xpForNextLevel : 0,
+            )
+          : null,
     );
   }
 
@@ -371,6 +467,8 @@ class TreeState {
       'introSeen': introSeen,
       'publicProfile': publicProfile,
       'seenItems': seenItems.toList(),
+      'announceGrowth': announceGrowth,
+      'growth': growth.toJson(),
     },
   };
 }
@@ -382,12 +480,3 @@ List<TreeTrait>? _traitsFromJson(Object? raw) {
   return matched.isEmpty && ids.isNotEmpty ? null : matched;
 }
 
-int _xpForLevel(int level) => level <= 1 ? 0 : 50 * (level - 1) * level;
-
-int _levelForXp(int xp) {
-  var level = 1;
-  while (level < 200 && xp >= _xpForLevel(level + 1)) {
-    level++;
-  }
-  return level;
-}

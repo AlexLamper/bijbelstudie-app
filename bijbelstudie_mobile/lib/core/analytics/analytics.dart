@@ -29,6 +29,24 @@ class AnalyticsEvents {
   /// refuses that cardinality, so an event carrying them is dropped in silence.
   static const crossRefOpened = 'crossref_opened';
   static const crossRefFollowed = 'crossref_followed';
+
+  /// The tree's own funnel (LEVENSBOOM_GROWTH_PLAN.md §13). Numbers travel as
+  /// strings, which the server's number and boolean props accept.
+  ///
+  /// `level`, `step`, `phase` (the phase id) and `floored` ('true'/'false').
+  static const treeLevelupSeen = 'tree_levelup_seen';
+
+  /// `fromPos`, `toPos`: the tree's position before and after a lesson's XP.
+  static const treeGrowthMoment = 'tree_growth_moment';
+
+  /// `step`, `level`.
+  static const treeGroeiOpened = 'tree_groei_opened';
+
+  /// No props.
+  static const treeStudioOpened = 'tree_studio_opened';
+
+  /// `action`: `open` (Bekijk je groei) or `close` (Sluiten).
+  static const treeAnnouncementSeen = 'tree_announcement_seen';
 }
 
 /// Fire-and-forget funnel tracking for the mobile app.

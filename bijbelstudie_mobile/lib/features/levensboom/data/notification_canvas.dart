@@ -141,8 +141,17 @@ Future<TreeImageFiles?> renderNotificationArt(
 }
 
 /// Where rendered notification art lives. Created on demand.
+///
+/// Versioned by the tree's growth model: art rendered by a build before growth
+/// v2 sits one level up and is never picked up again, so a notification can
+/// not show last week's tree drawn by the old generator. Bump the suffix with
+/// the next model change.
+const String kNotifArtVersion = 'v2';
+
 Future<Directory> notifArtDir() async {
-  final dir = Directory('${(await getTemporaryDirectory()).path}/levensboom/notif');
+  final dir = Directory(
+    '${(await getTemporaryDirectory()).path}/levensboom/notif/$kNotifArtVersion',
+  );
   await dir.create(recursive: true);
   return dir;
 }
