@@ -47,7 +47,7 @@ class TreePalette {
   /// `seasons` trait without re-deriving the month it already resolved.
   final Season season;
 
-  /// After the scene's say: a `forceNight` scene reports night at noon.
+  /// After the scene's say: a `forceTime: night` scene reports night at noon.
   final DayPhase timeOfDay;
   final TreeSceneId scene;
 
@@ -123,7 +123,6 @@ const _barkLit = Color(0xFF6B5442);
 const _nightMix = Color(0xFF1B2340);
 const _wiltMix = Color(0xFF8A8F7A);
 const _winterMix = Color(0xFF8A9A8A);
-const _almondBlossom = Color(0xFFFBD3E0);
 
 Color _mix(Color a, Color b, double amount) =>
     Color.lerp(a, b, amount.clamp(0.0, 1.0))!;
@@ -153,7 +152,7 @@ TreePalette buildPalette(
 }) {
   final spec = sceneSpec(scene);
   final sp = speciesParams(species);
-  final tod = spec.forceNight ? DayPhase.night : timeOfDay;
+  final tod = spec.forceTime ?? timeOfDay;
   final override = spec.sky[tod];
   final sky = _sky[tod]!;
   final foliage = _foliage[season]!;
@@ -180,10 +179,10 @@ TreePalette buildPalette(
     }
   }
 
+  // A species with its own blossom colour (the amandel's pale pink, the
+  // mosterd's yellow) keeps it; the seasons only decide whether there is any.
   final seasonBlossom = foliage[2];
-  final blossom = seasonBlossom == null
-      ? null
-      : (sp.blossom == BlossomMode.always ? _almondBlossom : seasonBlossom);
+  final blossom = seasonBlossom == null ? null : (sp.blossomColor ?? seasonBlossom);
   final ground = spec.groundTop ?? foliage[3]!;
   final groundDeep = spec.groundBottom ?? _mix(foliage[3]!, _bark, 0.7);
 

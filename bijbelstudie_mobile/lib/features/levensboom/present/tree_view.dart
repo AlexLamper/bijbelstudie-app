@@ -354,6 +354,16 @@ class TreePainter extends CustomPainter with SceneLayers {
         path.addOval(Rect.fromCenter(center: Offset(size * 0.65, 0), width: size * 2.1, height: size * 1.7));
       case LeafShape.almond:
         path.addOval(Rect.fromCenter(center: Offset(size * 0.65, 0), width: size * 2.3, height: size * 0.84));
+      case LeafShape.lance:
+        // The willow: long and thin, hanging from its stem.
+        path.addOval(Rect.fromCenter(center: Offset(size * 0.8, 0), width: size * 3, height: size * 0.44));
+      case LeafShape.scale:
+        // The cypress: short, fat foliage that overlaps into a dense mass.
+        path.addOval(Rect.fromCenter(center: Offset(size * 0.45, 0), width: size * 1.2, height: size * 0.8));
+      case LeafShape.feather:
+        // The acacia: a rib with tiny leaflets; the leaflets are strokes added
+        // by the caller where there is room to see them.
+        path.addOval(Rect.fromCenter(center: Offset(size * 0.7, 0), width: size * 2.2, height: size * 0.6));
       case LeafShape.needle:
         // A tuft of needles; a single stroke at avatar sizes.
         final length = size * 1.6;
@@ -418,22 +428,26 @@ class TreePainter extends CustomPainter with SceneLayers {
         canvas.drawPath(path, stroke..color = colour);
       } else {
         canvas.drawPath(path, fill..color = colour);
-        if (shape == LeafShape.frond || shape == LeafShape.large) {
+        final frond = shape == LeafShape.frond;
+        final feather = shape == LeafShape.feather;
+        if (frond || feather || shape == LeafShape.large) {
           rib
             ..color = leaf.phase > 0.5 ? palette.leaf : palette.leafAlt
             ..strokeWidth = math.max(0.5, size * 0.08);
           canvas.drawLine(
             Offset.zero,
-            Offset(size * (shape == LeafShape.frond ? 2.9 : 1.5), 0),
+            Offset(size * (frond ? 2.9 : feather ? 1.7 : 1.5), 0),
             rib,
           );
           // Leaflets either side of the rib, where there is room to see them.
-          if (shape == LeafShape.frond && scale > 1.4) {
-            final length = size * 3.2;
+          if ((frond || feather) && scale > 1.4) {
+            final pairs = frond ? 6 : 4;
+            final length = size * (frond ? 3.2 : 1.8);
+            final reachMax = size * (frond ? 0.9 : 0.4);
             rib.strokeWidth = math.max(0.5, size * 0.06);
-            for (var k = 1; k <= 6; k++) {
-              final at = k / 7 * length;
-              final reach = size * 0.9 * (1 - k / 9);
+            for (var k = 1; k <= pairs; k++) {
+              final at = k / (pairs + 1) * length;
+              final reach = reachMax * (1 - k / (pairs + 3));
               canvas.drawLine(Offset(at, 0), Offset(at + reach * 0.55, -reach), rib);
               canvas.drawLine(Offset(at, 0), Offset(at + reach * 0.55, reach), rib);
             }
@@ -486,6 +500,66 @@ class TreePainter extends CustomPainter with SceneLayers {
           ..strokeWidth = math.max(0.5, size * 0.12);
         canvas.drawLine(Offset(c.dx - size * 0.45, c.dy - size * 0.25), Offset(c.dx + size * 0.45, c.dy - size * 0.25), line);
         canvas.drawLine(Offset(c.dx - size * 0.5, c.dy + size * 0.2), Offset(c.dx + size * 0.5, c.dy + size * 0.2), line);
+      case FruitStyle.apple:
+        canvas.drawCircle(c, size * 0.85, paint);
+        canvas.drawLine(
+          Offset(c.dx, c.dy - size * 0.8),
+          Offset(c.dx + size * 0.15, c.dy - size * 1.25),
+          Paint()
+            ..color = palette.fruitAlt
+            ..strokeWidth = math.max(0.5, size * 0.14),
+        );
+      case FruitStyle.pomegranate:
+        canvas.drawCircle(c, size * 0.9, paint);
+        // The calyx crown on top.
+        canvas.drawPath(
+          Path()
+            ..moveTo(c.dx - size * 0.3, c.dy - size * 0.75)
+            ..lineTo(c.dx - size * 0.35, c.dy - size * 1.15)
+            ..lineTo(c.dx, c.dy - size * 0.95)
+            ..lineTo(c.dx + size * 0.35, c.dy - size * 1.15)
+            ..lineTo(c.dx + size * 0.3, c.dy - size * 0.75)
+            ..close(),
+          Paint()..color = palette.fruitAlt,
+        );
+      case FruitStyle.catkin:
+        canvas.drawOval(
+          Rect.fromCenter(center: c.translate(0, size * 0.5), width: size * 0.64, height: size * 1.8),
+          paint,
+        );
+        final seed = Paint()..color = palette.fruitAlt;
+        for (final (ox, oy) in const [(-0.12, 0.1), (0.14, 0.55), (-0.1, 1.0)]) {
+          canvas.drawCircle(Offset(c.dx + ox * size, c.dy + oy * size), size * 0.12, seed);
+        }
+      case FruitStyle.pod:
+        // A hanging, curved seed pod with a seam.
+        final pod = Path()
+          ..moveTo(c.dx - size * 0.5, c.dy - size * 0.3)
+          ..quadraticBezierTo(c.dx + size * 0.1, c.dy + size * 1.2, c.dx + size * 0.7, c.dy + size * 0.9);
+        canvas.drawPath(
+          pod,
+          Paint()
+            ..color = palette.fruit
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = math.max(0.8, size * 0.4),
+        );
+        canvas.drawPath(
+          pod,
+          Paint()
+            ..color = palette.fruitAlt
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = math.max(0.4, size * 0.1),
+        );
+      case FruitStyle.berry:
+        canvas.drawCircle(c, size * 0.5, paint);
+        canvas.drawCircle(Offset(c.dx - size * 0.4, c.dy + size * 0.45), size * 0.38, paint);
+        canvas.drawCircle(
+          Offset(c.dx + size * 0.55, c.dy + size * 0.35),
+          size * 0.42,
+          Paint()..color = palette.fruitAlt,
+        );
       case FruitStyle.acorn:
         canvas.drawOval(Rect.fromCenter(center: c.translate(0, size * 0.15), width: size * 1.4, height: size * 1.7), paint);
         canvas.drawOval(
@@ -569,15 +643,23 @@ class TreePainter extends CustomPainter with SceneLayers {
     }
 
     final perch = scene.perch;
-    if (perch != null && (animal == TreeAnimal.vogel || animal == TreeAnimal.duif)) {
+    if (perch != null && _perchAnimals.contains(animal)) {
       final p = Offset(originX + perch.x * scale, originY + perch.y * scale);
-      if (animal == TreeAnimal.vogel) {
-        _drawBird(canvas, p, scale);
-      } else {
-        _drawDove(canvas, p, scale);
+      switch (animal) {
+        case TreeAnimal.vogel:
+          _drawBird(canvas, p, scale);
+        case TreeAnimal.duif:
+          _drawPerchBird(canvas, p, scale, _dove);
+        case TreeAnimal.raaf:
+          _drawPerchBird(canvas, p, scale, _raven);
+        default:
+          _drawOwl(canvas, p, scale);
       }
     }
   }
+
+  /// The animals that sit on the perch rather than on the ground.
+  static const _perchAnimals = {TreeAnimal.vogel, TreeAnimal.duif, TreeAnimal.raaf, TreeAnimal.uil};
 
   // ------------------------------------------------------------- animals
 
@@ -596,12 +678,31 @@ class TreePainter extends CustomPainter with SceneLayers {
     );
   }
 
-  void _drawDove(Canvas canvas, Offset p, double scale) {
+  static const _dove = (
+    body: Color(0xFFF4F4F0),
+    wing: Color(0xFFE2E2D8),
+    beak: Color(0xFFE0A458),
+    eye: Color(0xFF2B2B2B),
+  );
+  static const _raven = (
+    body: Color(0xFF26262B),
+    wing: Color(0xFF3A3A42),
+    beak: Color(0xFF5A5A60),
+    eye: Color(0xFFDADAE0),
+  );
+
+  /// The dove and the raven: one bird, two coats.
+  void _drawPerchBird(
+    Canvas canvas,
+    Offset p,
+    double scale,
+    ({Color body, Color wing, Color beak, Color eye}) coat,
+  ) {
     final s = math.max(2.5, 2.4 * scale);
     final flap = still ? 0.0 : math.sin(timeMs * 0.004) * 0.25;
     final x = p.dx;
     final y = p.dy;
-    final body = Paint()..color = const Color(0xFFF4F4F0);
+    final body = Paint()..color = coat.body;
     canvas.save();
     canvas.translate(x, y - s * 0.4);
     canvas.rotate(-0.15);
@@ -622,7 +723,7 @@ class TreePainter extends CustomPainter with SceneLayers {
         ..quadraticBezierTo(x - s * 0.2, y - s * (1.35 + flap), x + s * 0.7, y - s * (1.05 + flap))
         ..lineTo(x + s * 0.4, y - s * 0.45)
         ..close(),
-      Paint()..color = const Color(0xFFE2E2D8),
+      Paint()..color = coat.wing,
     );
     canvas.drawPath(
       Path()
@@ -630,12 +731,71 @@ class TreePainter extends CustomPainter with SceneLayers {
         ..lineTo(x + s * 1.5, y - s * 0.72)
         ..lineTo(x + s * 1.18, y - s * 0.66)
         ..close(),
-      Paint()..color = const Color(0xFFE0A458),
+      Paint()..color = coat.beak,
     );
     canvas.drawCircle(
       Offset(x + s * 0.95, y - s * 0.86),
       math.max(0.5, s * 0.08),
-      Paint()..color = const Color(0xFF2B2B2B),
+      Paint()..color = coat.eye,
+    );
+  }
+
+  /// Asleep by day, eyes open at night - with the odd blink.
+  void _drawOwl(Canvas canvas, Offset p, double scale) {
+    final s = math.max(2.5, 2.2 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    const dark = Color(0xFF4A3A28);
+    final awake = palette.night && (still || math.sin(timeMs * 0.0009) < 0.97);
+    final brown = Paint()..color = const Color(0xFF8A6A48);
+    fillEllipse(canvas, Offset(x, y - s * 0.7), s * 0.7, s * 0.95, brown);
+    // Ear tufts.
+    for (final side in const [-1.0, 1.0]) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(x + side * s * 0.5, y - s * 1.55)
+          ..lineTo(x + side * s * 0.6, y - s * 2.05)
+          ..lineTo(x + side * s * 0.2, y - s * 1.65)
+          ..close(),
+        brown,
+      );
+    }
+    // Folded wings.
+    final wing = Paint()..color = dark.withValues(alpha: 0.35);
+    for (final side in const [-1.0, 1.0]) {
+      fillEllipse(canvas, Offset(x + side * s * 0.45, y - s * 0.6), s * 0.25, s * 0.55, wing, rotation: side * 0.2);
+    }
+    // Face.
+    fillEllipse(canvas, Offset(x, y - s * 1.2), s * 0.55, s * 0.45, Paint()..color = const Color(0xFFD9C4A0));
+    final darkFill = Paint()..color = dark;
+    for (final side in const [-1.0, 1.0]) {
+      final ex = x + side * s * 0.22;
+      final ey = y - s * 1.22;
+      if (awake) {
+        canvas.drawCircle(Offset(ex, ey), s * 0.16, Paint()..color = const Color(0xFFF2C14E));
+        canvas.drawCircle(Offset(ex, ey), s * 0.07, darkFill);
+      } else {
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset(ex, ey - s * 0.04), radius: s * 0.14),
+          0.2,
+          math.pi - 0.4,
+          false,
+          Paint()
+            ..color = dark
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = math.max(0.6, s * 0.06),
+        );
+      }
+    }
+    // Beak.
+    canvas.drawPath(
+      Path()
+        ..moveTo(x - s * 0.07, y - s * 1.08)
+        ..lineTo(x + s * 0.07, y - s * 1.08)
+        ..lineTo(x, y - s * 0.94)
+        ..close(),
+      darkFill,
     );
   }
 

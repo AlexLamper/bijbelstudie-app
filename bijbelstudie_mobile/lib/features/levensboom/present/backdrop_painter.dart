@@ -73,6 +73,18 @@ class TreeDecor {
           hue: i,
         ),
     ];
+    // Appended after everything that existed before, so no older decor moved.
+    // Same order as the website's `buildDecor`.
+    bees = [
+      for (var i = 0; i < 7; i++)
+        (
+          rx: 0.35 + rand() * 0.55,
+          ry: 0.3 + rand() * 0.5,
+          speed: 0.6 + rand() * 0.8,
+          phase: rand(),
+        ),
+    ];
+    eaglePhase = rand();
 
     final scene = seededRng('$seed:scene');
     dots = [
@@ -81,6 +93,11 @@ class TreeDecor {
     ];
     sheep = (-(13 + scene() * 8), 11 + scene() * 7);
     deer = 15 + scene() * 6;
+    // Same rule: later animals draw after the earlier ones.
+    fox = -(12 + scene() * 6);
+    donkey = 14 + scene() * 6;
+    stork = 12 + scene() * 5;
+    lion = 15 + scene() * 5;
   }
 
   late final List<({double x, double y, double r, double speed, double phase})> motes;
@@ -92,6 +109,10 @@ class TreeDecor {
   late final List<({double x, double y, double phase})> fireflies;
   late final List<({double rx, double ry, double speed, double phase, int hue})>
   butterflies;
+  late final List<({double rx, double ry, double speed, double phase})> bees;
+
+  /// Where on its circle the eagle starts. 0..1.
+  late final double eaglePhase;
 
   /// Backdrop details: stone/flower/olive positions, extra stars. 0..1.
   late final List<({double x, double y, double r, double k})> dots;
@@ -99,6 +120,10 @@ class TreeDecor {
   /// Where the ground animals stand, in tree units left/right of the trunk.
   late final (double, double) sheep;
   late final double deer;
+  late final double fox;
+  late final double donkey;
+  late final double stork;
+  late final double lion;
 }
 
 const int kSeasonsTraitLevel = 25;
@@ -124,6 +149,27 @@ class TreeFrame {
 
 const double kDeg = math.pi / 180;
 
+/// The canvas `ellipse(cx, cy, rx, ry, rotation)` the website draws with:
+/// radii, not a bounding box, and an optional rotation about the centre.
+void fillEllipse(
+  Canvas canvas,
+  Offset centre,
+  double rx,
+  double ry,
+  Paint paint, {
+  double rotation = 0,
+}) {
+  if (rotation == 0) {
+    canvas.drawOval(Rect.fromCenter(center: centre, width: rx * 2, height: ry * 2), paint);
+    return;
+  }
+  canvas.save();
+  canvas.translate(centre.dx, centre.dy);
+  canvas.rotate(rotation);
+  canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2), paint);
+  canvas.restore();
+}
+
 /// Ground animals stand beside the trunk; the frame has to hold them too.
 ({double minX, double maxX}) extentWithAnimals(
   TreeScene scene,
@@ -137,6 +183,10 @@ const double kDeg = math.pi / 180;
     maxX = math.max(maxX, kTrunkX + decor.sheep.$2 + 5);
   }
   if (animal == TreeAnimal.hert) maxX = math.max(maxX, kTrunkX + decor.deer + 6);
+  if (animal == TreeAnimal.vos) minX = math.min(minX, kTrunkX + decor.fox - 5);
+  if (animal == TreeAnimal.ezel) maxX = math.max(maxX, kTrunkX + decor.donkey + 7);
+  if (animal == TreeAnimal.ooievaar) maxX = math.max(maxX, kTrunkX + decor.stork + 4);
+  if (animal == TreeAnimal.leeuw) maxX = math.max(maxX, kTrunkX + decor.lion + 8);
   return (minX: minX, maxX: maxX);
 }
 
@@ -397,6 +447,17 @@ mixin SceneLayers {
     return path;
   }
 
+  /// A wavy line across the frame: sea swell, the shore's foam.
+  Path _wavePath(double width, double y, double amp, int count, double shift) {
+    final step = width / count;
+    final path = Path()..moveTo(-step + shift, y);
+    for (var i = -1; i <= count; i++) {
+      final x = i * step + shift;
+      path.quadraticBezierTo(x + step * 0.5, y - amp, x + step, y);
+    }
+    return path;
+  }
+
   void paintFarBackdrop(Canvas canvas, TreeFrame frame) {
     final w = frame.width;
     final h = frame.height;
@@ -581,6 +642,186 @@ mixin SceneLayers {
           mr * 0.85,
           paint..color = palette.skyTop,
         );
+      case Backdrop.river:
+        // Far bank and hills, then the river itself between them and the near
+        // bank the tree stands on - the reader is on the Jordan's shore.
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.08, 1.4, 0.6, h * 0.04), paint..color = palette.farAlt);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.05, 2.3, 2.9, 0), paint..color = palette.far);
+        final top = groundTop - h * 0.085;
+        canvas.drawRect(
+          Rect.fromLTRB(0, top, w, groundTop),
+          paint..color = palette.water ?? palette.far,
+        );
+        final streak = Paint()
+          ..color = palette.light.withValues(alpha: 0.35)
+          ..strokeWidth = math.max(1.0, h * 0.003);
+        for (var i = 0; i < 5; i++) {
+          final d = decor.dots[50 + i];
+          final y = top + (0.2 + d.y * 0.6) * (groundTop - top);
+          final drift = still ? 0.0 : math.sin(timeMs * 0.0006 + d.k * 6.283) * w * 0.01;
+          final half = w * 0.04 * (0.5 + d.r);
+          canvas.drawLine(Offset(d.x * w - half + drift, y), Offset(d.x * w + half + drift, y), streak);
+        }
+      case Backdrop.vineyard:
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.08, 1.4, 0.6, h * 0.04), paint..color = palette.farAlt);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.05, 2.3, 2.9, 0), paint..color = palette.far);
+        // Rows of vines on posts, smaller as they recede up the hill.
+        final post = Paint()..color = palette.groundDeep.withValues(alpha: 0.55);
+        for (var row = 0; row < 4; row++) {
+          final perspective = 1 - row * 0.18;
+          final y = groundTop - h * (0.015 + row * 0.03);
+          final step = w * 0.07 * perspective;
+          final offset = step * (row % 2 == 0 ? 0.25 : 0.6);
+          var k = 0;
+          for (var x = offset; x < w; x += step, k++) {
+            final d = decor.dots[(row * 17 + k) % 120];
+            post.strokeWidth = math.max(0.7, w * 0.004 * perspective);
+            canvas.drawLine(Offset(x, y), Offset(x, y - h * 0.03 * perspective), post);
+            canvas.drawOval(
+              Rect.fromCenter(
+                center: Offset(x, y - h * 0.028 * perspective),
+                width: math.max(3.0, w * 0.044 * perspective),
+                height: math.max(2.0, h * 0.028 * perspective),
+              ),
+              paint..color = palette.farAlt.withValues(alpha: 0.9),
+            );
+            if (d.k > 0.5) {
+              canvas.drawCircle(
+                Offset(x + (d.x - 0.5) * w * 0.02, y - h * 0.018 * perspective),
+                math.max(0.6, w * 0.004 * perspective),
+                paint..color = spec.accent.withValues(alpha: 0.9),
+              );
+            }
+          }
+        }
+      case Backdrop.field:
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.06, 1.1, 1.9, h * 0.03), paint..color = palette.farAlt);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.04, 1.9, 4.1, 0), paint..color = palette.far);
+      case Backdrop.sea:
+        final horizon = groundTop - h * 0.16;
+        canvas.drawRect(
+          Rect.fromLTRB(0, horizon, w, groundTop),
+          paint..color = palette.water ?? palette.far,
+        );
+        // Swell: rows of low scallops, drifting sideways.
+        final swell = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.0, h * 0.004);
+        for (var i = 0; i < 5; i++) {
+          final y = horizon + (0.18 + i * 0.17) * (groundTop - horizon);
+          final count = 9 + i * 2;
+          final shift = still ? 0.0 : (timeMs * 0.012 * (1 + i * 0.2)) % (w / count) - w / count;
+          canvas.drawPath(
+            _wavePath(w, y, h * 0.006 * (1 + i * 0.3), count, shift),
+            swell..color = spec.accent.withValues(alpha: 0.2 + i * 0.07),
+          );
+        }
+      case Backdrop.rainbow:
+        // The bow: six bands on a centre below the horizon; the earth band
+        // covers the part that would run under the ground.
+        final cx = w * 0.62;
+        final cy = groundTop + h * 0.32;
+        final r = h * 0.78;
+        final band = math.max(1.5, h * 0.014);
+        const colours = [
+          Color(0xFFE4483F),
+          Color(0xFFF0933A),
+          Color(0xFFF2D24A),
+          Color(0xFF6DBA5C),
+          Color(0xFF4E9CD6),
+          Color(0xFF7A5FB8),
+        ];
+        final bow = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = band;
+        for (var i = 0; i < colours.length; i++) {
+          canvas.drawArc(
+            Rect.fromCircle(center: Offset(cx, cy), radius: r - i * band),
+            math.pi,
+            math.pi,
+            false,
+            bow..color = colours[i].withValues(alpha: 0.5),
+          );
+        }
+        canvas.drawPath(
+          _hillPath(w, groundTop, h * 0.04, 1.2, 1.1, 0),
+          paint..color = palette.far.withValues(alpha: 0.55),
+        );
+      case Backdrop.sunrise:
+        final sx = w * 0.5;
+        final sy = groundTop - h * 0.1;
+        final sr = math.max(6.0, w * 0.09);
+        canvas.drawRect(
+          Rect.fromLTWH(0, 0, w, groundTop),
+          Paint()
+            ..shader = ui.Gradient.radial(Offset(sx, sy), sr * 3, [
+              palette.glow.withValues(alpha: 0.4),
+              palette.glow.withValues(alpha: 0),
+            ]),
+        );
+        // Rays, turning very slowly.
+        final ray = Paint()
+          ..color = spec.accent.withValues(alpha: 0.18)
+          ..strokeWidth = math.max(1.0, w * 0.006);
+        final turn = still ? 0.0 : timeMs * 0.00008;
+        for (var i = 0; i < 9; i++) {
+          final a = math.pi + (i / 8) * math.pi + turn;
+          canvas.drawLine(
+            Offset(sx + math.cos(a) * sr * 1.15, sy + math.sin(a) * sr * 1.15),
+            Offset(sx + math.cos(a) * sr * 2.4, sy + math.sin(a) * sr * 2.4),
+            ray,
+          );
+        }
+        canvas.drawCircle(Offset(sx, sy), sr, paint..color = spec.accent);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.1, 1.2, 0.4, h * 0.05), paint..color = palette.farAlt);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.06, 2.0, 2.4, 0), paint..color = palette.far);
+      case Backdrop.shepherds:
+        // One bright star over the fields, and a flock on the near hill.
+        final sx = w * 0.72;
+        final sy = h * 0.14;
+        final sr = math.max(3.0, w * 0.02);
+        final twinkle = still ? 1.0 : 0.92 + 0.08 * math.sin(timeMs * 0.002);
+        canvas.drawRect(
+          Rect.fromLTWH(sx - sr * 5, sy - sr * 5, sr * 10, sr * 10),
+          Paint()
+            ..shader = ui.Gradient.radial(Offset(sx, sy), sr * 5, [
+              spec.accent.withValues(alpha: 0x55 / 255),
+              spec.accent.withValues(alpha: 0),
+            ]),
+        );
+        paint.color = spec.accent;
+        canvas.drawPath(
+          Path()
+            ..moveTo(sx, sy - sr * 3 * twinkle)
+            ..lineTo(sx + sr * 0.3, sy)
+            ..lineTo(sx, sy + sr * 3 * twinkle)
+            ..lineTo(sx - sr * 0.3, sy)
+            ..close(),
+          paint,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(sx - sr * 2.2 * twinkle, sy)
+            ..lineTo(sx, sy - sr * 0.3)
+            ..lineTo(sx + sr * 2.2 * twinkle, sy)
+            ..lineTo(sx, sy + sr * 0.3)
+            ..close(),
+          paint,
+        );
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.09, 1.1, 1.5, h * 0.04), paint..color = palette.farAlt);
+        canvas.drawPath(_hillPath(w, groundTop, h * 0.05, 1.8, 3.6, 0), paint..color = palette.far);
+        paint.color = palette.light.withValues(alpha: 0.8);
+        for (var i = 0; i < 5; i++) {
+          final d = decor.dots[70 + i];
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: Offset(w * (0.08 + d.x * 0.84), groundTop - h * 0.012 - d.y * h * 0.03),
+              width: math.max(2.4, w * 0.016),
+              height: math.max(1.6, w * 0.01),
+            ),
+            paint,
+          );
+        }
       case Backdrop.meadow:
         canvas.drawPath(
           _hillPath(w, groundTop, h * 0.04, 1.2, 1.1, 0),
@@ -599,6 +840,92 @@ mixin SceneLayers {
     final paint = Paint();
 
     switch (spec.backdrop) {
+      case Backdrop.river:
+        // Reeds along the near bank, swaying at the head.
+        final stem = Paint()
+          ..color = palette.groundDeep
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(0.8, band * 0.03);
+        for (var i = 0; i < 10; i++) {
+          final d = decor.dots[54 + i];
+          final x = w * (0.03 + d.x * 0.94);
+          final base = groundTop + band * (0.5 + d.y * 0.45);
+          final top = base - band * (0.5 + d.r * 0.35);
+          final sway = still ? 0.0 : math.sin(timeMs * 0.0015 + d.k * 6.283) * band * 0.04;
+          canvas.drawPath(
+            Path()
+              ..moveTo(x, base)
+              ..quadraticBezierTo(x, (base + top) / 2, x + sway, top),
+            stem,
+          );
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: Offset(x + sway, top - band * 0.06),
+              width: math.max(2.0, band * 0.06),
+              height: math.max(4.0, band * 0.18),
+            ),
+            paint..color = spec.accent,
+          );
+        }
+      case Backdrop.field:
+        // Standing wheat, heads nodding in the wind.
+        final stem = Paint()
+          ..color = palette.groundDeep
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(0.8, band * 0.025);
+        paint.color = spec.accent;
+        for (var i = 0; i < 22; i++) {
+          final d = decor.dots[60 + i];
+          final x = w * (0.02 + d.x * 0.96);
+          final base = groundTop + band * (0.35 + d.y * 0.6);
+          final top = base - band * (0.5 + d.r * 0.4);
+          final sway = still ? 0.0 : math.sin(timeMs * 0.0013 + d.k * 6.283) * band * 0.05;
+          canvas.drawPath(
+            Path()
+              ..moveTo(x, base)
+              ..quadraticBezierTo(x, (base + top) / 2, x + sway, top),
+            stem,
+          );
+          canvas.save();
+          canvas.translate(x + sway, top - band * 0.08);
+          if (band > 0) canvas.rotate(sway / band);
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: Offset.zero,
+              width: math.max(2.0, band * 0.07),
+              height: math.max(4.0, band * 0.22),
+            ),
+            paint,
+          );
+          canvas.restore();
+        }
+      case Backdrop.sea:
+        // Foam where the last wave reaches the sand.
+        final shift = still ? 0.0 : math.sin(timeMs * 0.0009) * w * 0.01;
+        canvas.drawPath(
+          _wavePath(w, groundTop + band * 0.04, band * 0.05, 11, shift),
+          Paint()
+            ..color = spec.accent.withValues(alpha: 0.85)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(1.5, band * 0.06),
+        );
+        // Two shells.
+        paint.color = palette.light;
+        for (var i = 0; i < 2; i++) {
+          final d = decor.dots[44 + i];
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: Offset(w * (0.1 + d.x * 0.8), groundTop + band * (0.45 + d.y * 0.4)),
+              width: math.max(2.4, w * 0.016),
+              height: math.max(2.0, w * 0.012),
+            ),
+            paint,
+          );
+        }
+      case Backdrop.vineyard:
+      case Backdrop.rainbow:
+      case Backdrop.sunrise:
+      case Backdrop.shepherds:
       case Backdrop.meadow:
         final water = palette.water;
         if (water == null) return;
@@ -778,6 +1105,250 @@ mixin SceneLayers {
     canvas.drawCircle(Offset(x + s * 1.65, y - s * 1.6), s * 0.22, Paint()..color = const Color(0xFFF2EFE6));
   }
 
+  /// Sitting on the left of the trunk, looking at it.
+  void _drawFox(Canvas canvas, Offset p, double scale) {
+    final s = math.max(3.0, 1.7 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    final wag = still ? 0.0 : math.sin(timeMs * 0.002) * 0.08;
+    final body = Paint()..color = const Color(0xFFD2692E);
+    final dark = Paint()..color = const Color(0xFF8E4A1E);
+    final cream = Paint()..color = const Color(0xFFF4EDE2);
+    // The tail curls round the front.
+    fillEllipse(canvas, Offset(x - s * 1.1, y - s * 0.45), s * 1.3, s * 0.5, body, rotation: -0.5 + wag);
+    canvas.drawCircle(Offset(x - s * 2.1, y - s * 0.85), s * 0.3, cream);
+    // Body, chest.
+    fillEllipse(canvas, Offset(x, y - s * 1.0), s * 0.85, s * 1.05, body);
+    fillEllipse(canvas, Offset(x + s * 0.25, y - s * 0.75), s * 0.4, s * 0.6, cream);
+    // Head and ears.
+    canvas.drawCircle(Offset(x + s * 0.35, y - s * 2.05), s * 0.55, body);
+    canvas.drawPath(
+      Path()
+        ..moveTo(x + s * 0.05, y - s * 2.4)
+        ..lineTo(x + s * 0.2, y - s * 3.0)
+        ..lineTo(x + s * 0.45, y - s * 2.45)
+        ..close(),
+      body,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(x + s * 0.5, y - s * 2.45)
+        ..lineTo(x + s * 0.75, y - s * 3.0)
+        ..lineTo(x + s * 0.85, y - s * 2.35)
+        ..close(),
+      body,
+    );
+    // Snout, nose, eye, paws.
+    fillEllipse(canvas, Offset(x + s * 0.7, y - s * 1.95), s * 0.35, s * 0.22, cream);
+    canvas.drawCircle(Offset(x + s * 0.98, y - s * 1.97), math.max(0.5, s * 0.08), dark);
+    canvas.drawCircle(Offset(x + s * 0.5, y - s * 2.15), math.max(0.5, s * 0.07), dark);
+    for (final px in const [0.35, 0.75]) {
+      fillEllipse(canvas, Offset(x + s * px, y - s * 0.05), s * 0.22, s * 0.12, dark);
+    }
+  }
+
+  /// Standing on the right, facing the tree.
+  void _drawDonkey(Canvas canvas, Offset p, double scale) {
+    final s = math.max(3.0, 1.9 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    const grey = Color(0xFF8C8A86);
+    const dark = Color(0xFF5E5C58);
+    final flick = still ? 0.0 : math.max(0.0, math.sin(timeMs * 0.003)) * 0.3;
+    final legs = Paint()
+      ..color = dark
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(1.0, s * 0.2);
+    for (final lx in const [-0.95, -0.5, 0.5, 0.95]) {
+      canvas.drawLine(Offset(x + lx * s, y - s * 1.05), Offset(x + lx * s, y), legs);
+    }
+    final fill = Paint()..color = grey;
+    fillEllipse(canvas, Offset(x, y - s * 1.45), s * 1.5, s * 0.75, fill);
+    // Neck, head, muzzle.
+    canvas.drawLine(
+      Offset(x - s * 1.2, y - s * 1.7),
+      Offset(x - s * 1.75, y - s * 2.55),
+      Paint()
+        ..color = grey
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(1.5, s * 0.5),
+    );
+    fillEllipse(canvas, Offset(x - s * 1.95, y - s * 2.7), s * 0.55, s * 0.38, fill, rotation: 0.35);
+    fillEllipse(
+      canvas,
+      Offset(x - s * 2.35, y - s * 2.55),
+      s * 0.3,
+      s * 0.22,
+      Paint()..color = const Color(0xFFC9C4BB),
+      rotation: 0.35,
+    );
+    // Ears.
+    fillEllipse(canvas, Offset(x - s * 1.75, y - s * 3.3), s * 0.14, s * 0.5, fill, rotation: -0.25 - flick);
+    fillEllipse(canvas, Offset(x - s * 1.5, y - s * 3.2), s * 0.14, s * 0.5, fill, rotation: 0.15);
+    // Mane, eye, tail.
+    final line = Paint()
+      ..color = dark
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(0.8, s * 0.12);
+    for (var i = 0; i < 3; i++) {
+      final mx = x - s * (1.25 + i * 0.18);
+      final my = y - s * (1.85 + i * 0.28);
+      canvas.drawLine(Offset(mx, my), Offset(mx + s * 0.2, my - s * 0.12), line);
+    }
+    final darkFill = Paint()..color = dark;
+    canvas.drawCircle(Offset(x - s * 2.05, y - s * 2.8), math.max(0.5, s * 0.07), darkFill);
+    canvas.drawLine(Offset(x + s * 1.4, y - s * 1.6), Offset(x + s * 1.75, y - s * 0.9), line);
+    canvas.drawCircle(Offset(x + s * 1.78, y - s * 0.82), s * 0.15, darkFill);
+  }
+
+  /// On one leg, on the right, facing the tree.
+  void _drawStork(Canvas canvas, Offset p, double scale) {
+    final s = math.max(3.0, 2 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    const white = Color(0xFFF6F6F2);
+    const black = Color(0xFF2B2B2E);
+    const red = Color(0xFFD9432F);
+    final nod = still ? 0.0 : math.sin(timeMs * 0.0015) * 0.06;
+    canvas.drawPath(
+      Path()
+        ..moveTo(x, y - s * 1.6)
+        ..lineTo(x, y)
+        ..moveTo(x + s * 0.1, y - s * 1.6)
+        ..lineTo(x + s * 0.35, y - s * 1.0)
+        ..lineTo(x + s * 0.1, y - s * 0.75),
+      Paint()
+        ..color = red
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.8, s * 0.12),
+    );
+    fillEllipse(canvas, Offset(x + s * 0.1, y - s * 2.1), s * 0.9, s * 0.5, Paint()..color = white, rotation: -0.15);
+    fillEllipse(canvas, Offset(x + s * 0.7, y - s * 2.05), s * 0.45, s * 0.28, Paint()..color = black, rotation: -0.2);
+    // Neck and head.
+    final hy = y - s * (3.55 - nod);
+    canvas.drawLine(
+      Offset(x - s * 0.5, y - s * 2.3),
+      Offset(x - s * 0.85, hy + s * 0.15),
+      Paint()
+        ..color = white
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(1.5, s * 0.28),
+    );
+    canvas.drawCircle(Offset(x - s * 0.9, hy), s * 0.3, Paint()..color = white);
+    canvas.drawPath(
+      Path()
+        ..moveTo(x - s * 1.1, hy)
+        ..lineTo(x - s * 2.0, hy + s * 0.2)
+        ..lineTo(x - s * 1.1, hy + s * 0.1)
+        ..close(),
+      Paint()..color = red,
+    );
+    canvas.drawCircle(Offset(x - s * 0.98, hy - s * 0.07), math.max(0.5, s * 0.06), Paint()..color = black);
+  }
+
+  /// Lying down on the right, facing the tree, tail tip twitching.
+  void _drawLion(Canvas canvas, Offset p, double scale) {
+    final s = math.max(3.0, 2.1 * scale);
+    final x = p.dx;
+    final y = p.dy;
+    final tan = Paint()..color = const Color(0xFFC9973F);
+    final mane = Paint()..color = const Color(0xFF8E5E1E);
+    final dark = Paint()..color = const Color(0xFF5C3A12);
+    final sway = still ? 0.0 : math.sin(timeMs * 0.0018) * 0.15;
+    canvas.drawPath(
+      Path()
+        ..moveTo(x + s * 1.6, y - s * 0.7)
+        ..quadraticBezierTo(x + s * 2.2, y - s * 0.7, x + s * (2.4 + sway), y - s * 0.2),
+      Paint()
+        ..color = tan.color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.8, s * 0.14),
+    );
+    canvas.drawCircle(Offset(x + s * (2.45 + sway), y - s * 0.18), s * 0.2, mane);
+    fillEllipse(canvas, Offset(x + s * 0.2, y - s * 0.75), s * 1.7, s * 0.7, tan);
+    for (final (ox, oy) in const [(-1.0, -0.25), (-0.8, -0.1)]) {
+      fillEllipse(canvas, Offset(x + s * ox, y + s * oy), s * 0.7, s * 0.21, tan);
+    }
+    canvas.drawCircle(Offset(x - s * 1.05, y - s * 1.5), s * 0.85, mane);
+    canvas.drawCircle(Offset(x - s * 1.15, y - s * 1.45), s * 0.55, tan);
+    for (final ex in const [-0.75, -1.45]) {
+      canvas.drawCircle(Offset(x + s * ex, y - s * 1.95), s * 0.16, tan);
+    }
+    fillEllipse(canvas, Offset(x - s * 1.35, y - s * 1.3), s * 0.32, s * 0.22, Paint()..color = const Color(0xFFEBD9A8));
+    canvas.drawCircle(Offset(x - s * 1.6, y - s * 1.38), math.max(0.5, s * 0.08), dark);
+    for (final ex in const [-1.3, -1.0]) {
+      canvas.drawCircle(Offset(x + s * ex, y - s * 1.6), math.max(0.5, s * 0.06), dark);
+    }
+  }
+
+  void _drawBees(Canvas canvas, TreeFrame frame) {
+    final b = scene.bounds;
+    final scale = frame.scale;
+    final cx = frame.originX + ((b.minX + b.maxX) / 2) * scale;
+    final cy = frame.originY + ((b.minY + kGroundY) / 2) * scale;
+    final rx = ((b.maxX - b.minX) / 2) * scale;
+    final ry = ((kGroundY - b.minY) / 2) * scale;
+    final size = math.max(1.2, 0.6 * scale);
+    final wing = Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7);
+    final body = Paint()..color = const Color(0xFFF2C744);
+    final stripe = Paint()..color = const Color(0xFF3B3330);
+    for (final bee in decor.bees) {
+      final p = bee.phase * math.pi * 2;
+      final tt = still ? 0.0 : timeMs * 0.0011 * bee.speed;
+      final x = cx + math.cos(tt + p) * rx * bee.rx;
+      final y = cy +
+          math.sin(tt * 1.7 + p) * ry * bee.ry +
+          (still ? 0.0 : math.sin(timeMs * 0.02 + p) * size * 0.3);
+      for (final side in const [-1.0, 1.0]) {
+        fillEllipse(
+          canvas,
+          Offset(x + side * size * 0.4, y - size * 0.7),
+          size * 0.45,
+          size * 0.3,
+          wing,
+          rotation: side * -0.6,
+        );
+      }
+      fillEllipse(canvas, Offset(x, y), size, size * 0.65, body);
+      canvas.drawRect(Rect.fromLTWH(x - size * 0.18, y - size * 0.6, size * 0.36, size * 1.2), stripe);
+    }
+  }
+
+  /// A silhouette circling high in the sky, in viewport fractions.
+  void _drawEagle(Canvas canvas, TreeFrame frame) {
+    final w = frame.width;
+    final h = frame.height;
+    final cx = w * 0.5;
+    final cy = h * 0.16;
+    final rx = w * 0.3;
+    final ry = h * 0.06;
+    final a = (still ? 0.0 : timeMs * 0.00035) + decor.eaglePhase * math.pi * 2;
+    final x = cx + math.cos(a) * rx;
+    final y = cy + math.sin(a) * ry;
+    final heading = math.atan2(math.cos(a) * ry, -math.sin(a) * rx);
+    final s = math.max(4.0, w * 0.03);
+    final glide = 1 + (still ? 0.0 : 0.08 * math.sin(timeMs * 0.006));
+    final paint = Paint()..color = palette.bark.withValues(alpha: 0.85);
+    canvas.save();
+    canvas.translate(x, y);
+    canvas.rotate(heading);
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, -s * 1.6 * glide)
+        ..quadraticBezierTo(-s * 0.45, -s * 0.8, -s * 0.1, 0)
+        ..quadraticBezierTo(-s * 0.45, s * 0.8, 0, s * 1.6 * glide)
+        ..quadraticBezierTo(s * 0.25, s * 0.8, s * 0.15, 0)
+        ..quadraticBezierTo(s * 0.25, -s * 0.8, 0, -s * 1.6 * glide)
+        ..close(),
+      paint,
+    );
+    fillEllipse(canvas, Offset.zero, s * 0.55, s * 0.2, paint);
+    canvas.drawCircle(Offset(s * 0.6, 0), s * 0.14, paint);
+    canvas.restore();
+  }
+
   void _drawButterflies(Canvas canvas, TreeFrame frame) {
     final b = scene.bounds;
     final scale = frame.scale;
@@ -823,7 +1394,22 @@ mixin SceneLayers {
     if (animal == TreeAnimal.hert) {
       _drawDeer(canvas, Offset(frame.pivotX + decor.deer * scale, groundY), scale);
     }
+    if (animal == TreeAnimal.vos) {
+      _drawFox(canvas, Offset(frame.pivotX + decor.fox * scale, groundY), scale);
+    }
+    if (animal == TreeAnimal.ezel) {
+      _drawDonkey(canvas, Offset(frame.pivotX + decor.donkey * scale, groundY), scale);
+    }
+    if (animal == TreeAnimal.ooievaar) {
+      _drawStork(canvas, Offset(frame.pivotX + decor.stork * scale, groundY), scale);
+    }
+    if (animal == TreeAnimal.leeuw) {
+      _drawLion(canvas, Offset(frame.pivotX + decor.lion * scale, groundY), scale);
+    }
     if (animal == TreeAnimal.vlinders) _drawButterflies(canvas, frame);
+    if (animal == TreeAnimal.bijen) _drawBees(canvas, frame);
+    // The eagle needs a sky: it circles in the scene framing only.
+    if (animal == TreeAnimal.adelaar && framing == TreeFraming.scene) _drawEagle(canvas, frame);
 
     if (animal == TreeAnimal.vuurvliegjes && palette.night) {
       final b = scene.bounds;
