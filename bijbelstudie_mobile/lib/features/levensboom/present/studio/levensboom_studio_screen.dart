@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,7 @@ import '../tree_analytics.dart';
 import '../tree_view.dart';
 import 'groei_tab.dart';
 import 'studio_tiles.dart';
+import 'whole_growth_player.dart';
 
 /// `/profile/boom` - the studio.
 ///
@@ -202,7 +204,12 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
       slivers: [
         SliverPersistentHeader(
           pinned: true,
-          delegate: _StageHeader(tree: tree, draw: draw, disabled: tree.disabled),
+          delegate: _StageHeader(
+            tree: tree,
+            draw: draw,
+            disabled: tree.disabled,
+            textScale: MediaQuery.textScalerOf(context).scale(14) / 14,
+          ),
         ),
         SliverToBoxAdapter(child: _ProgressStrip(tree: tree)),
         if (tree.disabled)
@@ -236,7 +243,14 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
         if (kind == null)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-            sliver: GroeiTab(tree: tree),
+            // The player draws what the stage draws: its species and scene.
+            // Not while the tree is switched off - there is no tree to show.
+            sliver: GroeiTab(
+              tree: tree,
+              onWatchGrowth: tree.disabled
+                  ? null
+                  : () => showWholeGrowth(context, tree: tree, species: draw.species, scene: draw.scene),
+            ),
           )
         else ...[
           SliverToBoxAdapter(
@@ -266,17 +280,29 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
 /// The pinned stage: shrinks from a full scene to a strip as the grid scrolls
 /// under it, and the tree re-frames itself to whatever height it gets.
 class _StageHeader extends SliverPersistentHeaderDelegate {
-  _StageHeader({required this.tree, required this.draw, required this.disabled});
+  _StageHeader({
+    required this.tree,
+    required this.draw,
+    required this.disabled,
+    required this.textScale,
+  });
 
   final TreeState tree;
   final AvatarChoice draw;
   final bool disabled;
 
-  @override
-  double get maxExtent => 300;
+  /// The reader's text size: the pills on the stage grow with it.
+  final double textScale;
 
   @override
-  double get minExtent => 150;
+  double get maxExtent => math.max(300, minExtent);
+
+  /// Shrunk all the way, the stage still holds its pills without stacking
+  /// them on top of each other: the wilting pill at the top, the level and a
+  /// two-line growth pill at the bottom (82 px of padding and gaps, and
+  /// 70 px of pill text per unit of text size).
+  @override
+  double get minExtent => math.max(150, 82 + 70 * textScale);
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -318,33 +344,41 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
                   animal: draw.animal,
                   reducedMotion: tree.reducedMotion,
                 ),
+              // A Wrap, not a Row: "Eeuwenoude boom · 4 jaarringen" moves
+              // under the level on a narrow stage instead of being cut short.
               Positioned(
                 left: 12,
                 right: 12,
                 bottom: 10,
-                child: Row(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     _Pill(
                       text: 'Niveau ${tree.level}',
                       background: gold ? kGoldRing : AppTheme.teal,
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: _Pill(
-                        text: growthPill(tree.phase.name, tree.step),
-                        background: Colors.black.withValues(alpha: 0.45),
-                      ),
+                    _Pill(
+                      text: growthPill(tree.phase.name, tree.step),
+                      background: Colors.black.withValues(alpha: 0.45),
+                      maxLines: 2,
                     ),
                   ],
                 ),
               ),
+              // Bounded on both sides, so a long line ellipsizes on the stage
+              // instead of running off its left edge.
               if (tree.wilting)
                 Positioned(
+                  left: 12,
                   right: 12,
                   top: 10,
-                  child: _Pill(
-                    text: '${tree.daysSinceActive} ${tree.daysSinceActive == 1 ? 'dag' : 'dagen'} niet gelezen',
-                    background: Colors.black.withValues(alpha: 0.45),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _Pill(
+                      text: '${tree.daysSinceActive} ${tree.daysSinceActive == 1 ? 'dag' : 'dagen'} niet gelezen',
+                      background: Colors.black.withValues(alpha: 0.45),
+                    ),
                   ),
                 ),
             ],
@@ -356,14 +390,15 @@ class _StageHeader extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_StageHeader old) =>
-      old.tree != tree || old.draw != draw || old.disabled != disabled;
+      old.tree != tree || old.draw != draw || old.disabled != disabled || old.textScale != textScale;
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.background});
+  const _Pill({required this.text, required this.background, this.maxLines = 1});
 
   final String text;
   final Color background;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -372,11 +407,13 @@ class _Pill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+        // Not a 999 px pill radius: a pill that wraps onto a second line
+        // would turn into a lozenge.
+        borderRadius: BorderRadius.circular(maxLines > 1 ? AppTheme.radiusMd : AppTheme.radiusPill),
       ),
       child: Text(
         text,
-        maxLines: 1,
+        maxLines: maxLines,
         overflow: TextOverflow.ellipsis,
         style: AppTheme.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
       ),

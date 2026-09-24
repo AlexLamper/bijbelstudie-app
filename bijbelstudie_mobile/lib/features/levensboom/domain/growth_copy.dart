@@ -157,6 +157,52 @@ String? maturingNextLine(int step, [GrowthFloor? floor]) {
 }
 
 // ---------------------------------------------------------------------------
+// "Bekijk de hele groei": the studio's playback of steps 1 to 30
+// ---------------------------------------------------------------------------
+
+/// The playback's labels (the website's `WHOLE_GROWTH`). The step pill under
+/// the tree is [growthPill].
+class WholeGrowthCopy {
+  const WholeGrowthCopy._();
+
+  final String open = 'Bekijk de hele groei';
+  final String play = 'Afspelen';
+  final String pause = 'Pauzeer';
+  final String restart = 'Opnieuw';
+  final String toNow = 'Naar nu';
+  final String now = 'Nu';
+  final String close = 'Sluiten';
+}
+
+const WholeGrowthCopy wholeGrowth = WholeGrowthCopy._();
+
+/// "Zo groeit je eik". Inside the sentence the species is a common noun, so
+/// its first letter drops to lowercase - only the first, so a place name in it
+/// stays a name: "Zo groeit je ceder van de Libanon".
+String wholeGrowthTitle(String speciesName) {
+  final name = speciesName.trim();
+  if (name.isEmpty) return 'Zo groeit je ';
+  return 'Zo groeit je ${name[0].toLowerCase()}${name.substring(1)}';
+}
+
+/// The line under the playback's pill, for the step on screen against the
+/// tree's own step: "Behaald op niveau 7.", "Hier ben je nu." or "Stap 14
+/// bereik je op niveau 14.". The level is the one this account stands on that
+/// step at ([levelForStep]), so a head start reads as it happened: the steps
+/// it skipped were "Behaald op niveau 1.".
+///
+/// The future line names a step and a level in one sentence, which §9.1 keeps
+/// apart everywhere else. It is the owner's wording for this surface, and the
+/// website has it word for word.
+String wholeGrowthLine(int step, int currentStep, [GrowthFloor? floor]) {
+  final n = step < 1 ? 1 : step;
+  final now = currentStep < 1 ? 1 : currentStep;
+  if (n == now) return 'Hier ben je nu.';
+  final level = levelForStep(n, floor);
+  return n < now ? 'Behaald op niveau $level.' : 'Stap $n bereik je op niveau $level.';
+}
+
+// ---------------------------------------------------------------------------
 // The level-up card (§9.3)
 // ---------------------------------------------------------------------------
 

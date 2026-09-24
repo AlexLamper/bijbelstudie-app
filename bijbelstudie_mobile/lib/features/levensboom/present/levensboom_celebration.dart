@@ -153,11 +153,14 @@ class _CelebrationDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radiusLg + 8),
       ),
       clipBehavior: Clip.antiAlias,
+      // The tree keeps a fixed share of the card and the words under it
+      // scroll: a fruit line, three unlocks and large text on a 640 dp phone
+      // are taller than the screen, and the card used to overflow it.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 240,
+            height: math.min(240.0, MediaQuery.sizeOf(context).height * 0.34),
             width: double.infinity,
             child: ClipRect(
               // The reader's own tree growing from where it stood to where it
@@ -188,98 +191,108 @@ class _CelebrationDialog extends StatelessWidget {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
-            child: Column(
-              children: [
-                Text(
-                  copy.title,
-                  textAlign: TextAlign.center,
-                  style: AppTheme.displayMedium.copyWith(color: Colors.white),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  copy.subtitle,
-                  textAlign: TextAlign.center,
-                  style: AppTheme.bodyStrong.copyWith(
-                    color: const Color(0xFF8FD694),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (copy.line != null) ...[
-                  const SizedBox(height: 10),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+              child: Column(
+                children: [
                   Text(
-                    copy.line!,
+                    copy.title,
                     textAlign: TextAlign.center,
-                    style: AppTheme.bodyMuted.copyWith(color: Colors.white70),
+                    style: AppTheme.displayMedium.copyWith(color: Colors.white),
                   ),
-                ],
-                if (unlocked.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  const SizedBox(height: 8),
+                  Text(
+                    copy.subtitle,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.bodyStrong.copyWith(
+                      color: const Color(0xFF8FD694),
+                      fontWeight: FontWeight.w700,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'NIEUW VOOR JE BOOM',
-                          style: AppTheme.caption.copyWith(
-                            color: Colors.white54,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
-                            fontSize: 10.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        for (final item in unlocked)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: AppTheme.bodyStrong.copyWith(color: Colors.white),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    item.blurb,
-                                    textAlign: TextAlign.end,
-                                    style: AppTheme.caption.copyWith(color: Colors.white60),
-                                  ),
-                                ),
-                              ],
+                  ),
+                  if (copy.line != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      copy.line!,
+                      textAlign: TextAlign.center,
+                      style: AppTheme.bodyMuted.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                  if (unlocked.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NIEUW VOOR JE BOOM',
+                            style: AppTheme.caption.copyWith(
+                              color: Colors.white54,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                              fontSize: 10.5,
                             ),
                           ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 32),
-                            foregroundColor: const Color(0xFF8FD694),
+                          const SizedBox(height: 6),
+                          for (final item in unlocked)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              // The name gets at most 60 % of the row, so at
+                              // large text a long one wraps instead of pushing
+                              // the row past the card.
+                              child: LayoutBuilder(
+                                builder: (context, box) => Row(
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(maxWidth: box.maxWidth * 0.6),
+                                      child: Text(
+                                        item.name,
+                                        style: AppTheme.bodyStrong.copyWith(color: Colors.white),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        item.blurb,
+                                        textAlign: TextAlign.end,
+                                        style: AppTheme.caption.copyWith(color: Colors.white60),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 32),
+                              foregroundColor: const Color(0xFF8FD694),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              context.push('/profile/boom');
+                            },
+                            child: const Text('Bekijk je voortgang →'),
                           ),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            context.push('/profile/boom');
-                          },
-                          child: const Text('Bekijk je voortgang →'),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ],
+                  const SizedBox(height: 22),
+                  SiteButton(
+                    label: 'Verder',
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
-                const SizedBox(height: 22),
-                SiteButton(
-                  label: 'Verder',
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
+              ),
             ),
           ),
         ],

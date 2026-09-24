@@ -452,6 +452,14 @@ class TreePainter extends CustomPainter with SceneLayers {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The scene is designed larger than any box it lands in - the rainbow's
+    // bow runs on a centre below the horizon and wider than a tile, animals
+    // and a big crown can reach past the frame - and a CustomPaint does not
+    // clip. Without this the bow painted into a studio tile's caption and
+    // over its border. One rect clip, so every surface stays in its box.
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+
     final frame = measureTreeFrame(size, scene, framing, animal, decor);
     paintSky(canvas, frame);
     paintGround(canvas, frame);
@@ -472,6 +480,7 @@ class TreePainter extends CustomPainter with SceneLayers {
     canvas.restore();
 
     paintForeground(canvas, frame);
+    canvas.restore();
   }
 
 

@@ -90,6 +90,9 @@ class VerseScenePainter extends CustomPainter with SceneLayers {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Same as TreePainter: the backdrops (the rainbow's bow above all) are
+    // drawn larger than the box, and a CustomPaint does not clip.
+    canvas.clipRect(Offset.zero & size);
     final frame = measureTreeFrame(size, scene, framing, animal, decor);
     paintSky(canvas, frame);
     paintClouds(

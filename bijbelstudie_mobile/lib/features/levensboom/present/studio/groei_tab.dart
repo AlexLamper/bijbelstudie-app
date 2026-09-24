@@ -29,9 +29,12 @@ import 'groei_thumbnails.dart';
 /// the current row at the reader's own position, and the level at which the
 /// account stands on that step for traits and fruit - as the website's ladder.
 class GroeiTab extends ConsumerStatefulWidget {
-  const GroeiTab({super.key, required this.tree});
+  const GroeiTab({super.key, required this.tree, this.onWatchGrowth});
 
   final TreeState tree;
+
+  /// Opens the growth player ("Bekijk de hele groei"); no button without it.
+  final VoidCallback? onWatchGrowth;
 
   @override
   ConsumerState<GroeiTab> createState() => _GroeiTabState();
@@ -54,7 +57,7 @@ class _GroeiTabState extends ConsumerState<GroeiTab> {
     final floor = tree.floor;
     final step = tree.step;
     final items = <WidgetBuilder>[
-      (_) => _Header(tree: tree),
+      (_) => _Header(tree: tree, onWatchGrowth: widget.onWatchGrowth),
       (_) => _XpDetails(tree: tree),
       for (var p = 0; p < kStages.length; p++) ...[
         (_) => _PhaseHeader(
@@ -83,13 +86,15 @@ class _GroeiTabState extends ConsumerState<GroeiTab> {
 /// account with a head start - the one line that explains why the step runs
 /// ahead of the level.
 class _Header extends StatelessWidget {
-  const _Header({required this.tree});
+  const _Header({required this.tree, this.onWatchGrowth});
 
   final TreeState tree;
+  final VoidCallback? onWatchGrowth;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    final watch = onWatchGrowth;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -107,6 +112,22 @@ class _Header extends StatelessWidget {
         if (showsFlooredExplainer(tree.floor, tree.step)) ...[
           const SizedBox(height: 10),
           Text(flooredExplainer, style: AppTheme.caption.copyWith(color: AppTheme.inkMuted)),
+        ],
+        if (watch != null) ...[
+          const SizedBox(height: 14),
+          // Not a SiteOutlineButton: its label cannot wrap, and at large text
+          // on a narrow phone this one would run off the screen.
+          OutlinedButton(
+            onPressed: watch,
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll<Size>(Size(0, 44)),
+              padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
+                EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(wholeGrowth.open, textAlign: TextAlign.center),
+          ),
         ],
         const SizedBox(height: 16),
       ],
@@ -266,9 +287,14 @@ class _StepRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
+                // A Wrap, not a Row: on a narrow phone or with large text
+                // "Niveau 20" moves under "Stap 20" as a whole instead of
+                // running out of the row (it used to overflow into the
+                // status). Bottom-aligned, which with one line height for
+                // both sizes keeps the baselines within a pixel.
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.end,
                   children: [
                     Text(
                       ladderStep(n),
@@ -277,13 +303,11 @@ class _StepRow extends StatelessWidget {
                       ),
                     ),
                     // Ahead, the status already names the level.
-                    if (!ahead) ...[
-                      const SizedBox(width: 8),
+                    if (!ahead)
                       Text(
                         ladderLevel(level),
                         style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
                       ),
-                    ],
                   ],
                 ),
                 if (arrivals.isNotEmpty) ...[
