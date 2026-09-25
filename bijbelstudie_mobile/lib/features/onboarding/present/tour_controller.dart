@@ -71,14 +71,17 @@ class TourAnchorIds {
 /// The walkthrough, kept deliberately short.
 ///
 /// It used to be ten steps that marched the reader through every pane of the
-/// study screen, each with a paragraph of copy. People did not finish it. The
-/// list below is one step per place worth knowing about - Start, Bijbel,
-/// Studies, Notities/Profiel, and the Pro pitch for a free account - so the
-/// whole thing is five taps for a free reader and four for a subscriber.
+/// study screen, each with a paragraph of copy. People did not finish it. It
+/// then went to one step per tab, which was too thin: the reader got a single
+/// step pointing at its own tab icon, and the verse long-press - where most of
+/// the app's tools live - was one clause in a paragraph. The list below gives
+/// the reader three steps, each on the control it describes, and keeps one
+/// step for every other place worth knowing about: seven taps for a free
+/// reader, six for a subscriber.
 ///
-/// Every step anchors on the bottom tab bar or on the Start hero, both of
-/// which are present the moment the route lands, so no step can stall hunting
-/// for a widget deep inside a screen that is still loading.
+/// Every anchor is present the moment its route lands - the reader's text
+/// anchor wraps its loading skeleton too - so no step can stall hunting for a
+/// widget deep inside a screen that is still loading.
 const List<TourStep> _allSteps = [
   TourStep(
     anchorId: TourAnchorIds.dashboardHero,
@@ -89,14 +92,34 @@ const List<TourStep> _allSteps = [
         'verder te lezen.',
   ),
   TourStep(
-    anchorId: TourAnchorIds.navStudy,
+    anchorId: TourAnchorIds.readerText,
     route: '/study',
     showMaterials: false,
-    title: 'Bijbel lezen',
+    title: 'Houd een vers ingedrukt',
     description:
-        'Hier lees je de bijbeltekst. Houd een vers ingedrukt om te markeren '
-        'of er een notitie bij te schrijven, en wissel bovenin naar '
-        'commentaar en grondtekst.',
+        'Dan kun je het markeren, er een notitie of bladwijzer bij zetten, '
+        'kruisverwijzingen zien of het commentaar en de grondtekst bij dat '
+        'vers openen. Delen en kopiëren kan ook.',
+  ),
+  TourStep(
+    anchorId: TourAnchorIds.readerBar,
+    route: '/study',
+    showMaterials: false,
+    title: 'Vertaling en weergave',
+    description:
+        'Tik op de vertaling om te wisselen. Met het vergrootglas zoek je in '
+        'de hele Bijbel, en onder Aa stel je lettergrootte en weergave in.',
+  ),
+  TourStep(
+    anchorId: TourAnchorIds.studyPaneSwitcher,
+    route: '/study',
+    showMaterials: true,
+    materialsTab: 0,
+    title: 'Bijbel en Studie',
+    description:
+        'Tik op de titel om een ander boek of hoofdstuk te kiezen. Onder '
+        'Studie vind je commentaar, grondtekst, achtergrond en de assistent '
+        'bij het hoofdstuk dat je leest.',
   ),
   TourStep(
     anchorId: TourAnchorIds.navStudies,

@@ -213,6 +213,9 @@ class _TourOverlayState extends ConsumerState<_TourOverlay> {
   /// Closes the tour and puts the reader on the screen worth starting from.
   void _endTour() {
     ref.read(tourControllerProvider.notifier).finish();
+    // The Bijbel en Studie step leaves `/study` on its materials pane; the
+    // next tap on the Bijbel tab should open on the text, not on that.
+    ref.read(studyPaneProvider.notifier).showReader();
     final router = ref.read(routerProvider);
     if (router.state.uri.path != _tourExitRoute) router.go(_tourExitRoute);
   }

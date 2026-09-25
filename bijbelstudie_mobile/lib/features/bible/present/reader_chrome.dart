@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../onboarding/present/tour_controller.dart';
+
 /// Whether the app chrome around the reader - its own top bar and the shell's
 /// bottom tab bar - is currently shown.
 ///
@@ -13,10 +15,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// value outside `/read`, so no other screen can ever be stranded without a
 /// tab bar even if a reset were missed.
 class ReaderChromeVisibility extends Notifier<bool> {
+  /// The guided tour points at the reader's top bar and at the tab bar, so the
+  /// chrome is pinned while it runs. Opening a chapter restores the saved
+  /// scroll offset with a jump the reader reads as scrolling down, which used
+  /// to slide both bars away and leave the tour spotlighting empty space.
+  /// Watching the tour also resets the chrome to shown when it starts or ends.
   @override
-  bool build() => true;
+  bool build() {
+    ref.watch(tourControllerProvider.select((tour) => tour.active));
+    return true;
+  }
 
   void setVisible(bool visible) {
+    if (!visible && ref.read(tourControllerProvider).active) return;
     if (state != visible) state = visible;
   }
 
