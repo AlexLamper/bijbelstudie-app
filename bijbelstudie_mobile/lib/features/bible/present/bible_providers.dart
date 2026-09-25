@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/preview_config.dart';
+import '../../../core/data/bible_books.dart';
 import '../../../core/db/content_cache.dart';
 import '../../commentary/data/commentary_repository.dart';
 import '../../dashboard/data/dashboard_models.dart';
@@ -200,12 +201,12 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
     _pinned = false;
     unawaited(_hydrate());
 
-    // Genesis 1, but `restored: false`: a placeholder to satisfy the type, not
-    // an answer. It is only ever painted once [_hydrate] has confirmed that
+    // The start chapter, but `restored: false`: a placeholder to satisfy the
+    // type, not an answer. It is only ever painted once [_hydrate] has confirmed that
     // this reader has genuinely never opened a chapter.
     return const ReaderLocation(
       versionId: 'statenvertaling',
-      book: 'Genesis',
+      book: BibleBooks.startBook,
       chapter: 1,
     );
   }
@@ -227,7 +228,7 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
     try {
       await settings.loaded.timeout(_budget);
     } catch (_) {
-      // No preferences to be had; the server copy or Genesis 1 answers instead.
+      // No preferences to be had; the server copy or the start chapter answers instead.
     }
     final remote = await remoteFuture;
 
@@ -257,7 +258,7 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
 
     state = ReaderLocation(
       versionId: local.lastVersionId,
-      book: localBook ?? 'Genesis',
+      book: localBook ?? BibleBooks.startBook,
       chapter: localChapter ?? 1,
       restored: true,
     );

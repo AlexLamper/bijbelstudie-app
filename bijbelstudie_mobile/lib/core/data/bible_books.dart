@@ -32,6 +32,12 @@ class BibleBooks {
 
   static List<String> get all => [...oldTestament, ...newTestament];
 
+  /// Where a reader who has never opened a chapter starts: Johannes 1, not
+  /// Genesis 1. Reading guides steer beginners to a gospel first, and Johannes
+  /// opens with "In den beginne". Mirrors `START_BOOK` in `lib/book-mapping.ts`
+  /// on www.bijbelstudie.io.
+  static const String startBook = 'Johannes';
+
   static const Map<String, int> chapterCounts = {
     'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numeri': 36,
     'Deuteronomium': 34, 'Jozua': 24, 'Richteren': 21, 'Ruth': 4,
