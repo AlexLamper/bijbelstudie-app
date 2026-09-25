@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../notes/domain/note_models.dart';
+import '../../notes/present/note_row.dart' show ReflectionNoteBody;
 import '../../notes/present/notes_providers.dart';
 import '../../study/domain/chapter_study_models.dart';
 import '../../study/domain/lesson_models.dart';
@@ -738,14 +739,18 @@ class _Notes extends ConsumerWidget {
                   '${note.book} ${note.chapter}${note.verse == null ? '' : ':${note.verse}'}',
                   style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  note.noteText,
-                  style: AppTheme.bodyMuted.copyWith(
-                    height: 1.6,
-                    color: AppTheme.ink,
+                if (note.isStudyReflection)
+                  ReflectionNoteBody(note: note)
+                else ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    note.noteText,
+                    style: AppTheme.bodyMuted.copyWith(
+                      height: 1.6,
+                      color: AppTheme.ink,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

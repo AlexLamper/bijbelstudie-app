@@ -51,14 +51,16 @@ class NoteRow extends ConsumerWidget {
                 ? note.color.fill(Theme.of(context).brightness)
                 : null,
           ),
-          if (note.noteText.trim().isNotEmpty) ...[
+          if (note.isStudyReflection)
+            ReflectionNoteBody(note: note)
+          else if (note.noteText.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               note.noteText,
               style: AppTheme.bodyMuted.copyWith(height: 1.6, color: AppTheme.ink),
             ),
           ],
-          if (note.verseText.trim().isNotEmpty) ...[
+          if (!note.isStudyReflection && note.verseText.trim().isNotEmpty) ...[
             const SizedBox(height: 9),
             IntrinsicHeight(
               child: Row(
@@ -86,8 +88,13 @@ class NoteRow extends ConsumerWidget {
 
     if (picked == NoteRowAction.share) {
       final text = [
-        note.verseText.trim(),
-        note.noteText.trim(),
+        if (note.isStudyReflection) ...[
+          note.reflectionParts.question,
+          note.reflectionParts.answer,
+        ] else ...[
+          note.verseText.trim(),
+          note.noteText.trim(),
+        ],
         note.reference,
       ].where((part) => part.isNotEmpty).join('\n\n');
       await shareRowText(context, text: text, subject: note.reference);
@@ -140,6 +147,57 @@ class NoteRow extends ConsumerWidget {
         messenger.showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
+  }
+}
+
+/// A note from a study lesson's reflection step: a small mark that says where
+/// it came from, the lesson's question, and the reader's answer right under it.
+///
+/// No scripture. The server copies the whole lesson passage into these - for
+/// a chapter study, the entire chapter - which buried a two-line answer under
+/// a wall of text. The reference on the meta line above is all the row needs,
+/// and a tap on the Notities screen opens that chapter anyway.
+class ReflectionNoteBody extends StatelessWidget {
+  const ReflectionNoteBody({super.key, required this.note});
+
+  final StudyNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final (:question, :answer) = note.reflectionParts;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(Icons.auto_stories_outlined, size: 13, color: AppTheme.teal),
+            const SizedBox(width: 5),
+            Text(
+              'Reflectie uit je studie',
+              style: AppTheme.caption.copyWith(fontSize: 12, color: AppTheme.teal),
+            ),
+          ],
+        ),
+        if (question.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            question,
+            style: AppTheme.bodyMuted.copyWith(
+              fontSize: 13.5,
+              height: 1.45,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+        if (answer.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(answer, style: AppTheme.bodyMuted.copyWith(height: 1.5, color: AppTheme.ink)),
+        ],
+      ],
+    );
   }
 }
 

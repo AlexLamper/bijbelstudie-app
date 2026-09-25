@@ -803,13 +803,13 @@ class OriginalTextPane extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final verse in original.verses)
-                    _OriginalVerseBlock(verse: verse),
+                    OriginalVerseBlock(verse: verse),
                 ],
               ),
             )
           else
             for (final verse in original.verses)
-              _OriginalVerseBlock(verse: verse),
+              OriginalVerseBlock(verse: verse),
           if (original.locked) const _OriginalTextPaywall(),
           const SizedBox(height: 20),
           const RuleLine(),
@@ -824,8 +824,8 @@ class OriginalTextPane extends ConsumerWidget {
   }
 }
 
-class _OriginalVerseBlock extends StatelessWidget {
-  const _OriginalVerseBlock({required this.verse});
+class OriginalVerseBlock extends StatelessWidget {
+  const OriginalVerseBlock({super.key, required this.verse});
 
   final OriginalVerse verse;
 

@@ -95,6 +95,33 @@ class StudyNote {
     return end != null && end > verse! ? '$book $chapter:$verse-$end' : '$book $chapter:$verse';
   }
 
+  /// A note the server wrote from a study lesson's reflection step
+  /// (`promoteReflectionToNote` in the website repo), rather than one the
+  /// reader made themselves. Those are always tagged `studie` plus the study's
+  /// id; the id, a Mongo ObjectId, is what sets them apart from a note the
+  /// reader happened to tag `studie` on their own.
+  bool get isStudyReflection =>
+      !isHighlight && tags.contains('studie') && tags.any(_objectId.hasMatch);
+
+  static final _objectId = RegExp(r'^[0-9a-f]{24}$');
+
+  /// A reflection note split into the lesson's question and what the reader
+  /// wrote and ticked under it.
+  ///
+  /// The server joins those with blank lines, and a reflection with nothing
+  /// written comes out with three in a row between the question and "Deze
+  /// week:". Blank lines are dropped here so the answer sits right under the
+  /// question it answers.
+  ({String question, String answer}) get reflectionParts {
+    final lines = noteText
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (lines.isEmpty) return (question: '', answer: '');
+    return (question: lines.first, answer: lines.skip(1).join('\n'));
+  }
+
   /// A copy under a fresh id. Needed to restore a deleted note: the server
   /// keeps a tombstone for the old id and refuses to resurrect it (409).
   StudyNote withNewId(String id) => StudyNote(

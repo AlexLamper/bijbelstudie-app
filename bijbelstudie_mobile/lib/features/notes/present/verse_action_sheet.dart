@@ -9,6 +9,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../commentary/present/commentary_jump.dart';
+import '../../commentary/present/original_verse_sheet.dart';
 import '../../crossrefs/present/crossref_providers.dart';
 import '../../crossrefs/present/crossref_sheet.dart';
 import '../../study/present/study_pane_controller.dart';
@@ -18,9 +19,10 @@ import 'notes_providers.dart';
 
 /// What the sheet was dismissed with. Only the note needs one: everything else
 /// the sheet offers is done before it closes.
-enum _VerseSheetResult { note, commentary, crossRefs }
+enum _VerseSheetResult { note, commentary, original, crossRefs }
 
-/// Long-press on a verse: highlight, commentary, note, bookmark, share, copy.
+/// Long-press on a verse: highlight, commentary, grondtekst, note, bookmark,
+/// cross-references, share, copy.
 ///
 /// The note editor is opened by *this* function, after the sheet has closed,
 /// rather than by the sheet itself. The sheet used to pop and then immediately
@@ -44,7 +46,7 @@ Future<void> showVerseActionSheet({
 }) async {
   final result = await showModalBottomSheet<_VerseSheetResult>(
     context: context,
-    // Six rows under a four-line verse are taller than the default 9/16 cap
+    // Seven rows under a four-line verse are taller than the default 9/16 cap
     // on a small phone; the sheet sizes to its content and scrolls instead.
     isScrollControlled: true,
     useSafeArea: true,
@@ -60,6 +62,12 @@ Future<void> showVerseActionSheet({
 
   if (result == _VerseSheetResult.commentary) {
     if (context.mounted) onOpenCommentary?.call();
+    return;
+  }
+  if (result == _VerseSheetResult.original) {
+    if (context.mounted) {
+      await showOriginalVerseSheet(context: context, chapter: chapter, verse: verse);
+    }
     return;
   }
   if (result == _VerseSheetResult.crossRefs) {
@@ -385,6 +393,13 @@ class _VerseActionSheet extends ConsumerWidget {
                   ),
                 ),
                 RuleListTile(
+                  onTap: () => _openOriginal(context),
+                  child: _ActionRow(
+                    icon: Icons.translate,
+                    label: 'Grondtekst bij vers ${verse.number}',
+                  ),
+                ),
+                RuleListTile(
                   onTap: () => _addNote(context),
                   child: const _ActionRow(
                     icon: Icons.edit_note,
@@ -497,6 +512,11 @@ class _VerseActionSheet extends ConsumerWidget {
   /// editor here — see the note on that function for why.
   void _addNote(BuildContext context) {
     Navigator.of(context).pop(_VerseSheetResult.note);
+  }
+
+  /// Same hand-back as the note: the grondtekst sheet outlives this one.
+  void _openOriginal(BuildContext context) {
+    Navigator.of(context).pop(_VerseSheetResult.original);
   }
 
   /// Same hand-back as the note: the cross-reference sheet outlives this one.

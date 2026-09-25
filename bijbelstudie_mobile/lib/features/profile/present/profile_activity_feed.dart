@@ -281,8 +281,13 @@ class _VerseBody extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final swatch = note.color.swatch;
     final fill = note.color.fill(brightness);
-    final verse = note.verseText.trim();
-    final body = note.noteText.trim();
+    // A study reflection carries its whole lesson passage - a chapter, for a
+    // chapter study - so it shows as the question and answer alone.
+    final reflection = note.isStudyReflection ? note.reflectionParts : null;
+    final verse = reflection != null ? '' : note.verseText.trim();
+    final body = reflection != null
+        ? '${reflection.question}\n${reflection.answer}'.trim()
+        : note.noteText.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,8 +477,13 @@ class _OverflowMenu extends ConsumerWidget {
             context.go('/read');
           case 'share':
             final parts = [
-              note!.verseText.trim(),
-              note.noteText.trim(),
+              if (note!.isStudyReflection) ...[
+                note.reflectionParts.question,
+                note.reflectionParts.answer,
+              ] else ...[
+                note.verseText.trim(),
+                note.noteText.trim(),
+              ],
               note.reference,
             ].where((part) => part.isNotEmpty);
             Share.share(parts.join('\n\n'), subject: note.reference);
