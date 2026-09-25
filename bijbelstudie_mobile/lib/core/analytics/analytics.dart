@@ -44,9 +44,6 @@ class AnalyticsEvents {
 
   /// No props.
   static const treeStudioOpened = 'tree_studio_opened';
-
-  /// `action`: `open` (Bekijk je groei) or `close` (Sluiten).
-  static const treeAnnouncementSeen = 'tree_announcement_seen';
 }
 
 /// Fire-and-forget funnel tracking for the mobile app.

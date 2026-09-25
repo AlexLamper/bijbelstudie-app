@@ -113,7 +113,6 @@ class TreeState {
     this.introSeen = false,
     this.publicProfile = false,
     this.seenItems = const {},
-    this.announceGrowth = false,
     GrowthInfo? growth,
   }) : _growth = growth;
 
@@ -156,11 +155,6 @@ class TreeState {
   final bool introSeen;
   final bool publicProfile;
   final Set<String> seenItems;
-
-  /// The server's `levensboom.announceGrowth`: this account existed before
-  /// growth v2 and may get the one-time card. Whether it was already dismissed
-  /// is `seenItems` (`growth-v2`), not this flag.
-  final bool announceGrowth;
 
   /// The growth block as served (or as recomputed after a grant); null when the
   /// server predates it, and then [growth] computes it locally.
@@ -310,7 +304,6 @@ class TreeState {
     bool? introSeen,
     bool? publicProfile,
     Set<String>? seenItems,
-    bool? announceGrowth,
     GrowthInfo? growth,
   }) {
     final moved = level != null || xpIntoLevel != null || xpForNextLevel != null;
@@ -344,7 +337,6 @@ class TreeState {
       introSeen: introSeen ?? this.introSeen,
       publicProfile: publicProfile ?? this.publicProfile,
       seenItems: seenItems ?? this.seenItems,
-      announceGrowth: announceGrowth ?? this.announceGrowth,
       // Moving the XP without a new block recomputes it with the kept floor;
       // a state that never had a served block keeps computing it lazily.
       growth: growth ??
@@ -420,7 +412,6 @@ class TreeState {
       introSeen: tree['introSeen'] == true,
       publicProfile: tree['publicProfile'] == true,
       seenItems: (tree['seenItems'] as List?)?.whereType<String>().toSet() ?? const {},
-      announceGrowth: tree['announceGrowth'] == true,
       // Only a served block is kept; without one [growth] computes it locally.
       growth: tree['growth'] is Map
           ? GrowthInfo.fromJson(
@@ -467,7 +458,6 @@ class TreeState {
       'introSeen': introSeen,
       'publicProfile': publicProfile,
       'seenItems': seenItems.toList(),
-      'announceGrowth': announceGrowth,
       'growth': growth.toJson(),
     },
   };

@@ -352,28 +352,3 @@ LevelUpCopy levelUpCopy({required int level, int? fromLevel, GrowthFloor? floor}
 
   return copy(LevelUpCase.newStep, 'Je boom is gegroeid', stepLabel, extra ?? 'Er is nieuw hout bijgekomen.');
 }
-
-// ---------------------------------------------------------------------------
-// The one-time announcement (§9.6)
-// ---------------------------------------------------------------------------
-
-/// The `seenItems` key that records the card was dismissed.
-const String growthAnnouncementKey = 'growth-v2';
-
-const String growthAnnouncementTitle = 'Je boom groeit nu in twintig stappen';
-
-const String growthAnnouncementBody =
-    'Vanaf vandaag groeit je boom langzamer en in meer stappen, met elke les en elk '
-    'hoofdstuk een stukje. Hij blijft minstens zo groot als hij was. Bij stap 20 is hij '
-    'volgroeid; daarna komt er met elk niveau een jaarring bij.';
-
-const String growthAnnouncementOpen = 'Bekijk je groei';
-const String growthAnnouncementClose = 'Sluiten';
-
-/// Only accounts from before the launch get the card (the server decides,
-/// `announceGrowth`), once, and never while the tree is switched off.
-bool showsGrowthAnnouncement({
-  required bool announceGrowth,
-  required Set<String> seenItems,
-  bool disabled = false,
-}) => announceGrowth && !disabled && !seenItems.contains(growthAnnouncementKey);
