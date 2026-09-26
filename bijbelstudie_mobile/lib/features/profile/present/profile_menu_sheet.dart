@@ -101,6 +101,11 @@ Future<void> showProfileMenuSheet(
                     onTap: () => go(() => context.go('/resources')),
                   ),
                   _MenuRow(
+                    icon: Icons.menu_book_outlined,
+                    label: 'Bronnen',
+                    onTap: () => go(() => context.go('/bronnen')),
+                  ),
+                  _MenuRow(
                     icon: Icons.search,
                     label: 'Zoeken',
                     onTap: () => go(() => context.push('/search')),

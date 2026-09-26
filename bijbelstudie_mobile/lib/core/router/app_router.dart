@@ -24,6 +24,9 @@ import '../../features/auth/present/login_screen.dart';
 import '../../features/auth/present/register_screen.dart';
 import '../../features/bible/present/read_screen.dart';
 import '../../features/bible/present/reader_chrome.dart';
+import '../../features/bronnen/present/bronnen_screen.dart';
+import '../../features/bronnen/present/section_reader_screen.dart';
+import '../../features/bronnen/present/work_screen.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
 import '../../features/levensboom/present/levensboom_tab_icon.dart';
@@ -172,6 +175,7 @@ class MainScaffold extends ConsumerWidget {
     // Sections without their own tab still highlight where they belong.
     if (location.startsWith('/read') || location.startsWith('/commentary')) return 1;
     if (location.startsWith('/resources')) return 0;
+    if (location.startsWith('/bronnen')) return 0;
     if (location.startsWith('/search')) return 1;
     return 0;
   }
@@ -346,6 +350,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           // Reachable from the dashboard and Profiel rather than the tab bar.
           GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
+          // Bronnen: belijdenis, catechismus en formulieren, read in the app.
+          // Reached from the Profiel menu. A work and its reader sit outside
+          // the shell (below) with a back arrow.
+          GoRoute(path: '/bronnen', builder: (context, state) => const BronnenScreen()),
           // Groepen is out for the MVP. The route stays as a redirect so any
           // persisted route or old deep link resolves instead of hitting the
           // not-found page.
@@ -364,6 +372,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/groups/:id', redirect: (context, state) => '/dashboard'),
+      // One Bronnen work, then its reader: full screen like a lesson, a
+      // sitting with a back arrow rather than a tab bar. Slugs and section ids
+      // are stable on the server (they are cache keys too).
+      GoRoute(
+        path: '/bronnen/:slug',
+        builder: (context, state) => BronWorkScreen(slug: state.pathParameters['slug']!),
+      ),
+      GoRoute(
+        path: '/bronnen/:slug/:sectionId',
+        builder: (context, state) => BronSectionReaderScreen(
+          slug: state.pathParameters['slug']!,
+          sectionId: state.pathParameters['sectionId']!,
+        ),
+      ),
       // Outside the shell: a study is configured and then left for the reader,
       // so it gets a back arrow rather than a tab bar.
       // Before `/studies/:id`, or go_router matches "boeken" as a study id.
