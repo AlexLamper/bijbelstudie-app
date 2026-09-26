@@ -806,11 +806,16 @@ class _PhotoAction extends StatelessWidget {
 ///
 /// Behaves like a [_PhotoAction] otherwise — same size, splash and tooltip —
 /// but on the transition to liked it plays a one-shot scale overshoot, swaps
-/// the outline heart for the filled one, fades the colour to [AppTheme.flame]
+/// the outline heart for the filled one, fades the colour to [_heartRed]
 /// and sends a single accent ring outward. Unliking just settles the colour
 /// and fill back without the ring. When the platform asks for reduced motion
 /// ([MediaQuery.disableAnimationsOf]) every part of this collapses to an
 /// instant state change.
+/// The liked heart: `#DC2626`, red-600, the same red as the web card's heart.
+/// Its own colour rather than [AppTheme.flame], which is the streak's orange;
+/// the heart sits on the photo, so one value reads in light and dark alike.
+const Color _heartRed = Color(0xFFDC2626);
+
 class _AnimatedHeartButton extends StatefulWidget {
   const _AnimatedHeartButton({required this.liked, required this.onPressed});
 
@@ -903,7 +908,7 @@ class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
           builder: (context, t, _) => Icon(
             t > 0.5 ? Icons.favorite : Icons.favorite_border,
             size: 22,
-            color: Color.lerp(Colors.white, AppTheme.flame, t),
+            color: Color.lerp(Colors.white, _heartRed, t),
           ),
         ),
       ),
@@ -922,7 +927,7 @@ class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
           height: 22 + eased * 26,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.flame, width: 2),
+            border: Border.all(color: _heartRed, width: 2),
           ),
         ),
       ),
