@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/referral_repository.dart';
 
@@ -109,6 +110,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final overview = widget.overview;
+    // Pro members (paying, trial, comp) give the week; no sales pitch to them.
+    final isPro = ref.watch(hasProProvider);
 
     return AppCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -116,8 +119,9 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Maakt een vriend via jouw link een account, dan krijgt die meteen '
-            'een week Pro.'
+            '${isPro ? 'Geef een vriend een week Pro cadeau. Maakt die via jouw '
+                'link een account, dan gaat de week meteen in.' : 'Maakt een vriend '
+                'via jouw link een account, dan krijgt die meteen een week Pro.'}'
             '${overview.youEarn ? ' Gaat je vriend echt aan de slag, dan krijg '
                 'jij er ook een week bij.' : ''}',
             style: AppTheme.bodyMuted,
