@@ -9,6 +9,11 @@ import '../../../core/config/google_sign_in_config.dart';
 import '../data/auth_repository.dart';
 import '../../../core/data/payload_cache.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/notifications/notification_schedule.dart';
+import '../../../core/notifications/notification_scheduler.dart'
+    show notificationReschedulerProvider;
+import '../../../core/notifications/notification_service.dart';
+import '../../../core/notifications/retention_store.dart';
 import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
 import '../../levensboom/data/levensboom_repository.dart';
@@ -125,6 +130,29 @@ class AuthController extends AsyncNotifier<User?> {
     // reports Pro - it must describe this account, not the previous one.
     ref.invalidate(premiumControllerProvider);
     unawaited(_flushPendingAfterSignIn());
+    // The notifications are this account's now: arm them from its own
+    // plan and studies (a sign-out cancelled the previous reader's).
+    try {
+      ref.read(notificationReschedulerProvider).requestReschedule();
+    } catch (_) {}
+  }
+
+  /// Local notifications are per account: every armed one carries the
+  /// previous reader's plan, study or streak, and the cached schedule holds
+  /// their words. Both go with the session. The retention ledger itself
+  /// (streak mirror, celebrated milestones) stays - it is what keeps a
+  /// returning reader from being congratulated twice - but its armed tags
+  /// are dropped, since their one-shots were just cancelled. Never throws.
+  Future<void> _clearDeviceNotifications() async {
+    try {
+      await ref.read(notificationServiceProvider).cancelAllManaged();
+    } catch (_) {}
+    await NotificationScheduleRepository.clearCache();
+    try {
+      await ref
+          .read(retentionStoreProvider.notifier)
+          .replaceArmed(const [], now: DateTime.now());
+    } catch (_) {}
   }
 
   /// Restore a persisted session on app launch.
@@ -405,6 +433,7 @@ class AuthController extends AsyncNotifier<User?> {
   void signOutExpiredSession() {
     if (state.value == null) return; // already signed out
     state = const AsyncValue.data(null);
+    unawaited(_clearDeviceNotifications());
   }
 
   Future<void> logout() async {
@@ -414,6 +443,7 @@ class AuthController extends AsyncNotifier<User?> {
     // Per-account state that lives on the device goes with the session.
     await LevensboomRepository.clearCache();
     await PayloadCache.clearAll();
+    await _clearDeviceNotifications();
 
     if (GoogleSignInConfig.isAvailable) {
       // Never fatal: a user who cannot sign out is far worse than a Google

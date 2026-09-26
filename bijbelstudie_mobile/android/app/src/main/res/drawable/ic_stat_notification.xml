@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for local notifications. Android draws the small icon from
+     its alpha channel only, so it must be a single white glyph on transparent:
+     the full-colour launcher icon rendered as a grey blob. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.5,2h3v5.5h5.5v3h-5.5V22h-3V10.5H5v-3h5.5z" />
+</vector>

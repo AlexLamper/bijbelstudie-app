@@ -181,10 +181,10 @@ String _fmtMinutes(int minutes) =>
     '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
     '${(minutes % 60).toString().padLeft(2, '0')}';
 
-/// The full notifications block (`RETENTION_PLAN.md` §6): a master switch, the
-/// study-reminder time, per-type toggles, quiet hours, and a one-tap
-/// "sla vandaag over". Full opt-out is a single tap on the master row - no
-/// confirmation nag.
+/// The notifications block (DAILY_HABIT_PLAN.md §1): a master switch, the two
+/// daily slots (Ochtend, Avond herinnering), what the morning may be about,
+/// the other nudges, quiet hours, and a one-tap "sla vandaag over". Full
+/// opt-out is a single tap on the master row - no confirmation nag.
 class _NotificationsSection extends ConsumerWidget {
   const _NotificationsSection();
 
@@ -211,7 +211,11 @@ class _NotificationsSection extends ConsumerWidget {
             cadenceFrom(rhythm: e.rhythm, reminderDays: e.reminderDays).model ==
                 RetentionModel.weekGoal);
 
-        void bump() => ref.invalidate(notificationRecomputeProvider);
+        // A settings change never changes the words, only when and which:
+        // the cached schedule is reused.
+        void bump() => ref
+            .read(notificationReschedulerProvider)
+            .requestReschedule(contentChanged: false);
 
         return _SettingsGroup(
           title: 'Meldingen',
@@ -219,7 +223,7 @@ class _NotificationsSection extends ConsumerWidget {
             _SettingsRow(
               label: 'Herinneringen',
               subtitle: status.permitted
-                  ? 'Hooguit één per dag, op jouw moment.'
+                  ? 'Hooguit twee per dag.'
                   : 'Zet meldingen aan in de systeeminstellingen.',
               switchValue: master,
               onSwitchChanged: (on) async {
@@ -227,7 +231,10 @@ class _NotificationsSection extends ConsumerWidget {
                   final granted = await ref
                       .read(notificationServiceProvider)
                       .requestPermission();
-                  await prefsCtl.setMasterEnabled(granted);
+                  // A denial is not stored as "off": the switch reads the OS
+                  // state too, and granting later in the system settings
+                  // should just start the reminders.
+                  if (granted) await prefsCtl.setMasterEnabled(true);
                   if (!granted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                       content: Text(
@@ -245,18 +252,69 @@ class _NotificationsSection extends ConsumerWidget {
               },
             ),
             if (master) ...[
+              _SettingsRow(
+                label: 'Ochtend',
+                subtitle: 'Je taak van vandaag, met de tekst van de dag',
+                trailing: _TimeButton(
+                  minutes: prefs.morningMinutes,
+                  onPicked: (m) async {
+                    await prefsCtl.setMorningMinutes(m);
+                    bump();
+                  },
+                ),
+              ),
               _NotifTimeRow(
-                title: 'Studieherinnering',
-                enabled: prefs.studyReminderEnabled,
-                minutes: prefs.studyReminderMinutes,
+                title: 'Avond herinnering',
+                subtitle: 'Alleen als je die dag de app nog niet hebt geopend',
+                enabled: prefs.eveningEnabled,
+                minutes: prefs.eveningMinutes,
                 onToggle: (v) async {
-                  await prefsCtl.setStudyReminder(enabled: v);
+                  await prefsCtl.setEvening(enabled: v);
                   bump();
                 },
                 onPickTime: (m) async {
-                  await prefsCtl.setStudyReminder(minutes: m, enabled: true);
+                  await prefsCtl.setEvening(minutes: m, enabled: true);
                   bump();
                 },
+              ),
+              if (prefs.eveningEnabled && prefs.eveningMinutes <= prefs.morningMinutes)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  child: Text(
+                    'De avond valt voor de ochtend en wordt daarom overgeslagen.',
+                    style: AppTheme.caption,
+                  ),
+                ),
+              const _SubHeading('Inhoud'),
+              _SettingsRow(
+                label: 'Tekst van de dag',
+                switchValue: prefs.verseEnabled,
+                onSwitchChanged: (v) async {
+                  await prefsCtl.setContent(DailyContentKind.verse, v);
+                  bump();
+                },
+              ),
+              _SettingsRow(
+                label: 'Leesplan',
+                subtitle: 'Bijbel in een jaar',
+                switchValue: prefs.planEnabled,
+                onSwitchChanged: (v) async {
+                  await prefsCtl.setContent(DailyContentKind.plan, v);
+                  bump();
+                },
+              ),
+              _SettingsRow(
+                label: 'Studie',
+                subtitle: 'De les waar je gebleven was',
+                switchValue: prefs.studyEnabled,
+                onSwitchChanged: (v) async {
+                  await prefsCtl.setContent(DailyContentKind.study, v);
+                  bump();
+                },
+              ),
+              const _SubHeading(
+                'Overige meldingen',
+                caption: 'Alleen op een dag waarop er nog ruimte is.',
               ),
               _SettingsRow(
                 label: 'Reeks bijna kwijt',
@@ -299,19 +357,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _NotifTimeRow(
-                title: 'Vers van de dag',
-                enabled: prefs.dailyVerseEnabled,
-                minutes: prefs.dailyVerseMinutes,
-                onToggle: (v) async {
-                  await prefsCtl.setDailyVerse(enabled: v);
-                  bump();
-                },
-                onPickTime: (m) async {
-                  await prefsCtl.setDailyVerse(minutes: m, enabled: true);
-                  bump();
-                },
-              ),
+              const _SubHeading('Rust'),
               _QuietHoursRow(
                 startMinutes: prefs.quietStartMinutes,
                 endMinutes: prefs.quietEndMinutes,
@@ -347,6 +393,35 @@ class _NotificationsSection extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// A small heading inside a group, splitting one block into parts.
+class _SubHeading extends StatelessWidget {
+  const _SubHeading(this.title, {this.caption});
+
+  final String title;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: AppTheme.bodyLead.copyWith(fontWeight: FontWeight.w600),
+          ),
+          if (caption != null) ...[
+            const SizedBox(height: 2),
+            Text(caption!, style: AppTheme.caption),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -437,9 +512,11 @@ class _NotifTimeRow extends StatelessWidget implements _SettingsRowLike {
     required this.minutes,
     required this.onToggle,
     required this.onPickTime,
+    this.subtitle,
   });
 
   final String title;
+  final String? subtitle;
   final bool enabled;
   final int minutes;
   final ValueChanged<bool> onToggle;
@@ -449,7 +526,7 @@ class _NotifTimeRow extends StatelessWidget implements _SettingsRowLike {
   Widget build(BuildContext context) {
     return _SettingsRow(
       label: title,
-      subtitle: enabled ? 'Elke keer om ${_fmtMinutes(minutes)}' : 'Uit',
+      subtitle: subtitle ?? (enabled ? 'Elke keer om ${_fmtMinutes(minutes)}' : 'Uit'),
       trailing: enabled ? _TimeButton(minutes: minutes, onPicked: onPickTime) : null,
       switchValue: enabled,
       onSwitchChanged: onToggle,

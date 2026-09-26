@@ -71,6 +71,25 @@ RenderedVariant pickVariant(
   return renderVariant(type, template, tokens);
 }
 
+/// The daily reminder for a reader with no study running: it opens the reader
+/// where they left off. Token-free, so it never depends on a study's data.
+const List<VariantTemplate> readingReminderCopy = [
+  VariantTemplate('rr1', 'Even tijd voor het Woord',
+      'Lees verder waar je gebleven was. Een paar minuten is genoeg.'),
+  VariantTemplate('rr2', 'Je hoofdstuk van vandaag',
+      'Eén hoofdstuk, in je eigen tempo.'),
+  VariantTemplate('rr3', 'Een rustig moment',
+      'Open de Bijbel waar je was en lees een stukje.'),
+  VariantTemplate('rr4', 'Stil worden bij het Woord',
+      'Een paar verzen is al genoeg voor vandaag.'),
+];
+
+/// A [readingReminderCopy] line by [rotation], so consecutive days differ.
+RenderedVariant pickReadingReminder({required int rotation}) {
+  final t = readingReminderCopy[rotation.abs() % readingReminderCopy.length];
+  return RenderedVariant(variantId: t.id, title: t.title, body: t.body);
+}
+
 /// Bundled Dutch fallback pools (`RETENTION_PLAN.md` §5). The server copy batch
 /// (`GET /api/v1/notifications/copy?type=...`) overrides a type when present.
 const Map<NotifType, List<VariantTemplate>> notificationCopy = {

@@ -1,165 +1,364 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/server_image.dart';
+import '../../studies/data/study_models.dart';
 import '../../studies/present/studies_providers.dart';
 import '../../studies/present/study_banner.dart';
 import '../data/dashboard_models.dart';
+import '../data/resume_models.dart';
+import 'resume_providers.dart';
 
-/// "Waar je gebleven was" (`RETENTION_PLAN.md` §3.2). The most recently active,
-/// unfinished study: cover, title, "les X van Y", a progress bar, and a CTA
-/// straight into the resume lesson.
+/// "Verder waar je gebleven was" (DAILY_HABIT_PLAN.md §3): the one card that
+/// answers where the reader is, first on the Start tab.
 ///
-/// When no study is under way, this falls back to the plain Bible reading
-/// position instead of rendering nothing - the dashboard used to carry a
-/// separate hero card for that, which duplicated this one; the capability
-/// moved here rather than being dropped.
+/// Renders the server's `resume` answer - the same object the website's card
+/// renders - so web and app never disagree. A server that predates `resume`
+/// gets [buildLocalResume] instead: the most recently active unfinished study
+/// (`continueStudyProvider`), else the last chapter read, else the start
+/// prompt - what this card always chose, now in the shared layout.
 class ContinueStudyCard extends ConsumerWidget {
-  const ContinueStudyCard({super.key, this.lastRead, required this.onContinueReading});
+  const ContinueStudyCard({
+    super.key,
+    this.resume,
+    this.lastRead,
+    this.readChapters = const {},
+    this.onOpen,
+  });
 
-  /// The reader's most recent Bible chapter, or null for a brand-new account.
+  /// The server's answer; null from an older server.
+  final DashboardResume? resume;
+
+  /// The reader's most recent chapter, for the fallback. Null for a new account.
   final LastRead? lastRead;
 
-  /// Opens [lastRead] (or Genesis 1 when there is none yet) in the reader.
-  /// Only used while no study is under way.
-  final VoidCallback onContinueReading;
+  /// For the fallback chapter's "12 van 50 hoofdstukken".
+  final Map<String, List<int>> readChapters;
+
+  /// Overrides navigation (tests). Defaults to [openResumeHref].
+  final void Function(String href)? onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pick = ref.watch(continueStudyProvider);
-    final scheme = Theme.of(context).colorScheme;
+    final shown = watchResume(
+      ref,
+      server: resume,
+      lastRead: lastRead,
+      readChapters: readChapters,
+    );
+    final catalogue = ref.watch(curatedStudiesProvider).value ?? const <CuratedStudy>[];
 
-    if (pick == null) {
-      final hasProgress = lastRead != null;
-      return AppCard(
-        padding: const EdgeInsets.all(14),
-        onTap: onContinueReading,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            IconChip(
-              icon: hasProgress ? Icons.menu_book_outlined : Icons.auto_stories,
-              size: 56,
-              iconSize: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    hasProgress ? 'Waar je gebleven was' : 'Begin met lezen',
-                    style: AppTheme.metaLabel.copyWith(color: AppTheme.teal),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    hasProgress ? lastRead!.book : 'Start je bijbelstudie',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.bodyStrong.copyWith(
-                      fontSize: 14,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasProgress
-                        ? 'Hoofdstuk ${lastRead!.chapter} · ${lastRead!.version}'
-                        : 'Lees dag voor dag door de Bijbel',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: AppTheme.inkMuted),
-          ],
-        ),
-      );
+    Widget? coverFor(ResumeItem item) {
+      if (item.kind != ResumeKind.study) return null;
+      for (final study in catalogue) {
+        if (study.id == item.studyId) return StudyBanner(study: study);
+      }
+      final url = item.imageUrl;
+      if (url == null) return null;
+      return ServerImage(imagePath: url, fallback: const _PaintedCover());
     }
 
-    final study = pick.study;
-    final total = study.lessonCount;
-    final done = pick.completed.clamp(0, total);
+    return ResumeCardView(
+      resume: shown,
+      cover: coverFor(shown.primary),
+      onOpen: onOpen ?? (href) => openResumeHref(context, ref, href),
+    );
+  }
+}
+
+/// The card itself, free of providers so it can be tested on fixed data.
+///
+/// Laid out as `components/dashboard/ResumeCard.tsx` on the website: eyebrow
+/// and schedule chip, title, subtitle, then either "Vandaag gedaan" or the
+/// step bar, the lesson bar with its count, one full-width teal button, and
+/// the other running studies under "Ook bezig met".
+class ResumeCardView extends StatelessWidget {
+  const ResumeCardView({
+    super.key,
+    required this.resume,
+    required this.onOpen,
+    this.cover,
+  });
+
+  final DashboardResume resume;
+  final void Function(String href) onOpen;
+
+  /// The study's banner, square-cropped. Null for chapters and starts.
+  final Widget? cover;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final scheme = Theme.of(context).colorScheme;
+    final item = resume.primary;
+    final step = item.step;
+    final progress = item.kind == ResumeKind.start ? null : item.progress;
+    final schedule = item.doneToday ? null : item.schedule;
 
     return AppCard(
-      padding: const EdgeInsets.all(14),
-      onTap: () => context.push('/studie/${study.id}/${pick.resumeDay}'),
+      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                child: SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: StudyBanner(study: study),
+              if (cover != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  child: SizedBox.square(dimension: 56, child: cover),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Waar je gebleven was',
-                      style: AppTheme.metaLabel.copyWith(color: AppTheme.teal),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.kind == ResumeKind.start
+                                ? 'Begin waar je wilt'
+                                : 'Verder waar je gebleven was',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTheme.metaLabel.copyWith(color: AppTheme.teal),
+                          ),
+                        ),
+                        if (schedule != null) ...[
+                          const SizedBox(width: 8),
+                          schedule.isBehind
+                              ? SiteBadge.neutral(schedule.label)
+                              : SiteBadge.teal(schedule.label),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
-                      study.title,
+                      item.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTheme.bodyStrong.copyWith(
-                        fontSize: 14,
+                      style: AppTheme.displayTitle.copyWith(
+                        fontSize: 18,
                         color: scheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      total > 0 ? 'Les ${pick.resumeDay} van $total' : 'Verdergaan',
-                      style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                    ),
+                    if (item.subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.caption.copyWith(fontSize: 13),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
-          if (total > 0) ...[
+
+          if (item.doneToday) ...[
+            const SizedBox(height: 14),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Vandaag gedaan',
+                    style: TextStyle(color: AppTheme.teal, fontWeight: FontWeight.w600),
+                  ),
+                  if (item.nextLabel != null) TextSpan(text: ' · ${item.nextLabel}'),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption.copyWith(fontSize: 13),
+            ),
+          ] else if (step != null) ...[
+            const SizedBox(height: 14),
+            _StepBar(count: step.count, index: step.index),
+            const SizedBox(height: 7),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: 'Stap ${step.index} van ${step.count} · '),
+                  TextSpan(
+                    text: step.label,
+                    style: TextStyle(color: AppTheme.inkSoft, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption.copyWith(fontSize: 13),
+            ),
+          ],
+
+          if (progress != null) ...[
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: (done / total).clamp(0.0, 1.0),
-                minHeight: 5,
-                backgroundColor: scheme.outline,
-                valueColor: AlwaysStoppedAnimation(AppTheme.teal),
+            Row(
+              children: [
+                Expanded(child: SiteProgressBar(value: progress.fraction, height: 4)),
+                const SizedBox(width: 12),
+                Text(
+                  item.kind == ResumeKind.study
+                      ? '${progress.done} van ${progress.total} lessen'
+                      : '${progress.done} van ${progress.total} gelezen',
+                  style: AppTheme.caption.copyWith(
+                    color: AppTheme.inkFaint,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 16),
+          SiteButton(label: item.cta, onPressed: () => onOpen(item.href)),
+
+          if (item.kind == ResumeKind.start) ...[
+            const SizedBox(height: 4),
+            Center(
+              child: TextButton(
+                onPressed: () => onOpen('/lezen'),
+                child: Text(
+                  'Of begin met lezen',
+                  style: AppTheme.bodyStrong.copyWith(fontSize: 13.5, color: AppTheme.inkSoft),
+                ),
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                'Verder met de les',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.teal,
-                  fontWeight: FontWeight.w600,
+
+          if (resume.others.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const RuleLine(),
+            const SizedBox(height: 12),
+            Text('Ook bezig met', style: AppTheme.metaLabel),
+            const SizedBox(height: 2),
+            for (var i = 0; i < resume.others.length; i++) ...[
+              if (i > 0) const RuleLine(),
+              _OtherRow(
+                item: resume.others[i],
+                onTap: () => onOpen(resume.others[i].href),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One segment per step of this lesson (six, or five without a context step):
+/// finished steps teal, the current one a lighter teal, the rest the rule.
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.count, required this.index});
+
+  final int count;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = count.clamp(1, 12);
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          for (var i = 1; i <= segments; i++) ...[
+            if (i > 1) const SizedBox(width: 4),
+            Expanded(
+              child: Container(
+                key: ValueKey('resume-step-$i'),
+                height: 6,
+                decoration: BoxDecoration(
+                  color: i < index
+                      ? AppTheme.teal
+                      : i == index
+                      ? AppTheme.teal.withValues(alpha: 0.45)
+                      : AppTheme.rule,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                 ),
               ),
-              const SizedBox(width: 3),
-              Icon(Icons.arrow_forward, size: 13, color: AppTheme.teal),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One other running study: title, subtitle, a short bar and a chevron.
+class _OtherRow extends StatelessWidget {
+  const _OtherRow({required this.item, required this.onTap});
+
+  final ResumeItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.bodyStrong.copyWith(color: scheme.onSurface),
+                    ),
+                    if (item.subtitle != null)
+                      Text(
+                        item.subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.caption,
+                      ),
+                  ],
+                ),
+              ),
+              if (item.progress != null) ...[
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 64,
+                  child: SiteProgressBar(value: item.progress!.fraction, height: 4),
+                ),
+              ],
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, size: 18, color: AppTheme.teal),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The banner ground without a picture, for a cover URL that fails to load.
+class _PaintedCover extends StatelessWidget {
+  const _PaintedCover();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.tealStrong, AppTheme.bannerEnd],
+        ),
       ),
     );
   }

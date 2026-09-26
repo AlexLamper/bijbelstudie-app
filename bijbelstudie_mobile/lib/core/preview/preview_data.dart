@@ -2,8 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/content_cache.dart';
+import '../notifications/notification_schedule.dart';
 import '../../features/bible/domain/bible_models.dart';
 import '../../features/bible/present/bible_providers.dart';
+import '../../features/bible_year/data/bible_year_models.dart';
+import '../../features/bible_year/data/bible_year_repository.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
@@ -14,6 +17,8 @@ import '../../features/notes/domain/note_models.dart';
 import '../../features/notes/present/notes_providers.dart';
 import '../../features/profile/data/profile_model.dart';
 import '../../features/profile/present/profile_provider.dart';
+import '../../features/studies/data/enrollment_models.dart';
+import '../../features/studies/data/enrollment_repository.dart';
 import '../../features/studies/data/study_models.dart';
 import '../../features/studies/present/studies_providers.dart';
 
@@ -292,6 +297,20 @@ class PreviewData {
         // forever - and a skeleton shimmers on a repeating controller, which is
         // what makes `pumpAndSettle` in the widget tests never return.
         treeStateProvider.overrideWith(PreviewTreeNotifier.new),
+        // Bijbel in een jaar: no plan, so the Start tab shows no card and the
+        // Studies tab its two option cards - and nothing reaches the network.
+        bibleYearRepositoryProvider.overrideWithValue(_PreviewBibleYearRepository()),
+        // The resume card and the dashboard's study lists read these two. Left
+        // real, each started a request that cannot succeed here - and the
+        // secure-storage timeout it waits on outlives a widget test.
+        studyEnrollmentsProvider.overrideWith((ref) async => const {}),
+        serverStudyLessonsProvider.overrideWith((ref) async => const <String, Set<int>>{}),
+        // The notification scheduler confirms an empty enrollment list with
+        // the repository itself; that must not reach the network either.
+        enrollmentRepositoryProvider.overrideWithValue(const _PreviewEnrollmentRepository()),
+        // No network for the notification content either.
+        notificationScheduleRepositoryProvider
+            .overrideWithValue(NotificationScheduleRepository(null)),
       ],
       child: child,
     );
@@ -353,4 +372,67 @@ class _PreviewDashboardRepository implements DashboardRepository {
   @override
   Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>
       const [];
+}
+
+/// No enrollments, and every write refused.
+class _PreviewEnrollmentRepository implements EnrollmentRepository {
+  const _PreviewEnrollmentRepository();
+
+  static const _refused = EnrollmentException('Niet beschikbaar in de voorbeeldweergave.');
+
+  @override
+  Future<List<StudyEnrollment>> list() async => const [];
+
+  @override
+  Future<StudyEnrollment?> find(String studyId) async => null;
+
+  @override
+  Future<StudyEnrollment> enrol(String studyId, EnrollmentSettings settings) async =>
+      throw _refused;
+
+  @override
+  Future<StudyEnrollment> updateSettings(String studyId, EnrollmentSettings settings) async =>
+      throw _refused;
+
+  @override
+  Future<void> abandon(String studyId) async => throw _refused;
+}
+
+/// Answers `/bible-year` with "no plan" and refuses every write.
+class _PreviewBibleYearRepository extends BibleYearRepository {
+  _PreviewBibleYearRepository() : super(null, timeZone: () async => 'Europe/Amsterdam');
+
+  static const _refused = BibleYearException(
+    BibleYearErrorKind.server,
+    'Niet beschikbaar in de voorbeeldweergave.',
+  );
+
+  @override
+  Future<BibleYearState> fetchState() async => const BibleYearState();
+
+  @override
+  Future<Map<String, dynamic>> start(BibleYearStartBody body) async => throw _refused;
+
+  @override
+  Future<Map<String, dynamic>> restart(BibleYearStartBody body) async => throw _refused;
+
+  @override
+  Future<Map<String, dynamic>> shift() async => throw _refused;
+
+  @override
+  Future<Map<String, dynamic>> stop() async => throw _refused;
+
+  @override
+  Future<Map<String, dynamic>> markRefs(List<BibleYearChapterKey> refs, bool read) async =>
+      throw _refused;
+
+  @override
+  Future<Map<String, dynamic>> markDay(int day, bool read) async => throw _refused;
+
+  @override
+  Future<BibleYearSchedule> schedule(
+    BibleYearPlanKey plan,
+    BibleYearTrackKey track, {
+    int? version,
+  }) async => throw _refused;
 }

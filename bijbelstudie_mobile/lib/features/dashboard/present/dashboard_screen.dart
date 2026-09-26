@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/data/bible_books.dart';
-import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../bible_year/present/bible_year_providers.dart';
+import '../../bible_year/present/bible_year_today_card.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
@@ -33,11 +34,6 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
-
-    // Fire-and-forget: re-derives the whole notification ladder from cached
-    // state on every dashboard build (like the old copy-refresh did). The
-    // result is never rendered.
-    ref.watch(notificationRecomputeProvider);
 
     // The server streak is authoritative; feed it to the local mirror so a
     // later "streak broke" guess can be corrected (RETENTION_PLAN §2).
@@ -73,7 +69,12 @@ class DashboardScreen extends ConsumerWidget {
           bottom: false,
           child: RefreshIndicator(
             color: AppTheme.teal,
-            onRefresh: () async => ref.invalidate(dashboardProvider),
+            onRefresh: () async {
+              ref.invalidate(dashboardProvider);
+              if (ref.exists(bibleYearProvider)) {
+                await ref.read(bibleYearProvider.notifier).refresh();
+              }
+            },
             child: _DashboardBody(data: data),
           ),
         ),
@@ -164,25 +165,25 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // "Waar je gebleven was" - a study lesson in progress, or else
-              // the last Bible chapter read.
+              // "Verder waar je gebleven was" - the server's `resume` answer
+              // (same object as the website's card), or on an older server a
+              // study lesson in progress, else the last Bible chapter read.
               TourAnchor(
                 id: TourAnchorIds.dashboardHero,
                 child: ContinueStudyCard(
+                  resume: data.resume,
                   lastRead: data.lastRead,
-                  onContinueReading: () {
-                    final last = data.lastRead;
-                    _openChapter(
-                      context,
-                      ref,
-                      book: last?.book ?? BibleBooks.startBook,
-                      chapter: last?.chapter ?? 1,
-                      version: last?.version ?? 'statenvertaling',
-                    );
-                  },
+                  readChapters: data.readChapters,
                 ),
               ),
               const SizedBox(height: 16),
+
+              // The Bijbel-in-een-jaar "Vandaag" card (DAILY_HABIT_PLAN.md
+              // §4), under the resume card and above the daily verse. Renders
+              // nothing - its 16px gap included - unless a plan is active.
+              // The dashboard already says whether one is, so a reader without
+              // a plan costs no `/bible-year` request.
+              BibleYearDashboardCard(planActive: data.bibleYearActive),
 
               // The card renders today's verse, or — offline — the newest one
               // in its local archive. It is left out entirely only when there

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'core/app_lifecycle.dart';
@@ -54,32 +54,22 @@ Future<void> _initRevenueCat() async {
   }());
 }
 
-/// Re-arms the daily reading reminder with the OS on every launch.
-///
-/// The alarm does not survive a reinstall, and Android can drop it on a
-/// force-stop; `scheduleDaily` cancels before it sets, so calling it again
-/// with the stored time is a no-op when the reminder is already in place and
-/// a fix when it is not. Nothing runs when no reminder is stored.
-///
-/// It also re-arms the rolling batch of reminders, which is now a fortnight of
-/// one-shot notifications rather than one repeating alarm. Someone who does not
-/// open the app for two weeks therefore stops being reminded - which is the
-/// behaviour we want anyway: a nudge nobody has acted on in a fortnight should
-/// go quiet rather than repeat forever.
 /// Brings the notification service up before anything schedules:
 ///
 /// - sets `tz.local` from the real IANA zone (the old code initialised the
 ///   zone database but never set `tz.local`, so an 08:00 reminder fired at
 ///   08:00 **UTC** — `RETENTION_PLAN.md` §1);
 /// - registers the new Android channels and deletes the legacy
-///   `daily_reading` channel.
+///   `daily_reading` channel;
+/// - reads a cold-start notification tap, which the splash routes to once the
+///   session is checked.
 ///
 /// The actual (re)scheduling of the ladder is done by `notificationRecompute`,
 /// which runs from `appLifecycleProvider` the moment the app tree builds and on
 /// every foreground thereafter.
 Future<void> _initNotifications() async {
   if (kIsWeb) return;
-  await NotificationService(FlutterLocalNotificationsPlugin()).initialise();
+  await NotificationService.instance.initialise();
 }
 
 void main() async {
@@ -150,7 +140,7 @@ class BijbelStudieApp extends ConsumerWidget {
     ref.watch(sessionExpiryWiringProvider);
 
     // Registers the lifecycle observer: re-runs the notification scheduler on
-    // every foreground and arms the "on close" one-shots on background.
+    // launch and on every foreground.
     ref.watch(appLifecycleProvider);
 
     final routerConfig = ref.watch(routerProvider);
@@ -188,6 +178,11 @@ class BijbelStudieApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: routerConfig,
+      // The app is Dutch-only, so the framework's own strings are too: the
+      // date and time pickers, "Terug", "Annuleren".
+      locale: const Locale('nl', 'NL'),
+      supportedLocales: const [Locale('nl', 'NL')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       // The guided tour paints a spotlight over the running app, so it has to
       // sit above the router's Navigator - including the bottom tab bar, which
       // two of its steps point at. It builds nothing while the tour is off.

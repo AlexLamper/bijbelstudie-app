@@ -754,10 +754,11 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
     final minutes = hour * 60 + minute;
     // Kept for the picker's own selected-state (it watches this value).
     await ref.read(readingSettingsProvider.notifier).setDailyReminder(minutes);
-    await ref.read(notificationPrefsProvider.notifier).setStudyReminder(
-          enabled: true,
-          minutes: minutes,
-        );
+    // The chosen moment is the morning slot.
+    await ref.read(notificationPrefsProvider.notifier).setMorningMinutes(minutes);
+    // Choosing a time is choosing reminders: without the master switch the
+    // scheduler cancels everything, whatever permission the OS gives later.
+    await ref.read(notificationPrefsProvider.notifier).setMasterEnabled(true);
     await ref
         .read(notificationPrefsProvider.notifier)
         .setPendingPermissionRequest(true);
@@ -776,9 +777,10 @@ class _ReminderStepState extends ConsumerState<_ReminderStep> {
   Future<void> _turnOff() async {
     setState(() => _busy = true);
     await ref.read(readingSettingsProvider.notifier).setDailyReminder(null);
+    // "Geen herinnering, bedankt" is an explicit off, kept from then on.
     await ref
         .read(notificationPrefsProvider.notifier)
-        .setStudyReminder(enabled: false);
+        .setMasterEnabled(false);
     await ref
         .read(notificationPrefsProvider.notifier)
         .setPendingPermissionRequest(false);

@@ -101,7 +101,10 @@ class NotificationArt {
     DateTime when, {
     bool celebrate = false,
   }) {
-    if (type == NotifType.dailyVerse) return _verseArt(when);
+    // The morning carries the day's verse, so it gets the verse scene.
+    if (type == NotifType.dailyVerse || type == NotifType.morning) {
+      return _verseArt(when);
+    }
     if (tree == null) return Future.value(null);
     switch (type) {
       case NotifType.streakAtRisk:
@@ -123,8 +126,10 @@ class NotificationArt {
             : _treeArt('tree-healthy', withLevel: true);
       case NotifType.studyReminder:
       case NotifType.lessonHalfway:
+      case NotifType.evening:
         return _treeArt('tree-healthy', withLevel: true);
       case NotifType.dailyVerse:
+      case NotifType.morning:
         return Future.value(null);
     }
   }

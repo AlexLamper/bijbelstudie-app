@@ -41,6 +41,9 @@
              and the notification never appears, and nothing survives a
              reboot even though RECEIVE_BOOT_COMPLETED is granted above. -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- Handles notification action buttons ("Later vandaag") that do not
+             open the app; without it the tap is silently dropped. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

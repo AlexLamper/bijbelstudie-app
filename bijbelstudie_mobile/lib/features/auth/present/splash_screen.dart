@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/data/onboarding_gate.dart';
@@ -70,6 +71,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   void dispose() {
+    // However the splash was left, taps from here on navigate directly.
+    NotificationService.takeLaunchRoute();
     _watchdog?.cancel();
     _progress.dispose();
     _exit.dispose();
@@ -91,7 +94,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (_progress.value < 1) await _animate(_progress);
     if (!mounted) return;
     await _animate(_exit);
-    if (mounted) context.go(route);
+    // A cold start from a notification tap lands on the tapped route, but only
+    // once the session is known good and setup is done ('/dashboard'); a
+    // reader heading to login or the setup wizard goes there instead.
+    final launch = NotificationService.takeLaunchRoute();
+    final target = route == '/dashboard' && launch != null ? launch : route;
+    if (mounted) context.go(target);
   }
 
   Future<void> _animate(AnimationController controller) async {

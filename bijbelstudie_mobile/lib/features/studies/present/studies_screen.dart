@@ -5,6 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../bible_year/present/bible_year_providers.dart';
+import '../../bible_year/present/bible_year_studies_block.dart';
+import '../../dashboard/data/resume_models.dart';
+import '../../dashboard/present/dashboard_providers.dart';
+import '../../dashboard/present/resume_providers.dart';
 import '../data/study_models.dart';
 import 'chapter_picker_sheet.dart';
 import 'studies_providers.dart';
@@ -50,11 +55,26 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             ref.invalidate(curatedStudiesProvider);
             ref.invalidate(serverStudyLessonsProvider);
             ref.invalidate(studyEnrollmentsProvider);
+            if (ref.exists(bibleYearProvider)) {
+              await ref.read(bibleYearProvider.notifier).refresh();
+            }
             await ref.read(curatedStudiesProvider.future);
           },
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _Header(controller: _searchController)),
+              // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4), at the top as on
+              // the website. Outside the catalogue's `when` so it shows while
+              // the studies load; hidden while searching, like every other
+              // browsing aid on this page.
+              SliverToBoxAdapter(
+                child: Consumer(
+                  builder: (context, ref, _) =>
+                      ref.watch(studiesQueryProvider).trim().isEmpty
+                      ? const BibleYearStudiesBlock()
+                      : const SizedBox.shrink(),
+                ),
+              ),
               ...studies.when(
                 loading: () => const [
                   SliverPadding(
@@ -123,14 +143,20 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       ];
     }
 
-    final continueStudy = ref.watch(continueStudyProvider);
+    final continueTarget = _continueTarget(ref, all);
     final filtered = all.where((study) => _inFilter(study, filter)).toList(growable: false);
     final featured = _featured(all);
 
     return [
       const SliverToBoxAdapter(child: _FilterRow()),
-      if (continueStudy != null)
-        SliverToBoxAdapter(child: _ContinueRow(study: continueStudy.study)),
+      if (continueTarget != null)
+        SliverToBoxAdapter(
+          child: _ContinueRow(
+            study: continueTarget.study,
+            day: continueTarget.day,
+            href: continueTarget.href,
+          ),
+        ),
       const SliverToBoxAdapter(child: _ChapterPickerEntry()),
       if (featured.isNotEmpty)
         SliverToBoxAdapter(child: _NewThisMonth(studies: featured)),
@@ -382,17 +408,20 @@ class _FilterRow extends ConsumerWidget {
 /// The ring is the study's progress drawn around its own banner, so the row
 /// answers "how far am I" without a second line of text.
 class _ContinueRow extends ConsumerWidget {
-  const _ContinueRow({required this.study});
+  const _ContinueRow({required this.study, required this.day, required this.href});
 
   final CuratedStudy study;
+  final int day;
+
+  /// Where "Lezen" goes - the lesson, on its step when one is known.
+  final String href;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
     final status = ref.watch(studyStatusProvider(study));
-    final day = status.resumeDay(study);
 
-    void open() => context.push('/studie/${study.id}/$day');
+    void open() => openResumeHref(context, ref, href);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -603,7 +632,15 @@ class _StudyRow extends ConsumerWidget {
             context.push('/studies/${study.id}');
             return;
           }
-          context.push('/studie/${study.id}/${status.resumeDay(study)}');
+          final day = status.resumeDay(study);
+          final enrollment = status.enrollment;
+          context.push(
+            lessonLocation(
+              study.id,
+              day,
+              enrollment?.currentLessonDay == day ? enrollment?.resumeStep : null,
+            ),
+          );
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -700,4 +737,35 @@ class _ChapterPickerEntry extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The study "Verder waar je was" resumes, and where it lands.
+///
+/// The Start tab's server answer (`resume` on `/dashboard`) wins when it names
+/// a study in the catalogue, so this row and the Start tab's card agree. It is
+/// only read when the Start tab has already loaded it - watching it here would
+/// otherwise cost a `/dashboard` request just for this row. Without it, the
+/// device's own pick (`continueStudyProvider`) and the enrollment's step.
+({CuratedStudy study, int day, String href})? _continueTarget(
+  WidgetRef ref,
+  List<CuratedStudy> all,
+) {
+  final DashboardResume? resume =
+      ref.exists(dashboardProvider) ? ref.watch(dashboardProvider).value?.resume : null;
+  final primary = resume?.primary;
+  if (primary != null && primary.kind == ResumeKind.study && primary.lessonDay != null) {
+    for (final study in all) {
+      if (study.id == primary.studyId) {
+        return (study: study, day: primary.lessonDay!, href: primary.href);
+      }
+    }
+  }
+
+  final pick = ref.watch(continueStudyProvider);
+  if (pick == null) return null;
+  final local = buildLocalResume(
+    pick: pick,
+    enrollment: ref.watch(studyEnrollmentProvider(pick.study.id)),
+  );
+  return (study: pick.study, day: pick.resumeDay, href: local.primary.href);
 }

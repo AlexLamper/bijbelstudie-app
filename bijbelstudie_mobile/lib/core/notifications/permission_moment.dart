@@ -28,6 +28,11 @@ enum PermissionMoment {
 
   /// A first badge, or a finished study.
   firstMilestone,
+
+  /// The reader picked "Elke dag om …" when starting Bijbel in een jaar: an
+  /// explicit request for a reminder, so it is offered even when an earlier
+  /// moment was declined (the OS decides whether its own dialog still shows).
+  planReminder,
 }
 
 extension PermissionMomentCopy on PermissionMoment {
@@ -43,6 +48,8 @@ extension PermissionMomentCopy on PermissionMoment {
         return 'Twee dagen op rij - mooi.';
       case PermissionMoment.firstMilestone:
         return 'Je hebt iets bereikt.';
+      case PermissionMoment.planReminder:
+        return 'Je leesplan staat klaar.';
     }
   }
 }
@@ -57,6 +64,7 @@ bool permissionMomentEarned(PermissionMoment moment, RetentionState state) {
   switch (moment) {
     case PermissionMoment.firstLesson:
     case PermissionMoment.firstMilestone:
+    case PermissionMoment.planReminder:
       return true;
     case PermissionMoment.chaptersRead:
       return state.completionsEver >= 3;
@@ -65,44 +73,67 @@ bool permissionMomentEarned(PermissionMoment moment, RetentionState state) {
   }
 }
 
+/// Two moments landing together must not stack two sheets.
+bool _sheetOpen = false;
+
 /// Offers the pre-permission sheet if [moment] has genuinely been earned and
 /// the ask has not been spent yet.
 ///
 /// Returns true when the OS dialog was shown and permission was granted.
 /// Everything else - already asked, already granted, notifications switched off
 /// by hand - returns false without showing anything.
+
 Future<bool> maybeAskForNotifications(
   BuildContext context,
   WidgetRef ref,
   PermissionMoment moment,
 ) async {
+  // Everything the rest needs is read before the first await: the widget
+  // behind [ref] can be gone by the time the sheet or the OS dialog closes.
   final store = ref.read(retentionStoreProvider.notifier);
+  final service = ref.read(notificationServiceProvider);
+  final prefsCtl = ref.read(notificationPrefsProvider.notifier);
+  final rescheduler = ref.read(notificationReschedulerProvider);
   await store.loaded;
+  if (!context.mounted) return false;
   final state = ref.read(retentionStoreProvider);
-  if (state.permissionAskedAfterFirstLesson) return false;
+  if (state.permissionAskedAfterFirstLesson &&
+      moment != PermissionMoment.planReminder) {
+    return false;
+  }
 
   if (!permissionMomentEarned(moment, state)) return false;
 
-  final service = ref.read(notificationServiceProvider);
-  if (await service.hasPermission()) return false;
-  if (!context.mounted) return false;
+  if (await service.hasPermission()) {
+    // Android 12 and below grant at install, so there is nothing to ask - but
+    // the reminders still have to be switched on (unless the reader turned
+    // them off themselves).
+    await prefsCtl.enableIfUnset();
+    rescheduler.requestReschedule();
+    return false;
+  }
+  if (!context.mounted || _sheetOpen) return false;
 
+  _sheetOpen = true;
+  final bool? wants;
+  try {
+    wants = await _showSheet(context, ref, moment);
+  } finally {
+    _sheetOpen = false;
+  }
+  // Spent only once the sheet was really on screen: a context that went away
+  // before it could open must not burn the one ask.
   await store.markPermissionAsked();
-  if (!context.mounted) return false;
-
-  final wants = await _showSheet(context, ref, moment);
   if (wants != true) return false;
 
   final granted = await service.requestPermission();
   if (granted) {
-    final prefs = ref.read(notificationPrefsProvider.notifier);
-    await prefs.setMasterEnabled(true);
-    await prefs.setStudyReminder(enabled: true);
+    await prefsCtl.setMasterEnabled(true);
+    await prefsCtl.setStudyReminder(enabled: true);
   }
-  await ref
-      .read(notificationPrefsProvider.notifier)
-      .setPendingPermissionRequest(false);
-  ref.invalidate(notificationRecomputeProvider);
+  await prefsCtl.setPendingPermissionRequest(false);
+  // Captured above; `ref` itself may belong to a disposed widget by now.
+  rescheduler.requestReschedule();
   return granted;
 }
 

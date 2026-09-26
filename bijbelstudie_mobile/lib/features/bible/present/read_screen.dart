@@ -276,7 +276,9 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
       unawaited(
         ref.read(retentionStoreProvider.notifier).markCompleted().then((_) {
           if (!mounted) return;
-          ref.invalidate(notificationRecomputeProvider);
+          // Throttled: paging through chapters records one read after another,
+          // and each would otherwise refetch the schedule.
+          ref.read(notificationReschedulerProvider).requestReschedule(throttle: true);
           // The reader who never opens a study still earns the ask here
           // (`AVATAR_NOTIFICATIONS_PLAN.md` §7). Both moments are no-ops
           // until they are earned, and the ask is only ever spent once.
@@ -576,10 +578,15 @@ class _ReaderBar extends ConsumerWidget {
                     // Lined up by their 34px boxes, the tools stop well short of
                     // the edge the Bijbel/Studie switch above them ends on: the
                     // last one is "meer", three narrow dots in the middle of its
-                    // box. Shifted as one group so the dots end on that edge and
-                    // the gaps between the tools stay even.
+                    // box. Shifted as one group so the dots end near that edge and
+                    // the gaps between the tools stay even - held back by
+                    // [_ToolSlot.edgeClearance] so "meer" is not jammed against
+                    // the screen edge and stays easy to tap.
                     Transform.translate(
-                      offset: const Offset(_ToolSlot.trailingGlyphInset, 0),
+                      offset: const Offset(
+                        _ToolSlot.trailingGlyphInset - _ToolSlot.edgeClearance,
+                        0,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -783,6 +790,10 @@ class _ToolSlot extends StatelessWidget {
   /// 19px icon is centred in the 34px box, and `more_vert`'s dots end at 14 of
   /// its 24 units.
   static const double trailingGlyphInset = (34 - 19) / 2 + 19 * (24 - 14) / 24;
+
+  /// How far short of the full [trailingGlyphInset] shift the group stops, so
+  /// the last box keeps a few pixels of room from the screen edge.
+  static const double edgeClearance = 6;
 
   final Widget child;
   final bool active;

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource shrinking (on by default for Flutter release builds) cannot see
+     resources flutter_local_notifications looks up by name at runtime. Without
+     this the notification icon is stripped and notifications fail silently. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_notification,@mipmap/ic_launcher" />

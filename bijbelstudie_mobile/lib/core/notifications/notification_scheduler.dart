@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../features/auth/domain/display_name.dart';
+import '../../features/auth/present/auth_controller.dart' show authStorageProvider;
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
@@ -12,11 +14,15 @@ import '../../features/levensboom/data/tree_image.dart';
 import '../../features/levensboom/present/levensboom_providers.dart';
 import '../../features/settings/data/notification_prefs.dart';
 import '../../features/studies/data/enrollment_models.dart';
+import '../../features/studies/data/enrollment_repository.dart';
 import '../../features/studies/data/study_models.dart';
 import '../../features/studies/data/study_plan_store.dart';
 import '../../features/studies/present/studies_providers.dart';
+import '../config/preview_config.dart';
+import 'daily_slots.dart';
 import 'notification_art.dart';
 import 'notification_copy.dart';
+import 'notification_schedule.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
 
@@ -172,52 +178,432 @@ class Candidate {
 
   /// `showNow` instead of `zonedSchedule` (weeklyGoal "met").
   final bool immediate;
-
-  int get _dayOrdinal => when.year * 10000 + when.month * 100 + when.day;
 }
 
-/// The priority + cap ladder (§4.4): at most one capped candidate per calendar
-/// day; `dailyVerse` and `milestone` are exempt. When [cappedSentToday] is true,
-/// every capped candidate that would fire *today* is dropped.
-List<Candidate> applyLadder(
+/// The one place the daily total is enforced (DAILY_HABIT_PLAN.md §1): per
+/// local calendar day at most [maxPerDay] notifications, counting the ones
+/// that day already has in [used] (fired, or armed and kept - see
+/// [RetentionStore.usedByDay]). Within a day the highest priority wins - the
+/// morning and evening slots outrank every other scheduled type - and a tie
+/// goes to the earlier one.
+List<Candidate> applyDailyCap(
   List<Candidate> candidates, {
-  required bool cappedSentToday,
-  DateTime? now,
+  Map<String, int> used = const {},
+  int maxPerDay = kMaxNotificationsPerDay,
 }) {
-  final today = now ?? DateTime.now();
-  final todayOrdinal = today.year * 10000 + today.month * 100 + today.day;
-
-  final byDay = <int, List<Candidate>>{};
-  final kept = <Candidate>[];
-
+  final byDay = <String, List<Candidate>>{};
   for (final c in candidates) {
-    if (!c.type.isCapped) {
-      kept.add(c);
-      continue;
-    }
-    byDay.putIfAbsent(c._dayOrdinal, () => []).add(c);
+    byDay.putIfAbsent(retentionDayKey(c.when), () => []).add(c);
   }
-
+  final kept = <Candidate>[];
   for (final entry in byDay.entries) {
+    final room = maxPerDay - (used[entry.key] ?? 0);
+    if (room <= 0) continue;
     final list = [...entry.value]
-      ..sort((a, b) => b.type.priority.compareTo(a.type.priority));
-    if (entry.key <= todayOrdinal && cappedSentToday) continue; // day already spent
-    kept.add(list.first);
+      ..sort((a, b) {
+        final p = b.type.priority.compareTo(a.type.priority);
+        return p != 0 ? p : a.when.compareTo(b.when);
+      });
+    kept.addAll(list.take(room));
   }
+  kept.sort((a, b) => a.when.compareTo(b.when));
   return kept;
 }
 
-final notificationRecomputeProvider = FutureProvider<void>((ref) async {
-  await NotificationScheduler.recompute(ref);
+/// Whether this device holds a signed-in session (a stored access token).
+/// Without one nothing may be armed: every notification is the previous
+/// reader's plan, study and streak. A function so tests can stand in.
+final notificationSessionProvider = Provider<Future<bool> Function()>((ref) {
+  return () async {
+    if (PreviewConfig.enabled) return true;
+    try {
+      final token = await ref.read(authStorageProvider).getToken();
+      return token != null && token.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  };
 });
+
+/// "Please re-derive the notifications", callable from anywhere:
+///
+/// ```dart
+/// ref.read(notificationReschedulerProvider).requestReschedule();
+/// ```
+///
+/// Works from a widget's `WidgetRef` and from a provider's `Ref` alike.
+/// Requests made in the same turn of the event loop fold into one run, and
+/// runs are serialized by [NotificationScheduler.recompute] (a request that
+/// arrives mid-run becomes one more run afterwards). No timers: a pending
+/// debounce timer would outlive every widget test that touches a trigger.
+final notificationReschedulerProvider = Provider<NotificationRescheduler>((ref) {
+  return NotificationRescheduler(ref);
+});
+
+class NotificationRescheduler {
+  NotificationRescheduler(this._ref);
+
+  final Ref _ref;
+  bool _pending = false;
+  bool _refresh = false;
+
+  /// A throttled content change that was not fetched yet; the next request
+  /// of any kind fetches.
+  bool _dirty = false;
+  DateTime? _lastRefresh;
+
+  /// How long a throttled request (a finished step) reuses the last fetch.
+  static const throttleWindow = Duration(minutes: 2);
+
+  /// [contentChanged]: progress moved (a lesson finished, a chapter read, a
+  /// Bijbel-in-een-jaar portion marked, a plan started or stopped), so the
+  /// schedule's words are refetched instead of reused from the cache. Pass
+  /// false for a settings change or a resume - the cached words are still
+  /// right (or are refetched once they are stale anyway).
+  ///
+  /// [throttle]: for frequent small changes (each finished step). Within
+  /// [throttleWindow] of the last fetch the change is only remembered, and
+  /// the next request - the lesson's end, a resume - fetches it.
+  void requestReschedule({bool contentChanged = true, bool throttle = false}) {
+    if (kIsWeb) return;
+    var force = contentChanged || _dirty;
+    final last = _lastRefresh;
+    if (force &&
+        throttle &&
+        last != null &&
+        DateTime.now().difference(last) < throttleWindow) {
+      force = false;
+      _dirty = true;
+    } else if (force) {
+      _dirty = false;
+    }
+    _refresh = _refresh || force;
+    if (_pending) return;
+    _pending = true;
+    // A microtask, not a zero timer: every request of this turn still lands
+    // first, and it never shows up as a pending timer in a widget test.
+    scheduleMicrotask(() {
+      _pending = false;
+      final refresh = _refresh;
+      _refresh = false;
+      if (refresh) _lastRefresh = DateTime.now();
+      NotificationScheduler.recompute(_ref, refreshContent: refresh).catchError(
+          (Object e, StackTrace st) =>
+              debugPrint('[Notifications] reschedule failed: $e\n$st'));
+    });
+  }
+}
+
+/// What the scheduler reads from the network-backed providers, resolved (not
+/// peeked at) before anything is cancelled.
+class SchedulerInputs {
+  const SchedulerInputs({
+    required this.enrollments,
+    required this.plans,
+    required this.curated,
+    required this.dashboard,
+  });
+
+  final Map<String, StudyEnrollment> enrollments;
+  final Map<String, StudyPlan> plans;
+  final List<CuratedStudy> curated;
+  final DashboardData? dashboard;
+}
 
 /// The single brain (§4.1). A pure function of cached enrollments + study plans
 /// + [RetentionStore] + [NotificationPrefs] + last [DashboardData]; produces a
 /// candidate list, applies the ladder, then cancel-then-schedules per type.
 class NotificationScheduler {
-  static Future<void> recompute(Ref ref) async {
-    if (kIsWeb) return;
+  static bool _running = false;
+  static Ref? _queued;
+  static bool _queuedRefresh = false;
 
+  /// When an empty enrollment list was last confirmed with the server; see
+  /// [loadInputs].
+  static DateTime? _emptyConfirmedAt;
+
+  static const _loadBudget = Duration(seconds: 10);
+
+  /// Runs one recompute at a time. Launch, resume, the dashboard and every
+  /// completion all ask for one, often together; overlapping runs would
+  /// interleave their cancel-then-schedule passes. A request that arrives
+  /// mid-run is folded into one more run afterwards, with the newest ref.
+  ///
+  /// [refreshContent] refetches `/notifications/schedule` even when the cached
+  /// copy is fresh; a queued request keeps the flag if any caller set it.
+  static Future<void> recompute(Ref ref, {bool refreshContent = false}) async {
+    if (kIsWeb) return;
+    if (_running) {
+      _queued = ref;
+      _queuedRefresh = _queuedRefresh || refreshContent;
+      return;
+    }
+    _running = true;
+    try {
+      Ref? next = ref;
+      var refresh = refreshContent;
+      while (next != null) {
+        _queued = null;
+        _queuedRefresh = false;
+        try {
+          await _recomputeOnce(next, refreshContent: refresh);
+        } catch (e, st) {
+          if (_queued == null) rethrow;
+          debugPrint('[Notifications] recompute failed, rerunning: $e\n$st');
+        }
+        next = _queued;
+        refresh = _queuedRefresh;
+      }
+    } finally {
+      _running = false;
+    }
+  }
+
+  @visibleForTesting
+  static void debugReset() {
+    _running = false;
+    _queued = null;
+    _queuedRefresh = false;
+    _emptyConfirmedAt = null;
+  }
+
+  /// Cancels today's evening slot: the app is open, so the "not opened today"
+  /// nudge is moot. Called on launch and resume, before (and independent of)
+  /// the recompute, which then leaves today's evening out. Never throws.
+  static Future<void> cancelTodayEvening(Ref ref) async {
+    if (kIsWeb) return;
+    final now = DateTime.now();
+    try {
+      await ref.read(notificationServiceProvider).cancelEveningOn(now);
+    } catch (e) {
+      debugPrint('[Notifications] cancelling the evening slot failed: $e');
+    }
+    try {
+      await ref
+          .read(retentionStoreProvider.notifier)
+          .dropArmed(NotifType.evening, retentionDayKey(now), now: now);
+    } catch (_) {}
+  }
+
+  /// The two daily slots for the next 14 local days (DAILY_HABIT_PLAN.md §1):
+  /// the morning at [NotificationPrefs.morningMinutes], the evening at
+  /// [NotificationPrefs.eveningMinutes] from tomorrow on (today the app is
+  /// open, which is exactly when the evening is not wanted). Both are kept out
+  /// of quiet hours on their own date, and an evening that would not come
+  /// after the morning is left out. Pure: no plugin, no network.
+  @visibleForTesting
+  static List<Candidate> dailyCandidates({
+    required NotificationPrefs prefs,
+    required NotificationSchedule? schedule,
+    required LocalDailyFallback fallback,
+    Map<String, ScheduleVerse> localVerses = const {},
+    required tz.TZDateTime now,
+  }) {
+    if (!prefs.masterEnabled) return const [];
+    final quiet = prefs.quietHours;
+    final morningMin = clampDailyMinutes(prefs.morningMinutes, quiet);
+    final eveningMin = clampDailyMinutes(prefs.eveningMinutes, quiet);
+    final snoozedUntil = prefs.snoozedUntilEpochMs;
+    bool open(tz.TZDateTime t) =>
+        t.isAfter(now) &&
+        (snoozedUntil == null || t.millisecondsSinceEpoch >= snoozedUntil);
+
+    final out = <Candidate>[];
+    for (var offset = 0; offset < 14; offset++) {
+      final date = DateTime(now.year, now.month, now.day + offset);
+      final key = retentionDayKey(date);
+      final lines = dailyLinesFor(
+        day: schedule?.dayFor(key),
+        content: prefs.content,
+        fallback: fallback,
+        fallbackVerse: localVerses[key],
+        rotation: epochDayOf(date),
+      );
+      final slot = dailySlotFor(date);
+      tz.TZDateTime at(int minutes) => tz.TZDateTime(
+          now.location, date.year, date.month, date.day, minutes ~/ 60, minutes % 60);
+
+      final morning = at(morningMin);
+      if (open(morning)) {
+        out.add(Candidate(
+          type: NotifType.morning,
+          when: morning,
+          slot: slot,
+          variant: lines.morning.variant,
+          deepLink: lines.morning.route,
+        ));
+      }
+      if (offset > 0 && prefs.eveningEnabled && eveningMin > morningMin) {
+        final evening = at(eveningMin);
+        if (open(evening)) {
+          out.add(Candidate(
+            type: NotifType.evening,
+            when: evening,
+            slot: slot,
+            variant: lines.evening.variant,
+            deepLink: lines.evening.route,
+          ));
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Verses the device holds for a given date (the dashboard's daily-verse
+  /// archive), for days the schedule does not cover.
+  static Map<String, ScheduleVerse> _localVerses(Ref ref) {
+    final out = <String, ScheduleVerse>{};
+    try {
+      for (final e in ref.read(dailyVerseStoreProvider).history) {
+        if (e.text.trim().isEmpty || e.reference.trim().isEmpty) continue;
+        out.putIfAbsent(e.date, () => ScheduleVerse(text: e.text, reference: e.reference));
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  static Future<NotificationSchedule?> _loadSchedule(
+    Ref ref,
+    String? zone, {
+    required bool force,
+    required String exclude,
+  }) async {
+    try {
+      return await ref
+          .read(notificationScheduleRepositoryProvider)
+          .load(timeZone: zone, force: force, exclude: exclude)
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      debugPrint('[Notifications] schedule unavailable: $e');
+      return null;
+    }
+  }
+
+  static const _dailyTypes = {
+    NotifType.morning,
+    NotifType.evening,
+    // Retired; cancelled alongside so an upgrade never leaves one armed.
+    NotifType.studyReminder,
+    NotifType.dailyVerse,
+  };
+
+  /// Offline (enrollments unknown) but with a cached schedule: rewrites only
+  /// the daily slots and leaves every other one-shot as it is. Those still
+  /// count towards each day's total, so the cap holds. Only ever reached with
+  /// a session ([_recomputeOnce] checks first): signed out, the cached words
+  /// are someone else's.
+  static Future<void> _rewriteDailyOnly(
+    Ref ref,
+    NotificationService service,
+    NotificationPrefs prefs,
+    NotificationSchedule schedule,
+    tz.TZDateTime now,
+  ) async {
+    final store = ref.read(retentionStoreProvider.notifier);
+    final candidates = dailyCandidates(
+      prefs: prefs,
+      schedule: schedule,
+      fallback: LocalDailyFallback.none,
+      localVerses: _localVerses(ref),
+      now: now,
+    );
+    final others = NotifType.values.toSet().difference(_dailyTypes);
+    final kept = applyDailyCap(candidates,
+        used: await _withSnooze(store.usedByDay(now, stillArmed: others)));
+    for (final type in _dailyTypes) {
+      await service.cancelType(type);
+    }
+    final art = NotificationArt.of(ref, now: now);
+    final armed = <({NotifType type, DateTime firesAt})>[];
+    for (final c in kept) {
+      if (await _write(service, art, c)) armed.add((type: c.type, firesAt: c.when));
+    }
+    await store.replaceArmed(armed, now: now, onlyTypes: _dailyTypes);
+  }
+
+  /// Awaits [future] with a subscription held open, so an auto-dispose
+  /// provider nobody is watching is not torn down mid-load.
+  static Future<T> _hold<T>(Ref ref, ProviderListenable<Future<T>> future) async {
+    final sub = ref.listen<Future<T>>(future, (_, _) {});
+    try {
+      return await sub.read().timeout(_loadBudget);
+    } finally {
+      sub.close();
+    }
+  }
+
+  /// Resolves everything the ladder needs, or null when it cannot be known.
+  ///
+  /// Null means "keep what is scheduled": the previous batch was built from
+  /// real data and stays right for up to two weeks, while cancelling on a
+  /// failed or slow load is what used to wipe every study reminder on a
+  /// launch without network.
+  @visibleForTesting
+  static Future<SchedulerInputs?> loadInputs(Ref ref) async {
+    try {
+      final plansCtl = ref.read(studyPlansProvider.notifier);
+      await plansCtl.loaded.timeout(_loadBudget);
+      final plans = ref.read(studyPlansProvider);
+
+      var enrollments = await _hold(ref, studyEnrollmentsProvider.future);
+      if (enrollments.isEmpty) {
+        // The provider maps a failed request to an empty map, which would read
+        // as "no study". Confirm with the repository, which throws instead;
+        // once per few minutes is plenty.
+        final confirmed = _emptyConfirmedAt;
+        if (confirmed == null ||
+            DateTime.now().difference(confirmed) > const Duration(minutes: 5)) {
+          final list = await ref
+              .read(enrollmentRepositoryProvider)
+              .list()
+              .timeout(_loadBudget);
+          enrollments = {for (final e in list) e.studyId: e};
+          if (list.isEmpty) _emptyConfirmedAt = DateTime.now();
+        }
+      } else {
+        _emptyConfirmedAt = null;
+      }
+
+      final curated = await _hold(ref, curatedStudiesProvider.future);
+
+      // Only the reader's first name comes from here: read it if a screen has
+      // it loaded, never start a request for it.
+      final dashboard =
+          ref.exists(dashboardProvider) ? ref.read(dashboardProvider).value : null;
+
+      return SchedulerInputs(
+        enrollments: enrollments,
+        plans: plans,
+        curated: curated,
+        dashboard: dashboard,
+      );
+    } catch (e) {
+      debugPrint('[Notifications] inputs unavailable, keeping schedule: $e');
+      return null;
+    }
+  }
+
+  /// Waits (briefly) for the verse archive's first read from disk, so the
+  /// daily-verse copy is not rendered from an empty history.
+  static Future<void> _verseLoaded(Ref ref) async {
+    if (ref.read(dailyVerseStoreProvider).loaded) return;
+    final done = Completer<void>();
+    final sub = ref.listen<bool>(
+      dailyVerseStoreProvider.select((m) => m.loaded),
+      (_, loaded) {
+        if (loaded && !done.isCompleted) done.complete();
+      },
+    );
+    try {
+      await done.future.timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Render from whatever is there.
+    } finally {
+      sub.close();
+    }
+  }
+
+  static Future<void> _recomputeOnce(Ref ref, {bool refreshContent = false}) async {
     final prefsCtl = ref.read(notificationPrefsProvider.notifier);
     await prefsCtl.loaded;
     final prefs = ref.read(notificationPrefsProvider);
@@ -229,6 +615,12 @@ class NotificationScheduler {
       await service.cancelAllManaged();
       return;
     }
+    if (!await ref.read(notificationSessionProvider)()) {
+      // Signed out (or the session expired): nothing of the previous
+      // reader's may stay armed, and nothing is written from the cache.
+      await service.cancelAllManaged();
+      return;
+    }
     if (!await service.hasPermission()) {
       // Nothing scheduled without permission; the settings hint covers it.
       return;
@@ -236,6 +628,28 @@ class NotificationScheduler {
 
     final store = ref.read(retentionStoreProvider.notifier);
     await store.loaded;
+    // A recompute only ever runs with the app in the foreground, so today
+    // counts as opened: today's evening slot is not armed again.
+    await store.markOpened();
+
+    final inputs = await loadInputs(ref);
+    final schedule = await _loadSchedule(
+      ref,
+      service.localZoneName,
+      force: refreshContent && inputs != null,
+      exclude: prefs.content.excludeParam,
+    );
+    await _verseLoaded(ref);
+    if (inputs == null) {
+      // Nothing known about the reader's studies: keep what is scheduled -
+      // unless the cached schedule lets the daily slots be rewritten (a
+      // settings change made offline, say).
+      if (schedule != null) {
+        await _rewriteDailyOnly(
+            ref, service, prefs, schedule, tz.TZDateTime.now(tz.local));
+      }
+      return;
+    }
 
     // Timezone change -> wipe and re-derive everything against the new zone.
     final zone = service.localZoneName ?? DateTime.now().timeZoneName;
@@ -247,10 +661,10 @@ class NotificationScheduler {
     final now = tz.TZDateTime.now(tz.local);
 
     // ── Resolve the study we nudge for: most recently active enrollment ──
-    final enrollments = ref.read(studyEnrollmentsProvider).value ?? const {};
-    final plans = ref.read(studyPlansProvider);
-    final curated = ref.read(curatedStudiesProvider).value ?? const <CuratedStudy>[];
-    final dashboard = ref.read(dashboardProvider).value;
+    final enrollments = inputs.enrollments;
+    final plans = inputs.plans;
+    final curated = inputs.curated;
+    final dashboard = inputs.dashboard;
 
     StudyEnrollment? enrollment;
     for (final e in enrollments.values) {
@@ -281,18 +695,24 @@ class NotificationScheduler {
       }
     }
 
-    final cadence = cadenceFrom(
-      rhythm: enrollment?.rhythm,
-      reminderDays: enrollment?.reminderDays ?? const [],
-      localCadence: plan?.cadence,
-      startedAt: enrollment?.startedAt ?? plan?.startedAt,
-    );
+    // No study running: the daily reminder is a reading reminder instead of
+    // nothing, on a plain daily cadence.
+    final reading = studyId == null;
+    final cadence = reading
+        ? const CadenceInfo(model: RetentionModel.dailyStreak)
+        : cadenceFrom(
+            rhythm: enrollment?.rhythm,
+            reminderDays: enrollment?.reminderDays ?? const [],
+            localCadence: plan?.cadence,
+            startedAt: enrollment?.startedAt ?? plan?.startedAt,
+          );
 
     final resumeDay = enrollment?.currentLessonDay ??
         _firstUndoneDay(study, plan) ??
         1;
-    final deepLink =
-        studyId != null ? '/studie/$studyId/$resumeDay' : '/dashboard';
+    final deepLink = studyId == null
+        ? '/read'
+        : studyDeepLink(studyId, resumeDay, enrollment?.resumeStep);
 
     final lessonTitle = study?.lessonForDay(resumeDay)?.title ??
         (study != null ? 'les $resumeDay' : null);
@@ -308,35 +728,22 @@ class NotificationScheduler {
 
     final quiet = prefs.quietHours;
     final candidates = <Candidate>[];
+    String? weekGoalCelebration;
 
-    // ── studyReminder ────────────────────────────────────────────────────
-    if (prefs.enabledFor('studyReminder') &&
-        !prefs.snoozedNow &&
-        cadence.model != RetentionModel.none &&
-        cadence.remind) {
-      final h = prefs.studyReminderMinutes ~/ 60;
-      final m = prefs.studyReminderMinutes % 60;
-      var slot = 0;
-      for (var offset = 0; offset < 14 && slot < 14; offset++) {
-        final day = now.add(Duration(days: offset));
-        if (!cadence.isCadenceDay(day)) continue;
-        if (offset == 0 && store.studiedToday) continue;
-        final fire = service.clampToWaking(
-          service.nextInstanceOf(h, m, dayOffset: offset),
-          quiet,
-          NotifType.studyReminder,
-        );
-        candidates.add(Candidate(
-          type: NotifType.studyReminder,
-          when: fire,
-          slot: slot,
-          deepLink: deepLink,
-          variant: pickVariant(NotifType.studyReminder,
-              rotation: offset, tokens: tokens),
-        ));
-        slot++;
-      }
-    }
+    // ── morning + evening (the two daily slots) ─────────────────────────
+    candidates.addAll(dailyCandidates(
+      prefs: prefs,
+      schedule: schedule,
+      fallback: studyId == null
+          ? LocalDailyFallback.none
+          : LocalDailyFallback(
+              studyTitle: study?.title,
+              lessonLabel: lessonTitle,
+              studyRoute: deepLink,
+            ),
+      localVerses: _localVerses(ref),
+      now: now,
+    ));
 
     final todayIsCadence = cadence.isCadenceDay(now);
     final completionsThisWeek = store.completionsThisWeek;
@@ -384,7 +791,7 @@ class NotificationScheduler {
       if (last != null &&
           retentionDayGap(last, retentionDayKey(now)) > 1 + graceDays &&
           (prevStreak >= 3 || streak >= 3) &&
-          !store.sentTypeToday(NotifType.streakLost)) {
+          !store.sentTypeOn(NotifType.streakLost, now)) {
         final fire = service.clampToWaking(
           service.nextInstanceOf(9, 0),
           quiet,
@@ -425,6 +832,7 @@ class NotificationScheduler {
       if (completionsThisWeek >= cadence.weekGoalTarget) {
         final celebrateId = 'weekgoal-${retentionWeekKey(now)}';
         if (!store.hasMilestone(celebrateId)) {
+          weekGoalCelebration = celebrateId;
           candidates.add(Candidate(
             type: NotifType.weeklyGoal,
             when: now,
@@ -439,7 +847,6 @@ class NotificationScheduler {
                   'done': '$completionsThisWeek',
                 }),
           ));
-          await store.markMilestone(celebrateId);
         }
       } else if (!prefs.snoozedNow && !store.studiedToday) {
         // "Behind": the coming Thursday 18:30.
@@ -470,30 +877,28 @@ class NotificationScheduler {
       }
     }
 
-    // ── dormant (3 / 7 / 14 / 30) ────────────────────────────────────────
+    // ── dormant (3 / 7 / 14 / 30 days after the last open) ──────────────
+    //
+    // The next unreached threshold is armed; inside the 14-day daily-slot
+    // window it only survives the cap on a day with a slot switched off. So
+    // every threshold beyond that window is armed as well: a reader who stops
+    // opening the app runs out of daily slots after day 13, and these are the
+    // win-back that is left. All of it still goes through [applyDailyCap].
     if (prefs.enabledFor('dormant')) {
       final lastOpen = ref.read(retentionStoreProvider).lastOpenDay;
-      if (lastOpen != null) {
-        const thresholds = [3, 7, 14, 30];
-        final sinceOpen = retentionDayGap(lastOpen, retentionDayKey(now));
-        for (var i = 0; i < thresholds.length; i++) {
-          final t = thresholds[i];
-          if (t <= sinceOpen) continue; // already passed without opening
-          final base = DateTime.parse(lastOpen).add(Duration(days: t));
-          final fire = service.clampToWaking(
+      if (lastOpen != null && lastOpen.isNotEmpty) {
+        candidates.addAll(dormantCandidates(
+          lastOpenDay: lastOpen,
+          sinceOpen: retentionDayGap(lastOpen, retentionDayKey(now)),
+          now: now,
+          fireAt: (base) => service.clampToWaking(
             tz.TZDateTime(tz.local, base.year, base.month, base.day, 10, 0),
             quiet,
             NotifType.dormant,
-          );
-          candidates.add(Candidate(
-            type: NotifType.dormant,
-            when: fire,
-            slot: i,
-            deepLink: enrollment != null ? deepLink : '/dashboard',
-            variant: pickVariant(NotifType.dormant, rotation: t, tokens: tokens),
-          ));
-          break; // only the next unreached threshold is armed
-        }
+          ),
+          deepLink: enrollment != null ? deepLink : '/dashboard',
+          tokens: tokens,
+        ));
       }
     }
 
@@ -517,7 +922,7 @@ class NotificationScheduler {
 
       if (daysAway == 2 &&
           !(tree?.disabled ?? false) &&
-          !store.sentTypeToday(NotifType.treeWilting)) {
+          !store.sentTypeOn(NotifType.treeWilting, now)) {
         final fire = service.clampToWaking(
           service.nextInstanceOf(10, 30),
           quiet,
@@ -536,39 +941,16 @@ class NotificationScheduler {
       }
     }
 
-    // ── dailyVerse (independent of cadence and of the cap) ───────────────
-    if (prefs.enabledFor('dailyVerse')) {
-      final verses = ref.read(dailyVerseStoreProvider).history;
-      final latest = verses.isEmpty ? null : verses.first;
-      final h = prefs.dailyVerseMinutes ~/ 60;
-      final m = prefs.dailyVerseMinutes % 60;
-      for (var offset = 0; offset < 14; offset++) {
-        final fire = service.clampToWaking(
-          service.nextInstanceOf(h, m, dayOffset: offset),
-          quiet,
-          NotifType.dailyVerse,
-        );
-        candidates.add(Candidate(
-          type: NotifType.dailyVerse,
-          when: fire,
-          slot: offset,
-          deepLink: '/dashboard',
-          variant: pickVariant(NotifType.dailyVerse, rotation: offset, tokens: {
-            'verse': latest?.text,
-            'reference': latest?.reference,
-          }),
-        ));
-      }
+    // ── Daily total + write ─────────────────────────────────────────────
+    // A "Later vandaag" re-post is moot once the day's study is done; one
+    // that stays counts towards its day.
+    if (store.studiedToday) await service.cancelSnooze();
+    final kept = applyDailyCap(candidates, used: await _withSnooze(store.usedByDay(now)));
+    if (weekGoalCelebration != null &&
+        kept.any((c) => c.type == NotifType.weeklyGoal && c.immediate)) {
+      await store.markMilestone(weekGoalCelebration);
     }
 
-    // ── Ladder + write ──────────────────────────────────────────────────
-    final kept = applyLadder(
-      candidates,
-      cappedSentToday: store.cappedSentToday,
-      now: now,
-    );
-
-    final scheduledTypes = kept.map((c) => c.type).toSet();
     for (final type in NotifType.values) {
       if (type == NotifType.milestone) continue;
       await service.cancelType(type);
@@ -579,32 +961,105 @@ class NotificationScheduler {
     final art = NotificationArt.of(ref, now: now);
     unawaited(NotificationArt.sweep(now: now));
 
+    final armed = <({NotifType type, DateTime firesAt})>[];
     for (final c in kept) {
-      final images =
-          c.images ?? await art.forCandidate(c.type, c.when, celebrate: c.immediate);
-      if (c.immediate) {
-        await service.showNow(c.type, c.variant,
-            deepLink: c.deepLink, slot: c.slot, images: images);
-      } else {
-        final tzWhen = c.when is tz.TZDateTime
-            ? c.when as tz.TZDateTime
-            : tz.TZDateTime.from(c.when, tz.local);
-        await service.scheduleOneShot(c.type, tzWhen, c.variant,
-            deepLink: c.deepLink, slot: c.slot, images: images);
-      }
-      // Optimistic cap bookkeeping: a capped one-shot firing today counts as
-      // spent, so no second capped type is added today even across restarts. A
-      // completion before it fires triggers a recompute that cancels it.
-      if (c.type.isCapped &&
-          c.when.year == now.year &&
-          c.when.month == now.month &&
-          c.when.day == now.day) {
-        await store.recordNotificationSent(c.type, now: now);
+      // One failed write (a missing attachment, a plugin error) must not cost
+      // the rest of the batch; it is retried once without its picture.
+      final ok = await _write(service, art, c);
+      if (!ok) continue;
+      armed.add((type: c.type, firesAt: c.immediate ? now : c.when));
+    }
+    // The ledger records the instant each one-shot fires; it only counts as
+    // "sent" once that instant has passed, so re-running before then keeps it
+    // instead of dropping it (`sentTagFired`).
+    await store.replaceArmed(armed, now: now);
+  }
+
+  /// [used] plus the pending "Later vandaag" re-post, on its own day.
+  static Future<Map<String, int>> _withSnooze(Map<String, int> used) async {
+    final at = await NotificationService.snoozeRepostAt();
+    if (at == null) return used;
+    final key = retentionDayKey(at);
+    return {...used, key: (used[key] ?? 0) + 1};
+  }
+
+  /// The win-back thresholds, in days after the last open.
+  static const dormantThresholds = [3, 7, 14, 30];
+
+  /// The dormant candidates for a reader last seen on [lastOpenDay]: the next
+  /// unreached threshold, plus every later one that falls after the daily
+  /// slots' 14-day window (whose last slot is on `now + 13 days`).
+  @visibleForTesting
+  static List<Candidate> dormantCandidates({
+    required String lastOpenDay,
+    required int sinceOpen,
+    required DateTime now,
+    required DateTime Function(DateTime base) fireAt,
+    required String deepLink,
+    Map<String, String?> tokens = const {},
+  }) {
+    final horizon = retentionDayKey(DateTime(now.year, now.month, now.day + 13));
+    final lastOpen = DateTime.parse(lastOpenDay);
+    final out = <Candidate>[];
+    for (var i = 0; i < dormantThresholds.length; i++) {
+      final t = dormantThresholds[i];
+      if (t <= sinceOpen) continue; // already passed without opening
+      final fire = fireAt(DateTime(lastOpen.year, lastOpen.month, lastOpen.day + t));
+      final beyond = retentionDayKey(fire).compareTo(horizon) > 0;
+      if (out.isNotEmpty && !beyond) continue;
+      out.add(Candidate(
+        type: NotifType.dormant,
+        when: fire,
+        slot: i,
+        deepLink: deepLink,
+        variant: pickVariant(NotifType.dormant, rotation: t, tokens: tokens),
+      ));
+    }
+    return out;
+  }
+
+  /// Writes [c]; true when the OS accepted it.
+  static Future<bool> _write(
+    NotificationService service,
+    NotificationArt art,
+    Candidate c,
+  ) async {
+    TreeImageFiles? images;
+    try {
+      images = c.images ??
+          await art.forCandidate(c.type, c.when, celebrate: c.immediate);
+    } catch (e) {
+      debugPrint('[Notifications] art for ${c.type.id} failed: $e');
+    }
+    for (final withImages in [if (images != null) true, false]) {
+      try {
+        final pic = withImages ? images : null;
+        if (c.immediate) {
+          await service.showNow(c.type, c.variant,
+              deepLink: c.deepLink, slot: c.slot, images: pic);
+        } else {
+          final tzWhen = c.when is tz.TZDateTime
+              ? c.when as tz.TZDateTime
+              : tz.TZDateTime.from(c.when, tz.local);
+          await service.scheduleOneShot(c.type, tzWhen, c.variant,
+              deepLink: c.deepLink, slot: c.slot, images: pic);
+        }
+        return true;
+      } catch (e, st) {
+        debugPrint('[Notifications] ${c.type.id} slot ${c.slot} '
+            '${withImages ? 'with' : 'without'} art failed: $e\n$st');
       }
     }
+    return false;
+  }
 
-    // Types with nothing kept are already cancelled above.
-    scheduledTypes; // (kept for readability / future analytics)
+  /// The lesson a study notification opens: the resume day, on the step the
+  /// reader left off on when the server knows it.
+  static String studyDeepLink(String studyId, int day, StudyStep? step) {
+    final query = step == null || step == StudyStep.done ? '' : '?stap=${step.id}';
+    // Encoded: the router decodes path parameters and the tap whitelist
+    // accepts the escapes.
+    return '/studie/${Uri.encodeComponent(studyId)}/$day$query';
   }
 
   static int? _firstUndoneDay(CuratedStudy? study, StudyPlan? plan) {
@@ -703,12 +1158,20 @@ class NotificationScheduler {
     }
 
     if (!foregrounded) {
+      // Counts towards the daily total like everything else: every
+      // notification today, fired or still to come.
+      final now = DateTime.now();
+      final today = store.usedByDay(now,
+              stillArmed: NotifType.values.toSet())[retentionDayKey(now)] ??
+          0;
+      if (today >= kMaxNotificationsPerDay) return variant;
       final service = ref.read(notificationServiceProvider);
       // A milestone carries the grown tree - the thing the streak or badge
       // just did something for.
       final images = await NotificationArt.ofWidget(ref)
           .forCandidate(NotifType.milestone, DateTime.now());
       await service.showNow(NotifType.milestone, variant, deepLink: '/dashboard', images: images);
+      await store.recordNotificationSent(NotifType.milestone, now: now);
     }
     return variant;
   }

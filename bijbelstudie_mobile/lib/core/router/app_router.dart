@@ -14,6 +14,8 @@ import '../../features/study/present/lesson/lesson_screen.dart';
 import '../../features/study/domain/chapter_study_models.dart';
 import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
+import '../../features/bible_year/data/bible_year_models.dart';
+import '../../features/bible_year/present/bible_year_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
 import '../../features/onboarding/present/tour_controller.dart';
 import '../../features/onboarding/present/setup_flow_screen.dart';
@@ -368,6 +370,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/studies/boeken',
         builder: (context, state) => const BookOverviewScreen(),
+      ),
+      // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4). Also before
+      // `/studies/:id`; `?plan=jaar-2` preselects the duration.
+      GoRoute(
+        path: '/studies/bijbel-in-een-jaar',
+        builder: (context, state) => BibleYearScreen(
+          initialPlan: BibleYearPlanKey.tryParse(state.uri.queryParameters['plan']),
+        ),
       ),
       GoRoute(
         path: '/studies/:id',

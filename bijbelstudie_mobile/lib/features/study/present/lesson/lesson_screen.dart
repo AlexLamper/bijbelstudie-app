@@ -143,6 +143,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
         depthPanel == null) {
       return;
     }
+    // A finished step moves the study's position, which is what tomorrow's
+    // morning notification names; throttled, so a sitting costs a fetch or
+    // two rather than one per step.
+    final rescheduler =
+        completeStep == null ? null : ref.read(notificationReschedulerProvider);
     unawaited(
       ref
           .read(lessonRepositoryProvider)
@@ -155,7 +160,10 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
             depthPanel: depthPanel,
             entry: _entry,
           )
-          .then((_) {}, onError: (_, _) {}),
+          .then(
+            (_) => rescheduler?.requestReschedule(throttle: true),
+            onError: (_, _) {},
+          ),
     );
   }
 
@@ -236,7 +244,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
           }
         }, onError: (_, __) {}),
       );
-      ref.invalidate(notificationRecomputeProvider);
+      ref.read(notificationReschedulerProvider).requestReschedule();
 
       // A finished lesson is the app working as promised, so it counts towards
       // the rating gate. Silent on purpose: nothing is shown here, and the

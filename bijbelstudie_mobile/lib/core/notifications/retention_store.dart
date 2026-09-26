@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,8 +53,8 @@ class RetentionState {
   final String? graceUsedDay;
   final String? tzName;
 
-  /// `{ "2026-09-04": ["studyReminder"] }`, capped to 14 days - the frequency
-  /// cap ledger.
+  /// `{ "2026-09-04": ["studyReminder@1788000000000"] }`, capped to 14 days -
+  /// the frequency cap ledger. See [sentTagFired] for the tag format.
   final Map<String, List<String>> sentLog;
 
   /// Celebration dedupe: `streak-7`, `study-<id>-done`, `badge-<id>`,
@@ -126,6 +127,23 @@ String retentionWeekKey([DateTime? now]) {
 
 /// Number of whole days between two `yyyy-MM-dd` keys (`b - a`). Negative when
 /// [b] is before [a] (a clock rewind).
+/// A [RetentionState.sentLog] tag: `<typeId>@<epochMs>` for a one-shot armed
+/// to fire at that instant, or a bare `<typeId>` (older builds, written when
+/// the notification was scheduled; treated as already fired).
+({String typeId, int? firesAtMs}) parseSentTag(String tag) {
+  final at = tag.indexOf('@');
+  if (at < 0) return (typeId: tag, firesAtMs: null);
+  return (typeId: tag.substring(0, at), firesAtMs: int.tryParse(tag.substring(at + 1)));
+}
+
+/// Whether [tag] stands for a notification that has actually gone out by
+/// [now]. An armed one-shot still in the future has not: counting it as sent
+/// is what made the next recompute cancel the evening nudge it had just set.
+bool sentTagFired(String tag, DateTime now) {
+  final t = parseSentTag(tag);
+  return t.firesAtMs == null || t.firesAtMs! <= now.millisecondsSinceEpoch;
+}
+
 int retentionDayGap(String a, String b) {
   final da = DateTime.parse(a);
   final db = DateTime.parse(b);
@@ -151,17 +169,26 @@ class RetentionStore extends Notifier<RetentionState> {
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // [_persist] writes a missing day as '' - read it back as missing, or
+      // `DateTime.parse('')` throws in every day-gap check (and took the whole
+      // recompute and the first completion down with it).
+      String? day(String key) {
+        final v = prefs.getString('$_kPrefix$key');
+        return v == null || v.isEmpty ? null : v;
+      }
+      // The container can be gone by now (a test, a sign-out rebuild).
+      if (!ref.mounted) return;
       state = RetentionState(
         loaded: true,
-        lastCompletionDay: prefs.getString('${_kPrefix}lastCompletionDayKey'),
-        lastOpenDay: prefs.getString('${_kPrefix}lastOpenDayKey'),
+        lastCompletionDay: day('lastCompletionDayKey'),
+        lastOpenDay: day('lastOpenDayKey'),
         completionsByWeek: _decodeMap(prefs.getString('${_kPrefix}completionsByWeek')),
         localStreak: prefs.getInt('${_kPrefix}localStreak') ?? 0,
         serverStreakSeen: prefs.getInt('${_kPrefix}serverStreakSeen') ?? 0,
         completionsEver: prefs.getInt('${_kPrefix}completionsEver') ?? 0,
-        graceUsedDay: prefs.getString('${_kPrefix}graceUsedDayKey'),
+        graceUsedDay: day('graceUsedDayKey'),
         tzName: prefs.getString('${_kPrefix}tzName'),
-        sentLog: _decodeMap(prefs.getString('${_kPrefix}sentLog')),
+        sentLog: dropLegacyScheduledTags(_decodeMap(prefs.getString('${_kPrefix}sentLog'))),
         milestonesReached:
             (jsonDecodeList(prefs.getString('${_kPrefix}milestonesReached'))).toSet(),
         permissionAskedAfterFirstLesson:
@@ -169,7 +196,7 @@ class RetentionStore extends Notifier<RetentionState> {
         firstLessonDone: prefs.getBool('${_kPrefix}firstLessonDone') ?? false,
       );
     } catch (_) {
-      state = const RetentionState(loaded: true);
+      if (ref.mounted) state = const RetentionState(loaded: true);
     } finally {
       if (!_loaded.isCompleted) _loaded.complete();
     }
@@ -186,6 +213,27 @@ class RetentionStore extends Notifier<RetentionState> {
     } catch (_) {
       return const {};
     }
+  }
+
+  /// Types an older build could show on the spot (`showNow`), so a bare tag
+  /// of theirs may well stand for a notification that really went out.
+  static const _immediateTypeIds = {'milestone', 'weeklyGoal'};
+
+  /// An upgrade from a build that wrote a bare `<typeId>` tag when it
+  /// *scheduled* a one-shot: those were counted as sent from the moment they
+  /// were armed, cancelled or not, and would hold a day at its total. Only
+  /// the bare tags of types that can fire immediately are kept.
+  @visibleForTesting
+  static Map<String, List<String>> dropLegacyScheduledTags(Map<String, List<String>> log) {
+    final out = <String, List<String>>{};
+    for (final e in log.entries) {
+      final kept = e.value.where((tag) {
+        final t = parseSentTag(tag);
+        return t.firesAtMs != null || _immediateTypeIds.contains(t.typeId);
+      }).toList();
+      if (kept.isNotEmpty) out[e.key] = kept;
+    }
+    return out;
   }
 
   static List<String> jsonDecodeList(String? raw) {
@@ -237,19 +285,23 @@ class RetentionStore extends Notifier<RetentionState> {
   bool get openedToday => state.lastOpenDay == retentionDayKey();
 
   /// Whether a capped-type notification has already gone out today (§4.4).
-  bool get cappedSentToday {
-    final today = state.sentLog[retentionDayKey()] ?? const [];
+  bool get cappedSentToday => cappedSentOn(DateTime.now());
+
+  bool cappedSentOn(DateTime now) {
+    final today = state.sentLog[retentionDayKey(now)] ?? const [];
     return today.any((tag) {
-      final type = NotifType.values
-          .where((t) => t.id == tag)
-          .cast<NotifType?>()
-          .firstWhere((_) => true, orElse: () => null);
+      if (!sentTagFired(tag, now)) return false;
+      final id = parseSentTag(tag).typeId;
+      final type = NotifType.values.where((t) => t.id == id).firstOrNull;
       return type != null && type.isCapped;
     });
   }
 
-  bool sentTypeToday(NotifType type) =>
-      (state.sentLog[retentionDayKey()] ?? const []).contains(type.id);
+  bool sentTypeToday(NotifType type) => sentTypeOn(type, DateTime.now());
+
+  bool sentTypeOn(NotifType type, DateTime now) =>
+      (state.sentLog[retentionDayKey(now)] ?? const []).any((tag) =>
+          parseSentTag(tag).typeId == type.id && sentTagFired(tag, now));
 
   bool hasMilestone(String id) => state.milestonesReached.contains(id);
 
@@ -316,19 +368,93 @@ class RetentionStore extends Notifier<RetentionState> {
     ));
   }
 
-  Future<void> recordNotificationSent(NotifType type, {DateTime? now}) async {
+  /// Rewrites the armed ledger after a recompute: every armed tag that has
+  /// not fired by [now] is dropped (its one-shot was just cancelled), and
+  /// [armed] - every one-shot just written, on any day - is added. Tags that
+  /// already fired stay, so the day's total holds.
+  ///
+  /// [onlyTypes] limits the swap to those types: a recompute that rewrote only
+  /// the daily slots leaves the other types' armed tags alone, because their
+  /// one-shots are still with the OS.
+  Future<void> replaceArmed(
+    List<({NotifType type, DateTime firesAt})> armed, {
+    required DateTime now,
+    Set<NotifType>? onlyTypes,
+  }) async {
     await loaded;
-    final d = retentionDayKey(now);
+    final ids = onlyTypes?.map((t) => t.id).toSet();
+    final log = <String, List<String>>{};
+    for (final e in state.sentLog.entries) {
+      log[e.key] = e.value
+          .where((tag) =>
+              sentTagFired(tag, now) ||
+              (ids != null && !ids.contains(parseSentTag(tag).typeId)))
+          .toList();
+    }
+    log.removeWhere((_, v) => v.isEmpty);
+    for (final a in armed) {
+      final bucket = log.putIfAbsent(retentionDayKey(a.firesAt), () => <String>[]);
+      bucket.add('${a.type.id}@${a.firesAt.millisecondsSinceEpoch}');
+    }
+    await _persist(state.copyWith(sentLog: _trimLog(log, now)));
+  }
+
+  /// Keeps the last 14 days and everything ahead (armed one-shots reach 14
+  /// days out); ordering by key is chronological.
+  static Map<String, List<String>> _trimLog(Map<String, List<String>> log, DateTime now) {
+    final oldest = retentionDayKey(now.subtract(const Duration(days: 14)));
+    return {
+      for (final e in log.entries)
+        if (e.key.compareTo(oldest) >= 0) e.key: e.value,
+    };
+  }
+
+  /// Notifications per day key that count towards the daily total: every one
+  /// that has fired by [now], plus armed ones of [stillArmed] types (one-shots
+  /// the current recompute keeps rather than rewrites).
+  Map<String, int> usedByDay(
+    DateTime now, {
+    Set<NotifType> stillArmed = const {},
+  }) {
+    final keep = stillArmed.map((t) => t.id).toSet();
+    final out = <String, int>{};
+    for (final e in state.sentLog.entries) {
+      final n = e.value
+          .where((tag) => sentTagFired(tag, now) || keep.contains(parseSentTag(tag).typeId))
+          .length;
+      if (n > 0) out[e.key] = n;
+    }
+    return out;
+  }
+
+  /// Forgets [type]'s armed (not yet fired) tag on [dayKey] - its one-shot was
+  /// cancelled outside a recompute (today's evening, on app open).
+  Future<void> dropArmed(NotifType type, String dayKey, {required DateTime now}) async {
+    await loaded;
+    final tags = state.sentLog[dayKey];
+    if (tags == null) return;
+    final kept = tags
+        .where((t) => parseSentTag(t).typeId != type.id || sentTagFired(t, now))
+        .toList();
+    if (kept.length == tags.length) return;
     final log = {for (final e in state.sentLog.entries) e.key: [...e.value]};
-    final bucket = log.putIfAbsent(d, () => <String>[]);
-    if (!bucket.contains(type.id)) bucket.add(type.id);
-    if (log.length > 14) {
-      final keys = log.keys.toList()..sort();
-      for (final k in keys.take(log.length - 14)) {
-        log.remove(k);
-      }
+    if (kept.isEmpty) {
+      log.remove(dayKey);
+    } else {
+      log[dayKey] = kept;
     }
     await _persist(state.copyWith(sentLog: log));
+  }
+
+  /// Records a notification shown right now (a milestone, the weekly-goal
+  /// ping), so it counts towards today's total.
+  Future<void> recordNotificationSent(NotifType type, {DateTime? now}) async {
+    await loaded;
+    final at = now ?? DateTime.now();
+    final d = retentionDayKey(at);
+    final log = {for (final e in state.sentLog.entries) e.key: [...e.value]};
+    log.putIfAbsent(d, () => <String>[]).add('${type.id}@${at.millisecondsSinceEpoch}');
+    await _persist(state.copyWith(sentLog: _trimLog(log, at)));
   }
 
   Future<void> markMilestone(String id) async {
