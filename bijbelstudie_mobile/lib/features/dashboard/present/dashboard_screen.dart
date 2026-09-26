@@ -165,7 +165,7 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // "Verder waar je gebleven was" - the server's `resume` answer
+              // "Waar je gebleven was" - the server's `resume` answer
               // (same object as the website's card), or on an older server a
               // study lesson in progress, else the last Bible chapter read.
               TourAnchor(
