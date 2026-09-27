@@ -324,9 +324,15 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     await _ready;
     final today = dayKey(DateTime.now());
     final existing = state.history;
+    // Same day, same verse, same translation: nothing to write. A switch of
+    // translation keeps the reference but changes the text and the label, and
+    // today's entry must follow it - "Voorgaande dagen" and the favourites
+    // show the verse as the reader last saw it.
     if (existing.isNotEmpty &&
         existing.first.date == today &&
-        existing.first.reference == verse.reference) {
+        existing.first.reference == verse.reference &&
+        existing.first.text == verse.text &&
+        existing.first.version == version) {
       return;
     }
 
@@ -482,22 +488,40 @@ String dayKey(DateTime date) {
   return '${date.year}-$month-$day';
 }
 
-/// The short label for a translation id, as it is printed after a reference.
+/// The short label for a translation, as it is printed after a reference.
 ///
-/// Hand-mapped for the translations the app ships; anything the server starts
-/// serving falls back to its id in capitals, which is wrong-looking but never
-/// blank.
+/// Takes an id (`nbg51`) or the full name the server sends ("Statenvertaling",
+/// "NBG-vertaling 1951"), in any case - the same table as
+/// `versionAbbreviation` in the website's `lib/dailyVerseStore.ts`. The name
+/// used to fall through to capitals, which put "STATENVERTALING" after every
+/// reference. Anything unknown still falls back to capitals: wrong-looking,
+/// but never blank.
 String versionAbbreviation(String versionId) {
-  return switch (versionId) {
-    'statenvertaling' => 'SV',
-    'nbg51' => 'NBG51',
-    'canisiusbijbel' => 'CANIS',
-    'heilige_schrift_1917' => 'HS1917',
-    'kjv' => 'KJV',
-    'asv' => 'ASV',
-    'web' => 'WEB',
-    'geneva' => 'GNV',
-    'coverdale' => 'CVDL',
+  final key = versionId.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]'), '');
+  return switch (key) {
+    'statenvertaling' || 'sv' => 'SV',
+    'nbg51' || 'nbgvertaling1951' => 'NBG51',
+    'canisiusbijbel' || 'canisiusbijbel1939' => 'CANIS',
+    'heiligeschrift1917' || 'deheiligeschrift1917' => 'HS1917',
+    'kjv' || 'kingjamesversion' => 'KJV',
+    'asv' || 'americanstandardversion' => 'ASV',
+    'web' || 'worldenglishbible' => 'WEB',
+    'geneva' || 'genevabible(1599)' => 'GNV',
+    'coverdale' || 'coverdalebible(1535)' => 'CVDL',
     _ => versionId.replaceAll('_', '').toUpperCase(),
   };
 }
+
+/// The NBG-vertaling 1951 copyright notice, verbatim. The wording is
+/// contractual - never reword, shorten or restyle it. It must match
+/// `BIBLE_ATTRIBUTIONS.nbg51` in the website's `lib/bible-attribution.ts`,
+/// which is what the server sends as `attribution` with today's verse.
+const String nbg51Attribution =
+    'NBG-vertaling 1951© 1951 Nederlands-Vlaams Bijbelgenootschap';
+
+/// The notice a stored verse must carry, from the label it was stored with:
+/// the NBG51 string for an NBG51 verse, null for public domain. Days in the
+/// archive and hearted verses keep only the label, so this is how "Voorgaande
+/// dagen" and the favourites print the notice with licensed text.
+String? attributionForVersionLabel(String label) =>
+    label == 'NBG51' ? nbg51Attribution : null;

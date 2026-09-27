@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
 import '../../auth/domain/display_name.dart';
+import '../../settings/data/reading_settings.dart';
 
 import '../data/dashboard_models.dart';
 import '../data/dashboard_repository.dart';
@@ -32,11 +33,23 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
     }
 
-    final data = await repository.getDashboard();
+    // Read, not watched: a translation switch must not refetch the whole tab.
+    // The card follows a switch on its own ([dailyVerseInVersionProvider]).
+    final version = ref.read(readingSettingsProvider).lastVersionId;
+    final data = await repository.getDashboard(version: version);
     unawaited(PayloadCache.write(_cacheKey, data.raw));
     return data;
   }
 }
+
+/// Today's verse in one translation, for when the reader's translation is not
+/// the one `/dashboard` answered in - switched in the reader since, or the
+/// setting still coming off disk when the tab loaded. One small request, cached
+/// per translation on the CDN; dropped with the card.
+final dailyVerseInVersionProvider =
+    FutureProvider.autoDispose.family<DailyVerse?, String>((ref, versionId) {
+      return ref.watch(dashboardRepositoryProvider).getDailyVerse(version: versionId);
+    });
 
 final dashboardProvider =
     AsyncNotifierProvider.autoDispose<DashboardNotifier, DashboardData>(

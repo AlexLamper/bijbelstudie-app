@@ -52,13 +52,14 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   /// long verse lands where a short one was.
   static const double _cardHeight = 330;
 
-  bool _remembered = false;
+  /// The verse last written to the archive (reference, label and text), so a
+  /// rebuild does not write it again but a translation switch does.
+  String? _rememberedKey;
   bool _syncedArchive = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _rememberToday();
     _syncArchive();
   }
 
@@ -82,49 +83,72 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     });
   }
 
-  @override
-  void didUpdateWidget(covariant DailyVerseCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.verse?.reference != widget.verse?.reference) {
-      _remembered = false;
-      _rememberToday();
-    }
-  }
-
-  /// Appends today's verse to the local archive, once per mount.
+  /// Writes today's verse to the local archive - once, and again only when it
+  /// changes (a translation switch keeps the reference but not the text).
   ///
-  /// Deferred past the current frame: this runs from `didChangeDependencies`,
-  /// where writing to a provider would be a mutation during build.
-  void _rememberToday() {
-    final verse = widget.verse;
-    if (verse == null || _remembered) return;
-    _remembered = true;
+  /// Deferred past the current frame: this runs from `build`, where writing to
+  /// a provider would be a mutation during build.
+  void _rememberToday(DailyVerse verse, String version) {
+    final key = '${verse.reference}|$version|${verse.text}';
+    if (_rememberedKey == key) return;
+    _rememberedKey = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref
           .read(dailyVerseStoreProvider.notifier)
-          .remember(verse, version: _versionLabel(verse));
+          .remember(verse, version: version);
     });
+  }
+
+  /// Today's verse in the translation the reader reads in.
+  ///
+  /// `/dashboard` answers in the translation the reader had when the tab
+  /// loaded. When that is not the one selected now - switched in the reader
+  /// since, or the setting was still coming off disk - the verse is fetched
+  /// again in the current one, and the card shows the dashboard's copy until
+  /// it lands. `settled` is false while that fetch is in flight, so the
+  /// archive is not written with a verse about to be replaced.
+  ({DailyVerse? verse, bool settled}) _verseInReaderVersion() {
+    final base = widget.verse;
+    if (base == null) return (verse: null, settled: true);
+    final wanted = ref.watch(
+      readingSettingsProvider.select((s) => s.lastVersionId),
+    );
+    if (base.isIn(wanted)) return (verse: base, settled: true);
+    return switch (ref.watch(dailyVerseInVersionProvider(wanted))) {
+      AsyncData(:final value) => (verse: value ?? base, settled: true),
+      AsyncError() => (verse: base, settled: true),
+      _ => (verse: base, settled: false),
+    };
   }
 
   /// The abbreviation printed after the reference, e.g. `SV` in
   /// "Johannes 3:16 SV".
   ///
-  /// The feed does not send a translation today (see [DailyVerse.version]), so
-  /// this normally names the translation the reader has selected — which is
-  /// also the one "Lees het hele hoofdstuk" will open.
+  /// Always the translation the text is actually in, as the server names it:
+  /// `versionId` when sent, else the full name. Never the reader's selection -
+  /// when a translation lacks the day's verse the server sends the
+  /// Statenvertaling, and labelling that with the reader's choice would pass
+  /// one translation off as another. A payload naming nothing is the feed's
+  /// own Statenvertaling.
   String _versionLabel(DailyVerse verse) {
+    final id = verse.versionId;
+    if (id != null && id.isNotEmpty) return versionAbbreviation(id);
     final fromFeed = verse.version;
     if (fromFeed != null && fromFeed.isNotEmpty) {
       return versionAbbreviation(fromFeed);
     }
-    return versionAbbreviation(ref.read(readingSettingsProvider).lastVersionId);
+    return 'SV';
   }
 
   @override
   Widget build(BuildContext context) {
     final memory = ref.watch(dailyVerseStoreProvider);
-    final verse = widget.verse;
+    final resolved = _verseInReaderVersion();
+    final verse = resolved.verse;
+    if (verse != null && resolved.settled) {
+      _rememberToday(verse, _versionLabel(verse));
+    }
 
     // Offline or a failed feed: show the last verse that did arrive rather
     // than an empty hole where the card was yesterday.
@@ -154,6 +178,10 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final book = verse?.book ?? fallback!.book;
     final chapter = verse?.chapter ?? fallback!.chapter;
     final version = verse == null ? fallback!.version : _versionLabel(verse);
+    // The licence notice travels with licensed text everywhere it is shown:
+    // as the server sent it, or - for a stored day - from its label.
+    final attribution =
+        verse?.attribution ?? attributionForVersionLabel(version);
     final liked = memory.isLiked(reference);
     final verseNumber = verse?.verse ?? fallback?.verse;
     final scene = verseSceneForDay(DateTime.now());
@@ -168,6 +196,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
         text: text,
         reference: reference,
         version: version,
+        attribution: attribution,
         book: book,
         chapter: chapter,
         verseNumber: verseNumber,
@@ -184,13 +213,19 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
               text: text,
               reference: reference,
               version: version,
+              attribution: attribution,
               liked: liked,
               expanded: false,
               onLike: () => ref
                   .read(dailyVerseStoreProvider.notifier)
                   .toggleLike(reference),
-              onShare: (buttonContext) =>
-                  _share(buttonContext, text, reference, version),
+              onShare: (buttonContext) => _share(
+                buttonContext,
+                text,
+                reference,
+                version,
+                attribution,
+              ),
               onMore: () => _showMore(book, chapter, verseNumber),
             ),
           ),
@@ -214,6 +249,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     required String text,
     required String reference,
     required String version,
+    required String? attribution,
     required String book,
     required int chapter,
     required int? verseNumber,
@@ -234,8 +270,14 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
           text: text,
           reference: reference,
           version: version,
-          onShare: (buttonContext) =>
-              _share(buttonContext, text, reference, version),
+          attribution: attribution,
+          onShare: (buttonContext) => _share(
+            buttonContext,
+            text,
+            reference,
+            version,
+            attribution,
+          ),
           onReadChapter: () {
             Navigator.of(routeContext).pop();
             _openChapterAtVerse(book, chapter, verseNumber);
@@ -269,8 +311,11 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     String text,
     String reference,
     String version,
+    String? notice,
   ) async {
-    final attribution = version.isEmpty ? reference : '$reference ($version)';
+    // A licensed translation's notice goes with its text, off the app too.
+    final source = version.isEmpty ? reference : '$reference ($version)';
+    final attribution = notice == null ? source : '$source\n$notice';
     final box = buttonContext.findRenderObject() as RenderBox?;
     final origin = box != null && box.hasSize
         ? box.localToGlobal(Offset.zero) & box.size
@@ -350,6 +395,7 @@ class _VerseFace extends StatelessWidget {
     required this.text,
     required this.reference,
     required this.version,
+    this.attribution,
     required this.liked,
     required this.expanded,
     required this.onLike,
@@ -364,6 +410,10 @@ class _VerseFace extends StatelessWidget {
   final String text;
   final String reference;
   final String version;
+
+  /// The licence notice, printed verbatim under the verse (NBG51); null for
+  /// public-domain text.
+  final String? attribution;
   final bool liked;
 
   /// True in the modal: bigger type, the whole verse, and a close button.
@@ -489,6 +539,18 @@ class _VerseFace extends StatelessWidget {
                   ),
                 ),
               ),
+              if (attribution case final notice?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    notice,
+                    style: TextStyle(
+                      fontSize: expanded ? 12 : 10.5,
+                      height: 1.3,
+                      color: Colors.white.withValues(alpha: 0.78),
+                    ),
+                  ),
+                ),
               _VerseActions(
                 liked: liked,
                 onLike: onLike,
@@ -642,6 +704,7 @@ class _ExpandedVerseScreen extends ConsumerStatefulWidget {
     required this.text,
     required this.reference,
     required this.version,
+    required this.attribution,
     required this.onShare,
     required this.onReadChapter,
     required this.onHistory,
@@ -651,6 +714,7 @@ class _ExpandedVerseScreen extends ConsumerStatefulWidget {
   final String text;
   final String reference;
   final String version;
+  final String? attribution;
   final void Function(BuildContext buttonContext) onShare;
   final VoidCallback onReadChapter;
   final VoidCallback onHistory;
@@ -707,6 +771,7 @@ class _ExpandedVerseScreenState extends ConsumerState<_ExpandedVerseScreen> {
               text: widget.text,
               reference: widget.reference,
               version: widget.version,
+              attribution: widget.attribution,
               liked: liked,
               expanded: true,
               onLike: () => ref
@@ -1031,6 +1096,14 @@ class _HistorySheet extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppTheme.bodyMuted,
                           ),
+                          if (attributionForVersionLabel(entry.version)
+                              case final notice?) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              notice,
+                              style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+                            ),
+                          ],
                         ],
                       ),
                     );

@@ -67,6 +67,8 @@ class DailyVerse {
     required this.chapter,
     required this.verse,
     this.version,
+    this.versionId,
+    this.attribution,
   });
 
   final String text;
@@ -75,12 +77,31 @@ class DailyVerse {
   final int chapter;
   final int verse;
 
-  /// The translation the feed served the verse in, when it says so.
+  /// The translation id the text is actually in, e.g. `nbg51`.
   ///
-  /// The BijbelAPI "daytext" payload does not carry one today, so this is
-  /// almost always null; the card then labels the verse with the translation
-  /// the reader has selected instead. Parsed anyway so that a feed that starts
-  /// sending it wins over that guess without an app release.
+  /// Sent when the app asks for the verse in its reader's translation
+  /// (`?version=` on `/dashboard` and `/daytext`). The server falls back to
+  /// `statenvertaling` when that translation lacks the verse or is not
+  /// licensed for the app, so this - not the translation asked for - is what
+  /// the card labels the verse with. Null from a server that predates it.
+  final String? versionId;
+
+  /// The copyright notice that must be shown with this text, verbatim - the
+  /// NBG-vertaling 1951 string is contractual. Null for public domain.
+  final String? attribution;
+
+  /// Whether this is the verse as served for the reader's [readerVersionId]:
+  /// in that translation, or a server without the swap that only ever speaks
+  /// the Statenvertaling and was asked for it.
+  bool isIn(String readerVersionId) {
+    final id = versionId;
+    if (id != null) return id == readerVersionId;
+    return readerVersionId == 'statenvertaling';
+  }
+
+  /// The translation the server names for the verse, in full
+  /// ("Statenvertaling", "NBG-vertaling 1951"). [versionId] is the exact
+  /// one; this is the fallback for a server that does not send it.
   final String? version;
 
   static DailyVerse? fromJson(Map<String, dynamic>? json) {
@@ -105,6 +126,12 @@ class DailyVerse {
       version: _nonEmpty(json['version']) ??
           _nonEmpty(json['translation']) ??
           _nonEmpty(json['abbreviation']),
+      versionId: _nonEmpty(json['versionId']),
+      // Not trimmed or normalised: the notice is shown exactly as sent.
+      attribution: json['attribution'] is String &&
+              (json['attribution'] as String).trim().isNotEmpty
+          ? json['attribution'] as String
+          : null,
     );
   }
 }

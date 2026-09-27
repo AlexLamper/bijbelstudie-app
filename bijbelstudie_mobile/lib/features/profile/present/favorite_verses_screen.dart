@@ -115,6 +115,11 @@ class _FavoriteVerseRow extends ConsumerWidget {
                 ],
               ),
             ),
+            // Licensed text (NBG51) carries its notice, verbatim.
+            if (attributionForVersionLabel(like.version) case final notice?) ...[
+              const SizedBox(height: 6),
+              Text(notice, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
+            ],
           ],
         ],
       ),
@@ -126,9 +131,13 @@ class _FavoriteVerseRow extends ConsumerWidget {
     if (picked == null || !context.mounted) return;
 
     if (picked == NoteRowAction.share) {
-      final text = [like.text.trim(), like.referenceWithVersion]
-          .where((part) => part.isNotEmpty)
-          .join('\n\n');
+      final notice = like.text.trim().isEmpty
+          ? null
+          : attributionForVersionLabel(like.version);
+      final text = [
+        like.text.trim(),
+        [like.referenceWithVersion, if (notice != null) notice].join('\n'),
+      ].where((part) => part.isNotEmpty).join('\n\n');
       await shareRowText(context, text: text, subject: like.reference);
       return;
     }

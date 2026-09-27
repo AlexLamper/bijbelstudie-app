@@ -32,9 +32,17 @@ class DashboardRepository {
 
   /// One request for the whole tab. The website makes six; on a phone that is
   /// six round trips before anything renders.
-  Future<DashboardData> getDashboard() async {
+  ///
+  /// [version] is the translation the reader is in; the verse of the day comes
+  /// back in it (with its licence notice), or in the Statenvertaling when that
+  /// translation lacks the verse. Without it the server answers in the
+  /// Statenvertaling, as it always did.
+  Future<DashboardData> getDashboard({String? version}) async {
     try {
-      final response = await _apiClient.dio.get('/dashboard');
+      final response = await _apiClient.dio.get(
+        '/dashboard',
+        queryParameters: {if (version != null && version.isNotEmpty) 'version': version},
+      );
       return DashboardData.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw Exception('Fout bij ophalen dashboard: ${e.message}');
@@ -155,9 +163,15 @@ class DashboardRepository {
     );
   }
 
-  Future<DailyVerse?> getDailyVerse() async {
+  /// Today's verse on its own, in [version] when given - what the card asks
+  /// for when the reader's translation changed after `/dashboard` answered.
+  /// Public and cached per translation on the CDN.
+  Future<DailyVerse?> getDailyVerse({String? version}) async {
     try {
-      final response = await _apiClient.dio.get('/daytext');
+      final response = await _apiClient.dio.get(
+        '/daytext',
+        queryParameters: {if (version != null && version.isNotEmpty) 'version': version},
+      );
       return DailyVerse.fromJson(response.data as Map<String, dynamic>);
     } catch (_) {
       return null;
