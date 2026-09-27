@@ -90,6 +90,14 @@ Future<void> showProfileMenuSheet(
                     label: 'Bijbelstudies',
                     onTap: () => go(() => context.go('/studies')),
                   ),
+                  // The reading plan's own entry: it left the Start screen
+                  // and the top of Bijbelstudies, so this is where it lives.
+                  _MenuRow(
+                    icon: Icons.calendar_month_outlined,
+                    label: 'Bijbel in een jaar',
+                    onTap: () =>
+                        go(() => context.push('/studies/bijbel-in-een-jaar')),
+                  ),
                   _MenuRow(
                     icon: Icons.edit_note_outlined,
                     label: 'Notities en markeringen',

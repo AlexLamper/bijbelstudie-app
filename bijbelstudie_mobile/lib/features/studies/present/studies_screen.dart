@@ -63,18 +63,6 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _Header(controller: _searchController)),
-              // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4), at the top as on
-              // the website. Outside the catalogue's `when` so it shows while
-              // the studies load; hidden while searching, like every other
-              // browsing aid on this page.
-              SliverToBoxAdapter(
-                child: Consumer(
-                  builder: (context, ref, _) =>
-                      ref.watch(studiesQueryProvider).trim().isEmpty
-                      ? const BibleYearStudiesBlock()
-                      : const SizedBox.shrink(),
-                ),
-              ),
               ...studies.when(
                 loading: () => const [
                   SliverPadding(
@@ -191,19 +179,23 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
           ),
         ),
       ),
-      SliverPadding(
-        padding: const EdgeInsets.only(bottom: 40),
-        sliver: filtered.isEmpty
-            ? SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: _emptyFilter(filter),
-                ),
-              )
-            : SliverList.builder(
-                itemCount: filtered.length,
-                itemBuilder: (context, index) => _StudyRow(study: filtered[index]),
+      filtered.isEmpty
+          ? SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _emptyFilter(filter),
               ),
+            )
+          : SliverList.builder(
+              itemCount: filtered.length,
+              itemBuilder: (context, index) => _StudyRow(study: filtered[index]),
+            ),
+      // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4): one modest row under the
+      // catalogue, not a hero above it - the plan has its own row in the menu.
+      // Absent while searching, like every other browsing aid on this page.
+      const SliverPadding(
+        padding: EdgeInsets.only(bottom: 40),
+        sliver: SliverToBoxAdapter(child: BibleYearStudiesBlock()),
       ),
     ];
   }

@@ -8,8 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
-import '../../bible_year/present/bible_year_providers.dart';
-import '../../bible_year/present/bible_year_today_card.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
@@ -71,9 +69,6 @@ class DashboardScreen extends ConsumerWidget {
             color: AppTheme.teal,
             onRefresh: () async {
               ref.invalidate(dashboardProvider);
-              if (ref.exists(bibleYearProvider)) {
-                await ref.read(bibleYearProvider.notifier).refresh();
-              }
             },
             child: _DashboardBody(data: data),
           ),
@@ -177,13 +172,6 @@ class _DashboardBody extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // The Bijbel-in-een-jaar "Vandaag" card (DAILY_HABIT_PLAN.md
-              // §4), under the resume card and above the daily verse. Renders
-              // nothing - its 16px gap included - unless a plan is active.
-              // The dashboard already says whether one is, so a reader without
-              // a plan costs no `/bible-year` request.
-              BibleYearDashboardCard(planActive: data.bibleYearActive),
 
               // The card renders today's verse, or — offline — the newest one
               // in its local archive. It is left out entirely only when there

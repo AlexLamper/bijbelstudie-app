@@ -349,7 +349,8 @@ class _PreviewDashboardRepository implements DashboardRepository {
   const _PreviewDashboardRepository();
 
   @override
-  Future<DashboardData> getDashboard() async => PreviewData.dashboard;
+  Future<DashboardData> getDashboard({String? version}) async =>
+      PreviewData.dashboard;
 
   @override
   Future<void> recordRead({
@@ -367,7 +368,8 @@ class _PreviewDashboardRepository implements DashboardRepository {
   Future<StreakResult?> bumpStreak() async => null;
 
   @override
-  Future<DailyVerse?> getDailyVerse() async => PreviewData.dashboard.dailyVerse;
+  Future<DailyVerse?> getDailyVerse({String? version}) async =>
+      PreviewData.dashboard.dailyVerse;
 
   @override
   Future<List<DailyVerseEntry>> getDayTextHistory({int limit = 60}) async =>

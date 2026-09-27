@@ -10,10 +10,11 @@ import '../data/bible_year_models.dart';
 import '../domain/bible_year_display.dart';
 import 'bible_year_providers.dart';
 
-/// The "Bijbel in een jaar" block at the top of the Studies tab, as on the
-/// website's /studies. Not started (or signed out): two option cards, 1 jaar
-/// and 2 jaar, into the plan screen with that duration preselected. Started: a
-/// compact "Vandaag" row into the same screen.
+/// The "Bijbel in een jaar" row under the Studies catalogue, as on the
+/// website's /studies. Deliberately modest: the plan has its own row in the
+/// menu and is not the front of this tab. Not started (or signed out): one
+/// plain row into the plan screen, which holds the 1-jaar and 2-jaar options.
+/// Started: a compact "Vandaag" row into the same screen.
 class BibleYearStudiesBlock extends ConsumerStatefulWidget {
   const BibleYearStudiesBlock({super.key});
 
@@ -47,69 +48,44 @@ class _BibleYearStudiesBlockState extends ConsumerState<BibleYearStudiesBlock>
       );
     }
 
-    final plans = data?.catalogue.isNotEmpty == true ? data!.catalogue : kDefaultBibleYearCatalogue;
     final completed = data?.enrollment?.isCompleted == true;
 
+    // Not started (or signed out, or finished): one normal-sized row into the
+    // plan screen, where the 1-jaar and 2-jaar options live.
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.end,
-            spacing: 10,
-            children: [
-              Text('Bijbel in een jaar', style: AppTheme.bodyStrong.copyWith(fontSize: 13.5)),
-              Text(
-                completed ? 'Je hebt de hele Bijbel gelezen' : 'De hele Bijbel, elke dag een stuk',
-                style: AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.inkFaint),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        onTap: () => context.push(bibleYearPath),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bijbel in een jaar',
+                    style: AppTheme.displayBase,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    completed
+                        ? 'Je hebt de hele Bijbel gelezen'
+                        : 'Leesplan voor de hele Bijbel, in een of twee jaar',
+                    style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              for (var i = 0; i < plans.length; i++) ...[
-                if (i > 0) const SizedBox(width: 10),
-                Expanded(child: _PlanOption(plan: plans[i])),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanOption extends StatelessWidget {
-  const _PlanOption({required this.plan});
-
-  final BibleYearCatalogueEntry plan;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      onTap: () => context.push('$bibleYearPath?plan=${plan.planKey.id}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('De Bijbel in ${plan.label}', style: AppTheme.displayBase),
-          const SizedBox(height: 2),
-          Text(
-            '${plan.totalDays} dagen · ongeveer ${plan.minutesPerDay} min per dag',
-            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Start', style: AppTheme.pillLabel.copyWith(fontSize: 13, color: AppTheme.tealStrong)),
-              Icon(Icons.chevron_right, size: 16, color: AppTheme.tealStrong),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 10),
+            Text('Bekijk', style: AppTheme.pillLabel.copyWith(fontSize: 13, color: AppTheme.tealStrong)),
+            Icon(Icons.chevron_right, size: 16, color: AppTheme.tealStrong),
+          ],
+        ),
       ),
     );
   }
