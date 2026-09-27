@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
@@ -424,13 +423,6 @@ class _VerseActionSheet extends ConsumerWidget {
                   ),
                 ),
                 RuleListTile(
-                  onTap: () => _share(context),
-                  child: const _ActionRow(
-                    icon: Icons.ios_share,
-                    label: 'Delen',
-                  ),
-                ),
-                RuleListTile(
                   showRule: false,
                   onTap: () => _copy(context, reference),
                   child: const _ActionRow(
@@ -552,14 +544,6 @@ class _VerseActionSheet extends ConsumerWidget {
       }
     }
     if (context.mounted) Navigator.of(context).pop();
-  }
-
-  Future<void> _share(BuildContext context) async {
-    Navigator.of(context).pop();
-    await Share.share(
-      chapter.shareText(onlyVerses: [verse.number]),
-      subject: '${chapter.book} ${chapter.chapter}:${verse.number}',
-    );
   }
 
   Future<void> _copy(BuildContext context, String reference) async {
