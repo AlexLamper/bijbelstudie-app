@@ -26,21 +26,32 @@ class CrossRefRepository {
   static const kind = 'crossref';
   static const dataset = 'openbible';
 
-  static String sourceIdFor(String versionId) => '$dataset:$versionId';
+  /// The cache row for one translation, per tier.
+  ///
+  /// Free readers get the server's gated slice from the public (CDN) URL, Pro
+  /// readers the full list from `full=1`. The two are different payloads, so
+  /// they live in different rows: a reader who upgrades must not be served
+  /// the free slice off disk, and one whose Pro lapses must not keep the full
+  /// list. The free row keeps the pre-gate key.
+  static String sourceIdFor(String versionId, {bool full = false}) =>
+      full ? '$dataset-pro:$versionId' : '$dataset:$versionId';
 
+  /// [full] asks for every reference. The server only honours it for a Pro
+  /// account (it resolves the bearer); anyone else still gets the free slice.
   Future<CrossRefChapter> getChapter(
     String versionId,
     String book,
-    int chapter,
-  ) async {
-    final sourceId = sourceIdFor(versionId);
+    int chapter, {
+    bool full = false,
+  }) async {
+    final sourceId = sourceIdFor(versionId, full: full);
     final cached = await _readCache(sourceId, book, chapter);
 
     try {
       final etag = cached?.etag;
       final response = await _apiClient.dio.get(
         '/crossrefs/${Uri.encodeComponent(book)}/$chapter',
-        queryParameters: {'version': versionId},
+        queryParameters: {'version': versionId, if (full) 'full': '1'},
         options: Options(
           headers: etag == null ? null : {'If-None-Match': etag},
           // 304 is a success here, not an error.
@@ -107,9 +118,14 @@ class CrossRefRepository {
   Future<CrossRefChapter?> cachedChapter(
     String versionId,
     String book,
-    int chapter,
-  ) async {
-    final cached = await _readCache(sourceIdFor(versionId), book, chapter);
+    int chapter, {
+    bool full = false,
+  }) async {
+    final cached = await _readCache(
+      sourceIdFor(versionId, full: full),
+      book,
+      chapter,
+    );
     if (cached == null) return null;
     return CrossRefChapter.fromJson(cached.payload, fromCache: true);
   }

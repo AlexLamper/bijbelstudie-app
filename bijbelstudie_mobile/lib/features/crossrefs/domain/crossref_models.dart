@@ -118,19 +118,43 @@ class CrossRef {
 }
 
 /// The references hanging off one verse of the chapter, strongest first.
+///
+/// A free reader gets only the first few (the server's `FREE_CROSS_REFS`, the
+/// top-voted ones); [lockedCount] says how many more there are with Pro and
+/// [total] how many the verse has in all. A payload from before the gate has
+/// neither field, which reads as "everything is here".
 class CrossRefVerse {
-  const CrossRefVerse({required this.number, required this.refs});
+  const CrossRefVerse({
+    required this.number,
+    required this.refs,
+    int? total,
+    this.lockedCount = 0,
+  }) : total = total ?? refs.length;
 
   final int number;
   final List<CrossRef> refs;
 
+  /// References this verse has in total, including the locked ones.
+  final int total;
+
+  /// References withheld from this payload because the reader is not Pro.
+  final int lockedCount;
+
+  bool get isLocked => lockedCount > 0;
+
   factory CrossRefVerse.fromJson(Map<String, dynamic> json) {
+    final refs = (json['refs'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(CrossRef.fromJson)
+        .toList();
+    final locked = (json['lockedCount'] as num?)?.toInt() ?? 0;
+    final total = (json['total'] as num?)?.toInt();
     return CrossRefVerse(
       number: (json['n'] as num?)?.toInt() ?? 0,
-      refs: (json['refs'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(CrossRef.fromJson)
-          .toList(),
+      refs: refs,
+      lockedCount: locked < 0 ? 0 : locked,
+      // Never less than what actually arrived.
+      total: total == null || total < refs.length ? refs.length : total,
     );
   }
 }
@@ -203,14 +227,22 @@ class CrossRefChapter {
   }
 
   /// References for one verse, strongest first, empty when it has none.
-  List<CrossRef> refsFor(int verse) {
+  List<CrossRef> refsFor(int verse) => verseFor(verse)?.refs ?? const [];
+
+  /// The whole entry for one verse, or null when it has no references.
+  CrossRefVerse? verseFor(int verse) {
     for (final entry in verses) {
-      if (entry.number == verse) return entry.refs;
+      if (entry.number == verse) return entry;
     }
-    return const [];
+    return null;
   }
 
-  int countFor(int verse) => refsFor(verse).length;
+  /// How many references the verse has in total, locked ones included - the
+  /// number the long-press row shows.
+  int countFor(int verse) => verseFor(verse)?.total ?? 0;
+
+  /// How many of this verse's references are Pro-only in this payload.
+  int lockedCountFor(int verse) => verseFor(verse)?.lockedCount ?? 0;
 }
 
 /// The testament pair an analytics event may carry: `ot_ot`, `ot_nt`,

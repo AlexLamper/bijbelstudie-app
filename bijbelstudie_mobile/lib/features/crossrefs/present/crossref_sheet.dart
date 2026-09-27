@@ -10,6 +10,7 @@ import '../../../core/ui/skeleton.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
+import '../../premium/present/pro_access_provider.dart';
 import '../domain/crossref_models.dart';
 import 'crossref_providers.dart';
 
@@ -175,6 +176,12 @@ class _CrossRefSheetState extends ConsumerState<_CrossRefSheet> {
 
   Widget _body(ScrollController controller, CrossRefChapter data) {
     final refs = data.refsFor(widget.verse.number);
+    // A subscriber is never shown a lock (Guideline 3.1.1): right after a
+    // purchase the provider refetches the full list, and until it lands the
+    // free slice simply shows without the row.
+    final lockedCount = ref.watch(hasProProvider)
+        ? 0
+        : data.lockedCountFor(widget.verse.number);
 
     if (refs.isEmpty) {
       return _Padded(
@@ -228,9 +235,132 @@ class _CrossRefSheetState extends ConsumerState<_CrossRefSheet> {
             ),
           ),
         ],
+        if (lockedCount > 0) ...[
+          const SizedBox(height: 8),
+          CrossRefLockedRow(lockedCount: lockedCount),
+        ],
         const SizedBox(height: 12),
         _Attribution(data.attribution),
       ],
+    );
+  }
+}
+
+/// The row under a free reader's first references: how many more there are
+/// with Pro, over two placeholder rows. The placeholders are plain grey bars,
+/// never real labels or text - the withheld references are not on the device
+/// at all, the server never sent them. The lock identifies the row as a
+/// locked control; it is not decoration.
+///
+/// Tapping closes the sheet and opens the in-app paywall (`/pro-intro`,
+/// StoreKit / Play Billing through RevenueCat). Never web checkout.
+class CrossRefLockedRow extends ConsumerStatefulWidget {
+  const CrossRefLockedRow({super.key, required this.lockedCount});
+
+  final int lockedCount;
+
+  /// Must be a member of the server's `paywall_hit.surface` allowlist
+  /// (`lib/analyticsSchema.ts` in the web repo) or the event is dropped.
+  static const surface = 'crossrefs';
+
+  static String labelFor(int lockedCount) => lockedCount == 1
+      ? 'Nog 1 kruisverwijzing met Pro'
+      : 'Nog $lockedCount kruisverwijzingen met Pro';
+
+  @override
+  ConsumerState<CrossRefLockedRow> createState() => _CrossRefLockedRowState();
+}
+
+class _CrossRefLockedRowState extends ConsumerState<CrossRefLockedRow> {
+  @override
+  void initState() {
+    super.initState();
+    // One impression per mount, like UpgradePrompt.
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
+      'surface': CrossRefLockedRow.surface,
+    });
+  }
+
+  void _open() {
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+      'surface': CrossRefLockedRow.surface,
+    });
+    // Captured before the pop: the sheet's context is gone afterwards, the
+    // router is not.
+    final router = GoRouter.maybeOf(context);
+    Navigator.of(context).maybePop();
+    router?.push('/pro-intro?source=app_crossrefs');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final label = CrossRefLockedRow.labelFor(widget.lockedCount);
+    final bars = widget.lockedCount < 2 ? widget.lockedCount : 2;
+
+    return Semantics(
+      button: true,
+      label: '$label. Bekijk Pro.',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: _open,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        child: Ink(
+          decoration: BoxDecoration(
+            border: Border.all(color: AppTheme.rule),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < bars; i++) ...[
+                _PlaceholderBar(widthFactor: i == 0 ? 0.28 : 0.36, height: 10),
+                const SizedBox(height: 5),
+                const _PlaceholderBar(widthFactor: 1, height: 9),
+                const SizedBox(height: 10),
+              ],
+              Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 15, color: AppTheme.teal),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaceholderBar extends StatelessWidget {
+  const _PlaceholderBar({required this.widthFactor, required this.height});
+
+  final double widthFactor;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: AppTheme.paperSunkenStrong,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
     );
   }
 }
