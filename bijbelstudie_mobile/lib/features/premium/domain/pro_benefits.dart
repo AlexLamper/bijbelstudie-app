@@ -11,5 +11,5 @@ const List<(String, String)> kProBenefits = [
   // Not "Onbeperkt notities": the app's /api/v1 notes have no free limit, so
   // selling that would be a paid benefit free readers already have - exactly
   // what store review rejects as a misleading subscription.
-  ('Meer AI-vragen', 'Tot 200 vragen per dag in plaats van 5.'),
+  ('Meer AI-vragen', 'Tot 200 vragen per dag in plaats van 3.'),
 ];
