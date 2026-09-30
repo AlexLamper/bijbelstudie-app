@@ -6,11 +6,11 @@ import '../../auth/present/auth_controller.dart';
 /// What the "Tekst van de dag" card paints behind the verse. The order is the
 /// order of the pages the reader swipes through on the card.
 enum DailyVerseBackground {
-  /// The reader's own Levensboom (the default).
-  tree,
-
-  /// The day's nature photo (`assets/images/daytext/`).
+  /// The day's nature photo (`assets/images/daytext/`), the default.
   photo,
+
+  /// The reader's own Levensboom.
+  tree,
 }
 
 /// The reader's chosen background, remembered on the device per account so
@@ -37,7 +37,7 @@ class DailyVerseBackgroundStore extends Notifier<DailyVerseBackground> {
         ? kDailyVerseBackgroundKey
         : '$kDailyVerseBackgroundKey.$userId';
     _load(_key);
-    return DailyVerseBackground.tree;
+    return DailyVerseBackground.photo;
   }
 
   Future<void> _load(String key) async {
