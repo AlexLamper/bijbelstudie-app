@@ -11,13 +11,15 @@ import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../levensboom/domain/palette.dart' show DayPhase, timeOfDayForHour;
 import '../../levensboom/domain/verse_scene.dart';
 import '../../settings/data/reading_settings.dart';
+import '../data/daily_verse_background_store.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_repository.dart';
 import '../data/dashboard_models.dart';
 import 'dashboard_providers.dart';
-import 'widgets/daily_verse_tree_backdrop.dart';
+import 'widgets/daily_verse_background.dart';
+import 'widgets/daily_verse_share_image.dart';
 
-/// "Tekst van de dag" — the photo card at the top of the Start tab.
+/// "Tekst van de dag" - the photo card at the top of the Start tab.
 ///
 /// Modelled on the verse-of-the-day card in the YouVersion app: a full-bleed
 /// background, an eyebrow and the reference at the top left, the verse
@@ -36,7 +38,7 @@ class DailyVerseCard extends ConsumerStatefulWidget {
     required this.onOpenChapter,
   });
 
-  /// Today's verse, or null when `/dashboard` could not supply one — offline,
+  /// Today's verse, or null when `/dashboard` could not supply one - offline,
   /// or a feed hiccup. The card then falls back to the newest verse it has in
   /// its local archive, and renders nothing at all if that is empty too.
   final DailyVerse? verse;
@@ -47,7 +49,8 @@ class DailyVerseCard extends ConsumerStatefulWidget {
   ConsumerState<DailyVerseCard> createState() => _DailyVerseCardState();
 }
 
-class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
+class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
+    with SingleTickerProviderStateMixin {
   /// The card sits at a fixed height so the dashboard does not reflow when a
   /// long verse lands where a short one was.
   static const double _cardHeight = 330;
@@ -56,6 +59,21 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   /// rebuild does not write it again but a translation switch does.
   String? _rememberedKey;
   bool _syncedArchive = false;
+
+  /// The background pages (Levensboom, photo), swiped sideways on the card.
+  late final DailyVersePaging _paging = DailyVersePaging(
+    this,
+    initial: ref.read(dailyVerseBackgroundProvider).index,
+  );
+
+  /// True while the share image is being rendered, so a second tap waits.
+  bool _sharing = false;
+
+  @override
+  void dispose() {
+    _paging.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -185,12 +203,25 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     final liked = memory.isLiked(reference);
     final verseNumber = verse?.verse ?? fallback?.verse;
     final scene = verseSceneForDay(DateTime.now());
+    ref.listen(
+      dailyVerseBackgroundProvider,
+      (_, next) => _paging.sync(next.index),
+    );
 
     // Tapping the photo opens the same card full screen. The action buttons on
     // top of it keep their own taps: a tap recognizer nested inside this one
     // is the deeper entry in the gesture arena and wins it.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // Sideways swipes page between the two backgrounds; the one it settles
+      // on becomes the reader's default.
+      onHorizontalDragStart: (_) => _paging.dragStart(),
+      onHorizontalDragUpdate: (details) =>
+          _paging.dragUpdate(details, context.size?.width ?? 0),
+      onHorizontalDragEnd: (details) => ref
+          .read(dailyVerseBackgroundProvider.notifier)
+          .select(DailyVerseBackground.values[_paging.dragEnd(details)]),
+      onHorizontalDragCancel: _paging.dragCancel,
       onTap: () => _openExpanded(
         scene: scene,
         text: text,
@@ -210,6 +241,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             child: _VerseFace(
               scene: scene,
+              page: _paging.page,
               text: text,
               reference: reference,
               version: version,
@@ -313,25 +345,39 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     String version,
     String? notice,
   ) async {
-    // A licensed translation's notice goes with its text, off the app too.
-    final source = version.isEmpty ? reference : '$reference ($version)';
-    final attribution = notice == null ? source : '$source\n$notice';
+    if (_sharing) return;
+    _sharing = true;
     final box = buttonContext.findRenderObject() as RenderBox?;
     final origin = box != null && box.hasSize
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
     final messenger = ScaffoldMessenger.maybeOf(buttonContext);
+    final source = version.isEmpty ? reference : '$reference ($version)';
     try {
-      await Share.share(
-        '"$text"\n\n$attribution\n\n'
-        'Tekst van de dag op BijbelStudie - ${AppConfig.baseUrl}',
+      // A 9:16 status image on the reader's own background, the way
+      // YouVersion shares a verse; the text beside it is only where it came
+      // from. The licence notice is printed in the image itself.
+      final path = await renderDailyVerseShareImage(
+        buttonContext,
+        background: ref.read(dailyVerseBackgroundProvider),
+        scene: verseSceneForDay(DateTime.now()),
+        text: text,
+        reference: reference,
+        version: version,
+        attribution: notice,
+      );
+      await Share.shareXFiles(
+        [XFile(path, mimeType: 'image/png')],
+        text: '$source - ${AppConfig.baseUrl}',
         subject: 'Tekst van de dag - $reference',
         sharePositionOrigin: origin,
       );
-    } on Exception {
+    } on Object {
       messenger?.showSnackBar(
         const SnackBar(content: Text('Delen is niet gelukt.')),
       );
+    } finally {
+      _sharing = false;
     }
   }
 
@@ -350,7 +396,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
     }
   }
 
-  /// The local archive, as a sheet on [host]'s navigator — the dashboard's for
+  /// The local archive, as a sheet on [host]'s navigator - the dashboard's for
   /// the card, the dialog's for the modal, so the sheet lands on top of it.
   ///
   /// [beforeOpen] runs after the sheet closes and before the reader is sent to
@@ -373,7 +419,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
   }
 
   /// Names the verse the reader should scroll to and highlight, then hands
-  /// the actual navigation to [widget.onOpenChapter] as before — that keeps
+  /// the actual navigation to [widget.onOpenChapter] as before - that keeps
   /// this card out of routing, which stays the dashboard's job.
   void _openChapterAtVerse(String book, int chapter, int? verseNumber) {
     if (verseNumber != null) {
@@ -392,6 +438,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard> {
 class _VerseFace extends StatelessWidget {
   const _VerseFace({
     required this.scene,
+    this.page,
     required this.text,
     required this.reference,
     required this.version,
@@ -407,6 +454,11 @@ class _VerseFace extends StatelessWidget {
   });
 
   final VerseScene scene;
+
+  /// Card only: the background pager's position, 0..1. Null in the modal,
+  /// which shows the chosen background without paging.
+  final Animation<double>? page;
+
   final String text;
   final String reference;
   final String version;
@@ -422,7 +474,7 @@ class _VerseFace extends StatelessWidget {
   final VoidCallback onLike;
   final void Function(BuildContext buttonContext) onShare;
 
-  /// Card only — the "…" sheet that holds what the modal spells out.
+  /// Card only - the "…" sheet that holds what the modal spells out.
   final VoidCallback? onMore;
 
   /// Modal only.
@@ -435,7 +487,10 @@ class _VerseFace extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        DailyVerseBackdrop(scene: scene),
+        if (page case final page?)
+          DailyVerseBackgroundPager(scene: scene, page: page)
+        else
+          DailyVerseSelectedBackground(scene: scene),
 
         // Colours from here down sit on top of a photograph, so they are
         // literal white/black rather than theme tokens: the scrim has to
@@ -562,6 +617,14 @@ class _VerseFace extends StatelessWidget {
             ],
           ),
         ),
+
+        // Which background is showing; level with the eyebrow.
+        if (page case final page?)
+          Positioned(
+            top: 20,
+            right: 20,
+            child: IgnorePointer(child: DailyVersePageDots(page: page)),
+          ),
       ],
     );
   }
@@ -570,8 +633,8 @@ class _VerseFace extends StatelessWidget {
 /// The actions along the bottom of the photo.
 ///
 /// On the card: favourite, share and the "…" sheet. In the modal, where there
-/// is room, the sheet's two entries are spelled out instead — "Lees het hele
-/// hoofdstuk" as a button and the archive as an icon — so both surfaces offer
+/// is room, the sheet's two entries are spelled out instead - "Lees het hele
+/// hoofdstuk" as a button and the archive as an icon - so both surfaces offer
 /// the same four things and the modal never stacks a sheet on a dialog.
 class _VerseActions extends StatelessWidget {
   const _VerseActions({
@@ -869,7 +932,7 @@ class _PhotoAction extends StatelessWidget {
 /// The favourite button on the photo, with a small "pop" when a verse is
 /// liked.
 ///
-/// Behaves like a [_PhotoAction] otherwise — same size, splash and tooltip —
+/// Behaves like a [_PhotoAction] otherwise - same size, splash and tooltip -
 /// but on the transition to liked it plays a one-shot scale overshoot, swaps
 /// the outline heart for the filled one, fades the colour to [_heartRed]
 /// and sends a single accent ring outward. Unliking just settles the colour
@@ -980,7 +1043,7 @@ class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
     );
   }
 
-  /// A single expanding, fading circle in the accent colour — one clean pulse
+  /// A single expanding, fading circle in the accent colour - one clean pulse
   /// rather than a particle burst, which only reads as noise at this size.
   Widget _ring(double t) {
     final eased = Curves.easeOut.transform(t);

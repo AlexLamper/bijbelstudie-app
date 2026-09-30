@@ -17,12 +17,12 @@ import '../streak_detail_sheet.dart';
 /// Levensboom that grows with whatever the reader is being measured on, with
 /// the number tucked into a corner badge. Daily-streak readers grow it with the
 /// streak; week-goal readers grow it with this week's `done / target`. Both are
-/// visibly the same tree family, and the same tree as the one on Profiel — the
+/// visibly the same tree family, and the same tree as the one on Profiel - the
 /// seed is the account's. A `free`-rhythm reader, or one with no data yet, sees
 /// nothing here (the old bare "N dagen" pill is gone).
 ///
 /// Tapping it opens [showStreakDetailSheet], which explains whichever of the
-/// two this reader is actually looking at — a tree alone doesn't say what it
+/// two this reader is actually looking at - a tree alone doesn't say what it
 /// means.
 class HomeStreakIndicator extends ConsumerWidget {
   const HomeStreakIndicator({
@@ -203,7 +203,7 @@ class StreakRing extends StatelessWidget {
     final isDormant = streak <= 0;
 
     // "Boom verbergen" means no tree anywhere (TREE_FEATURE_PLAN §10), header
-    // included — the streak itself still has to be readable, so it falls back
+    // included - the streak itself still has to be readable, so it falls back
     // to a plain count pill.
     final days = streak == 1 ? 'dag' : 'dagen';
 
@@ -222,8 +222,8 @@ class StreakRing extends StatelessWidget {
       hasFreeze: hasFreeze,
       badge: '$streak',
       semanticsLabel: hasFreeze
-          ? 'Je boom — reeks van $streak $days, met een vrije dag'
-          : 'Je boom — reeks van $streak $days',
+          ? 'Je boom - reeks van $streak $days, met een vrije dag'
+          : 'Je boom - reeks van $streak $days',
       size: size,
     );
   }
@@ -267,7 +267,7 @@ class WeeklyGoalRing extends StatelessWidget {
       tree: tree,
       dormant: done <= 0,
       badge: '$done/$target',
-      semanticsLabel: 'Je boom — $done van $target $lessons deze week',
+      semanticsLabel: 'Je boom - $done van $target $lessons deze week',
       size: size,
     );
   }
@@ -276,7 +276,7 @@ class WeeklyGoalRing extends StatelessWidget {
 /// The no-tree fallback for readers who turned the Levensboom off.
 ///
 /// Keeps the header slot the same [size] the tree occupies so nothing beside it
-/// shifts, and stays a plain, quiet count — the point of switching the tree off
+/// shifts, and stays a plain, quiet count - the point of switching the tree off
 /// is not to get a differently decorated one.
 class _CountPill extends StatelessWidget {
   const _CountPill({
