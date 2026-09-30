@@ -104,6 +104,11 @@ Future<void> showProfileMenuSheet(
                     onTap: () => go(() => context.go('/notes')),
                   ),
                   _MenuRow(
+                    icon: Icons.favorite_border,
+                    label: 'Favoriete teksten',
+                    onTap: () => go(() => context.push('/profile/favorieten')),
+                  ),
+                  _MenuRow(
                     icon: Icons.local_library_outlined,
                     label: 'Hulpbronnen',
                     onTap: () => go(() => context.go('/resources')),
