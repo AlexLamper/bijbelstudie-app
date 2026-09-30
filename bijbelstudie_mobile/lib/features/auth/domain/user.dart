@@ -6,7 +6,7 @@ class User {
   final bool isPro;
 
   /// Where Pro came from: `stripe` (web subscriber), `apple`, `google`,
-  /// `admin`, or null. The paywall reads this — a web subscriber must be shown
+  /// `admin`, or null. The paywall reads this - a web subscriber must be shown
   /// "Actief via web" and no purchase button (App Store guideline 3.1.1).
   final String? proSource;
   final DateTime? proExpiresAt;

@@ -22,7 +22,7 @@ enum _ProPlan { monthly, yearly }
 ///
 /// Guideline 3.1.1: StoreKit products only. There is deliberately no Stripe
 /// link, no "abonneer op onze website", and no external purchase URL anywhere
-/// in this file — on the EU storefront that is an automatic rejection. Users
+/// in this file - on the EU storefront that is an automatic rejection. Users
 /// who already pay on the web keep Pro through `/api/v1/me` and are shown a
 /// status card instead of a purchase button.
 class PremiumScreen extends ConsumerStatefulWidget {
@@ -516,7 +516,7 @@ class _PlanTile extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  /// The amount the store will actually charge. This is the headline figure —
+  /// The amount the store will actually charge. This is the headline figure -
   /// guideline 3.1.2(c) requires the billed amount to be the most clear and
   /// conspicuous price on the tile, more so than any calculated figure.
   final String price;
@@ -527,7 +527,7 @@ class _PlanTile extends StatelessWidget {
   final VoidCallback onTap;
   final String? badge;
 
-  /// The derived per-week figure, shown smaller and below the billed amount —
+  /// The derived per-week figure, shown smaller and below the billed amount -
   /// a subordinate reference, never the headline.
   final String? perWeekLabel;
 

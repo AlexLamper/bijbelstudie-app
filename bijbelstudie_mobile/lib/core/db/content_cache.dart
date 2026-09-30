@@ -6,20 +6,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../data/account_scope.dart';
+
 /// On-device cache of fetched chapters.
 ///
 /// The corpus is ~355 MB on the server. It cannot ship inside the IPA and must
-/// not be downloaded wholesale on first launch, so the unit of transfer — and
-/// of caching — is one chapter. Rows are keyed `(kind, sourceId, book,
+/// not be downloaded wholesale on first launch, so the unit of transfer - and
+/// of caching - is one chapter. Rows are keyed `(kind, sourceId, book,
 /// chapter)` and carry the server's `ETag`, which turns a re-read into a
 /// conditional request that usually costs one empty 304.
 ///
 /// Eviction is least-recently-used against a byte cap. `lastReadAt` is what
-/// LRU sorts on, `fetchedAt` is when the bytes were last validated — a 304
+/// LRU sorts on, `fetchedAt` is when the bytes were last validated - a 304
 /// refreshes the second without touching the first.
 class ContentCache {
   static const _dbName = 'bijbelstudie_content.db';
-  static const _dbVersion = 1;
+  /// 2: search history and the write queue carry the account they belong to.
+  static const _dbVersion = 2;
 
   /// Default ceiling for cached chapter text. Roughly a few thousand chapters.
   static const int defaultMaxBytes = 300 * 1024 * 1024;
@@ -52,12 +55,7 @@ class ContentCache {
           )
         ''');
         await db.execute('CREATE INDEX idx_chapters_lru ON chapters (pinned, last_read_at)');
-        await db.execute('''
-          CREATE TABLE search_history (
-            query      TEXT PRIMARY KEY,
-            searched_at INTEGER NOT NULL
-          )
-        ''');
+        await db.execute(_createSearchHistory);
         await db.execute('''
           CREATE TABLE pending_changes (
             client_id  TEXT    NOT NULL,
@@ -65,12 +63,62 @@ class ContentCache {
             payload    TEXT,
             deleted    INTEGER NOT NULL DEFAULT 0,
             updated_at INTEGER NOT NULL,
+            account    TEXT    NOT NULL DEFAULT '',
             PRIMARY KEY (kind, client_id)
           )
         ''');
       },
+      onUpgrade: (db, from, to) async {
+        if (from < 2) {
+          // Existing rows are tagged '' (nobody yet); [_scoped] hands them to
+          // the account that inherited the pre-scoping data.
+          await db.execute(
+            "ALTER TABLE pending_changes ADD COLUMN account TEXT NOT NULL DEFAULT ''",
+          );
+          // The primary key changes, which SQLite can only do by copying.
+          await db.execute('ALTER TABLE search_history RENAME TO search_history_v1');
+          await db.execute(_createSearchHistory);
+          await db.execute(
+            "INSERT INTO search_history (account, query, searched_at) "
+            "SELECT '', query, searched_at FROM search_history_v1",
+          );
+          await db.execute('DROP TABLE search_history_v1');
+        }
+      },
     );
     return _db!;
+  }
+
+  static const _createSearchHistory = '''
+    CREATE TABLE search_history (
+      account     TEXT    NOT NULL DEFAULT '',
+      query       TEXT    NOT NULL,
+      searched_at INTEGER NOT NULL,
+      PRIMARY KEY (account, query)
+    )
+  ''';
+
+  /// Accounts already checked for untagged rows this session.
+  final Set<String> _adoptChecked = {};
+
+  /// The database, after handing untagged rows (written before search history
+  /// and the queue were per account) to [account] if it is the account that
+  /// inherited the pre-scoping data ([AccountScope.kLegacyOwnerKey]).
+  Future<Database> _scoped(String account) async {
+    final db = await _open();
+    if (account.isNotEmpty && _adoptChecked.add(account)) {
+      if (await AccountScope.legacyOwner() == account) {
+        await db.rawUpdate(
+          "UPDATE pending_changes SET account = ? WHERE account = ''",
+          [account],
+        );
+        await db.rawUpdate(
+          "UPDATE OR REPLACE search_history SET account = ? WHERE account = ''",
+          [account],
+        );
+      }
+    }
+    return db;
   }
 
   // --- offline write queue --------------------------------------------------
@@ -79,16 +127,22 @@ class ContentCache {
   /// server. Keyed on (kind, client_id) and replaced on conflict, so editing
   /// the same note five times offline leaves one row holding the latest state,
   /// not five conflicting ones.
+  ///
+  /// Every row is tagged with the [account] that made it ('' before any
+  /// sign-in), and only that account's rows are listed or replayed - another
+  /// reader's queued writes wait for them to sign in again.
   Future<void> enqueueChange({
     required String kind,
     required String clientId,
     Map<String, dynamic>? payload,
     bool deleted = false,
+    String? account,
   }) async {
-    final db = await _open();
+    final db = await _scoped(account ?? '');
     await db.insert('pending_changes', {
       'client_id': clientId,
       'kind': kind,
+      'account': account ?? '',
       'payload': payload == null ? null : jsonEncode(payload),
       'deleted': deleted ? 1 : 0,
       'updated_at': DateTime.now().millisecondsSinceEpoch,
@@ -100,12 +154,12 @@ class ContentCache {
   /// Pass [kind] to see only one record type's queue - that is what a list
   /// screen wants when it merges its own not-yet-synced writes into what the
   /// server returned; leave it out for the full queue that `/sync` replays.
-  Future<List<Map<String, dynamic>>> pendingChanges({String? kind}) async {
-    final db = await _open();
+  Future<List<Map<String, dynamic>>> pendingChanges({String? kind, String? account}) async {
+    final db = await _scoped(account ?? '');
     final rows = await db.query(
       'pending_changes',
-      where: kind == null ? null : 'kind = ?',
-      whereArgs: kind == null ? null : [kind],
+      where: kind == null ? 'account = ?' : 'account = ? AND kind = ?',
+      whereArgs: [account ?? '', if (kind != null) kind],
       orderBy: 'updated_at ASC',
     );
     return rows.map((row) {
@@ -123,9 +177,12 @@ class ContentCache {
     }).toList();
   }
 
-  Future<int> pendingChangeCount() async {
-    final db = await _open();
-    final result = await db.rawQuery('SELECT COUNT(*) AS n FROM pending_changes');
+  Future<int> pendingChangeCount({String? account}) async {
+    final db = await _scoped(account ?? '');
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM pending_changes WHERE account = ?',
+      [account ?? ''],
+    );
     return (result.first['n'] as num).toInt();
   }
 
@@ -155,7 +212,7 @@ class ContentCache {
     if (rows.isEmpty) return null;
 
     final row = rows.first;
-    // Touch the LRU timestamp, but do not await it — a read must not block on
+    // Touch the LRU timestamp, but do not await it - a read must not block on
     // a bookkeeping write.
     unawaited(
       db.update(
@@ -257,7 +314,7 @@ class ContentCache {
   /// Drops least-recently-read chapters until the cache fits again.
   ///
   /// Chapters the user explicitly downloaded ("Bewaar dit boek offline") are
-  /// pinned and evicted last — deleting them would silently break the offline
+  /// pinned and evicted last - deleting them would silently break the offline
   /// promise the download button made.
   Future<void> evictIfNeeded() async {
     final db = await _open();
@@ -419,29 +476,35 @@ class ContentCache {
 
   // --- search history -------------------------------------------------------
 
-  Future<void> recordSearch(String query) async {
+  // Per account, like the queue: [account] is the signed-in reader, '' before
+  // any sign-in.
+
+  Future<void> recordSearch(String query, {String? account}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
-    final db = await _open();
+    final db = await _scoped(account ?? '');
     await db.insert('search_history', {
+      'account': account ?? '',
       'query': trimmed,
       'searched_at': DateTime.now().millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<String>> recentSearches({int limit = 12}) async {
-    final db = await _open();
+  Future<List<String>> recentSearches({int limit = 12, String? account}) async {
+    final db = await _scoped(account ?? '');
     final rows = await db.query(
       'search_history',
+      where: 'account = ?',
+      whereArgs: [account ?? ''],
       orderBy: 'searched_at DESC',
       limit: limit,
     );
     return rows.map((r) => r['query'] as String).toList();
   }
 
-  Future<void> clearSearchHistory() async {
-    final db = await _open();
-    await db.delete('search_history');
+  Future<void> clearSearchHistory({String? account}) async {
+    final db = await _scoped(account ?? '');
+    await db.delete('search_history', where: 'account = ?', whereArgs: [account ?? '']);
   }
 }
 

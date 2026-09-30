@@ -35,6 +35,7 @@ import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
 import '../../features/premium/present/pro_access_provider.dart';
 import '../../features/premium/present/pro_celebration_screen.dart';
+import '../../features/premium/present/pro_promo_trigger.dart';
 import '../../features/profile/present/badges_screen.dart';
 import '../../features/profile/present/favorite_verses_screen.dart';
 import '../../features/profile/present/bible_progress_screen.dart';
@@ -50,7 +51,7 @@ import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
 /// (`components/layout/app-sidebar.tsx`): Dashboard, Bijbelstudie, Studies,
-/// Notities, Hulpbronnen — trimmed to the five that fit a phone bar, with
+/// Notities, Hulpbronnen - trimmed to the five that fit a phone bar, with
 /// Hulpbronnen reachable from the dashboard's "Snel naar" card and from
 /// Profiel. Groepen is hidden for the MVP: no tab, no links, and `/groups`
 /// redirects to the dashboard so a stale deep link cannot strand anyone.
@@ -85,7 +86,7 @@ class MainScaffold extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: child,
+      body: ProPromoTrigger(child: child),
       bottomNavigationBar: ReaderChromeReveal(
         visible: chromeVisible,
         axisAlignment: 1,
@@ -105,7 +106,12 @@ class MainScaffold extends ConsumerWidget {
                       child: _NavItem(
                         item: _items[i],
                         active: currentIndex == i,
-                        onTap: () => context.go(_items[i].route),
+                        onTap: () {
+                          // A tick only when the tab actually changes; re-tapping
+                          // the current tab is a no-op and should feel like one.
+                          if (currentIndex != i) AppHaptics.selection();
+                          context.go(_items[i].route);
+                        },
                       ),
                     ),
                 ],
@@ -220,46 +226,51 @@ class _NavItem extends StatelessWidget {
       button: true,
       selected: active,
       label: item.label,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // The tour's spotlight is cut around whatever this wraps. It sits
-            // on the icon alone rather than on the whole tab cell: a cell is a
-            // fifth of the bar wide and the full bar high, so spotlighting it
-            // highlighted mostly empty space and the neighbouring tabs' margins.
-            TourAnchor(
-              id: item.tourAnchorId,
-              // The Profiel tab wears the reader's own tree - the same face as
-              // the dashboard header and the website's navbar.
-              child: item.route == '/profile'
-                  ? LevensboomTabIcon(active: active)
-                  : item.lucide != null
-                  ? LucideIcon(
-                      item.lucide!,
-                      size: 21,
-                      color: color,
-                      strokeWidth: active ? 2.3 : 1.9,
-                    )
-                  : Icon(
-                      active ? item.activeIcon : item.icon,
-                      size: 21,
-                      color: color,
-                    ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontFamily: AppTheme.sansFontName,
-                fontSize: 10.5,
-                height: 1,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                color: color,
+      // Outside the InkWell so a press anywhere in the cell, not just on the
+      // icon and label, sinks the tab.
+      child: Pressable(
+        scale: 0.92,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // The tour's spotlight is cut around whatever this wraps. It sits
+              // on the icon alone rather than on the whole tab cell: a cell is a
+              // fifth of the bar wide and the full bar high, so spotlighting it
+              // highlighted mostly empty space and the neighbouring tabs' margins.
+              TourAnchor(
+                id: item.tourAnchorId,
+                // The Profiel tab wears the reader's own tree - the same face as
+                // the dashboard header and the website's navbar.
+                child: item.route == '/profile'
+                    ? LevensboomTabIcon(active: active)
+                    : item.lucide != null
+                    ? LucideIcon(
+                        item.lucide!,
+                        size: 21,
+                        color: color,
+                        strokeWidth: active ? 2.3 : 1.9,
+                      )
+                    : Icon(
+                        active ? item.activeIcon : item.icon,
+                        size: 21,
+                        color: color,
+                      ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontFamily: AppTheme.sansFontName,
+                  fontSize: 10.5,
+                  height: 1,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

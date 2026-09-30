@@ -111,11 +111,11 @@ String ladderCurrent(double progress) {
 /// Status of a step still ahead: "Niveau 12".
 String ladderAhead(int level) => ladderLevel(level);
 
-/// A phase section's range: "stap 7–12", "stap 21+" for the open-ended last.
+/// A phase section's range: "stap 7-12", "stap 21+" for the open-ended last.
 String phaseRange(int from, int? to) {
   if (to == null) return 'stap $from+';
   if (to == from) return 'stap $from';
-  return 'stap $from–$to';
+  return 'stap $from-$to';
 }
 
 /// The one line under the Groei header for an account with a head start from

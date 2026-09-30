@@ -501,7 +501,7 @@ class _VerseActionSheet extends ConsumerWidget {
   }
 
   /// Hands the note back to [showVerseActionSheet] instead of opening the
-  /// editor here — see the note on that function for why.
+  /// editor here - see the note on that function for why.
   void _addNote(BuildContext context) {
     Navigator.of(context).pop(_VerseSheetResult.note);
   }
@@ -606,7 +606,7 @@ class _ActionRow extends StatelessWidget {
   final String label;
 
   /// A count at the end of the row, or null while there is nothing to say.
-  /// Never a placeholder: a row that reads "0" or "—" invites a tap that
+  /// Never a placeholder: a row that reads "0" or "-" invites a tap that
   /// leads nowhere.
   final String? trailing;
 

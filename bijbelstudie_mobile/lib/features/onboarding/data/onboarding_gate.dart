@@ -9,7 +9,7 @@ import 'preferences_repository.dart';
 /// Splash (a returning session), login and register all funnel through this
 /// so the same rule decides whether the setup wizard or the tour still owes
 /// the user something, instead of three call sites each having their own
-/// opinion — which is how the app ended up shipping a splash screen that
+/// opinion - which is how the app ended up shipping a splash screen that
 /// unconditionally marked onboarding "seen" and a register screen that always
 /// went straight to `/dashboard`.
 ///
@@ -20,7 +20,7 @@ import 'preferences_repository.dart';
 /// The flags are read per account ([OnboardingStorage]). A second account
 /// registered on a phone that had already been set up used to inherit the
 /// first account's "done" flags and skip straight to the dashboard, never
-/// having been asked anything — and never asking the server, which knew
+/// having been asked anything - and never asking the server, which knew
 /// perfectly well that the new account had `onboardingCompleted: false`.
 Future<String> resolvePostAuthRoute(WidgetRef ref, {bool isNewAccount = false}) async {
   if (isNewAccount) return '/setup';
@@ -30,7 +30,7 @@ Future<String> resolvePostAuthRoute(WidgetRef ref, {bool isNewAccount = false}) 
 
   // Deliberately not left to throw. These are Keychain/KeyStore reads, and a
   // device that fails one (a restored backup, a rotated key, a locked
-  // keystore) would take the whole future down with it — and because the
+  // keystore) would take the whole future down with it - and because the
   // callers only chain `.then`, an authenticated user would sit on the login
   // screen with no error and no navigation. Signing in has already succeeded
   // by this point; the worst an unreadable flag can cost is being shown the
@@ -57,7 +57,7 @@ Future<String> resolvePostAuthRoute(WidgetRef ref, {bool isNewAccount = false}) 
         tourDone = true;
       }
     } catch (_) {
-      // Offline or the endpoint failed — fall back to what is known locally.
+      // Offline or the endpoint failed - fall back to what is known locally.
     }
   }
 

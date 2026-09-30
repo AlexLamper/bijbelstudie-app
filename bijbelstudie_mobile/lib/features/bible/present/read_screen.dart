@@ -1227,7 +1227,7 @@ class _ChapterNav extends ConsumerWidget {
           ),
           Flexible(
             child: Text(
-              '$current / ${chapters.isEmpty ? '–' : chapters.last}',
+              '$current / ${chapters.isEmpty ? '-' : chapters.last}',
               overflow: TextOverflow.ellipsis,
               style: AppTheme.caption.copyWith(
                 fontSize: 11,

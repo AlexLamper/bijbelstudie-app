@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/config/apple_sign_in_config.dart';
 import '../../../core/config/google_sign_in_config.dart';
 import '../data/auth_repository.dart';
+import '../../../core/data/account_scope.dart';
 import '../../../core/data/payload_cache.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/notifications/notification_schedule.dart';
@@ -38,6 +39,31 @@ final authRepositoryProvider = Provider(
 final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(() {
   return AuthController();
 });
+
+/// The account whose data the app's in-memory caches currently describe: the
+/// id of the last signed-in user.
+///
+/// Sticky across sign-out on purpose. A sign-out has nothing to refetch (and
+/// the screens still mounted while it runs must not rebuild into 401s); the
+/// moment that matters is the next sign-in, and it only changes this value
+/// when that sign-in is a *different* account. Every session-scoped provider
+/// resets on that change - [ProviderCache.cacheFor] listens to it centrally -
+/// so nothing fetched for the previous reader outlives the switch.
+final sessionAccountProvider = NotifierProvider<SessionAccount, String?>(SessionAccount.new);
+
+class SessionAccount extends Notifier<String?> {
+  @override
+  String? build() {
+    ref.listen(authControllerProvider.select((s) => s.value?.id), (_, id) {
+      if (id == null) return;
+      state = id;
+      // Persist it, and let the first account on this device inherit the
+      // favourites and plans stored before they were per account.
+      AccountScope.claim(id).catchError((_) {});
+    });
+    return ref.read(authControllerProvider).value?.id;
+  }
+}
 
 final googleSignInInitProvider = FutureProvider<void>((ref) async {
   return ref
@@ -105,7 +131,7 @@ class AuthController extends AsyncNotifier<User?> {
   ///
   ///  1. A null user is an error, not a success. `state = AsyncValue.data(null)`
   ///     reads as "signed out" to every listener, so the screens neither
-  ///     navigated nor showed a message — the button just stopped spinning.
+  ///     navigated nor showed a message - the button just stopped spinning.
   ///  2. Nothing best-effort runs *before* the state is published. Queue
   ///     flushing is a whole sync round trip whose size depends on how much
   ///     the device wrote while offline; awaiting it here held an
@@ -120,6 +146,14 @@ class AuthController extends AsyncNotifier<User?> {
       );
     }
     await _linkRevenueCat(user);
+    // The first-frame caches on disk must describe this account before any
+    // screen reads them. Sign-out already cleared them, but a sign-out forced
+    // by an expired session did not, and a request still in flight during
+    // sign-out can write the previous reader's payload back afterwards.
+    await PayloadCache.clearAll();
+    await LevensboomRepository.clearCache();
+    // Publishing a different account id resets every session-scoped provider
+    // (see [sessionAccountProvider]).
     state = AsyncValue.data(user);
     // The tree is per account. Whatever was loaded before this sign-in
     // belonged to someone else (or to this address before it was deleted and
@@ -219,7 +253,7 @@ class AuthController extends AsyncNotifier<User?> {
     }
   }
 
-  /// Signs in with Google — and registers the account when there isn't one.
+  /// Signs in with Google - and registers the account when there isn't one.
   ///
   /// This is deliberately a single entry point for both: `/api/v1/auth/google`
   /// finds, links or creates (see [AuthRepository.loginWithGoogle]), exactly
@@ -256,8 +290,8 @@ class AuthController extends AsyncNotifier<User?> {
   /// recovers it. Returns whether this method has dealt with the failure.
   ///
   /// What it must *not* do is swallow a failure that happened after the retry
-  /// found a credential. That is no longer an interrupted dialog — it is the
-  /// server or the network answering — and it used to be caught and replaced
+  /// found a credential. That is no longer an interrupted dialog - it is the
+  /// server or the network answering - and it used to be caught and replaced
   /// with "controleer SHA-1/SHA-256 van de release key in Google Cloud", which
   /// is advice about signing certificates aimed at a developer. A first-time
   /// user reading that had no idea their account simply had not been created.
@@ -438,6 +472,16 @@ class AuthController extends AsyncNotifier<User?> {
 
   Future<void> logout() async {
     state = const AsyncValue.loading();
+    // Push offline writes while this account's token is still valid. The
+    // queue is tagged per account, so what is left waits for this reader to
+    // sign in again rather than reaching the next account. Bounded, so
+    // a dead network cannot hold the reader on the sign-out spinner.
+    try {
+      await ref
+          .read(notesRepositoryProvider)
+          .flushPendingChanges()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
     final repository = ref.read(authRepositoryProvider);
     await repository.logout();
     // Per-account state that lives on the device goes with the session.

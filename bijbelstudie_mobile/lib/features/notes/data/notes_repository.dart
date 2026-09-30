@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/data/account_scope.dart';
 import '../../../core/db/content_cache.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../levensboom/domain/tree_state.dart';
@@ -14,6 +15,7 @@ final notesRepositoryProvider = Provider((ref) {
     ref.watch(apiClientProvider),
     ref.watch(contentCacheProvider),
     onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+    account: () => AccountScope.resolve(ref.read(sessionAccountProvider)),
   );
 });
 
@@ -82,7 +84,13 @@ String _rejectionMessage(DioException e, String action) {
 /// `POST /api/v1/sync` on the next successful call. Because the id travels with
 /// the record, replaying it is an upsert, never a duplicate.
 class NotesRepository {
-  NotesRepository(this._apiClient, this._cache, {XpSink? onXp}) : _onXp = onXp;
+  NotesRepository(
+    this._apiClient,
+    this._cache, {
+    XpSink? onXp,
+    Future<String?> Function()? account,
+  }) : _onXp = onXp,
+       _account = account;
 
   final ApiClient _apiClient;
   final ContentCache? _cache;
@@ -90,6 +98,14 @@ class NotesRepository {
   /// Forwards the `xp` a new note earned to the Levensboom. See [XpSink].
   /// Private so the test fakes that `implements` this class need not declare it.
   final XpSink? _onXp;
+
+  /// The signed-in account (or the last one, on an offline launch). The offline
+  /// queue is tagged with it, and a flush only replays that account's writes:
+  /// another reader's stay queued until they sign in again. Null before any
+  /// sign-in, which tags and replays the untagged rows.
+  final Future<String?> Function()? _account;
+
+  Future<String?> _accountId() async => _account == null ? null : await _account();
 
   Future<List<StudyNote>> listNotes() => _listNotes('/notes', kind: 'note');
 
@@ -133,6 +149,7 @@ class NotesRepository {
         kind: kind,
         clientId: note.id,
         payload: note.toRequestData(),
+        account: await _accountId(),
       );
       // The caller gets the note it just wrote; the server catches up later.
       return note;
@@ -147,7 +164,12 @@ class NotesRepository {
       unawaitedFlush();
     } on DioException catch (e) {
       if (!_isRetryable(e)) throw _rejection(e, 'verwijderd');
-      await _cache?.enqueueChange(kind: kind, clientId: note.id, deleted: true);
+      await _cache?.enqueueChange(
+        kind: kind,
+        clientId: note.id,
+        deleted: true,
+        account: await _accountId(),
+      );
     }
   }
 
@@ -179,6 +201,7 @@ class NotesRepository {
         kind: 'bookmark',
         clientId: bookmark.id,
         payload: bookmark.toRequestData(),
+        account: await _accountId(),
       );
       return bookmark;
     }
@@ -190,7 +213,12 @@ class NotesRepository {
       unawaitedFlush();
     } on DioException catch (e) {
       if (!_isRetryable(e)) throw _rejection(e, 'verwijderd');
-      await _cache?.enqueueChange(kind: 'bookmark', clientId: id, deleted: true);
+      await _cache?.enqueueChange(
+        kind: 'bookmark',
+        clientId: id,
+        deleted: true,
+        account: await _accountId(),
+      );
     }
   }
 
@@ -206,7 +234,8 @@ class NotesRepository {
   ) async {
     final cache = _cache;
     if (cache == null) return;
-    for (final change in await cache.pendingChanges(kind: kind)) {
+    final account = await _accountId();
+    for (final change in await cache.pendingChanges(kind: kind, account: account)) {
       final id = change['id'] as String;
       if (change.containsKey('deletedAt')) {
         byId.remove(id);
@@ -263,17 +292,19 @@ class NotesRepository {
         kind: 'reading-history',
         clientId: position.id,
         payload: position.toRequestData(),
+        account: await _accountId(),
       );
     }
   }
 
-  /// Replays everything queued while offline. Safe to call often — it returns
+  /// Replays everything queued while offline. Safe to call often - it returns
   /// immediately when the queue is empty.
   Future<int> flushPendingChanges() async {
     final cache = _cache;
     if (cache == null) return 0;
 
-    final pending = await cache.pendingChanges();
+    // Only this account's writes: the token sent with /sync is theirs.
+    final pending = await cache.pendingChanges(account: await _accountId());
     if (pending.isEmpty) return 0;
 
     try {
@@ -296,7 +327,7 @@ class NotesRepository {
     }
   }
 
-  /// Fire-and-forget flush after a successful call — the connection is known
+  /// Fire-and-forget flush after a successful call - the connection is known
   /// good at that moment, which is the cheapest possible trigger.
   void unawaitedFlush() {
     flushPendingChanges().catchError((_) => 0);

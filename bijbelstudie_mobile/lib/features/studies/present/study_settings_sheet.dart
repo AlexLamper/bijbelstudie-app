@@ -339,7 +339,7 @@ class _TranslationPickerState extends State<TranslationPicker> {
   @override
   void initState() {
     super.initState();
-    // Start expanded when the reader's own choice lives in this section —
+    // Start expanded when the reader's own choice lives in this section -
     // their pick should never be hidden from them.
     _otherExpanded = widget.sources.any(
       (s) => s.language != 'nl' && s.id == widget.selected,

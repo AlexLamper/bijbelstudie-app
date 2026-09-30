@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'pressable.dart';
+
+export 'pressable.dart';
 
 /// ---------------------------------------------------------------------------
 /// Building blocks copied from www.bijbelstudie.io.
@@ -23,7 +26,7 @@ class Eyebrow extends StatelessWidget {
   final String label;
   final Color? color;
 
-  /// Retained for source compatibility — the site draws no rule any more.
+  /// Retained for source compatibility - the site draws no rule any more.
   final Color? ruleColor;
 
   /// The 10px variant used above stat numbers.
@@ -43,7 +46,7 @@ class Eyebrow extends StatelessWidget {
   }
 }
 
-/// Page intro — `text-xl font-bold` heading with a muted sub-line, exactly the
+/// Page intro - `text-xl font-bold` heading with a muted sub-line, exactly the
 /// dashboard's `px-6 pt-7 pb-5 border-b border-border` header block.
 class GradientHeader extends StatelessWidget {
   const GradientHeader({
@@ -91,7 +94,7 @@ class GradientHeader extends StatelessWidget {
   }
 }
 
-/// Section heading — `text-sm font-bold` with an optional trailing link, the
+/// Section heading - `text-sm font-bold` with an optional trailing link, the
 /// pattern used above every dashboard card list.
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
@@ -141,7 +144,7 @@ class SectionHeader extends StatelessWidget {
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(width: 12),
               InkWell(
-                onTap: onAction,
+                onTap: AppHaptics.select(onAction),
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -177,7 +180,7 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// A 1px hairline — `border-border`.
+/// A 1px hairline - `border-border`.
 class RuleLine extends StatelessWidget {
   const RuleLine({super.key, this.color});
 
@@ -192,7 +195,7 @@ class RuleLine extends StatelessWidget {
   }
 }
 
-/// `h-7 w-7 rounded-lg bg-[rgba(13,148,136,0.08)]` with a small teal glyph —
+/// `h-7 w-7 rounded-lg bg-[rgba(13,148,136,0.08)]` with a small teal glyph -
 /// the icon chip that heads every card on the site.
 class IconChip extends StatelessWidget {
   const IconChip({
@@ -230,7 +233,7 @@ class IconChip extends StatelessWidget {
 }
 
 /// `bg-white dark:bg-card border border-gray-200 dark:border-border
-///  rounded-2xl` — the site never puts a shadow on a content card.
+///  rounded-2xl` - the site never puts a shadow on a content card.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -270,32 +273,36 @@ class AppCard extends StatelessWidget {
       );
     }
 
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(radius),
-      child: InkWell(
-        onTap: onTap,
+    // A card is big, so it travels less than a button does.
+    return Pressable(
+      scale: 0.98,
+      child: Material(
+        color: bg,
         borderRadius: BorderRadius.circular(radius),
-        highlightColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        splashColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: line),
+        child: InkWell(
+          onTap: AppHaptics.tap(onTap),
+          borderRadius: BorderRadius.circular(radius),
+          highlightColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          splashColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: line),
+            ),
+            // `clip` used to be honoured only on the non-tappable branch, so any
+            // card with an `onTap` silently ignored it and let a full-bleed image
+            // square off its own corners inside a rounded card.
+            clipBehavior: clip ? Clip.antiAlias : Clip.none,
+            child: child,
           ),
-          // `clip` used to be honoured only on the non-tappable branch, so any
-          // card with an `onTap` silently ignored it and let a full-bleed image
-          // square off its own corners inside a rounded card.
-          clipBehavior: clip ? Clip.antiAlias : Clip.none,
-          child: child,
         ),
       ),
     );
   }
 }
 
-/// White card whose children are separated by 1px rules — the site's list
+/// White card whose children are separated by 1px rules - the site's list
 /// card (`bg-white rounded-2xl border divide-y divide-border`).
 class RuleGrid extends StatelessWidget {
   const RuleGrid({super.key, required this.children});
@@ -347,7 +354,7 @@ class StatItem {
 }
 
 /// One `bg-white border rounded-xl` card holding the dashboard's stat trio
-/// side by side, `divide-x divide-border` in Tailwind terms — icon and value
+/// side by side, `divide-x divide-border` in Tailwind terms - icon and value
 /// inline per column, a single-line label under each, thin vertical rules
 /// between. Replaces the old one-card-per-stat grid, which wasted a border
 /// and a row of vertical space on every tile for what is, on a phone, three
@@ -417,7 +424,7 @@ class StatStrip extends StatelessWidget {
   }
 }
 
-/// One column of a [StatStrip] — icon beside the value, a tight one-line
+/// One column of a [StatStrip] - icon beside the value, a tight one-line
 /// label underneath, everything centred so the row reads as balanced.
 class _StatColumn extends StatelessWidget {
   const _StatColumn({required this.item});
@@ -464,7 +471,7 @@ class _StatColumn extends StatelessWidget {
 }
 
 /// `inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1
-///  rounded-full` on a tinted background — the streak pill and every tag.
+///  rounded-full` on a tinted background - the streak pill and every tag.
 class SiteBadge extends StatelessWidget {
   const SiteBadge(
     this.label, {
@@ -538,7 +545,7 @@ class SiteBadge extends StatelessWidget {
   }
 }
 
-/// Primary action — teal fill, `rounded-xl`, `text-sm font-semibold text-white`.
+/// Primary action - teal fill, `rounded-xl`, `text-sm font-semibold text-white`.
 class SiteButton extends StatelessWidget {
   const SiteButton({
     super.key,
@@ -561,44 +568,48 @@ class SiteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: expand ? double.infinity : null,
-      child: FilledButton(
-        onPressed: loading ? null : onPressed,
-        // The theme sets `minimumSize: Size.fromHeight(48)`, i.e. an *infinite*
-        // minimum width. Inside a Row that swallows the whole line and starves
-        // the flexible siblings, so a non-expanding button must drop it.
-        style: expand ? null : _compactStyle(height),
-        child: loading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
+    final action = loading ? null : onPressed;
+    return Pressable(
+      enabled: action != null,
+      child: SizedBox(
+        height: height,
+        width: expand ? double.infinity : null,
+        child: FilledButton(
+          onPressed: AppHaptics.tap(action),
+          // The theme sets `minimumSize: Size.fromHeight(48)`, i.e. an *infinite*
+          // minimum width. Inside a Row that swallows the whole line and starves
+          // the flexible siblings, so a non-expanding button must drop it.
+          style: expand ? null : _compactStyle(height),
+          child: loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 16),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(label),
+                    if (trailingIcon != null) ...[
+                      const SizedBox(width: 8),
+                      Icon(trailingIcon, size: 16),
+                    ],
+                  ],
                 ),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 16),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(label),
-                  if (trailingIcon != null) ...[
-                    const SizedBox(width: 8),
-                    Icon(trailingIcon, size: 16),
-                  ],
-                ],
-              ),
+        ),
       ),
     );
   }
 }
 
-/// Secondary action — `border border-gray-200 bg-white text-foreground`.
+/// Secondary action - `border border-gray-200 bg-white text-foreground`.
 class SiteOutlineButton extends StatelessWidget {
   const SiteOutlineButton({
     super.key,
@@ -617,30 +628,33 @@ class SiteOutlineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: expand ? double.infinity : null,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        // See [SiteButton.build]: the theme's infinite minimum width has to go
-        // when the button shares a Row with flexible content.
-        style: expand ? null : _compactStyle(height),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16),
-              const SizedBox(width: 8),
+    return Pressable(
+      enabled: onPressed != null,
+      child: SizedBox(
+        height: height,
+        width: expand ? double.infinity : null,
+        child: OutlinedButton(
+          onPressed: AppHaptics.tap(onPressed),
+          // See [SiteButton.build]: the theme's infinite minimum width has to go
+          // when the button shares a Row with flexible content.
+          style: expand ? null : _compactStyle(height),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16),
+                const SizedBox(width: 8),
+              ],
+              Text(label),
             ],
-            Text(label),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// The white pill button that sits on the teal hero — `bg-white rounded-xl
+/// The white pill button that sits on the teal hero - `bg-white rounded-xl
 /// px-5 py-2.5 text-sm font-semibold text-[#0D9488]`.
 class OnBrandButton extends StatelessWidget {
   const OnBrandButton({
@@ -657,26 +671,29 @@ class OnBrandButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      child: InkWell(
-        onTap: onPressed,
+    return Pressable(
+      enabled: onPressed != null,
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: AppTheme.buttonLabel.copyWith(color: AppTheme.teal),
-              ),
-              if (trailingIcon != null) ...[
-                const SizedBox(width: 8),
-                Icon(trailingIcon, size: 14, color: AppTheme.teal),
+        child: InkWell(
+          onTap: AppHaptics.tap(onPressed),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: AppTheme.buttonLabel.copyWith(color: AppTheme.teal),
+                ),
+                if (trailingIcon != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(trailingIcon, size: 14, color: AppTheme.teal),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -728,7 +745,7 @@ class RuleListTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: AppHaptics.tap(onTap),
         highlightColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
         splashColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
         child: content,
@@ -737,7 +754,7 @@ class RuleListTile extends StatelessWidget {
   }
 }
 
-/// Thin rounded progress track — `h-1.5 rounded-full bg-gray-200` with a teal
+/// Thin rounded progress track - `h-1.5 rounded-full bg-gray-200` with a teal
 /// fill, the bar under every plan and study card.
 class SiteProgressBar extends StatelessWidget {
   const SiteProgressBar({
@@ -767,7 +784,7 @@ class SiteProgressBar extends StatelessWidget {
   }
 }
 
-/// Loading spinner — teal, matching `text-brand` on the site.
+/// Loading spinner - teal, matching `text-brand` on the site.
 class AppLoader extends StatelessWidget {
   const AppLoader({super.key, this.size = 28});
 
@@ -788,7 +805,7 @@ class AppLoader extends StatelessWidget {
   }
 }
 
-/// Empty / error state — a muted glyph, a bold title and a muted lead.
+/// Empty / error state - a muted glyph, a bold title and a muted lead.
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
     super.key,
@@ -884,7 +901,10 @@ class AppSegmentedControl extends StatelessWidget {
               selected: i == selectedIndex,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(i),
+                onTap: () {
+                  if (i != selectedIndex) AppHaptics.selection();
+                  onChanged(i);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
                   decoration: BoxDecoration(
@@ -933,21 +953,24 @@ class AppFilterPill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected ? AppTheme.teal : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-            border: selected ? null : Border.all(color: AppTheme.rule),
-          ),
-          child: Text(
-            label,
-            style: AppTheme.pillLabel.copyWith(
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              color: selected ? Colors.white : AppTheme.inkSoft,
+      child: Pressable(
+        scale: 0.94,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: AppHaptics.select(onTap),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected ? AppTheme.teal : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+              border: selected ? null : Border.all(color: AppTheme.rule),
+            ),
+            child: Text(
+              label,
+              style: AppTheme.pillLabel.copyWith(
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? Colors.white : AppTheme.inkSoft,
+              ),
             ),
           ),
         ),
@@ -960,7 +983,7 @@ class AppFilterPill extends StatelessWidget {
 /// itself horizontally scrollable so a larger text scale never clips a tab.
 ///
 /// [leadingIcons] puts a small glyph in front of one tab, for a tab that is
-/// not like the others — the AI assistant, or a locked Pro tab. The glyph
+/// not like the others - the AI assistant, or a locked Pro tab. The glyph
 /// takes the label's own colour, so a marked tab still reads as part of the
 /// row rather than as a second accent loose in the design.
 class AppUnderlineTabs extends StatelessWidget {
@@ -986,7 +1009,7 @@ class AppUnderlineTabs extends StatelessWidget {
   final Map<int, IconData> leadingIcons;
 
   /// Index → a colour that glyph keeps whether its tab is selected or not,
-  /// for a mark that means something on its own — the assistant's gold. Left
+  /// for a mark that means something on its own - the assistant's gold. Left
   /// out, a glyph takes its label's colour.
   final Map<int, Color> leadingIconColors;
 
@@ -1014,7 +1037,10 @@ class AppUnderlineTabs extends StatelessWidget {
               selected: i == selectedIndex,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(i),
+                onTap: () {
+                  if (i != selectedIndex) AppHaptics.selection();
+                  onChanged(i);
+                },
                 // The underline is a border on the label's own box rather
                 // than a sized bar: inside a horizontal scroll there is no
                 // width to stretch a bar to.

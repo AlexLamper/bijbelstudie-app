@@ -27,7 +27,7 @@ class CrossRef {
   final int verse;
 
   /// Printable reference as the server formatted it. Never rebuilt for
-  /// display when the server sent one — the label and the numbering it
+  /// display when the server sent one - the label and the numbering it
   /// describes are decided in the same place.
   final String label;
 
@@ -85,7 +85,7 @@ class CrossRef {
     );
   }
 
-  /// The fallback used only when the server sent no label — an older build of
+  /// The fallback used only when the server sent no label - an older build of
   /// the route, or a payload that lost the field. Same shape the server uses:
   /// `Johannes 1:1-3`, `Mattheüs 5:1-7:29`.
   static String formatLabel({
@@ -162,7 +162,7 @@ class CrossRefVerse {
 /// One chapter's worth of cross-references.
 ///
 /// A chapter with nothing to show is a 200 with an empty [verses], never a
-/// 404, so "no references here" and "this failed" stay distinguishable — the
+/// 404, so "no references here" and "this failed" stay distinguishable - the
 /// sheet says something different for each.
 class CrossRefChapter {
   const CrossRefChapter({
@@ -249,7 +249,7 @@ class CrossRefChapter {
 /// `nt_ot`, `nt_nt`.
 ///
 /// This is the whole of what the funnel learns about which passage was
-/// followed. Book, chapter and verse are never sent — the server's allowlist
+/// followed. Book, chapter and verse are never sent - the server's allowlist
 /// refuses that cardinality by design, so an event carrying them is dropped
 /// silently and measures nothing.
 String crossRefTestamentPair(String fromBook, String toBook) {

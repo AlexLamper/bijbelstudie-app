@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'pressable.dart';
 
 /// Site button.
 ///
@@ -31,57 +32,61 @@ class PrimaryButton extends StatelessWidget {
     final bgColor = isSecondary ? scheme.surface : scheme.secondary;
     final fgColor = isSecondary ? scheme.onSurface : Colors.white;
 
-    return SizedBox(
-      width: double.infinity,
-      height: height,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          foregroundColor: fgColor,
-          disabledBackgroundColor: isSecondary
-              ? scheme.surfaceContainerHighest
-              : scheme.secondary.withValues(alpha: 0.45),
-          disabledForegroundColor: isSecondary
-              ? scheme.onSurfaceVariant
-              : Colors.white.withValues(alpha: 0.8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            side: isSecondary
-                ? BorderSide(color: scheme.outline)
-                : BorderSide.none,
+    final action = isLoading ? null : onPressed;
+    return Pressable(
+      enabled: action != null,
+      child: SizedBox(
+        width: double.infinity,
+        height: height,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bgColor,
+            foregroundColor: fgColor,
+            disabledBackgroundColor: isSecondary
+                ? scheme.surfaceContainerHighest
+                : scheme.secondary.withValues(alpha: 0.45),
+            disabledForegroundColor: isSecondary
+                ? scheme.onSurfaceVariant
+                : Colors.white.withValues(alpha: 0.8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              side: isSecondary
+                  ? BorderSide(color: scheme.outline)
+                  : BorderSide.none,
+            ),
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            textStyle: AppTheme.buttonLabel,
           ),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          textStyle: AppTheme.buttonLabel,
-        ),
-        onPressed: isLoading ? null : onPressed,
-        child: isLoading
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(fgColor),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (leading != null) ...[leading!, const SizedBox(width: 10)],
-                  Flexible(
-                    child: Text(
-                      text,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: AppTheme.sansFontName,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+          onPressed: AppHaptics.tap(action),
+          child: isLoading
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(fgColor),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (leading != null) ...[leading!, const SizedBox(width: 10)],
+                    Flexible(
+                      child: Text(
+                        text,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.sansFontName,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }

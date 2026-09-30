@@ -7,7 +7,7 @@
 ///
 /// Counts are nullable on purpose: `/api/v1/admin/stats` degrades per query and
 /// sends `null` for a figure it could not read, naming it in
-/// [AdminStats.degraded]. Null means "unknown" and must render as a dash —
+/// [AdminStats.degraded]. Null means "unknown" and must render as a dash -
 /// never as 0, which reads as a real measurement.
 library;
 
@@ -43,7 +43,7 @@ class AdminUserStats {
   /// Everyone with access, however they got it.
   final int? premium;
 
-  /// Everyone somebody actually pays for — the subscriber number.
+  /// Everyone somebody actually pays for - the subscriber number.
   final int? paying;
 
   final int? stripeSubscribers;
@@ -78,7 +78,7 @@ class AdminUserStats {
   }
 }
 
-/// The `billing` block — the card that has to make a billing problem loud.
+/// The `billing` block - the card that has to make a billing problem loud.
 class AdminBillingStats {
   const AdminBillingStats({
     this.byStatus,
@@ -151,7 +151,7 @@ class AdminRevenueStats {
   }
 }
 
-/// The `content` block — notes, sessions, groups, plans.
+/// The `content` block - notes, sessions, groups, plans.
 class AdminContentStats {
   const AdminContentStats({
     this.notes,
@@ -318,7 +318,7 @@ class AdminStudyRow {
   }
 }
 
-/// The `study` block — how many people actually study.
+/// The `study` block - how many people actually study.
 class AdminStudyStats {
   const AdminStudyStats({
     required this.enrollmentsActive,
@@ -380,7 +380,7 @@ class AdminInsights {
     required this.study,
   });
 
-  /// Days covered — the server clamps to 7...365.
+  /// Days covered - the server clamps to 7...365.
   final int range;
 
   final List<AdminSeriesPoint> signups;
@@ -469,7 +469,7 @@ class AdminAccount {
 
   final bool isPro;
 
-  /// Pro without payment — a review account or an admin grant.
+  /// Pro without payment - a review account or an admin grant.
   final bool isComped;
 
   final bool storePremium;

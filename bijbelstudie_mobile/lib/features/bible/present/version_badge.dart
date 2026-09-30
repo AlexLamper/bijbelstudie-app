@@ -67,7 +67,7 @@ class VersionBadge extends StatelessWidget {
 ///
 /// Replaces the hairline-with-a-word separator, which read as a divider
 /// rather than as the start of a section. The count is deliberately quieter
-/// than the name — it is a detail of the section, not a second heading.
+/// than the name - it is a detail of the section, not a second heading.
 class LanguageSectionHeader extends StatelessWidget {
   const LanguageSectionHeader({super.key, required this.label, required this.count});
 

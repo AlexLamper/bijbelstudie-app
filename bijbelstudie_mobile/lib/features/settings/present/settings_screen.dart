@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/data/account_scope.dart';
 import '../../../core/db/content_cache.dart';
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
 import '../../bible/present/reader_settings_sheet.dart';
@@ -44,7 +46,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _refreshCacheSize() async {
     final cache = ref.read(contentCacheProvider);
     final bytes = await cache?.totalBytes();
-    final pending = await cache?.pendingChangeCount();
+    // This account's queue only; another reader's waits for their sign-in.
+    final account = await AccountScope.resolve(ref.read(sessionAccountProvider));
+    final pending = await cache?.pendingChangeCount(account: account);
     if (mounted) {
       setState(() {
         _cacheBytes = bytes ?? 0;
@@ -555,7 +559,7 @@ class _QuietHoursRow extends StatelessWidget implements _SettingsRowLike {
         mainAxisSize: MainAxisSize.min,
         children: [
           _TimeButton(minutes: startMinutes, onPicked: (m) => onChanged(m, null)),
-          Text('–', style: AppTheme.bodyMuted),
+          Text('-', style: AppTheme.bodyMuted),
           _TimeButton(minutes: endMinutes, onPicked: (m) => onChanged(null, m)),
         ],
       ),

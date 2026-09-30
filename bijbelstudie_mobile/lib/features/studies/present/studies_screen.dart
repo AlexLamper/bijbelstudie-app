@@ -6,7 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible_year/present/bible_year_providers.dart';
-import '../../bible_year/present/bible_year_studies_block.dart';
+import '../../dashboard/data/resume_link.dart';
 import '../../dashboard/data/resume_models.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../dashboard/present/resume_providers.dart';
@@ -182,21 +182,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       filtered.isEmpty
           ? SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 child: _emptyFilter(filter),
               ),
             )
-          : SliverList.builder(
-              itemCount: filtered.length,
-              itemBuilder: (context, index) => _StudyRow(study: filtered[index]),
+          : SliverPadding(
+              padding: const EdgeInsets.only(bottom: 40),
+              sliver: SliverList.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, index) => _StudyRow(study: filtered[index]),
+              ),
             ),
-      // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4): one modest row under the
-      // catalogue, not a hero above it - the plan has its own row in the menu.
-      // Absent while searching, like every other browsing aid on this page.
-      const SliverPadding(
-        padding: EdgeInsets.only(bottom: 40),
-        sliver: SliverToBoxAdapter(child: BibleYearStudiesBlock()),
-      ),
     ];
   }
 
@@ -312,9 +308,18 @@ class _Header extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            header: true,
-            child: Text('Studies', style: AppTheme.screenTitle),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text('Studies', style: AppTheme.screenTitle),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const _BibleYearButton(),
+            ],
           ),
           const SizedBox(height: 2),
           Text(
@@ -356,6 +361,50 @@ class _Header extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact entry to the reading plan, top-right of the header. Replaces the
+/// old row under the catalogue (DAILY_HABIT_PLAN.md §4) - the plan still has
+/// its own row in the menu, this is just a way in from the studies page.
+class _BibleYearButton extends StatelessWidget {
+  const _BibleYearButton();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Tooltip(
+      message: 'Bijbel in een jaar',
+      child: Semantics(
+        button: true,
+        label: 'Bijbel in een jaar',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => context.push(bibleYearPath),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppTheme.tealTint,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.calendar_month_outlined, size: 16, color: AppTheme.tealStrong),
+                const SizedBox(width: 5),
+                Text(
+                  'Jaarplan',
+                  style: AppTheme.pillLabel.copyWith(
+                    fontSize: 12,
+                    color: AppTheme.tealStrong,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

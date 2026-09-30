@@ -8,7 +8,7 @@ import '../domain/admin_entities.dart';
 import 'admin_common.dart';
 import 'admin_providers.dart';
 
-/// The insights tab — the website's `/admin/insights` page stacked for a
+/// The insights tab - the website's `/admin/insights` page stacked for a
 /// phone: a range picker, the traffic split, every day-series as a bar chart,
 /// the most-viewed pages and clicked targets, and the study funnel.
 class AdminInsightsTab extends ConsumerStatefulWidget {
@@ -228,9 +228,9 @@ class _AdminInsightsTabState extends ConsumerState<AdminInsightsTab> {
             ),
             AdminStatRow(
               label: 'Quizscore',
-              // Null when nothing is graded yet — an em dash, not 0%.
+              // Null when nothing is graded yet - an em dash, not 0%.
               value: data.study.quizAccuracy == null
-                  ? '—'
+                  ? '-'
                   : adminPercent(data.study.quizAccuracy!.toDouble()),
               showRule: false,
             ),

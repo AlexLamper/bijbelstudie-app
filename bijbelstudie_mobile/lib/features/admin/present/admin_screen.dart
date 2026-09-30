@@ -12,7 +12,7 @@ import 'admin_users_tab.dart';
 ///
 /// [isAdminProvider] only decides whether this screen is *shown*. Every call it
 /// makes hits `/api/v1/admin/*`, which re-reads the account server-side and
-/// answers 403 to anyone else — so reaching this route without the rights
+/// answers 403 to anyone else - so reaching this route without the rights
 /// yields empty error states, never data.
 class AdminScreen extends ConsumerWidget {
   const AdminScreen({super.key});

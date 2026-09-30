@@ -58,7 +58,7 @@ class GoogleSignInConfig {
   /// A button that cannot possibly work is worse than no button: on iOS it was
   /// hidden outright until an iOS OAuth client existed. That is now a config
   /// question rather than a hardcoded platform check, so shipping the client
-  /// id turns it on with no code change — and forgetting to ship it leaves the
+  /// id turns it on with no code change - and forgetting to ship it leaves the
   /// screen exactly as it was, with Sign in with Apple and email/password.
   static bool get isAvailable {
     if (kIsWeb) return webClientId.isNotEmpty;

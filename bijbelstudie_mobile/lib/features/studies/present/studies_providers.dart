@@ -130,8 +130,8 @@ final studyEnrollmentProvider = Provider.autoDispose
 /// Which section of the catalogue is on screen.
 /// The one filter row on Studies · Ontdek.
 ///
-/// The redesign collapses what used to be three separate controls — the
-/// Ontdek/Mijn/Voltooid tabs, the four topic tiles and the kind pills — into a
+/// The redesign collapses what used to be three separate controls - the
+/// Ontdek/Mijn/Voltooid tabs, the four topic tiles and the kind pills - into a
 /// single scrollable chip row. The four discovery chips come first because
 /// they are the ones that fit on a 390px screen without scrolling; the two
 /// chips about this reader follow, so nothing that worked before is gone.
@@ -287,7 +287,7 @@ enum BookProgress {
   /// At least one study covering it has been started.
   started,
 
-  /// Nothing here yet — also the answer for a book no study covers.
+  /// Nothing here yet - also the answer for a book no study covers.
   none,
 }
 

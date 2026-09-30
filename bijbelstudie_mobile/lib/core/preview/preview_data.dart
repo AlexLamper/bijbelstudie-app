@@ -51,7 +51,7 @@ class PreviewData {
       id: 'matthew_henry_nl',
       name: 'Matthew Henry (NL)',
       language: 'nl',
-      attribution: 'Matthew Henry (1662–1714) - publiek domein',
+      attribution: 'Matthew Henry (1662-1714) - publiek domein',
     ),
   ];
 
@@ -97,9 +97,9 @@ class PreviewData {
     sourceId: 'matthew_henry_nl',
     book: 'Genesis',
     chapter: 1,
-    attribution: 'Matthew Henry (1662–1714) - publiek domein',
+    attribution: 'Matthew Henry (1662-1714) - publiek domein',
     verses: [
-      // Verse 0 is the chapter introduction — that is how the corpus keys it.
+      // Verse 0 is the chapter introduction - that is how the corpus keys it.
       Verse(
         number: 0,
         text:
@@ -182,7 +182,7 @@ class PreviewData {
           title: 'Het lege graf',
           book: 'Johannes',
           chapter: 20,
-          verseRange: '1–18',
+          verseRange: '1-18',
           focus: 'Wie waren de eerste getuigen?',
         ),
       ],

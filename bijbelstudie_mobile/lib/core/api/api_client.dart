@@ -11,7 +11,7 @@ class ApiClient {
   late final Dio dio;
 
   /// A second Dio without the auth interceptor. The refresh call must not be
-  /// able to trigger its own refresh — that is how you get an infinite loop.
+  /// able to trigger its own refresh - that is how you get an infinite loop.
   late final Dio _refreshDio;
 
   final AuthLocalStorage _storage;
@@ -21,7 +21,7 @@ class ApiClient {
   /// Single-flight guard. A screen that fires five requests at once gets five
   /// 401s; without this they would each start a refresh, and because refresh
   /// tokens rotate, four of those five would present an already-rotated token
-  /// and trip the server's replay detection — logging the user out for doing
+  /// and trip the server's replay detection - logging the user out for doing
   /// nothing wrong.
   Future<RefreshResult>? _refreshInFlight;
 
@@ -65,7 +65,7 @@ class ApiClient {
             // with something other than a definitive rejection (timeout,
             // offline, DNS failure, 5xx). That says nothing about whether the
             // refresh token is still good, so keep the session and just let
-            // the original error surface — the next request retries refresh
+            // the original error surface - the next request retries refresh
             // from scratch instead of the device being logged out for being
             // briefly offline.
             return handler.next(e);
@@ -99,8 +99,8 @@ class ApiClient {
   /// used to be excluded here, so a mistyped password on the login screen fell
   /// straight into the refresh branch below: the client spent the device's
   /// refresh token trying to rescue a session that was never in trouble, and
-  /// when that failed — as it does on any device whose last session had already
-  /// ended — it wiped secure storage and fired [onSessionExpired], which sends
+  /// when that failed - as it does on any device whose last session had already
+  /// ended - it wiped secure storage and fired [onSessionExpired], which sends
   /// the router to `/login?expired=1`.
   ///
   /// The visible result was a login that "does nothing": the typed credentials
@@ -132,7 +132,7 @@ class ApiClient {
   Future<RefreshResult> _doRefresh() async {
     final refreshToken = await _storage.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
-      // Nothing to refresh with — this is a definitive "log in again", not a
+      // Nothing to refresh with - this is a definitive "log in again", not a
       // transient failure.
       return const RefreshResult(null);
     }
@@ -160,8 +160,8 @@ class ApiClient {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       // Only a definitive rejection from the refresh endpoint itself means
-      // "this refresh token is dead, log in again". Everything else —
-      // timeouts, no connection, DNS failure, 5xx — is transient: the device
+      // "this refresh token is dead, log in again". Everything else -
+      // timeouts, no connection, DNS failure, 5xx - is transient: the device
       // may simply be offline, and logging the user out for that is the
       // exact bug this guards against.
       if (status == 401 || status == 403) {
@@ -172,7 +172,7 @@ class ApiClient {
       rethrow;
     } catch (_) {
       // Anything else unexpected (JSON parse failure, etc.) is also treated
-      // as transient — never clear credentials on ambiguity.
+      // as transient - never clear credentials on ambiguity.
       throw const _TransientRefreshFailure();
     }
   }

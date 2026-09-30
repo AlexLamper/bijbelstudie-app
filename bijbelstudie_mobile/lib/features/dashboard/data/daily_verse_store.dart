@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/data/account_scope.dart';
+import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import 'dashboard_models.dart';
 
 /// Local memory for the "Tekst van de dag" card.
 ///
 /// The server has no endpoint for either half of this: `GET /daytext` hands
-/// out today's verse and nothing else — no archive, no favourites. So the app
+/// out today's verse and nothing else - no archive, no favourites. So the app
 /// keeps both on the device, the same way [ReadingSettings] keeps the reader's
 /// typography: every verse that arrives is appended to a capped history, and
 /// every verse the reader hearts is stored whole, so "Favoriete teksten" can
@@ -16,7 +18,7 @@ import 'dashboard_models.dart';
 ///
 /// Both are best-effort. A device with no preferences plugin (tests, an
 /// unusual platform) simply gets an empty history and no likes rather than an
-/// error — the card must still render today's verse.
+/// error - the card must still render today's verse.
 
 /// One day's verse as it was stored, plus the day it was shown.
 class DailyVerseEntry {
@@ -181,6 +183,8 @@ class DailyVerseMemory {
   }
 }
 
+/// Per device: the archive is the same feed for everyone. The likes below are
+/// per account, keyed through [AccountScope.keyFor].
 const _kHistory = 'daytext.history';
 
 /// The pre-1.2 store: a flat list of hearted references, with no text and no
@@ -214,28 +218,38 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// user-visible, and a mutation can no longer be built on a blank history.
   late Future<void> _ready;
 
+  /// The account whose hearts this build shows. The store rebuilds when a
+  /// different account signs in, so one reader's favourites never show up
+  /// for the next.
+  late Future<String?> _account;
+
   @override
   DailyVerseMemory build() {
+    _account = AccountScope.resolve(ref.watch(sessionAccountProvider));
     _ready = _load();
     return const DailyVerseMemory();
   }
 
   Future<void> _load() async {
+    // This build's ref: after a rebuild (another account) it reads unmounted,
+    // so a slow read cannot land the previous reader's likes.
+    final buildRef = ref;
     try {
+      final account = await _account;
       final prefs = await SharedPreferences.getInstance();
       // The read outlives the provider when the app (or a test) tears down
       // mid-launch; writing state then throws rather than being ignored.
-      if (!ref.mounted) return;
+      if (!buildRef.mounted) return;
       final history = _decode(prefs.getString(_kHistory));
       state = DailyVerseMemory(
         history: history,
-        likes: _decodeLikes(prefs, history),
+        likes: _decodeLikes(prefs, history, account),
         loaded: true,
       );
     } catch (_) {
       // No preferences plugin: an empty archive, and likes that live only for
       // this session. Still "loaded" - nothing more is coming.
-      if (!ref.mounted) return;
+      if (!buildRef.mounted) return;
       state = state.copyWith(loaded: true);
     }
   }
@@ -265,8 +279,9 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   List<LikedVerse> _decodeLikes(
     SharedPreferences prefs,
     List<DailyVerseEntry> history,
+    String? account,
   ) {
-    final raw = prefs.getString(_kLikes);
+    final raw = prefs.getString(AccountScope.keyFor(_kLikes, account));
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw);
@@ -284,7 +299,8 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
       }
     }
 
-    final legacy = prefs.getStringList(_kLiked) ?? const <String>[];
+    final legacy =
+        prefs.getStringList(AccountScope.keyFor(_kLiked, account)) ?? const <String>[];
     if (legacy.isEmpty) return const [];
 
     final byReference = <String, DailyVerseEntry>{
@@ -452,15 +468,16 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     final capped = List<LikedVerse>.unmodifiable(likes);
     state = state.copyWith(likes: capped, loaded: true);
     try {
+      final account = await _account;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _kLikes,
+        AccountScope.keyFor(_kLikes, account),
         jsonEncode(capped.map((like) => like.toJson()).toList(growable: false)),
       );
-      // The legacy list is kept in step so an older build installed over this
-      // one still shows the right hearts.
+      // The legacy list is kept in step (under the same account key), as it
+      // was before likes were per account.
       await prefs.setStringList(
-        _kLiked,
+        AccountScope.keyFor(_kLiked, account),
         capped.map((like) => like.reference).toList(growable: false),
       );
     } catch (_) {
@@ -481,7 +498,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   }
 }
 
-/// `yyyy-mm-dd` in local time — the archive's per-day key.
+/// `yyyy-mm-dd` in local time - the archive's per-day key.
 String dayKey(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');

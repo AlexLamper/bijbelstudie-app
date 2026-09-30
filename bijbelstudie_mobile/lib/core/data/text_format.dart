@@ -5,6 +5,7 @@
 /// cached before `lib/mobileAttribution.ts` on the server dropped it. Folding
 /// it at the point of parsing is what makes the rule hold offline as well.
 ///
-/// The en dash is deliberately left alone - it carries the year ranges in the
-/// attributions, e.g. `Matthew Henry (1662-1714)`.
-String normaliseDashes(String input) => input.replaceAll('—', '-');
+/// The en dash is folded too, so year ranges such as `(1662-1714)` and verse
+/// ranges read with a plain hyphen.
+String normaliseDashes(String input) =>
+    input.replaceAll(RegExp('[—–]'), '-');

@@ -510,7 +510,7 @@ const _entities = <String, String>{
   '&apos;': "'",
   '&#39;': "'",
   '&nbsp;': ' ',
-  '&ndash;': '–',
+  '&ndash;': '-',
   '&mdash;': '-',
   '&hellip;': '…',
   '&eacute;': 'é',

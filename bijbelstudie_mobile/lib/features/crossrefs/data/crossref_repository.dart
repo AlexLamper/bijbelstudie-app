@@ -7,7 +7,7 @@ import '../domain/crossref_models.dart';
 
 /// Reads `/api/v1/crossrefs/:book/:chapter`, cache first.
 ///
-/// The rows live in the existing `chapters` table under `kind: 'crossref'` —
+/// The rows live in the existing `chapters` table under `kind: 'crossref'` -
 /// no migration, no schema version bump. The table is keyed
 /// `(kind, source_id, book, chapter)`, which is exactly the shape of a
 /// cross-reference chapter, and it brings the ETag column, the LRU and the
@@ -114,7 +114,7 @@ class CrossRefRepository {
   /// budget on a number nobody asked for, and would stall the action sheet
   /// behind the network on a bad connection. Once the reader has opened the
   /// references for a chapter, the whole chapter's counts are on disk and
-  /// every verse in it shows one — offline included.
+  /// every verse in it shows one - offline included.
   Future<CrossRefChapter?> cachedChapter(
     String versionId,
     String book,

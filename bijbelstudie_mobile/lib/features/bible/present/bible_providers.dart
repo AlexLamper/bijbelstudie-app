@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/preview_config.dart';
 import '../../../core/data/bible_books.dart';
 import '../../../core/db/content_cache.dart';
+import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../commentary/data/commentary_repository.dart';
 import '../../dashboard/data/dashboard_models.dart';
 import '../../dashboard/data/dashboard_repository.dart';
@@ -177,6 +178,8 @@ class ReaderLocation {
 final remoteReaderLocationProvider = FutureProvider<LastRead?>((ref) async {
   // Preview runs on canned data with no account behind it.
   if (PreviewConfig.enabled) return null;
+  // Per account: asked again when a different account signs in.
+  ref.watch(sessionAccountProvider);
   return ref.watch(dashboardRepositoryProvider).getLastRead();
 });
 
@@ -198,6 +201,9 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
 
   @override
   ReaderLocation build() {
+    // A different account signing in re-runs the hydration against its own
+    // server copy instead of keeping the previous reader's chapter.
+    ref.watch(sessionAccountProvider);
     _pinned = false;
     unawaited(_hydrate());
 

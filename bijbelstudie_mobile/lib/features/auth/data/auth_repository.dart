@@ -59,7 +59,7 @@ class AuthRepository {
   /// creates the account with one atomic upsert. That is the same "find or
   /// create" the website's NextAuth `signIn` callback does, so there is no
   /// separate mobile "registreren met Google" route and `/auth/register` must
-  /// not be called first — it wants a password this user does not have.
+  /// not be called first - it wants a password this user does not have.
   ///
   /// [email] and [name] are what Google handed the *client*. The server
   /// derives both from the verified ID token and ignores what we send; they
@@ -81,7 +81,7 @@ class AuthRepository {
 
   /// Revokes the refresh token server-side, then clears local storage.
   ///
-  /// The local clear happens even if the network call fails — a logout that
+  /// The local clear happens even if the network call fails - a logout that
   /// leaves a usable token on the device is worse than an orphaned row on the
   /// server, which expires on its own.
   Future<void> logout() async {
@@ -99,7 +99,7 @@ class AuthRepository {
   /// Turns a failed auth call into something a reader can act on.
   ///
   /// `errorV1` defaults `message` to the error code, so a route that passes no
-  /// copy answers `{"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"}` — and
+  /// copy answers `{"error":"INTERNAL_ERROR","message":"INTERNAL_ERROR"}` - and
   /// that raw code was shown verbatim on the login screen. It is not Dutch, it
   /// is not a sentence, and it tells the user nothing about whether to retry.
   /// A message equal to the code is therefore dropped in favour of our own

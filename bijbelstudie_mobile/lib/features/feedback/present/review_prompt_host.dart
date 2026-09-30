@@ -21,8 +21,8 @@ const Set<String> _safeRoutes = {'/dashboard', '/profile'};
 /// Routes whose visit counts as real engagement once the reader has stayed
 /// [ReviewPromptThresholds.engagementDwell] on one of them.
 ///
-/// Dwell is only one of the signals; the stronger ones — a finished lesson, a
-/// passed quiz, a streak milestone — are recorded where they happen and land
+/// Dwell is only one of the signals; the stronger ones - a finished lesson, a
+/// passed quiz, a streak milestone - are recorded where they happen and land
 /// in the same counter. See [ReviewSignal].
 const Set<String> _engagementRoutes = {
   '/read',
@@ -34,14 +34,14 @@ const Set<String> _engagementRoutes = {
 /// Picks the moment to ask the OS for a rating prompt.
 ///
 /// It paints nothing. There is no card, no scrim, no stars, no "do you like
-/// the app?" — that shape of pre-prompt is banned outright: App Store Review
+/// the app?" - that shape of pre-prompt is banned outright: App Store Review
 /// Guideline 5.6.1 requires the provided API and disallows custom review
 /// prompts, and Play's in-app review guidelines forbid both the "do you like
 /// the app" question and any overlay around the review card. Stars we drew
 /// ourselves were dishonest on top of that, since one star and five did the
 /// same thing and neither was recorded anywhere.
 ///
-/// What is allowed — and encouraged by both stores — is choosing *when* to
+/// What is allowed - and encouraged by both stores - is choosing *when* to
 /// call the API. That is all this widget does: it counts launches and
 /// engagement, waits until the app is sitting still on a safe screen, and then
 /// calls [InAppReview.requestReview] once. The OS decides the rest: the sheet

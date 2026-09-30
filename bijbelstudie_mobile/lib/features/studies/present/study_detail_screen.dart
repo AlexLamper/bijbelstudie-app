@@ -866,6 +866,19 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                         _start();
                       },
               ),
+              const SizedBox(height: 4),
+              Center(
+                child: InkWell(
+                  onTap: () => context.canPop() ? context.pop() : context.go('/studies'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    child: Text(
+                      'Terug naar overzicht',
+                      style: AppTheme.caption,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/data/account_scope.dart';
+import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
+
 /// How a study is configured and how far through it the reader is, kept on the
 /// device.
 ///
@@ -127,7 +130,8 @@ class StudyPlan {
 }
 
 /// One key holding every plan, so a plan can be read back without first knowing
-/// which studies exist.
+/// which studies exist. Per account: stored as `studies.plans.<accountId>`
+/// through [AccountScope.keyFor].
 const _kPlansKey = 'studies.plans';
 
 final studyPlansProvider =
@@ -136,7 +140,11 @@ final studyPlansProvider =
     );
 
 class StudyPlansController extends Notifier<Map<String, StudyPlan>> {
-  final Completer<void> _loaded = Completer<void>();
+  Completer<void> _loaded = Completer<void>();
+
+  /// The account whose plans this build holds. The controller rebuilds when a
+  /// different account signs in, so one reader's plans never carry over.
+  late Future<String?> _account;
 
   /// Completes once the first read from disk is done, successfully or not.
   /// [build] returns an empty map and fills it a moment later, so anything that
@@ -145,14 +153,23 @@ class StudyPlansController extends Notifier<Map<String, StudyPlan>> {
 
   @override
   Map<String, StudyPlan> build() {
+    _account = AccountScope.resolve(ref.watch(sessionAccountProvider));
+    // A rebuild for another account waits for that account's read; a caller
+    // still waiting on the previous completer is served by this one.
+    if (_loaded.isCompleted) _loaded = Completer<void>();
     _load();
     return const {};
   }
 
   Future<void> _load() async {
+    // This build's ref: after a rebuild it reads unmounted, so a slow read
+    // cannot land the previous reader's plans.
+    final buildRef = ref;
     try {
+      final account = await _account;
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kPlansKey);
+      final raw = prefs.getString(AccountScope.keyFor(_kPlansKey, account));
+      if (!buildRef.mounted) return;
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as Map<String, dynamic>;
         final plans = <String, StudyPlan>{};
@@ -176,9 +193,10 @@ class StudyPlansController extends Notifier<Map<String, StudyPlan>> {
   Future<void> _persist(Map<String, StudyPlan> plans) async {
     state = plans;
     try {
+      final account = await _account;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _kPlansKey,
+        AccountScope.keyFor(_kPlansKey, account),
         jsonEncode({for (final e in plans.entries) e.key: e.value.toJson()}),
       );
     } catch (_) {

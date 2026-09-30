@@ -20,7 +20,7 @@ final crossRefRepositoryProvider = Provider((ref) {
 /// The unit is the chapter, not the verse, because that is the unit the route
 /// serves, the unit the ETag covers and the unit the cache row holds. A sheet
 /// opened on verse 3 and one opened on verse 4 of the same chapter therefore
-/// share a single request — and the long-press row can show a count without
+/// share a single request - and the long-press row can show a count without
 /// costing a second one.
 ///
 /// A Pro reader asks for the full list (`full=1`); everyone else reads the

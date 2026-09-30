@@ -7,7 +7,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../data/groups_repository.dart';
 import '../../levensboom/present/tree_view.dart';
 
-/// `/groepen/[id]` — the group's wall, its roster, and the invite code.
+/// `/groepen/[id]` - the group's wall, its roster, and the invite code.
 class GroupDetailScreen extends ConsumerStatefulWidget {
   const GroupDetailScreen({super.key, required this.groupId});
 
@@ -196,7 +196,7 @@ class _GroupHeader extends StatelessWidget {
                   icon: Icons.assignment_outlined,
                 ),
               if (group.inviteCode != null)
-                // Tapping copies it — an invite code is meant to be passed on.
+                // Tapping copies it - an invite code is meant to be passed on.
                 InkWell(
                   onTap: () {
                     Clipboard.setData(ClipboardData(text: group.inviteCode!));

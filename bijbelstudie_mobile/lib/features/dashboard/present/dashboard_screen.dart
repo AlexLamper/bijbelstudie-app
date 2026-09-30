@@ -24,7 +24,7 @@ import 'widgets/streak_ring.dart';
 /// `/dashboard` on www.bijbelstudie.io, folded into one column.
 ///
 /// The website lays this out as a wide main column plus a 280px sidebar; on a
-/// phone the two stack in the order the site prioritises them — hero, stats,
+/// phone the two stack in the order the site prioritises them - hero, stats,
 /// book map, studies, then what the sidebar holds.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -47,7 +47,7 @@ class DashboardScreen extends ConsumerWidget {
       // The greeting header paints its own `scheme.surface` block full-bleed to
       // the very top of the screen (see `_DashboardBody`'s header `Container`,
       // which adds the status-bar inset itself), so only the loading / error
-      // states — which have no header of their own — keep the top SafeArea.
+      // states - which have no header of their own - keep the top SafeArea.
       body: dashboard.when(
         loading: () => const DashboardSkeleton(),
         error: (error, _) => SafeArea(
@@ -173,7 +173,7 @@ class _DashboardBody extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // The card renders today's verse, or — offline — the newest one
+              // The card renders today's verse, or - offline - the newest one
               // in its local archive. It is left out entirely only when there
               // is neither, which is why the archive is consulted here too.
               if (data.dailyVerse != null || hasArchivedVerse) ...[
@@ -400,7 +400,7 @@ class _TestamentGrid extends StatelessWidget {
   }
 }
 
-/// "Aanbevolen studies" — up to four compact rows, each a picture and a
+/// "Aanbevolen studies" - up to four compact rows, each a picture and a
 /// promise rather than a line of text: the old plain list of type-pill +
 /// title sold none of them. Every row leans on [StudyBanner], the same 16:6
 /// artwork (with its painted fallback) that the studies tab and the detail
@@ -423,8 +423,8 @@ class _RecommendedStudiesCard extends ConsumerWidget {
         ref.watch(serverStudyLessonsProvider).value ??
         const <String, Set<int>>{};
 
-    // A finished study stays in the list — it is still a fair suggestion to
-    // revisit — but steps back so the unread ones read first.
+    // A finished study stays in the list - it is still a fair suggestion to
+    // revisit - but steps back so the unread ones read first.
     Widget dim(CuratedStudy study, Widget child) => Opacity(
       opacity:
           isStudyFinished(

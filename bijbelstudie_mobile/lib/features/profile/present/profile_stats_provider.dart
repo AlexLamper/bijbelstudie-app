@@ -9,7 +9,7 @@ import '../domain/profile_stats.dart';
 ///
 /// Gates on `/dashboard`, which is the only source for the reading history.
 /// The streak, the freezes and the awarded badge ids come from
-/// `/gamification` instead — it is the endpoint that owns the XP system, it
+/// `/gamification` instead - it is the endpoint that owns the XP system, it
 /// returns the badge ids the server actually granted, and it is what the
 /// Levensboom already reads, so the two cannot disagree about the same account.
 /// While that request is in flight the dashboard's own figures stand in, so the

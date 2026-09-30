@@ -26,7 +26,7 @@ const int crossRefPreviewBatch = 5;
 /// thing, previewed in the translation the reader is already in.
 ///
 /// Navigation is done *here*, after the sheet has closed, rather than inside
-/// it — the same rule `showVerseActionSheet` follows. The sheet pops with the
+/// it - the same rule `showVerseActionSheet` follows. The sheet pops with the
 /// reference it was asked to follow; [context] and [ref] belong to the reader,
 /// which is still mounted, so the reader location and the "terug" snackbar are
 /// set from a scope that outlives the sheet.
@@ -367,7 +367,7 @@ class _PlaceholderBar extends StatelessWidget {
 
 /// The scrolling body of the sheet. [DraggableScrollableSheet] only drags when
 /// the scrollable it builds uses the controller it handed out, so every state
-/// of the sheet — loading, error, empty, full — has to scroll through this.
+/// of the sheet - loading, error, empty, full - has to scroll through this.
 class _Padded extends StatelessWidget {
   const _Padded({required this.controller, required this.children});
 
@@ -521,8 +521,8 @@ class _CrossRefRowState extends ConsumerState<_CrossRefRow> {
 ///
 /// Read through [chapterContentProvider], so several references into the same
 /// chapter share one request and one sqflite row, and a chapter that is
-/// already on the device costs nothing at all. When it cannot be had — no
-/// network and nothing cached — the row falls back to the reference label,
+/// already on the device costs nothing at all. When it cannot be had - no
+/// network and nothing cached - the row falls back to the reference label,
 /// which still says where to look.
 class _VersePreview extends ConsumerWidget {
   const _VersePreview({

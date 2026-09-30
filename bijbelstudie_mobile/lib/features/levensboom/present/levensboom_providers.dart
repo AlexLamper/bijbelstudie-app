@@ -177,7 +177,11 @@ class TreeStateNotifier extends AsyncNotifier<TreeState> {
   }
 }
 
-final treeStateProvider = AsyncNotifierProvider<TreeStateNotifier, TreeState>(
+// autoDispose so that switching accounts can drop it outright (see
+// `cacheFor`); `cacheFor` keeps it alive in normal use as before. A keep-alive
+// provider can only be rebuilt, and a rebuild keeps the previous reader's tree
+// readable through `.value` until the new one lands.
+final treeStateProvider = AsyncNotifierProvider.autoDispose<TreeStateNotifier, TreeState>(
   TreeStateNotifier.new,
 );
 

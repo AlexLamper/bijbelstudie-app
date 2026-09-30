@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Asking for a rating on the first launch is the fastest way to collect one
 /// star: the reader has not read anything yet, so the only thing they can rate
 /// is the interruption. Everything that decides *when* the ask is allowed lives
-/// in [ReviewPromptThresholds] — one place, so the policy can be read and
+/// in [ReviewPromptThresholds] - one place, so the policy can be read and
 /// changed without hunting through the widget that renders it.
 ///
 /// What this file decides is only *when the app may call the native API*.
@@ -27,14 +27,14 @@ class ReviewPromptThresholds {
   const ReviewPromptThresholds._();
 
   /// Distinct app launches (a cold start, or a return from the background
-  /// after the app was actually suspended) — not rebuilds.
+  /// after the app was actually suspended) - not rebuilds.
   static const int minLaunches = 3;
 
   /// …and those launches must fall on at least this many different calendar
   /// days. Three launches inside one evening is one session, not a habit.
   static const int minLaunchDays = 3;
 
-  /// Moments that counted as real use — a long read, a finished lesson, a
+  /// Moments that counted as real use - a long read, a finished lesson, a
   /// passed quiz, a streak milestone. See [ReviewSignal].
   static const int minEngagements = 3;
 
@@ -53,13 +53,13 @@ class ReviewPromptThresholds {
   /// After an ask that did not end in a rating, stay quiet this long.
   static const Duration backoffAfterAsk = Duration(days: 60);
 
-  /// At most this many asks inside [askWindow] — a *rolling* window, not a
+  /// At most this many asks inside [askWindow] - a *rolling* window, not a
   /// lifetime cap.
   ///
   /// This mirrors the platform: `SKStoreReviewController` allows up to three
   /// prompts per 365 days per device, and Play throttles on a comparable
   /// window of its own. Counting for a lifetime instead threw two of the three
-  /// away — a reader who ignored the sheet twice in their first year could
+  /// away - a reader who ignored the sheet twice in their first year could
   /// never be asked again, ever, while the OS would happily have shown it.
   static const int maxAsksPerWindow = 3;
 
@@ -89,7 +89,7 @@ enum ReviewSignal {
   streakMilestone,
 }
 
-/// The App Store id of "BijbelStudie — Lees & Leer".
+/// The App Store id of "BijbelStudie - Lees & Leer".
 ///
 /// Overridable with `--dart-define=APP_STORE_ID=…` so a second listing (or a
 /// test build) does not need a code change, but it defaults to the real id:
@@ -100,7 +100,7 @@ const String kAppStoreId = String.fromEnvironment(
 );
 
 /// The App Store page with the review composer already open. Used only by the
-/// explicit, user-initiated "Beoordeel de app" action — never automatically.
+/// explicit, user-initiated "Beoordeel de app" action - never automatically.
 String get appStoreWriteReviewUrl =>
     'https://apps.apple.com/app/id$kAppStoreId?action=write-review';
 
@@ -123,7 +123,7 @@ class ReviewPromptState {
   final int launchDays;
   final int engagements;
 
-  /// What earned the most recent engagement, this session only — it is never
+  /// What earned the most recent engagement, this session only - it is never
   /// written to disk and the gate never reads it. It exists so a call site can
   /// be traced back from the state, and so the tests can tell the signals
   /// apart.
@@ -140,7 +140,7 @@ class ReviewPromptState {
   /// True once the reader took the explicit "Beoordeel de app" route to the
   /// store listing. Terminal: the automatic ask never returns.
   ///
-  /// Note this is *not* set by an ask. The OS may show nothing at all —
+  /// Note this is *not* set by an ask. The OS may show nothing at all -
   /// `requestReview` is rate-limited by the system, the reader can switch
   /// in-app ratings off in Settings, and a call that returns normally is no
   /// evidence the sheet appeared, let alone that a review was written. Nothing
@@ -186,7 +186,7 @@ class ReviewPromptState {
   /// Whether the app is allowed to call the review API at [now].
   ///
   /// This answers "has this reader earned an ask" only. Whether the *moment*
-  /// is right — no tour, no onboarding, not mid-chapter — is the host widget's
+  /// is right - no tour, no onboarding, not mid-chapter - is the host widget's
   /// job, because that depends on the screen and not on any counter. And
   /// whether anything is then actually drawn is the OS's decision, not ours.
   bool shouldAsk({required DateTime now}) {
@@ -268,8 +268,8 @@ class ReviewPromptController extends Notifier<ReviewPromptState> {
     }
   }
 
-  /// The ask history, or — on the first run after the lifetime counter was
-  /// replaced — one reconstructed from it.
+  /// The ask history, or - on the first run after the lifetime counter was
+  /// replaced - one reconstructed from it.
   ///
   /// The old format kept a count and a single timestamp, so the only honest
   /// reconstruction is "all of them happened at the last known ask". That errs
@@ -325,7 +325,7 @@ class ReviewPromptController extends Notifier<ReviewPromptState> {
   /// lesson, a passed quiz, a streak milestone.
   ///
   /// Deliberately silent. The signal is recorded where it happens and the
-  /// native sheet is left to the host, which fires it later on a calm screen —
+  /// native sheet is left to the host, which fires it later on a calm screen -
   /// interrupting the celebration the reader just earned is exactly the
   /// timing both stores warn against.
   Future<void> recordSuccess(ReviewSignal signal) async {
@@ -341,7 +341,7 @@ class ReviewPromptController extends Notifier<ReviewPromptState> {
   Future<void> recordEngagement() => recordSuccess(ReviewSignal.dwell);
 
   /// The review API was called. Starts the back-off and consumes one slot in
-  /// the rolling window — whether or not the OS drew anything, because we have
+  /// the rolling window - whether or not the OS drew anything, because we have
   /// no way to find out and guessing would burn the reader's patience.
   Future<void> markAsked({DateTime? now}) async {
     await loaded;
@@ -361,7 +361,7 @@ class ReviewPromptController extends Notifier<ReviewPromptState> {
     );
   }
 
-  /// The reader went to the store listing themselves. Terminal — the automatic
+  /// The reader went to the store listing themselves. Terminal - the automatic
   /// ask never returns on this device.
   Future<void> markRated() async {
     await loaded;

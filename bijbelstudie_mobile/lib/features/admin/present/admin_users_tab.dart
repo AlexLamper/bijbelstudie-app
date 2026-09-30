@@ -12,7 +12,7 @@ import 'admin_user_sheet.dart';
 /// Which slice of the account list is on screen.
 enum _AccountFilter { all, pro, admins, billing }
 
-/// The users tab — the website's `/admin/users` table as a searchable list.
+/// The users tab - the website's `/admin/users` table as a searchable list.
 ///
 /// Searching and filtering run over the already-loaded page (the repository
 /// fetches up to 500 at once), so typing never waits on the network. Tapping a

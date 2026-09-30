@@ -68,7 +68,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         // moment this listener runs; if route resolution rejects and nothing
         // catches it, the failure disappears into the zone and they are left
         // sitting on this screen, signed in, with no error and no navigation.
-        // The dashboard is the safe destination — the wizard and the tour can
+        // The dashboard is the safe destination - the wizard and the tour can
         // still be replayed from Profiel.
         resolvePostAuthRoute(ref, isNewAccount: _isRegisterAction)
             .then((route) {

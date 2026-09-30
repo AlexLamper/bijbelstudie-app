@@ -10,7 +10,7 @@ import '../data/review_prompt.dart';
 /// The explicit "Beoordeel de app" action.
 ///
 /// A menu row the reader taps themselves is not a prompt, so this one is
-/// allowed to leave the app and open the store listing outright — which is
+/// allowed to leave the app and open the store listing outright - which is
 /// exactly what the automatic path must never do. It is also the only escape
 /// hatch for someone whose system quota for the native sheet is spent: the OS
 /// silently shows nothing then, and there is no way for the app to find out.

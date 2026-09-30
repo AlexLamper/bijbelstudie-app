@@ -143,7 +143,7 @@ final bookSummaryProvider =
       return ref.watch(contextRepositoryProvider).getBookSummary(book);
     });
 
-/// (book, chapter) — a value type so the family caches by content, not by
+/// (book, chapter) - a value type so the family caches by content, not by
 /// instance identity.
 class GeoRef {
   const GeoRef(this.book, this.chapter);

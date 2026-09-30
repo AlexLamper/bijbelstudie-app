@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/data/account_scope.dart';
 import '../../../core/db/content_cache.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../bible/data/bible_repository.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
@@ -59,9 +61,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _loadHistory() async {
     final cache = ref.read(contentCacheProvider);
     if (cache == null) return;
-    final history = await cache.recentSearches();
+    final history = await cache.recentSearches(account: await _account());
     if (mounted) setState(() => _history = history);
   }
+
+  /// Search history is per account, not per device.
+  Future<String?> _account() => AccountScope.resolve(ref.read(sessionAccountProvider));
 
   Future<void> _run(String query) async {
     final trimmed = query.trim();
@@ -81,7 +86,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             versionId: location.versionId,
             book: _wholeBible ? null : _scopeBook(location),
           );
-      await ref.read(contentCacheProvider)?.recordSearch(trimmed);
+      await ref
+          .read(contentCacheProvider)
+          ?.recordSearch(trimmed, account: await _account());
       await _loadHistory();
       if (mounted) setState(() => _results = results);
     } on ContentNotLicensedException {
@@ -241,7 +248,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               const Eyebrow('Recent gezocht'),
               TextButton(
                 onPressed: () async {
-                  await ref.read(contentCacheProvider)?.clearSearchHistory();
+                  await ref
+                      .read(contentCacheProvider)
+                      ?.clearSearchHistory(account: await _account());
                   await _loadHistory();
                 },
                 child: const Text('Wissen'),

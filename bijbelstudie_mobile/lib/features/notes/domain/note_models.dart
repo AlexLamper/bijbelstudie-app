@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// Records that sync with `/api/v1/{notes,highlights,bookmarks,reading-history}`.
 ///
 /// Every record carries a client-generated UUID as its `id`. The server keys on
-/// it, so creating a record offline and uploading it later — possibly twice,
-/// after a dropped connection — produces exactly one row.
+/// it, so creating a record offline and uploading it later - possibly twice,
+/// after a dropped connection - produces exactly one row.
 
 enum HighlightColor { yellow, blue, green, pink, purple, orange }
 
@@ -23,7 +23,7 @@ extension HighlightColorX on HighlightColor {
   /// Dark-mode fill: deep, muted variants of [swatch] chosen so the reader's
   /// light body text (`AppTheme.darkInk`, `0xFFE5E5E5`) keeps >=4.5:1
   /// contrast against them. `swatch` itself is a light pastel meant to sit
-  /// under *dark* text — used as-is in dark mode it made the (light) reader
+  /// under *dark* text - used as-is in dark mode it made the (light) reader
   /// text nearly invisible. This never touches `id`/`swatch`, only how a
   /// highlight is painted, so the synced colour value is unchanged.
   Color get _darkFill => switch (this) {
