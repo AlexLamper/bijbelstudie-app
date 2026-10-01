@@ -5,13 +5,12 @@
 import '../../../core/data/bible_books.dart';
 import '../../studies/data/enrollment_models.dart';
 
-/// `/studies/bijbel-in-een-jaar` is registered in `core/router/app_router.dart`
-/// (before `/studies/:id`). Set back to false only if that route goes away:
-/// the path would then be caught by `/studies/:id` and open a study detail
-/// screen for a study that does not exist, so it falls back to the Studies tab.
+/// The website's `/studies/bijbel-in-een-jaar` opens the app's reading plan
+/// (`/leesplan`, `PlanRoutes.plan`). Set back to false only if that route
+/// goes away: the href then falls back to the Studies tab.
 const bool kBibleYearRouteAvailable = true;
 
-const String bibleYearPath = '/studies/bijbel-in-een-jaar';
+const String bibleYearPath = '/leesplan';
 
 sealed class ResumeTarget {
   const ResumeTarget();

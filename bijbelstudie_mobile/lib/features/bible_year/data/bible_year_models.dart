@@ -23,10 +23,11 @@ enum BibleYearPlanKey {
 }
 
 /// `'gemengd'` = OT / NT / Psalmen+Spreuken side by side; `'canoniek'` =
-/// Genesis to Openbaring.
+/// Genesis to Openbaring; `'chronologisch'` = in the order it happened.
 enum BibleYearTrackKey {
   gemengd('gemengd'),
-  canoniek('canoniek');
+  canoniek('canoniek'),
+  chronologisch('chronologisch');
 
   const BibleYearTrackKey(this.id);
 
@@ -39,6 +40,37 @@ enum BibleYearTrackKey {
     return null;
   }
 }
+
+/// `'lezen'` = the chapters; `'studeren'` = plus a commentary ('uitleg') on
+/// one chapter and one question ('vraag') per day.
+enum BibleYearMode {
+  lezen('lezen'),
+  studeren('studeren');
+
+  const BibleYearMode(this.id);
+
+  final String id;
+
+  /// Absent or unknown reads as 'lezen' (runs from before the mode existed).
+  static BibleYearMode fromId(Object? raw) =>
+      raw == studeren.id ? BibleYearMode.studeren : BibleYearMode.lezen;
+}
+
+/// The two extra parts of a 'studeren' day.
+enum BibleYearStudyPart {
+  uitleg('uitleg'),
+  vraag('vraag');
+
+  const BibleYearStudyPart(this.id);
+
+  final String id;
+}
+
+/// "23.vraag" - how `studyDone` stores a study part of a day.
+String bibleYearStudyKey(int day, BibleYearStudyPart part) => '$day.${part.id}';
+
+/// "GEN.1" - how `readRefs` stores a chapter.
+String bibleYearRefKey(String code, int chapter) => '$code.$chapter';
 
 enum BibleYearStatus {
   active('active'),
@@ -75,6 +107,9 @@ double _num(Object? raw, [double fallback = 0]) {
 
 bool _bool(Object? raw) => raw == true;
 
+Set<String> _strings(Object? raw) =>
+    raw is List ? raw.whereType<String>().toSet() : <String>{};
+
 List<Map<String, dynamic>> _maps(Object? raw) {
   if (raw is! List) return const [];
   return raw
@@ -93,6 +128,7 @@ class BibleYearRef {
     required this.code,
     required this.chapter,
     this.read = false,
+    this.minutes = 0,
   });
 
   final String book;
@@ -102,7 +138,13 @@ class BibleYearRef {
   /// Always false on a schedule day; the state on today's portions.
   final bool read;
 
+  /// Estimated reading minutes; 0 when the server did not send it.
+  final int minutes;
+
   String get key => '$code:$chapter';
+
+  /// The `readRefs` form, "GEN.1".
+  String get refKey => bibleYearRefKey(code, chapter);
 
   static BibleYearRef? fromJson(Map<String, dynamic> json) {
     final chapter = _int(json['chapter']);
@@ -113,17 +155,68 @@ class BibleYearRef {
       code: _str(json['code']),
       chapter: chapter,
       read: _bool(json['read']),
+      minutes: _int(json['minutes']),
     );
   }
 
-  BibleYearRef copyWith({bool? read}) =>
-      BibleYearRef(book: book, code: code, chapter: chapter, read: read ?? this.read);
+  BibleYearRef copyWith({bool? read}) => BibleYearRef(
+    book: book,
+    code: code,
+    chapter: chapter,
+    read: read ?? this.read,
+    minutes: minutes,
+  );
 
   Map<String, dynamic> toJson() => {
     'book': book,
     'code': code,
     'chapter': chapter,
     'read': read,
+    'minutes': minutes,
+  };
+}
+
+/// The 'studeren' parts of a day: the chapter the commentary is on, and the
+/// question. On today, with whether each part is done.
+class BibleYearDayStudy {
+  const BibleYearDayStudy({
+    required this.ref,
+    required this.question,
+    this.uitlegDone = false,
+    this.vraagDone = false,
+  });
+
+  final BibleYearRef ref;
+  final String question;
+  final bool uitlegDone;
+  final bool vraagDone;
+
+  bool get done => uitlegDone && vraagDone;
+
+  static BibleYearDayStudy? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final ref = BibleYearRef.fromJson(_map(json['ref']) ?? const {});
+    if (ref == null) return null;
+    return BibleYearDayStudy(
+      ref: ref,
+      question: _str(json['question']),
+      uitlegDone: _bool(json['uitlegDone']),
+      vraagDone: _bool(json['vraagDone']),
+    );
+  }
+
+  BibleYearDayStudy copyWith({bool? uitlegDone, bool? vraagDone}) => BibleYearDayStudy(
+    ref: ref,
+    question: question,
+    uitlegDone: uitlegDone ?? this.uitlegDone,
+    vraagDone: vraagDone ?? this.vraagDone,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'ref': ref.toJson(),
+    'question': question,
+    'uitlegDone': uitlegDone,
+    'vraagDone': vraagDone,
   };
 }
 
@@ -197,16 +290,23 @@ class BibleYearScheduleDay {
     required this.day,
     required this.portions,
     required this.minutes,
+    this.study,
   });
 
   final int day;
   final List<BibleYearPortion> portions;
   final int minutes;
 
+  /// Only when fetched with `detail=1`.
+  final BibleYearDayStudy? study;
+
+  List<BibleYearRef> get refs => [for (final p in portions) ...p.refs];
+
   factory BibleYearScheduleDay.fromJson(Map<String, dynamic> json) => BibleYearScheduleDay(
     day: _int(json['day']),
     portions: _maps(json['portions']).map(BibleYearPortion.fromJson).toList(growable: false),
     minutes: _int(json['minutes']),
+    study: BibleYearDayStudy.fromJson(_map(json['study'])),
   );
 }
 
@@ -324,11 +424,21 @@ class BibleYearEnrollment {
     required this.percentBible,
     required this.expectedEndDate,
     this.completedAt,
+    this.mode = BibleYearMode.lezen,
+    this.readRefs = const {},
+    this.studyDone = const {},
   });
 
   final String id;
   final BibleYearPlanKey planKey;
   final BibleYearTrackKey track;
+  final BibleYearMode mode;
+
+  /// Every read chapter, "GEN.1" ([bibleYearRefKey]).
+  final Set<String> readRefs;
+
+  /// Study parts done, "23.vraag" ([bibleYearStudyKey]).
+  final Set<String> studyDone;
   final int scheduleVersion;
 
   /// 'YYYY-MM-DD' in the reader's time zone.
@@ -368,13 +478,39 @@ class BibleYearEnrollment {
       percentBible: _num(json['percentBible']),
       expectedEndDate: _str(json['expectedEndDate']),
       completedAt: json['completedAt'] is String ? json['completedAt'] as String : null,
+      mode: BibleYearMode.fromId(json['mode']),
+      readRefs: _strings(json['readRefs']),
+      studyDone: _strings(json['studyDone']),
     );
   }
+
+  BibleYearEnrollment copyWith({Set<String>? readRefs, Set<String>? studyDone}) =>
+      BibleYearEnrollment(
+        id: id,
+        planKey: planKey,
+        track: track,
+        scheduleVersion: scheduleVersion,
+        startDate: startDate,
+        timeZone: timeZone,
+        shiftDays: shiftDays,
+        status: status,
+        totalDays: totalDays,
+        chaptersRead: readRefs?.length ?? chaptersRead,
+        percentBible: readRefs == null ? percentBible : (readRefs.length * 100 / 1189).floorToDouble(),
+        expectedEndDate: expectedEndDate,
+        completedAt: completedAt,
+        mode: mode,
+        readRefs: readRefs ?? this.readRefs,
+        studyDone: studyDone ?? this.studyDone,
+      );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'planKey': planKey.id,
     'track': track.id,
+    'mode': mode.id,
+    'readRefs': readRefs.toList(),
+    'studyDone': studyDone.toList(),
     'scheduleVersion': scheduleVersion,
     'startDate': startDate,
     'timeZone': timeZone,
@@ -404,6 +540,7 @@ class BibleYearToday {
     required this.totalDays,
     required this.localDate,
     required this.portions,
+    this.study,
     required this.todayDone,
     required this.behindDays,
     required this.aheadDays,
@@ -419,6 +556,9 @@ class BibleYearToday {
   final int totalDays;
   final String localDate;
   final List<BibleYearPortion> portions;
+
+  /// 'studeren' only.
+  final BibleYearDayStudy? study;
   final bool todayDone;
   final int behindDays;
   final int aheadDays;
@@ -442,6 +582,7 @@ class BibleYearToday {
       totalDays: _int(json['totalDays']),
       localDate: _str(json['localDate']),
       portions: portions,
+      study: BibleYearDayStudy.fromJson(_map(json['study'])),
       todayDone: json.containsKey('todayDone')
           ? _bool(json['todayDone'])
           : portions.isNotEmpty && portions.every((p) => p.done),
@@ -459,11 +600,16 @@ class BibleYearToday {
     );
   }
 
-  BibleYearToday copyWith({List<BibleYearPortion>? portions, bool? todayDone}) => BibleYearToday(
+  BibleYearToday copyWith({
+    List<BibleYearPortion>? portions,
+    BibleYearDayStudy? study,
+    bool? todayDone,
+  }) => BibleYearToday(
     dayNumber: dayNumber,
     totalDays: totalDays,
     localDate: localDate,
     portions: portions ?? this.portions,
+    study: study ?? this.study,
     todayDone: todayDone ?? this.todayDone,
     behindDays: behindDays,
     aheadDays: aheadDays,
@@ -479,6 +625,7 @@ class BibleYearToday {
     'totalDays': totalDays,
     'localDate': localDate,
     'portions': [for (final p in portions) p.toJson()],
+    'study': study?.toJson(),
     'todayDone': todayDone,
     'behindDays': behindDays,
     'aheadDays': aheadDays,
@@ -530,12 +677,13 @@ class BibleYearState {
     today: BibleYearToday.fromJson(_map(json['today'])),
   );
 
-  BibleYearState copyWith({BibleYearToday? today}) => BibleYearState(
-    catalogue: catalogue,
-    tracks: tracks,
-    enrollment: enrollment,
-    today: today ?? this.today,
-  );
+  BibleYearState copyWith({BibleYearToday? today, BibleYearEnrollment? enrollment}) =>
+      BibleYearState(
+        catalogue: catalogue,
+        tracks: tracks,
+        enrollment: enrollment ?? this.enrollment,
+        today: today ?? this.today,
+      );
 
   Map<String, dynamic> toJson() => {
     'catalogue': [for (final c in catalogue) c.toJson()],
@@ -551,19 +699,23 @@ class BibleYearStartBody {
     required this.planKey,
     required this.track,
     required this.startDate,
+    this.mode = BibleYearMode.lezen,
     this.timeZone,
   });
 
   final BibleYearPlanKey planKey;
   final BibleYearTrackKey track;
+  final BibleYearMode mode;
 
-  /// 'YYYY-MM-DD', today or later in the reader's time zone.
+  /// 'YYYY-MM-DD' in the reader's time zone, within a year either side of
+  /// today; an earlier date ("1 januari") starts with its past days open.
   final String startDate;
   final String? timeZone;
 
   Map<String, dynamic> toJson() => {
     'planKey': planKey.id,
     'track': track.id,
+    'mode': mode.id,
     'startDate': startDate,
     if (timeZone != null && timeZone!.isNotEmpty) 'timeZone': timeZone,
   };

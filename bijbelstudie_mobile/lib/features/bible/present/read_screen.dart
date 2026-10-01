@@ -23,14 +23,15 @@ import '../../notes/present/notes_providers.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
+import '../../bible_year/present/plan_reader_tick.dart';
 import '../../study/domain/chapter_study_models.dart';
 import '../domain/bible_models.dart';
 import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
-import 'chapter_marks_sheet.dart';
-import 'offline_library_sheet.dart';
+import 'chapter_end_detector.dart';
 import 'reader_chrome.dart';
 import 'reader_header.dart';
+import 'reader_more_menu.dart';
 import 'reader_settings_sheet.dart';
 import 'source_picker_sheet.dart';
 
@@ -439,7 +440,7 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                   id: TourAnchorIds.readerText,
                   child: chapterAsync.when(
                     loading: () => const ReaderSkeleton(),
-                    error: (error, _) => _ReaderError(error: error),
+                    error: (error, _) => ReaderChapterError(error: error),
                     data: (chapter) {
                       _recordChapterOpen(location);
                       // Watched, not read: the chapter-marks sheet sets this
@@ -453,14 +454,28 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                       }
                       final locationKey =
                           '${location.versionId}/${location.book}/${location.chapter}';
-                      return _ChapterBody(
-                        chapter: chapter,
-                        settings: settings,
-                        scrollController: _scrollController,
-                        onVerseLongPress: (verse) =>
-                            _openVerseActions(chapter, verse),
-                        verseKey: (number) => _verseKey(locationKey, number),
-                        pulsingVerse: _pulsingVerse,
+                      // Read to the end: ticks the chapter in a running
+                      // "Bijbel in een jaar" plan (a no-op without one).
+                      return ChapterEndDetector(
+                        key: ValueKey(locationKey),
+                        onEnd: () => unawaited(
+                          tickPlanChapterAtEnd(
+                            ProviderScope.containerOf(context, listen: false),
+                            location.book,
+                            location.chapter,
+                          ),
+                        ),
+                        child: ReaderChapterBody(
+                          chapter: chapter,
+                          book: location.book,
+                          chapterNumber: location.chapter,
+                          settings: settings,
+                          scrollController: _scrollController,
+                          onVerseLongPress: (verse) =>
+                              _openVerseActions(chapter, verse),
+                          verseKey: (number) => _verseKey(locationKey, number),
+                          pulsingVerse: _pulsingVerse,
+                        ),
                       );
                     },
                   ),
@@ -499,12 +514,12 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
 }
 
 /// The reader header: where you are and which pane, then the translation and
-/// the four reading tools.
+/// the three reading tools.
 ///
-/// The tool order is the one the design fixed - zoeken, weergave, offline,
-/// meer - and it is deliberately not the order the buttons grew in. Choosing
-/// a translation moved from a fifth tool into the pill on the left, and the
-/// chapter's note and highlight counts moved behind "meer".
+/// The tool order is the one the design fixed - zoeken, weergave, meer.
+/// Choosing a translation moved into the pill on the left; the study shortcut
+/// went because the Bijbel/Studie switch above already does that; offline
+/// moved behind "meer" with bookmarks and sharing (see [ReaderMoreButton]).
 class _ReaderBar extends ConsumerWidget {
   const _ReaderBar({required this.location, required this.embedded});
 
@@ -602,19 +617,12 @@ class _ReaderBar extends ConsumerWidget {
                             tooltip: 'Weergave',
                             onTap: () => showReaderSettingsSheet(context, ref),
                           ),
-                          if (canStudyChapter(location.book))
-                            _ToolButton(
-                              icon: Icons.school_outlined,
-                              tooltip: 'Bestudeer dit hoofdstuk',
-                              onTap: () => context.push(
-                                chapterStudyRoute(
-                                  location.book,
-                                  location.chapter,
-                                ),
-                              ),
+                          ReaderMoreButton(
+                            location: location,
+                            child: _ToolSlot(
+                              child: Icon(Icons.more_horiz, size: 19, color: AppTheme.inkSoft),
                             ),
-                          _OfflineButton(location: location),
-                          _MoreButton(location: location),
+                          ),
                         ],
                       ),
                     ),
@@ -715,19 +723,18 @@ class _VersionPill extends StatelessWidget {
   }
 }
 
-/// One 34x34 tool in the header row, on a 36px pitch (34 plus the 2px gap).
+/// One 34x34 tool in the header row, on a 44px pitch (34 plus a 10px gap).
 ///
-/// Not an [IconButton]: that one insists on 48x48 of layout, which would push
-/// the four boxes apart. The tap area is the whole slot - 36 wide, 44 tall -
-/// so there is no dead strip between neighbours; it cannot be wider than the
-/// pitch without two buttons claiming the same point.
+/// Not an [IconButton]: that one insists on 48x48 of layout. The tap area is
+/// the whole slot - 44 by 44 - so there is no dead strip between neighbours;
+/// it cannot be wider than the pitch without two buttons claiming the same
+/// point.
 class _ToolButton extends StatelessWidget {
   const _ToolButton({
     this.icon,
     this.glyph,
     required this.tooltip,
     required this.onTap,
-    this.active = false,
   }) : assert(icon != null || glyph != null);
 
   static const double tapHeight = 44;
@@ -739,12 +746,11 @@ class _ToolButton extends StatelessWidget {
   final String? glyph;
   final String tooltip;
   final VoidCallback onTap;
-  final bool active;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final color = active ? AppTheme.teal : AppTheme.inkSoft;
+    final color = AppTheme.inkSoft;
     final label = glyph;
 
     return Tooltip(
@@ -757,7 +763,6 @@ class _ToolButton extends StatelessWidget {
           onTap: onTap,
           radius: 20,
           child: _ToolSlot(
-            active: active,
             child: label != null
                 ? Text(
                     label,
@@ -780,28 +785,27 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
-/// The 36x44 slot a tool sits in, its 34x34 box flush right so every gap is
-/// exactly 2. The header shifts the whole group by [trailingGlyphInset], so the
+/// The 44x44 slot a tool sits in, its 34x34 box flush right so every gap is
+/// exactly 10. The header shifts the whole group by [trailingGlyphInset], so the
 /// last glyph - not its box - meets the header's 16px edge.
 class _ToolSlot extends StatelessWidget {
-  const _ToolSlot({required this.child, this.active = false});
+  const _ToolSlot({required this.child});
 
   /// How far inside its box the right edge of the "meer" dots is drawn: the
-  /// 19px icon is centred in the 34px box, and `more_vert`'s dots end at 14 of
+  /// 19px icon is centred in the 34px box, and `more_horiz`'s dots end at 20 of
   /// its 24 units.
-  static const double trailingGlyphInset = (34 - 19) / 2 + 19 * (24 - 14) / 24;
+  static const double trailingGlyphInset = (34 - 19) / 2 + 19 * (24 - 20) / 24;
 
   /// How far short of the full [trailingGlyphInset] shift the group stops, so
   /// the last box keeps a few pixels of room from the screen edge.
   static const double edgeClearance = 6;
 
   final Widget child;
-  final bool active;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 36,
+      width: _ToolButton.tapHeight,
       height: _ToolButton.tapHeight,
       child: Align(
         alignment: Alignment.centerRight,
@@ -809,10 +813,6 @@ class _ToolSlot extends StatelessWidget {
           width: 34,
           height: 34,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active ? AppTheme.tealWash : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          ),
           child: child,
         ),
       ),
@@ -820,108 +820,41 @@ class _ToolSlot extends StatelessWidget {
   }
 }
 
-/// The reader's way into "Offline lezen".
-///
-/// The download used to live only inside the book picker's expanded chapter
-/// grid, three taps deep and below the fold - which is why offline reading
-/// could look unimplemented to someone who had paid for it. It sits in the
-/// header tool row instead, and its icon reports the current book's real
-/// state: filled once every chapter of the book is genuinely on disk, outlined
-/// otherwise. It never anticipates a download that has not finished.
-class _OfflineButton extends ConsumerWidget {
-  const _OfflineButton({required this.location});
-
-  final ReaderLocation location;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref
-        .watch(
-          bookOfflineStatusProvider(BookRef(location.versionId, location.book)),
-        )
-        .value;
-    final complete = status?.isComplete ?? false;
-
-    return _ToolButton(
-      icon: complete ? Icons.offline_pin : Icons.download_outlined,
-      tooltip: complete
-          ? '${location.book} is offline beschikbaar'
-          : 'Offline lezen',
-      active: complete,
-      onTap: () => showOfflineLibrarySheet(context),
-    );
-  }
-}
-
-/// "Meer": what the reader already has in this chapter.
-///
-/// Counts come from the notes and highlights lists the app loads anyway - see
-/// [chapterMarkCountsProvider] - and both always show, zeros included. Both
-/// entries open [showChapterMarksSheet], the chapter's one list of notes and
-/// highlights. A plain [PopupMenuButton] until the menu gets its own design.
-class _MoreButton extends ConsumerWidget {
-  const _MoreButton({required this.location});
-
-  final ReaderLocation location;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    AppTheme.dependOn(context);
-    final counts = ref.watch(
-      chapterMarkCountsProvider(ChapterKey(location.book, location.chapter)),
-    );
-
-    return PopupMenuButton<_MarksEntry>(
-      tooltip: 'Meer',
-      color: AppTheme.surface,
-      onSelected: (_) => showChapterMarksSheet(
-        context,
-        ref,
-        book: location.book,
-        chapter: location.chapter,
-      ),
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          value: _MarksEntry.notes,
-          child: Text(_plural(counts.notes, 'notitie', 'notities')),
-        ),
-        PopupMenuItem(
-          value: _MarksEntry.highlights,
-          child: Text(_plural(counts.highlights, 'markering', 'markeringen')),
-        ),
-      ],
-      child: _ToolSlot(
-        child: Icon(Icons.more_vert, size: 19, color: AppTheme.inkSoft),
-      ),
-    );
-  }
-
-  static String _plural(int count, String one, String many) =>
-      '$count ${count == 1 ? one : many}';
-}
-
-enum _MarksEntry { notes, highlights }
-
-class _ChapterBody extends StatelessWidget {
-  const _ChapterBody({
+/// The text of one chapter: verses, then the study link and attribution.
+/// Shared by the reader and the plan reader (`PlanReaderScreen`).
+class ReaderChapterBody extends StatelessWidget {
+  const ReaderChapterBody({
+    super.key,
     required this.chapter,
+    required this.book,
+    required this.chapterNumber,
     required this.settings,
-    required this.scrollController,
+    this.scrollController,
     required this.onVerseLongPress,
-    required this.verseKey,
-    required this.pulsingVerse,
+    this.verseKey,
+    this.pulsingVerse,
+    this.showStudyLink = true,
   });
 
   final ChapterContent chapter;
+
+  /// The chapter as the reader names it - highlights and note markers are
+  /// keyed on it.
+  final String book;
+  final int chapterNumber;
   final ReadingSettings settings;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
   final void Function(Verse verse) onVerseLongPress;
 
   /// A stable [GlobalKey] for a verse number, used to scroll it into view.
-  final GlobalKey Function(int verseNumber) verseKey;
+  final GlobalKey Function(int verseNumber)? verseKey;
 
   /// The verse [_scrollToPendingVerse] just landed on, or null.
   final int? pulsingVerse;
+
+  /// "Bestudeer dit hoofdstuk" under the text; off in the plan reader, whose
+  /// way onward is its own button.
+  final bool showStudyLink;
 
   @override
   Widget build(BuildContext context) {
@@ -940,7 +873,9 @@ class _ChapterBody extends StatelessWidget {
         ],
         for (final verse in chapter.verses)
           _VerseRow(
-            key: verseKey(verse.number),
+            key: verseKey?.call(verse.number),
+            book: book,
+            chapter: chapterNumber,
             verse: verse,
             fontSize: fontSize,
             settings: settings,
@@ -949,7 +884,7 @@ class _ChapterBody extends StatelessWidget {
           ),
         const SizedBox(height: 28),
         // The end of the chapter is the natural moment to go deeper into it.
-        if (canStudyChapter(chapter.book)) ...[
+        if (showStudyLink && canStudyChapter(chapter.book)) ...[
           // A plain OutlinedButton rather than SiteOutlineButton: its label
           // must be free to wrap at large text sizes instead of overflowing.
           OutlinedButton(
@@ -976,6 +911,8 @@ class _ChapterBody extends StatelessWidget {
 class _VerseRow extends ConsumerWidget {
   const _VerseRow({
     super.key,
+    required this.book,
+    required this.chapter,
     required this.verse,
     required this.fontSize,
     required this.settings,
@@ -983,6 +920,8 @@ class _VerseRow extends ConsumerWidget {
     this.pulse = false,
   });
 
+  final String book;
+  final int chapter;
   final Verse verse;
   final double fontSize;
   final ReadingSettings settings;
@@ -996,11 +935,10 @@ class _VerseRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final highlights = ref.watch(highlightIndexProvider);
-    final location = ref.watch(readerLocationProvider);
-    final key = VerseKey(location.book, location.chapter, verse.number);
+    final key = VerseKey(book, chapter, verse.number);
     final highlight = highlights[key];
     final noteMarkers = ref.watch(
-      chapterNoteMarkersProvider(ChapterKey(location.book, location.chapter)),
+      chapterNoteMarkersProvider(ChapterKey(book, chapter)),
     );
     final hasNote = noteMarkers.contains(verse.number);
 
@@ -1137,8 +1075,8 @@ class _OfflineNotice extends StatelessWidget {
   }
 }
 
-class _ReaderError extends StatelessWidget {
-  const _ReaderError({required this.error});
+class ReaderChapterError extends StatelessWidget {
+  const ReaderChapterError({super.key, required this.error});
 
   final Object error;
 

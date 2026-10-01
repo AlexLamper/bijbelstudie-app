@@ -20,7 +20,23 @@ final bookmarksProvider = FutureProvider.autoDispose<List<Bookmark>>((ref) {
   return ref.watch(notesRepositoryProvider).listBookmarks();
 });
 
-final readingHistoryProvider = FutureProvider.autoDispose<List<ReadingPosition>>((ref) {
+/// The tab [NotesScreen] should open on, set just before navigating there -
+/// the reader's "Bladwijzers" entry sets [NotesTab.bookmarks]. Consumed (reset
+/// to null) by the screen, so the Notities tab in the bar still opens on notes.
+enum NotesTab { notes, highlights, bookmarks }
+
+class PendingNotesTab extends Notifier<NotesTab?> {
+  @override
+  NotesTab? build() => null;
+
+  void set(NotesTab? tab) => state = tab;
+}
+
+final pendingNotesTabProvider = NotifierProvider<PendingNotesTab, NotesTab?>(
+  PendingNotesTab.new,
+);
+
+final readingHistoryProvider =FutureProvider.autoDispose<List<ReadingPosition>>((ref) {
   ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listReadingHistory();
 });

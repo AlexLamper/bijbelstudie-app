@@ -2,17 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../bible/present/bible_providers.dart';
-import '../../dashboard/data/resume_link.dart';
-import '../../study/present/study_pane_controller.dart';
 import '../data/bible_year_models.dart';
 import '../data/bible_year_repository.dart';
 import '../domain/bible_year_display.dart';
+import '../domain/plan_calendar.dart';
 
 /// The state behind every "Bijbel in een jaar" surface in the app - the plan
 /// screen, the Studies block and the Start tab's card - so ticking a chapter
@@ -140,10 +138,72 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
   Future<String?> markRefs(List<BibleYearChapterKey> refs, bool read) {
     final current = state.value;
     final today = current?.today;
+    final enrollment = current?.enrollment;
     if (current != null && today != null) {
-      state = AsyncData(current.copyWith(today: applyRefMark(today, refs, read)));
+      final keys = {for (final r in refs) bibleYearRefKey(r.code, r.chapter)};
+      state = AsyncData(
+        current.copyWith(
+          today: applyRefMark(today, refs, read),
+          enrollment: enrollment?.copyWith(
+            readRefs: read
+                ? {...enrollment.readRefs, ...keys}
+                : enrollment.readRefs.difference(keys),
+          ),
+        ),
+      );
     }
     return _apply(() => _repository.markRefs(refs, read), reloadOnFailure: true);
+  }
+
+  /// The reader scrolled [code] [chapter] to its end: ticks it in the running
+  /// plan, once. A no-op without a plan or when it is already read, so the
+  /// reader can call it for every chapter it finishes.
+  Future<String?> chapterReadToEnd(String code, int chapter) async {
+    final enrollment = state.value?.enrollment;
+    if (enrollment == null || !enrollment.isActive || code.isEmpty) return null;
+    if (enrollment.readRefs.contains(bibleYearRefKey(code, chapter))) return null;
+    return markRefs([BibleYearChapterKey(code, chapter)], true);
+  }
+
+  /// A 'studeren' part of [day]: the uitleg read, or the vraag opened.
+  Future<String?> markStudy(int day, BibleYearStudyPart part, {bool done = true}) {
+    final current = state.value;
+    final enrollment = current?.enrollment;
+    if (current != null && enrollment != null) {
+      final key = bibleYearStudyKey(day, part);
+      if (done && enrollment.studyDone.contains(key)) return Future.value();
+      final today = current.today;
+      var study = today?.study;
+      if (today != null && study != null && today.dayNumber == day) {
+        study = part == BibleYearStudyPart.uitleg
+            ? study.copyWith(uitlegDone: done)
+            : study.copyWith(vraagDone: done);
+      }
+      final nextToday = today == null || study == null
+          ? today
+          : today.copyWith(
+              study: study,
+              todayDone: today.portions.every((p) => p.done) && study.done && today.dayNumber > 0,
+            );
+      state = AsyncData(
+        current.copyWith(
+          today: nextToday,
+          enrollment: enrollment.copyWith(
+            studyDone: done
+                ? {...enrollment.studyDone, key}
+                : enrollment.studyDone.difference({key}),
+          ),
+        ),
+      );
+    }
+    return _apply(() => _repository.markStudy(day, part, done), reloadOnFailure: true);
+  }
+
+  /// Changes the running plan's settings (the gear); read chapters stay.
+  Future<String?> updateSettings(BibleYearStartBody body) async {
+    final error = await _apply(() => _repository.update(body));
+    if (error == null && ref.mounted) _notifyReminders();
+    return error;
   }
 
   Future<String?> markDay(int day, bool read) => _apply(() => _repository.markDay(day, read));
@@ -229,18 +289,6 @@ final bibleYearScheduleProvider = FutureProvider.autoDispose
           .schedule(key.plan, key.track, version: key.version);
     });
 
-/// Opens [chapter] in the reader the way every other "lees hoofdstuk" link in
-/// the app does (reader location, reader half of the split screen, Bijbel
-/// tab), and marks the plan stale so the chapter shows as read on return.
-void openBibleYearChapter(BuildContext context, WidgetRef ref, BibleYearRef chapter) {
-  ref.read(bibleYearProvider.notifier).markDirty();
-  ref
-      .read(readerLocationProvider.notifier)
-      .openChapter(book: resolveBookName(chapter.book) ?? chapter.book, chapter: chapter.chapter);
-  ref.read(studyPaneProvider.notifier).showReader();
-  context.go('/study');
-}
-
 /// Refetches the plan (when stale) each time the widget mounts - which is how
 /// a reader coming back from the Bijbel tab finds today's chapters ticked.
 mixin BibleYearRefreshOnMount<T extends ConsumerStatefulWidget> on ConsumerState<T> {
@@ -263,3 +311,44 @@ mixin BibleYearRefreshOnMount<T extends ConsumerStatefulWidget> on ConsumerState
     });
   }
 }
+
+/// The running plan as a [PlanCalendar]: the state's enrollment (read
+/// chapters, study parts) over the static schedule. Data(null) without a
+/// running plan. Recomputed on every tick without refetching the schedule.
+final planCalendarProvider = Provider.autoDispose<AsyncValue<PlanCalendar?>>((ref) {
+  final async = ref.watch(bibleYearProvider);
+  final value = async.value;
+  if (value == null) {
+    final error = async.error;
+    return error != null ? AsyncError(error, async.stackTrace ?? StackTrace.current) : const AsyncLoading();
+  }
+  final enrollment = value.enrollment;
+  final today = value.today;
+  if (enrollment == null || !enrollment.isActive || today == null) return const AsyncData(null);
+  final schedule = ref.watch(
+    bibleYearScheduleProvider((
+      plan: enrollment.planKey,
+      track: enrollment.track,
+      version: enrollment.scheduleVersion,
+    )),
+  );
+  return schedule.whenData(
+    (s) => PlanCalendar(enrollment: enrollment, schedule: s, todayDay: today.dayNumber),
+  );
+});
+
+typedef BibleYearDayPreviewKey = ({BibleYearPlanKey plan, BibleYearTrackKey track, int day});
+
+/// One day of a not yet chosen plan (the setup's "Dag 1" example). Null when
+/// it cannot be fetched; the caller shows static text then.
+final bibleYearDayPreviewProvider = FutureProvider.autoDispose
+    .family<BibleYearScheduleDay?, BibleYearDayPreviewKey>((ref, key) async {
+      ref.cacheFor(const Duration(minutes: 30));
+      try {
+        return await ref
+            .watch(bibleYearRepositoryProvider)
+            .scheduleDay(key.plan, key.track, key.day);
+      } on BibleYearException {
+        return null;
+      }
+    });

@@ -8,6 +8,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../bible_year/present/bible_year_providers.dart';
+import '../../bible_year/present/plan_start_card.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../studies/data/study_models.dart';
 import '../../studies/data/study_plan_store.dart';
@@ -69,6 +71,9 @@ class DashboardScreen extends ConsumerWidget {
             color: AppTheme.teal,
             onRefresh: () async {
               ref.invalidate(dashboardProvider);
+              if (ref.exists(bibleYearProvider)) {
+                await ref.read(bibleYearProvider.notifier).refresh();
+              }
             },
             child: _DashboardBody(data: data),
           ),
@@ -160,6 +165,12 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Bijbel in een jaar, first under the greeting: the plan card
+              // while a plan runs, else an invitation to begin one. The
+              // dashboard says whether a plan runs, so a reader without one
+              // costs no `/bible-year` request.
+              PlanStartSlot(planActive: data.bibleYearActive),
+
               // "Waar je gebleven was" - the server's `resume` answer
               // (same object as the website's card), or on an older server a
               // study lesson in progress, else the last Bible chapter read.

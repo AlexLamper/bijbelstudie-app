@@ -9,6 +9,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../admin/present/admin_providers.dart';
 import '../../auth/domain/display_name.dart';
 import '../../auth/present/auth_controller.dart';
+import '../../bible_year/present/plan_widgets.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../feedback/present/feedback_sheet.dart';
 import '../../feedback/present/rate_app.dart';
@@ -97,7 +98,7 @@ Future<void> showProfileMenuSheet(
                     icon: Icons.calendar_month_outlined,
                     label: 'Bijbel in een jaar',
                     onTap: () =>
-                        go(() => context.push('/studies/bijbel-in-een-jaar')),
+                        go(() => context.push(PlanRoutes.plan)),
                   ),
                   _MenuRow(
                     icon: Icons.edit_note_outlined,

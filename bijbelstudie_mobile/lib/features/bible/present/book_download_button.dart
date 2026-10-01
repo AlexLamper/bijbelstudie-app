@@ -11,6 +11,104 @@ import '../../premium/present/pro_access_provider.dart';
 import '../data/bible_repository.dart';
 import 'bible_providers.dart';
 
+/// The book downloads that are running right now, by book.
+///
+/// Held here rather than in the widget that started one: the reader's "meer"
+/// menu and the book picker both start downloads, and both are gone the moment
+/// they close. The download carries on regardless, and whichever of them is
+/// opened next shows the same progress instead of starting a second run.
+class BookDownloads extends Notifier<Map<BookRef, BookDownloadProgress>> {
+  final _subscriptions = <BookRef, StreamSubscription<BookDownloadProgress>>{};
+  final _results = <BookRef, Completer<int?>>{};
+
+  @override
+  Map<BookRef, BookDownloadProgress> build() {
+    ref.onDispose(() {
+      for (final subscription in _subscriptions.values) {
+        subscription.cancel();
+      }
+      _subscriptions.clear();
+    });
+    return const {};
+  }
+
+  /// Fetches [chapters] of [book] into the cache.
+  ///
+  /// Completes with the number of chapters that could not be fetched, or null
+  /// when the run was cancelled, failed outright or was already running.
+  Future<int?> start(BookRef book, List<int> chapters) {
+    if (_subscriptions.containsKey(book)) return Future.value(null);
+    final result = Completer<int?>();
+    _results[book] = result;
+    _set(book, BookDownloadProgress(done: 0, total: chapters.length));
+
+    _subscriptions[book] = ref
+        .read(bibleRepositoryProvider)
+        .downloadBook(versionId: book.sourceId, book: book.book, chapters: chapters)
+        .listen(
+          (progress) => _set(book, progress),
+          onDone: () => _finish(book, state[book]?.failed ?? 0),
+          onError: (_) => _finish(book, null),
+          cancelOnError: true,
+        );
+    return result.future;
+  }
+
+  /// Stops the loop. Chapters already fetched stay cached.
+  void cancel(BookRef book) {
+    _subscriptions[book]?.cancel();
+    _finish(book, null);
+  }
+
+  void _set(BookRef book, BookDownloadProgress progress) {
+    state = {...state, book: progress};
+  }
+
+  /// Whatever the download changed is on disk now, so anything showing the
+  /// stored state has to be asked again.
+  void _finish(BookRef book, int? failed) {
+    _subscriptions.remove(book);
+    state = {...state}..remove(book);
+    ref.invalidate(offlineBooksProvider);
+    ref.invalidate(bookOfflineStatusProvider(book));
+    final result = _results.remove(book);
+    if (result != null && !result.isCompleted) result.complete(failed);
+  }
+}
+
+final bookDownloadsProvider =
+    NotifierProvider<BookDownloads, Map<BookRef, BookDownloadProgress>>(BookDownloads.new);
+
+/// Starts a download of [chapters] and reports chapters that could not be
+/// fetched through [messenger] - captured before the caller can go away, so the
+/// message still lands after the sheet or menu that started it has closed.
+Future<void> runBookDownload(
+  ScaffoldMessengerState? messenger,
+  BookDownloads downloads,
+  BookRef book,
+  List<int> chapters,
+) async {
+  final failed = await downloads.start(book, chapters);
+  if (failed == null || failed == 0) return;
+  messenger?.showSnackBar(
+    SnackBar(
+      content: Text(
+        '$failed hoofdstuk${failed == 1 ? '' : 'ken'} kon niet worden opgehaald. '
+        'Probeer het later opnieuw.',
+      ),
+    ),
+  );
+}
+
+/// Offline reading is a Pro feature; this is the way to Pro from wherever a
+/// download was offered. Counted under the same surface everywhere.
+void openOfflinePaywall(BuildContext context, WidgetRef ref) {
+  ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
+    'surface': 'offline',
+  });
+  context.push('/pro-intro?source=app_study');
+}
+
 /// "Bewaar dit boek offline".
 ///
 /// Per book, never per translation: a whole translation is hundreds of requests
@@ -40,15 +138,9 @@ class BookDownloadButton extends ConsumerStatefulWidget {
 }
 
 class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
-  StreamSubscription<BookDownloadProgress>? _subscription;
-  BookDownloadProgress? _progress;
   bool _lockedImpressionReported = false;
 
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
-  }
+  BookRef get _bookRef => BookRef(widget.versionId, widget.book);
 
   /// Offline reading is one of the four things the paywall sells.
   ///
@@ -57,12 +149,7 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   /// has to stay reachable for the reader to work at all. What Pro buys here is
   /// the bulk download, which is a feature rather than a body of text, so the
   /// button is the honest place to gate it.
-  void _openPaywall() {
-    ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
-      'surface': 'offline',
-    });
-    context.push('/pro-intro?source=app_study');
-  }
+  void _openPaywall() => openOfflinePaywall(context, ref);
 
   /// Whatever the download changed is on disk now, so anything showing the
   /// stored state has to be asked again.
@@ -72,47 +159,15 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   }
 
   void _start(List<int> chapters) {
-    final stream = ref.read(bibleRepositoryProvider).downloadBook(
-          versionId: widget.versionId,
-          book: widget.book,
-          chapters: chapters,
-        );
-
-    setState(() => _progress = BookDownloadProgress(done: 0, total: chapters.length));
-
-    _subscription = stream.listen(
-      (progress) {
-        if (mounted) setState(() => _progress = progress);
-      },
-      onDone: () {
-        final failed = _progress?.failed ?? 0;
-        if (mounted) setState(() => _progress = null);
-        _subscription = null;
-        _refreshOfflineState();
-        if (mounted && failed > 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '$failed hoofdstuk${failed == 1 ? '' : 'ken'} kon niet worden opgehaald. '
-                'Probeer het later opnieuw.',
-              ),
-            ),
-          );
-        }
-      },
-      onError: (_) {
-        if (mounted) setState(() => _progress = null);
-        _refreshOfflineState();
-      },
+    runBookDownload(
+      ScaffoldMessenger.maybeOf(context),
+      ref.read(bookDownloadsProvider.notifier),
+      _bookRef,
+      chapters,
     );
   }
 
-  void _cancel() {
-    _subscription?.cancel();
-    _subscription = null;
-    setState(() => _progress = null);
-    _refreshOfflineState();
-  }
+  void _cancel() => ref.read(bookDownloadsProvider.notifier).cancel(_bookRef);
 
   Future<void> _remove() async {
     await ref.read(bibleRepositoryProvider).removeOfflineBook(widget.versionId, widget.book);
@@ -125,7 +180,7 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = _progress;
+    final progress = ref.watch(bookDownloadsProvider)[_bookRef];
     // Store or server: flips the moment a purchase completes.
     final isPro = ref.watch(hasProProvider);
     final status = ref

@@ -15,7 +15,9 @@ import '../../features/study/domain/chapter_study_models.dart';
 import '../../features/auth/present/auth_controller.dart';
 import '../../features/auth/present/splash_screen.dart';
 import '../../features/bible_year/data/bible_year_models.dart';
-import '../../features/bible_year/present/bible_year_screen.dart';
+import '../../features/bible_year/present/plan_reader_screen.dart';
+import '../../features/bible_year/present/plan_screen.dart';
+import '../../features/bible_year/present/plan_setup_screen.dart';
 import '../../features/onboarding/present/onboarding_screen.dart';
 import '../../features/onboarding/present/tour_controller.dart';
 import '../../features/onboarding/present/setup_flow_screen.dart';
@@ -369,6 +371,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           // persisted route or old deep link resolves instead of hitting the
           // not-found page.
           GoRoute(path: '/groups', redirect: (context, state) => '/dashboard'),
+          // Bijbel in een jaar: Vandaag | Schema. In the shell so the bottom
+          // nav stays, with Start lit (no tab of its own). `?tab=schema&day=`.
+          GoRoute(
+            path: '/leesplan',
+            builder: (context, state) => PlanScreen(
+              initialTab: state.uri.queryParameters['tab'] == 'schema' ? 1 : 0,
+              initialDay: int.tryParse(state.uri.queryParameters['day'] ?? ''),
+            ),
+          ),
           GoRoute(path: '/read', builder: (context, state) => const ReadScreen()),
           GoRoute(path: '/commentary', builder: (context, state) => const CommentaryScreen()),
           // ?book= carries the caller's current book so the "alleen dit boek"
@@ -404,12 +415,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/studies/boeken',
         builder: (context, state) => const BookOverviewScreen(),
       ),
-      // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4). Also before
-      // `/studies/:id`; `?plan=jaar-2` preselects the duration.
+      // Bijbel in een jaar (DAILY_HABIT_PLAN.md §4). The old plan page's path
+      // (the website's `href`, old deep links) lands on the plan; before
+      // `/studies/:id`. The steps and the plan reader are full screen.
+      GoRoute(path: '/studies/bijbel-in-een-jaar', redirect: (context, state) => '/leesplan'),
       GoRoute(
-        path: '/studies/bijbel-in-een-jaar',
-        builder: (context, state) => BibleYearScreen(
+        path: '/leesplan/instellen',
+        builder: (context, state) => PlanSetupScreen(
+          edit: state.uri.queryParameters['edit'] == '1',
           initialPlan: BibleYearPlanKey.tryParse(state.uri.queryParameters['plan']),
+        ),
+      ),
+      GoRoute(
+        path: '/leesplan/lezen',
+        builder: (context, state) => PlanReaderScreen(
+          day: int.tryParse(state.uri.queryParameters['day'] ?? '') ?? 1,
+          part: int.tryParse(state.uri.queryParameters['part'] ?? '') ?? 0,
         ),
       ),
       GoRoute(

@@ -123,6 +123,16 @@ class BibleYearRepository {
   Future<Map<String, dynamic>> restart(BibleYearStartBody body) =>
       _call(() => _dio.patch(_base, data: {'action': 'restart', ...body.toJson()}));
 
+  /// PATCH update - mode, duration, order or start date of the running plan.
+  /// Read chapters are kept (progress is per chapter).
+  Future<Map<String, dynamic>> update(BibleYearStartBody body) =>
+      _call(() => _dio.patch(_base, data: {'action': 'update', ...body.toJson()}));
+
+  /// POST mark - a 'studeren' part of a day done or not.
+  Future<Map<String, dynamic>> markStudy(int day, BibleYearStudyPart part, bool read) => _call(
+    () => _dio.post('$_base/mark', data: {'day': day, 'study': part.id, 'read': read}),
+  );
+
   /// POST mark - chapters read or unread.
   Future<Map<String, dynamic>> markRefs(List<BibleYearChapterKey> refs, bool read) => _call(
     () => _dio.post(
@@ -153,10 +163,28 @@ class BibleYearRepository {
           // `v` per the plan, `version` as the website's client sends it.
           if (version != null) 'v': '$version',
           if (version != null) 'version': '$version',
+          // Per-chapter minutes and each day's study parts.
+          'detail': '1',
         },
       ),
     );
     return BibleYearSchedule.fromJson(data);
+  }
+
+  /// GET schedule `day=N` - one day only (the setup's "Dag 1" preview), so
+  /// browsing the orders doesn't pull a whole schedule each.
+  Future<BibleYearScheduleDay?> scheduleDay(
+    BibleYearPlanKey plan,
+    BibleYearTrackKey track,
+    int day,
+  ) async {
+    final data = await _call(
+      () => _dio.get(
+        '$_base/schedule',
+        queryParameters: {'plan': plan.id, 'track': track.id, 'day': '$day'},
+      ),
+    );
+    return BibleYearSchedule.fromJson(data).dayAt(day);
   }
 
   Future<Map<String, dynamic>> _call(Future<Response<dynamic>> Function() run) async {

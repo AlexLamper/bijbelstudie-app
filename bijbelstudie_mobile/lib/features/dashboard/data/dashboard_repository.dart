@@ -70,6 +70,9 @@ class DashboardRepository {
           'version': version,
           if (commentary != null) 'commentary': commentary,
           if (awardXp != null) 'awardXp': awardXp,
+          // Opening a chapter no longer ticks it in "Bijbel in een jaar": the
+          // reader marks it once it is scrolled to the end (bible-year/mark).
+          'planTick': false,
         },
       );
       // Null on a chapter already marked read, which is the common case.

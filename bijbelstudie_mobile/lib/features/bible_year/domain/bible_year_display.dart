@@ -231,7 +231,7 @@ BibleYearToday applyRefMark(
   ];
   return today.copyWith(
     portions: portions,
-    todayDone: portions.isNotEmpty && portions.every((p) => p.done),
+    todayDone: portions.isNotEmpty && portions.every((p) => p.done) && (today.study?.done ?? true),
   );
 }
 

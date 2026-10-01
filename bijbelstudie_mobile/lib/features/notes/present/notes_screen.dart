@@ -34,7 +34,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   late final TabController _tabController = TabController(
     length: 3,
     vsync: this,
+    initialIndex: _takePendingTab()?.index ?? 0,
   );
+
+  /// Reads [pendingNotesTabProvider] and clears it after this frame - a
+  /// provider cannot be written while the tree is building.
+  NotesTab? _takePendingTab() {
+    final tab = ref.read(pendingNotesTabProvider);
+    if (tab != null) {
+      final pending = ref.read(pendingNotesTabProvider.notifier);
+      WidgetsBinding.instance.addPostFrameCallback((_) => pending.set(null));
+    }
+    return tab;
+  }
 
   @override
   void dispose() {
