@@ -11,6 +11,7 @@ import '../../dashboard/data/dashboard_models.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/bible_repository.dart';
+import '../data/hsv_repository.dart';
 import '../domain/bible_models.dart';
 import '../domain/version_catalog.dart';
 
@@ -355,3 +356,26 @@ class ReaderLocationController extends Notifier<ReaderLocation> {
     );
   }
 }
+
+/// Which verses may be quoted from the Herziene Statenvertaling, fetched once
+/// per app run and held - it is a list of coordinates, not text, and the reader
+/// needs the answer before it can decide whether to offer the HSV on a verse.
+///
+/// A failure resolves to an empty index rather than an error: the HSV row is a
+/// courtesy beside the verse, and a reader with no network should see the rest
+/// of the sheet exactly as usual.
+final hsvIndexProvider = FutureProvider<HsvIndex>((ref) async {
+  try {
+    return await ref.watch(hsvRepositoryProvider).getIndex();
+  } catch (_) {
+    return const HsvIndex.empty();
+  }
+});
+
+/// The quoted HSV verses of one chapter. `autoDispose`, and never written to
+/// the content cache: licensed text stays in memory for as long as it is on
+/// screen. [ChapterRef.sourceId] is always `hsv` here.
+final hsvChapterProvider = FutureProvider.autoDispose
+    .family<Map<int, String>, ChapterRef>((ref, chapterRef) {
+      return ref.watch(hsvRepositoryProvider).getChapter(chapterRef.book, chapterRef.chapter);
+    });
