@@ -107,7 +107,10 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome, size: 20, color: AppTheme.teal),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Image.asset('assets/images/app_icon.png', width: 28, height: 28),
+              ),
               const SizedBox(height: 10),
               Text(
                 widget.title,

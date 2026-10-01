@@ -455,39 +455,49 @@ class _Benefits extends StatelessWidget {
 
   static const _items = kProBenefits;
 
+  /// One-line taglines for the compact paywall rows; the full sentences in
+  /// [kProBenefits] stay on the promo and celebration screens. A benefit
+  /// added there without a tagline here just shows its title.
+  static const _taglines = {
+    'Offline lezen': 'zonder verbinding',
+    'Alle commentaren': 'Matthew Henry en Dachsel',
+    'Grondtekst': 'Hebreeuws en Grieks',
+    'Meer AI-vragen': '200 per dag',
+  };
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Eyebrow('Pro'),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Text('Verdiep je studie', style: AppTheme.displaySmall),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         RuleGrid(
           children: [
             for (var i = 0; i < _items.length; i++)
               RuleListTile(
                 showRule: i < _items.length - 1,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(Icons.check, size: 16, color: AppTheme.positive),
-                    ),
-                    const SizedBox(width: 12),
+                    Icon(Icons.check, size: 14, color: AppTheme.positive),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_items[i].$1, style: Theme.of(context).textTheme.titleMedium),
-                          const SizedBox(height: 2),
-                          Text(
-                            _items[i].$2,
-                            style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                          ),
-                        ],
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: _items[i].$1, style: AppTheme.bodyStrong),
+                            if (_taglines[_items[i].$1] case final tagline?)
+                              TextSpan(
+                                text: '  $tagline',
+                                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+                              ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

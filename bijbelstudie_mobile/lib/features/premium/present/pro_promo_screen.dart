@@ -194,11 +194,9 @@ class _BenefitRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.tealTint),
-            child: Icon(Icons.check_rounded, size: 16, color: AppTheme.teal),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(Icons.check_rounded, size: 20, color: AppTheme.teal),
           ),
           const SizedBox(width: 14),
           Expanded(

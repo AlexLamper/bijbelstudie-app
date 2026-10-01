@@ -345,12 +345,6 @@ class _DemoStep extends StatelessWidget {
             ],
           ),
         ),
-
-        const SizedBox(height: 20),
-        Text(
-          'Ga verder dan alleen de Bijbel lezen. Begrijp hem.',
-          style: AppTheme.displaySmall,
-        ),
       ],
     );
   }

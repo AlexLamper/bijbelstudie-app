@@ -54,7 +54,6 @@ class _ProCelebrationScreenState extends State<ProCelebrationScreen>
     'Offline lezen': Icons.download_for_offline_outlined,
     'Alle commentaren': Icons.chat_bubble_outline,
     'Grondtekst': Icons.translate,
-    'Alle kruisverwijzingen': Icons.link,
     'Meer AI-vragen': Icons.auto_awesome_outlined,
   };
 
