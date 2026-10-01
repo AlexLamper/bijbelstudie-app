@@ -10,10 +10,10 @@ import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/segmented_track.dart';
 import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
-import '../../bible/present/reader_settings_sheet.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
@@ -94,33 +94,107 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               // Applies on the spot: main.dart watches the same stored value
               // and resolves AppTheme's brightness from it.
-              _SettingsRow(
-                label: 'Thema',
-                trailing: AppSegmentedControl(
-                  labels: [
-                    for (final mode in ThemeModeLabelX.pickerOrder) mode.label,
-                  ],
-                  selectedIndex: ThemeModeLabelX.pickerOrder.indexOf(
-                    settings.themeMode,
-                  ),
-                  onChanged: (index) {
-                    final picked = ThemeModeLabelX.pickerOrder[index];
-                    if (picked != settings.themeMode) {
-                      controller.setThemeMode(picked);
-                    }
-                  },
-                ),
+              _ThemePicker(
+                selected: settings.themeMode,
+                onChanged: (picked) {
+                  if (picked != settings.themeMode) controller.setThemeMode(picked);
+                },
               ),
             ],
           ),
+          // The same settings the reader's Weergave sheet writes, through the
+          // same controller, so the two places cannot drift apart.
           _SettingsGroup(
             title: 'Leesweergave',
             children: [
-              // The same chips the reader's Weergave sheet shows, so the two
-              // places that set these cannot drift apart.
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
-                child: ReaderTypographyControls(showPreview: false),
+              _SegmentRow<ReaderFontSize>(
+                label: 'Tekstgrootte',
+                values: ReaderFontSize.values,
+                selected: settings.fontSize,
+                valueLabel: (v) => v.label,
+                onChanged: controller.setFontSize,
+                segment: (v, color) => Text(
+                  'A',
+                  style: TextStyle(
+                    fontFamily: AppTheme.sansFontName,
+                    fontSize: switch (v) {
+                      ReaderFontSize.small => 12,
+                      ReaderFontSize.base => 15,
+                      ReaderFontSize.large => 18,
+                      ReaderFontSize.xlarge => 21,
+                    },
+                    height: 1.2,
+                    color: color,
+                  ),
+                ),
+              ),
+              _SegmentRow<ReaderFontFamily>(
+                label: 'Lettertype',
+                values: ReaderFontFamily.values,
+                selected: settings.fontFamily,
+                valueLabel: (v) => v.label,
+                onChanged: controller.setFontFamily,
+                segment: (v, color) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Aa',
+                      style: TextStyle(
+                        fontFamily: v.fontName,
+                        fontSize: 18,
+                        height: 1.2,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      v.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              _SegmentRow<ReaderLineHeight>(
+                label: 'Regelafstand',
+                values: ReaderLineHeight.values,
+                selected: settings.lineHeight,
+                valueLabel: (v) => v.label,
+                onChanged: controller.setLineHeight,
+                segment: (v, color) => _LineSpacingGlyph(
+                  gap: switch (v) {
+                    ReaderLineHeight.snug => 2,
+                    ReaderLineHeight.normal => 3.5,
+                    ReaderLineHeight.relaxed => 5,
+                    ReaderLineHeight.loose => 6.5,
+                  },
+                  color: color,
+                ),
+              ),
+              _SegmentRow<ReaderLetterSpacing>(
+                label: 'Letterafstand',
+                values: ReaderLetterSpacing.values,
+                selected: settings.letterSpacing,
+                valueLabel: (v) => v.label,
+                onChanged: controller.setLetterSpacing,
+                // The stored steps, exaggerated so they can be told apart at
+                // this size.
+                segment: (v, color) => Text(
+                  'abc',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontFamily: AppTheme.sansFontName,
+                    fontSize: 14,
+                    letterSpacing: v.points * 2,
+                    color: color,
+                  ),
+                ),
+              ),
+              _SettingsRow(
+                label: 'Versnummers tonen',
+                switchValue: settings.showVerseNumbers,
+                onSwitchChanged: controller.setShowVerseNumbers,
               ),
             ],
           ),
@@ -131,6 +205,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _SettingsGroup(
             title: 'Opgeslagen tekst',
+            // Below the card rather than in it: the books list is a card of
+            // its own.
+            footer: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
+                child: Text(
+                  'Hoofdstukken die je leest worden opgeslagen zodat je ze offline kunt '
+                  'teruglezen. Boeken die je expliciet downloadt blijven bewaard; de rest '
+                  'wordt automatisch opgeruimd bij ${_formatBytes(ContentCache.defaultMaxBytes)}.',
+                  style: AppTheme.caption,
+                ),
+              ),
+              // The same list as the reader's offline sheet, so the answer to
+              // "what is actually on my phone, and how do I get that space back"
+              // is in both places a reader would look for it.
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: OfflineBooksList(),
+              ),
+            ],
             children: [
               _SettingsRow(
                 label: 'Cache',
@@ -150,22 +244,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onPressed: _syncPending,
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: Text(
-                  'Hoofdstukken die je leest worden opgeslagen zodat je ze offline kunt '
-                  'teruglezen. Boeken die je expliciet downloadt blijven bewaard; de rest '
-                  'wordt automatisch opgeruimd bij ${_formatBytes(ContentCache.defaultMaxBytes)}.',
-                  style: AppTheme.caption,
-                ),
-              ),
-              // The same list as the reader's offline sheet, so the answer to
-              // "what is actually on my phone, and how do I get that space back"
-              // is in both places a reader would look for it.
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: OfflineBooksList(),
-              ),
             ],
           ),
         ],
@@ -283,7 +361,7 @@ class _NotificationsSection extends ConsumerWidget {
               ),
               if (prefs.eveningEnabled && prefs.eveningMinutes <= prefs.morningMinutes)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: Text(
                     'De avond valt voor de ochtend en wordt daarom overgeslagen.',
                     style: AppTheme.caption,
@@ -412,7 +490,7 @@ class _SubHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -616,48 +694,323 @@ class _TimeButton extends StatelessWidget {
 /// paragraphs inside a group are never underlined.
 abstract interface class _SettingsRowLike {}
 
-/// One titled block of the settings list: a bold title, its children with
-/// hairlines between consecutive rows, and a full-bleed rule above the block
-/// (except the first one).
+/// One block of the settings list: a small uppercase title over a card that
+/// holds its [children], with hairlines between consecutive rows. [footer]
+/// sits under the card, on the page, for notes and anything that is a card of
+/// its own.
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup({
     required this.title,
     required this.children,
+    this.footer = const [],
     this.first = false,
   });
 
   final String title;
   final List<Widget> children;
+  final List<Widget> footer;
   final bool first;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (first)
-          const SizedBox(height: 12)
-        else ...[
-          const SizedBox(height: 22),
-          const RuleLine(),
-          const SizedBox(height: 26),
-        ],
+        SizedBox(height: first ? 16 : 28),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          child: Text(title, style: AppTheme.displaySmall),
+          padding: const EdgeInsets.fromLTRB(32, 0, 32, 8),
+          child: Eyebrow(title),
         ),
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0 &&
-              children[i - 1] is _SettingsRowLike &&
-              children[i] is _SettingsRowLike)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: RuleLine(),
-            ),
-          children[i],
-        ],
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            border: Border.all(color: scheme.outline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0 &&
+                    children[i - 1] is _SettingsRowLike &&
+                    children[i] is _SettingsRowLike)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: RuleLine(),
+                  ),
+                children[i],
+              ],
+            ],
+          ),
+        ),
+        ...footer,
       ],
+    );
+  }
+}
+
+/// The Thema choice as three small screens - light, dark, and half of each for
+/// "follow the device" - each over a radio with its label. The chosen screen
+/// gets an accent border.
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker({required this.selected, required this.onChanged});
+
+  final ThemeMode selected;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Thema',
+            style: AppTheme.bodyLead.copyWith(
+              color: AppTheme.ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final mode in ThemeModeLabelX.pickerOrder) ...[
+                if (mode != ThemeModeLabelX.pickerOrder.first) const SizedBox(width: 10),
+                Expanded(
+                  child: _ThemeTile(
+                    mode: mode,
+                    selected: mode == selected,
+                    onTap: () => onChanged(mode),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({required this.mode, required this.selected, required this.onTap});
+
+  final ThemeMode mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const light = _MiniScreen(
+      background: AppTheme.lightPaperRaised,
+      line: AppTheme.lightRuleStrong,
+    );
+    const dark = _MiniScreen(
+      background: AppTheme.darkPaper,
+      line: AppTheme.darkRuleStrong,
+    );
+    final screen = switch (mode) {
+      ThemeMode.light => light,
+      ThemeMode.dark => dark,
+      ThemeMode.system => Stack(
+        fit: StackFit.expand,
+        children: [
+          light,
+          ClipRect(clipper: _RightHalfClipper(), child: dark),
+        ],
+      ),
+    };
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: mode.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (!selected) AppHaptics.selection();
+          onTap();
+        },
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: 76,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(
+                  color: selected ? AppTheme.teal : AppTheme.rule,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: screen,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Radio<ThemeMode>(
+                  value: mode,
+                  groupValue: selected ? mode : null,
+                  onChanged: (_) => onTap(),
+                  activeColor: AppTheme.teal,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                Flexible(
+                  child: Text(
+                    mode.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.bodyLead.copyWith(
+                      fontSize: 14,
+                      color: selected ? AppTheme.ink : AppTheme.inkMuted,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A phone screen in miniature: three lines of "text" on a fixed background.
+class _MiniScreen extends StatelessWidget {
+  const _MiniScreen({required this.background, required this.line});
+
+  final Color background;
+  final Color line;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double widthFactor) => FractionallySizedBox(
+      widthFactor: widthFactor,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        height: 5,
+        decoration: BoxDecoration(
+          color: line,
+          borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+        ),
+      ),
+    );
+    return ColoredBox(
+      color: background,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [bar(0.8), const SizedBox(height: 7), bar(0.95), const SizedBox(height: 7), bar(0.6)],
+        ),
+      ),
+    );
+  }
+}
+
+class _RightHalfClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(size.width / 2, 0, size.width, size.height);
+
+  @override
+  bool shouldReclip(_RightHalfClipper oldClipper) => false;
+}
+
+/// A Leesweergave row: label left, the current value right, and under both a
+/// full-width [SegmentedTrack] whose segments show the choice rather than name
+/// it.
+class _SegmentRow<T> extends StatelessWidget implements _SettingsRowLike {
+  const _SegmentRow({
+    required this.label,
+    required this.values,
+    required this.selected,
+    required this.valueLabel,
+    required this.onChanged,
+    required this.segment,
+  });
+
+  final String label;
+  final List<T> values;
+  final T selected;
+  final String Function(T value) valueLabel;
+  final ValueChanged<T> onChanged;
+  final Widget Function(T value, Color color) segment;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTheme.bodyLead.copyWith(
+                    color: AppTheme.ink,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(valueLabel(selected), style: AppTheme.bodyMuted),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SegmentedTrack(
+            segments: [
+              for (final v in values)
+                SegmentedTrackSegment(
+                  semanticLabel: valueLabel(v),
+                  builder: (context, _, color) => segment(v, color),
+                ),
+            ],
+            selectedIndex: values.indexOf(selected),
+            onChanged: (i) {
+              if (values[i] != selected) onChanged(values[i]);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Three short lines with [gap] between them - the Regelafstand glyph.
+class _LineSpacingGlyph extends StatelessWidget {
+  const _LineSpacingGlyph({required this.gap, required this.color});
+
+  final double gap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget line() => Container(
+      width: 20,
+      height: 2,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(1),
+      ),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [line(), SizedBox(height: gap), line(), SizedBox(height: gap), line()],
     );
   }
 }
@@ -700,7 +1053,7 @@ class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
     final content = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 52),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
             Expanded(

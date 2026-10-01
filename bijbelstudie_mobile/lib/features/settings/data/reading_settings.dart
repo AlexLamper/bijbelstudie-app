@@ -291,6 +291,7 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
       themeMode: switch (prefs.getString(_kThemeMode)) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,
+        'system' => ThemeMode.system,
         // Light unless the reader chose otherwise: "follow the device" is an
         // explicit choice, never the fallback.
         _ => ThemeMode.light,
