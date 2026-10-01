@@ -8,6 +8,7 @@ import '../../../../core/ui/app_widgets.dart';
 import '../../../feedback/data/review_prompt.dart';
 import '../../data/lesson_repository.dart';
 import '../../domain/lesson_models.dart';
+import 'lesson_loading_progress.dart';
 import 'lesson_providers.dart';
 
 /// Step 5 - five questions from BijbelQuiz on this passage.
@@ -55,6 +56,10 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
   bool _grading = false;
   QuizResult? _result;
   bool _seeded = false;
+
+  /// The loading bar was on screen and has not yet played its fill-and-fade.
+  /// Stays false when the quiz arrives from cache, so there is nothing to play.
+  bool _loaderPending = false;
 
   /// Reopening the step should show what the reader already answered, not a
   /// blank quiz - the server keeps every pick, and the shell keeps the ones
@@ -150,9 +155,25 @@ class _LessonQuizStepState extends ConsumerState<LessonQuizStep> {
     final quizAsync = ref.watch(lessonQuizProvider(widget.lessonRef));
 
     return quizAsync.when(
-      loading: () => const Center(child: AppLoader()),
-      error: (_, _) => _unavailable(QuizUnavailableReason.unavailable),
+      loading: () {
+        _loaderPending = true;
+        return const LessonLoadingProgress(key: ValueKey('quiz-loader'));
+      },
+      error: (_, _) {
+        _loaderPending = false;
+        return _unavailable(QuizUnavailableReason.unavailable);
+      },
       data: (quiz) {
+        if (_loaderPending) {
+          return LessonLoadingProgress(
+            key: const ValueKey('quiz-loader'),
+            done: true,
+            onFinished: () {
+              if (mounted) setState(() => _loaderPending = false);
+            },
+          );
+        }
+
         if (!quiz.available || quiz.questions.isEmpty) {
           return _unavailable(quiz.reason ?? QuizUnavailableReason.noQuestions);
         }
