@@ -7,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../admin/present/admin_providers.dart';
+import '../../auth/domain/display_name.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../feedback/present/feedback_sheet.dart';
@@ -289,7 +290,10 @@ Future<void> showProfileNameDialog(
   WidgetRef ref,
   ProfileModel profile,
 ) async {
-  final controller = TextEditingController(text: profile.name);
+  final isPlaceholder = isPlaceholderName(profile.name, profile.email);
+  final controller = TextEditingController(
+    text: isPlaceholder ? '' : profile.name,
+  );
   final name = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -298,7 +302,10 @@ Future<void> showProfileNameDialog(
         controller: controller,
         autofocus: true,
         textCapitalization: TextCapitalization.words,
-        decoration: const InputDecoration(labelText: 'Je naam'),
+        decoration: InputDecoration(
+          labelText: 'Je naam',
+          hintText: isPlaceholder ? 'Vul je naam in' : null,
+        ),
         onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
       ),
       actions: [
