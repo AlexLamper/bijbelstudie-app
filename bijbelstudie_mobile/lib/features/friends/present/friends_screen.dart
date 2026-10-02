@@ -124,8 +124,8 @@ class _FeedTab extends StatelessWidget {
           AppCard(
             padding: const EdgeInsets.all(20),
             child: Text(
-              'Nog niets gedeeld in je kring. Deel zelf een tekst of een mijlpaal '
-              'om te beginnen.',
+              'Nog niets te zien in je kring. Zodra iemand een studie afrondt of '
+              'een tekst bewaart, staat het hier.',
               textAlign: TextAlign.center,
               style: AppTheme.caption.copyWith(fontSize: 13.5),
             ),
