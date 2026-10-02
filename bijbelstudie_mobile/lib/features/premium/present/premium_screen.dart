@@ -14,6 +14,7 @@ import '../domain/price_framing.dart';
 import '../domain/pro_benefits.dart';
 import 'paywall_route.dart';
 import 'premium_controller.dart';
+import 'pro_paywall_view.dart';
 import 'pro_access_provider.dart';
 import '../domain/store_copy.dart';
 
@@ -142,13 +143,58 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
     // Derived from the live App Store prices, so the storefront's own currency
     // and tier are always what the customer is shown. Null when either product
-    // is missing or the currencies differ - in that case no claim is made.
-    final savingLabel = (monthlyProduct != null && yearlyProduct != null)
-        ? PriceFraming.annualSaving(monthlyProduct, yearlyProduct)
-        : null;
+    // is missing or the currencies differ - in that case no claim is made, and
+    // the badge stays off the card.
     final discountPercent = (monthlyProduct != null && yearlyProduct != null)
         ? PriceFraming.annualDiscountPercent(monthlyProduct, yearlyProduct)
         : null;
+    final selectedMissing = _selectedPlan == _ProPlan.monthly
+        ? monthlyProduct == null
+        : yearlyProduct == null;
+
+    if (!showActive) {
+      return ProPaywallView(
+        yearlyPrice: yearlyPrice,
+        monthlyPrice: monthlyPrice,
+        yearlyPerWeek: yearlyProduct != null
+            ? '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week'
+            : null,
+        monthlyPerWeek: monthlyProduct != null
+            ? '${PriceFraming.perWeek(monthlyProduct, isAnnual: false)} per week'
+            : null,
+        discountPercent: discountPercent,
+        yearlySelected: _selectedPlan == _ProPlan.yearly,
+        onSelectYearly: () => _selectPlan(_ProPlan.yearly),
+        onSelectMonthly: () => _selectPlan(_ProPlan.monthly),
+        busy: isLoading || pricesLoading,
+        // Without a price for the selected plan there is no product to buy, so
+        // the tap could only end in an error dialog.
+        onContinue: isLoading || pricesLoading || selectedMissing
+            ? null
+            : () {
+                final notifier = ref.read(premiumControllerProvider.notifier);
+                if (_selectedPlan == _ProPlan.monthly) {
+                  notifier.purchaseMonthly();
+                } else {
+                  notifier.purchaseYearly();
+                }
+              },
+        onClose: _close,
+        onTerms: () => _open(AppConfig.termsOfUseUrl),
+        onPrivacy: () => _open(AppConfig.privacyPolicyUrl),
+        onRestore: isLoading
+            ? () {}
+            : () => ref.read(premiumControllerProvider.notifier).restorePurchases(),
+        gateReason: widget.gate == null ? null : _GateReason(gate: widget.gate!),
+        priceNotice: premiumState.priceStatus == PriceStatus.unavailable
+            ? _PriceNotice(
+                message: premiumState.priceError ?? 'Prijzen konden niet worden geladen.',
+                diagnostics: premiumState.priceDiagnostics,
+                onRetry: () => ref.read(premiumControllerProvider.notifier).loadPrices(),
+              )
+            : null,
+      );
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -158,97 +204,12 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         // system navigation bar is added back by hand.
         padding: EdgeInsets.fromLTRB(20, 8, 20, 40 + MediaQuery.viewPaddingOf(context).bottom),
         children: [
-          if (showActive)
-            _ActiveCard(
-              fromWeb: profile?.isProFromWeb ?? false,
-              serverConfirmed: profile?.isPro ?? false,
-              managementUrl: premiumState.customerInfo?.managementURL,
-              onRestore: () =>
-                  ref.read(premiumControllerProvider.notifier).restorePurchases(),
-            )
-          else ...[
-            if (widget.gate case final gate?) ...[
-              _GateReason(gate: gate),
-              const SizedBox(height: 18),
-            ],
-            _Benefits(highlight: widget.gate?.benefit),
-            const SizedBox(height: 24),
-            if (premiumState.priceStatus == PriceStatus.unavailable) ...[
-              _PriceNotice(
-                message: premiumState.priceError ??
-                    'Prijzen konden niet worden geladen.',
-                diagnostics: premiumState.priceDiagnostics,
-                onRetry: () =>
-                    ref.read(premiumControllerProvider.notifier).loadPrices(),
-              ),
-              const SizedBox(height: 16),
-            ],
-            // Annual leads, in the widget order as well as by default selection.
-            _PlanTile(
-              title: 'Jaarlijks',
-              subtitle: 'Eén keer per jaar betalen',
-              // Guideline 3.1.2(c): the billed amount must be the most clear
-              // and conspicuous price on the tile. The per-week figure - the
-              // real yearly store price divided by 52 - is only a subordinate
-              // reference, shown smaller underneath it.
-              price: yearlyPrice,
-              priceSuffix: 'per jaar',
-              perWeekLabel: yearlyProduct != null
-                  ? '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week'
-                  : null,
-              savingLabel: savingLabel,
-              badge: discountPercent != null ? '$discountPercent% goedkoper' : 'Voordeligst',
-              selected: _selectedPlan == _ProPlan.yearly,
-              onTap: () => _selectPlan(_ProPlan.yearly),
-            ),
-            const SizedBox(height: 12),
-            _PlanTile(
-              title: 'Maandelijks',
-              subtitle: 'Elke maand opzegbaar',
-              price: monthlyPrice,
-              priceSuffix: 'per maand',
-              perWeekLabel: monthlyProduct != null
-                  ? '${PriceFraming.perWeek(monthlyProduct, isAnnual: false)} per week'
-                  : null,
-              selected: _selectedPlan == _ProPlan.monthly,
-              onTap: () => _selectPlan(_ProPlan.monthly),
-            ),
-            const SizedBox(height: 20),
-            SiteButton(
-              label: 'Pro nemen',
-              loading: isLoading || pricesLoading,
-              // Without a price for the selected plan there is no product to
-              // buy, so the tap can only end in an error dialog. Saying that
-              // up front beats staging a purchase that cannot start.
-              onPressed: isLoading ||
-                      pricesLoading ||
-                      (_selectedPlan == _ProPlan.monthly
-                          ? monthlyProduct == null
-                          : yearlyProduct == null)
-                  ? null
-                  : () {
-                      final notifier = ref.read(premiumControllerProvider.notifier);
-                      if (_selectedPlan == _ProPlan.monthly) {
-                        notifier.purchaseMonthly();
-                      } else {
-                        notifier.purchaseYearly();
-                      }
-                    },
-            ),
-            const SizedBox(height: 10),
-            // App Store review requires a visible restore action.
-            SiteOutlineButton(
-              label: 'Aankopen herstellen',
-              onPressed: isLoading
-                  ? null
-                  : () => ref.read(premiumControllerProvider.notifier).restorePurchases(),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              StoreCopy.renewalNotice,
-              style: AppTheme.bodyMuted.copyWith(fontSize: 11),
-            ),
-          ],
+          _ActiveCard(
+            fromWeb: profile?.isProFromWeb ?? false,
+            serverConfirmed: profile?.isPro ?? false,
+            managementUrl: premiumState.customerInfo?.managementURL,
+            onRestore: () => ref.read(premiumControllerProvider.notifier).restorePurchases(),
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -265,6 +226,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         ],
       ),
     );
+  }
+
+  /// The paywall is a modal: its close button pops back to whatever opened it,
+  /// and falls back to Start when it was opened as the first route.
+  void _close() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/dashboard');
+    }
   }
 
   Future<void> _open(String url) async {
@@ -496,184 +467,6 @@ class _GateReason extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Benefits extends StatelessWidget {
-  const _Benefits({this.highlight});
-
-  /// A `kProBenefits` title to show first, when the reader came here for one
-  /// particular thing. The list is otherwise in its authored order.
-  final String? highlight;
-
-  /// [kProBenefits] with [highlight] lifted to the front. Order only - nothing
-  /// is added or dropped, so the paywall still names exactly what the
-  /// celebration screen will confirm.
-  List<(String, String)> get _ordered {
-    final items = kProBenefits;
-    final first = highlight;
-    if (first == null) return items;
-    final match = items.indexWhere((item) => item.$1 == first);
-    if (match <= 0) return items;
-    return [items[match], ...items.where((item) => item.$1 != first)];
-  }
-
-  /// One-line taglines for the compact paywall rows; the full sentences in
-  /// [kProBenefits] stay on the promo and celebration screens. A benefit
-  /// added there without a tagline here just shows its title.
-  static const _taglines = {
-    'Offline lezen': 'zonder verbinding',
-    'Alle commentaren': 'Matthew Henry en Dachsel',
-    'Grondtekst': 'Hebreeuws en Grieks',
-    'Meer AI-vragen': '200 per dag',
-    'Onbeperkt notities': 'geen limiet van 10',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final items = _ordered;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Eyebrow('Pro'),
-        const SizedBox(height: 6),
-        Text('Verdiep je studie', style: AppTheme.displaySmall),
-        const SizedBox(height: 10),
-        RuleGrid(
-          children: [
-            for (var i = 0; i < items.length; i++)
-              RuleListTile(
-                showRule: i < items.length - 1,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                child: Row(
-                  children: [
-                    Icon(Icons.check, size: 14, color: AppTheme.positive),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: items[i].$1, style: AppTheme.bodyStrong),
-                            if (_taglines[items[i].$1] case final tagline?)
-                              TextSpan(
-                                text: '  $tagline',
-                                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                              ),
-                          ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PlanTile extends StatelessWidget {
-  const _PlanTile({
-    required this.title,
-    required this.subtitle,
-    required this.price,
-    required this.priceSuffix,
-    required this.selected,
-    required this.onTap,
-    this.badge,
-    this.perWeekLabel,
-    this.savingLabel,
-  });
-
-  final String title;
-  final String subtitle;
-
-  /// The amount the store will actually charge. This is the headline figure -
-  /// guideline 3.1.2(c) requires the billed amount to be the most clear and
-  /// conspicuous price on the tile, more so than any calculated figure.
-  final String price;
-
-  /// Billing period for [price], e.g. "per jaar" / "per maand".
-  final String priceSuffix;
-  final bool selected;
-  final VoidCallback onTap;
-  final String? badge;
-
-  /// The derived per-week figure, shown smaller and below the billed amount -
-  /// a subordinate reference, never the headline.
-  final String? perWeekLabel;
-
-  /// e.g. "Je bespaart € 29,89 per jaar". Only ever non-null when it is true of
-  /// the live store prices.
-  final String? savingLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '$title, $price $priceSuffix',
-      child: AppCard(
-        onTap: onTap,
-        borderColor: selected ? AppTheme.teal : AppTheme.rule,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium),
-                      if (badge != null) ...[
-                        const SizedBox(width: 8),
-                        SiteBadge.lapis(badge!),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
-                  if (savingLabel != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Je bespaart $savingLabel per jaar',
-                      style: AppTheme.bodyMuted.copyWith(
-                        fontSize: 12,
-                        color: AppTheme.teal,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(price, style: Theme.of(context).textTheme.headlineMedium),
-                Text(priceSuffix, style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
-                if (perWeekLabel != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    perWeekLabel!,
-                    style: AppTheme.bodyMuted.copyWith(fontSize: 10),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(width: 12),
-            Icon(
-              selected ? Icons.check_box : Icons.check_box_outline_blank,
-              size: 20,
-              color: selected ? AppTheme.teal : AppTheme.inkMuted,
-            ),
-          ],
-        ),
       ),
     );
   }
