@@ -44,7 +44,7 @@ No new stack anywhere: Mongoose schemas in `models/*.js`, business logic in
    kring all work, and actually delete documents.
 6. **One feed, two clients.** Web and app read the same documents through the
    same routes and the same wire contract. Neither gets a feature the other
-   silently lacks (contacts aside — see §5).
+   silently lacks (contacts aside — see §6).
 
 Items 1-3 are what store review hangs on: Apple 5.1.1(i) and 5.1.2 (contacts
 may not be required for app function, nor shared without consent) and the Play
@@ -116,30 +116,64 @@ Add `friendprofiles`, `friendships`, `friendrequests`, `friendposts` and
 archiving everything related (that guard exists because of the incident; a new
 collection that it does not know about is a hole in it).
 
-## 3. Shared wire contract and services
+## 3. What this reuses — no new plumbing anywhere
+
+Everything below already exists and is the thing to call, not to re-derive.
+
+**Web platform (`C:\Projectsijbelstudie`)**
+
+| Use | Existing |
+| --- | --- |
+| caller resolution, both clients | `requireUser` / `resolveUser` / `AuthUser` in `lib/apiAuth.ts` — NextAuth cookie **or** `Authorization: Bearer` via `lib/mobileJwt.ts`. One handler serves web and app. |
+| response plumbing | `corsPreflight`, `jsonV1`, `errorV1`, `handleV1Error` in `lib/apiV1.ts` (uniform error bodies, CORS, the 500 error id) |
+| database | `connectMongoDB` from `lib/mongodb.ts`; `models/*.js` Mongoose schemas |
+| throttling | `checkRateLimit` in `lib/mobileRateLimit.ts` (per-IP fixed window) for `discovery/match`; `lib/rateLimit.ts` buckets for the rest. In-process, so a courtesy limit — stated at the call site, as those modules ask. |
+| invite link, code, share text | `referralOverview` in `lib/referral.ts` and `/api/v1/referral`; the app's card already renders it. A friend request carries the same code, so one link does both jobs. |
+| streak / XP on a friend row | `lib/streak.ts`, `lib/gamification.ts` |
+| plan day on a friend row | `lib/bibleYear/service.ts` (the only writer of its enrollment) |
+| push on a request or reaction | `lib/notificationSchedule.ts`, `lib/notificationCopy.ts` |
+| account deletion safety | `archiveAccount`'s `related` map in `lib/accountArchive.ts` |
+| user lookup by id/email | `lib/userLookup.ts` |
+| route conventions | `app/api/v1/referral/route.ts` is the shortest example: `OPTIONS = corsPreflight`, `requireUser`, `jsonV1(..., { headers: { 'Cache-Control': 'private, no-store' } })`, `handleV1Error` in the catch |
+| tests | vitest in `tests/`, `npm test` |
+
+**App (`C:\Projectsijbelstudie-app`)**
+
+| Use | Existing |
+| --- | --- |
+| HTTP | `core/api/api_client.dart` (Dio + bearer refresh). Screens never touch Dio. |
+| last-good payload on a cold start | `core/data/payload_cache.dart` — the same trick `DashboardNotifier` uses, so the feed opens on what it had |
+| cards, buttons, headers, empty states | `core/ui/app_widgets.dart` (`AppCard`, `SiteButton`, `SectionHeader`, `IconChip`, `AppEmptyState`), `core/ui/skeleton.dart` |
+| colours, radii, type | `core/theme/app_theme.dart` — including `AppTheme.flame` for the streak and `tealTint` for avatars |
+| routing | `core/router/app_router.dart`; `/vriendenkring` is already in the shell |
+| report a post | `showFeedbackSheet` in `features/feedback/present/feedback_sheet.dart` |
+| invite share | `referralOverviewProvider` + `share_plus`, as `features/referral/present/invite_section.dart` does |
+| the contacts disclosure screen | `core/notifications/permission_moment.dart` is the existing "explain, then ask" pattern — the contacts moment is a second instance of it, not a new idea |
+| push | `core/notifications/` |
+
+**The only new dependency in either repo** is `flutter_contacts` in phase 3. It
+asks for the contacts permission itself, so no `permission_handler` is needed.
+Phases 1, 2 and 4 add no package anywhere.
+
+## 4. Shared wire contract and services
 
 Mirror the Bijbel-in-een-jaar arrangement exactly, because it is the pattern
 that already keeps web and app in step:
 
 | Where | What |
 | --- | --- |
-| `lib/friends/types.ts` | the wire contract: `FriendsFeed`, `FriendPost`, `FriendSummary`, `FriendRequest`. **Changes here, in `components/friends/`, in `lib/friends/client.ts` and in the app's `features/friends/` go in one pass.** |
+| `lib/friends/types.ts` | the wire contract: `FriendsFeed`, `FriendPost`, `FriendSummary`, `FriendRequestView`. No database imports, so client components can `import type` it. **Changes here, in `components/friends/`, in `lib/friends/client.ts` and in the app's `features/friends/` go in one pass.** |
 | `lib/friends/service.ts` | the only writer; feed assembly, pair invariants, request state machine |
-| `lib/friends/discovery.ts` | pure: normalisation and hashing (so it is unit-testable without a database) |
+| `lib/friends/discovery.ts` | pure: normalisation and hashing, unit-testable without a database |
 | `lib/friends/client.ts` | the browser's fetch wrapper, as `lib/bibleYear/client.ts` is |
-| `app/api/v1/friends/**` | route handlers |
+| `app/api/v1/friends/**` | route handlers, thin: auth, parse, call the service, `jsonV1` |
 
-The app's `features/friends/data/friend_models.dart` already matches this
-shape (`posts`, `newActivityCount`, `hasFriends`, and a post with
+The app's `features/friends/data/friend_models.dart` already matches this shape
+(`posts`, `newActivityCount`, `hasFriends`, and a post with
 `kind/reference/body/likeCount/likedByMe/commentCount`), so phase 1 needs no
 Dart change at all.
 
-**Auth:** these routes must accept both the website's NextAuth cookie and the
-app's bearer JWT, the way the other `/api/v1/*` routes do via the
-`lib/mobile*.ts` surface. One handler, two callers — not a second endpoint for
-the app.
-
-## 4. Endpoints
+## 5. Endpoints
 
 | Method | Path | Does |
 | --- | --- | --- |
@@ -167,7 +201,7 @@ collect the other side's ids, drop anyone in `blocked` (either direction), then
 For a kring of tens of people that is one indexed query; no fan-out collection
 is warranted at this size, and `before` gives cursor pagination later.
 
-## 5. Contact matching — app only, by nature
+## 6. Contact matching — app only, by nature
 
 A browser cannot read an address book, so **contacts are an app feature**; the
 web platform gets the same kring through invite link, code and QR. This is the
@@ -221,7 +255,7 @@ contact-matching app makes.
   linked to identity, not used for tracking. Play Data safety: contacts
   collected, not shared, processed ephemerally.
 
-## 6. The web platform's own surfaces
+## 7. The web platform's own surfaces
 
 - `app/vriendenkring/page.tsx` — the feed, the kring and the requests, same
   three sections as the app, Dutch slug like `groepen` / `notities`.
@@ -235,7 +269,7 @@ contact-matching app makes.
 - The invite page the link lands on: the existing `/uitnodiging` referral page
   grows a "word vrienden" path, so one link serves both.
 
-## 7. What posts to the feed, and when
+## 8. What posts to the feed, and when
 
 Each category is a switch in Instellingen on both clients, all **off** by
 default except mijlpalen:
@@ -249,14 +283,16 @@ default except mijlpalen:
 A post is a copy, not a reference: editing the note later does not change what
 the kring saw, and deleting the note deletes the post.
 
-## 8. Phases
+## 9. Phases
 
 **Phase 1 — backend + wire contract** (web repo, branch off `levensboom`)
 The five schemas, `lib/friends/{types,service,discovery,client}.ts`,
 `/friends/feed`, `/friends`, `/friends/requests`, likes, comments, `seen`,
-invite by code and link, and the `accountArchive` entries. Vitest for the feed
-query, the pair invariants and the request state machine. **The app needs no
-change: it already calls these paths and lights up the moment they answer.**
+invite by code (reusing `referralOverview`'s code), and the five new entries in
+`archiveAccount`'s `related` map. Handlers are `requireUser` + service call +
+`jsonV1`, with `handleV1Error` in the catch. Vitest for the feed query, the
+pair invariants and the request state machine. **The app needs no change: it
+already calls these paths and lights up the moment they answer.**
 
 **Phase 2 — kring without contacts** (both clients)
 App: `/vriendenkring` gains Feed | Vrienden | Verzoeken, invite by code, link
@@ -279,7 +315,7 @@ the server-side milestone posts.
 Push on a new request and on a reaction (the notifications feature exists),
 feed pagination via `before`, and a friend's Levensboom on their row.
 
-## 9. Tests
+## 10. Tests
 
 - **web** (`tests/`, `npm test`): feed excludes non-friends and blocked users;
   a request cannot be accepted twice; the pair document is unique whichever
@@ -293,7 +329,7 @@ feed pagination via `before`, and a friend's Levensboom on their row.
   access clears what was stored. `test/home_start_redesign_test.dart` already
   covers the Start tab's two main cards and the "Bij je vrienden" states.
 
-## 10. Open questions for the owner
+## 11. Open questions for the owner
 
 1. Is a vriendschap visible to the kring ("Marieke en Jonathan zijn vrienden")
    or strictly between the two? Plan assumes strictly between the two.

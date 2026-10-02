@@ -13,7 +13,7 @@ final friendsRepositoryProvider = Provider((ref) {
 /// `/api/v1/friends/*`.
 ///
 /// The endpoints do not exist on the web platform yet (Next.js + Mongoose; see
-/// `docs/vriendenkring-plan.md` for the schemas, the shared
+/// `VRIENDENKRING_PLAN.md` for the schemas, the shared
 /// `lib/friends/types.ts` contract and the phases).
 ///
 /// Every call therefore treats a

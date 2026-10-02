@@ -1,7 +1,7 @@
 /// Vriendenkring: the people a reader follows and what they post.
 ///
 /// The server does not answer `/friends` yet (see
-/// `docs/vriendenkring-plan.md`), so the repository degrades to an empty feed
+/// `VRIENDENKRING_PLAN.md`), so the repository degrades to an empty feed
 /// and every surface renders its "nog geen vrienden" state. The models are the
 /// shape that plan commits to, so wiring the endpoint later changes the
 /// repository only.
