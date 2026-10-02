@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/present/paywall_route.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../premium/present/pro_access_provider.dart';
@@ -102,11 +102,14 @@ Future<void> runBookDownload(
 
 /// Offline reading is a Pro feature; this is the way to Pro from wherever a
 /// download was offered. Counted under the same surface everywhere.
+///
+/// A reader here has already said what they want by tapping a download, so
+/// this goes straight to the price rather than through the pitch.
 void openOfflinePaywall(BuildContext context, WidgetRef ref) {
   ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
     'surface': 'offline',
   });
-  context.push('/pro-intro?source=app_study');
+  openPaywall(context, gate: PaywallGate.offline);
 }
 
 /// "Bewaar dit boek offline".

@@ -13,6 +13,7 @@ import '../../commentary/present/original_verse_sheet.dart';
 import '../../crossrefs/present/crossref_providers.dart';
 import '../../crossrefs/present/crossref_sheet.dart';
 import '../../study/present/study_pane_controller.dart';
+import '../../premium/present/paywall_route.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
@@ -172,7 +173,8 @@ Future<void> showAddNoteDialog({
         action: e.proRequired && router != null
             ? SnackBarAction(
                 label: 'Bekijk Pro',
-                onPressed: () => router.push('/pro-intro?source=app_notes'),
+                onPressed: () =>
+                    openPaywallWith(router, gate: PaywallGate.notes),
               )
             : null,
       ),

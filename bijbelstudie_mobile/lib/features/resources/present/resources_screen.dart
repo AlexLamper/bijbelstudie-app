@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/analytics/analytics.dart';
@@ -9,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../data/resources_repository.dart';
+import '../../premium/present/paywall_route.dart';
 
 /// `/hulpbronnen` - the library of public-domain Dutch works.
 ///
@@ -64,7 +64,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
         'surface': 'resources',
       });
-      context.push('/pro-intro?source=app_resources');
+      openPaywall(context, gate: PaywallGate.resources);
       return;
     }
     final uri = Uri.tryParse(item.sourceUrl);

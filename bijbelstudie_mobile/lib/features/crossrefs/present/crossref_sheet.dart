@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/present/paywall_route.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -252,7 +253,7 @@ class _CrossRefSheetState extends ConsumerState<_CrossRefSheet> {
 /// at all, the server never sent them. The lock identifies the row as a
 /// locked control; it is not decoration.
 ///
-/// Tapping closes the sheet and opens the in-app paywall (`/pro-intro`,
+/// Tapping closes the sheet and opens the in-app paywall (straight to the
 /// StoreKit / Play Billing through RevenueCat). Never web checkout.
 class CrossRefLockedRow extends ConsumerStatefulWidget {
   const CrossRefLockedRow({super.key, required this.lockedCount});
@@ -289,7 +290,7 @@ class _CrossRefLockedRowState extends ConsumerState<CrossRefLockedRow> {
     // router is not.
     final router = GoRouter.maybeOf(context);
     Navigator.of(context).maybePop();
-    router?.push('/pro-intro?source=app_crossrefs');
+    openPaywallWith(router, gate: PaywallGate.crossrefs);
   }
 
   @override

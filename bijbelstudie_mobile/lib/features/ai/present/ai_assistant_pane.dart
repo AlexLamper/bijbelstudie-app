@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/present/paywall_route.dart';
 import '../../premium/present/pro_access_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
@@ -272,7 +273,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                         AnalyticsEvents.paywallCtaClicked,
                         {'surface': 'ai_limit'},
                       );
-                      context.push('/pro-intro?source=app_ai');
+                      openPaywall(context, gate: PaywallGate.aiLimit);
                     },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),

@@ -12,6 +12,7 @@ import '../../../core/analytics/analytics.dart';
 import '../../profile/present/profile_provider.dart';
 import '../domain/price_framing.dart';
 import '../domain/pro_benefits.dart';
+import 'paywall_route.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
 import '../domain/store_copy.dart';
@@ -26,12 +27,20 @@ enum _ProPlan { monthly, yearly }
 /// who already pay on the web keep Pro through `/api/v1/me` and are shown a
 /// status card instead of a purchase button.
 class PremiumScreen extends ConsumerStatefulWidget {
-  const PremiumScreen({super.key, this.source});
+  const PremiumScreen({super.key, this.source, this.gate});
 
   /// Which surface sent the user here, so the contextual paywalls can be ranked
   /// against each other. Validated against the server allowlist before it is
   /// reported; anything unrecognised is dropped server-side.
   final String? source;
+
+  /// Set when the reader was sent here by a specific thing they could not do,
+  /// rather than by browsing. They skipped the three pitch screens on the way
+  /// in (see [openPaywall]), so this is what pays that back: the gate names
+  /// the reason above the price, and lifts its own benefit to the top of the
+  /// list. Null for a reader who arrived through the pitch or from Profiel,
+  /// and the screen is exactly as it was.
+  final PaywallGate? gate;
 
   @override
   ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
@@ -158,7 +167,11 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                   ref.read(premiumControllerProvider.notifier).restorePurchases(),
             )
           else ...[
-            const _Benefits(),
+            if (widget.gate case final gate?) ...[
+              _GateReason(gate: gate),
+              const SizedBox(height: 18),
+            ],
+            _Benefits(highlight: widget.gate?.benefit),
             const SizedBox(height: 24),
             if (premiumState.priceStatus == PriceStatus.unavailable) ...[
               _PriceNotice(
@@ -450,10 +463,62 @@ class _ActiveCard extends StatelessWidget {
   }
 }
 
-class _Benefits extends StatelessWidget {
-  const _Benefits();
+/// Why the reader is looking at this price, in one line, above it.
+///
+/// They were blocked on something and came straight here instead of through
+/// the three pitch screens, so this is the only place the app gets to say "we
+/// know what you were after". It restates the thing they just hit and nothing
+/// more - no second pitch, no price claim, and never a promise that is not
+/// also in [kProBenefits].
+class _GateReason extends StatelessWidget {
+  const _GateReason({required this.gate});
 
-  static const _items = kProBenefits;
+  final PaywallGate gate;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.teal.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: AppTheme.teal.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_open_outlined, size: 18, color: AppTheme.teal),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              gate.reason,
+              style: AppTheme.bodyStrong.copyWith(fontSize: 13, color: AppTheme.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Benefits extends StatelessWidget {
+  const _Benefits({this.highlight});
+
+  /// A `kProBenefits` title to show first, when the reader came here for one
+  /// particular thing. The list is otherwise in its authored order.
+  final String? highlight;
+
+  /// [kProBenefits] with [highlight] lifted to the front. Order only - nothing
+  /// is added or dropped, so the paywall still names exactly what the
+  /// celebration screen will confirm.
+  List<(String, String)> get _ordered {
+    final items = kProBenefits;
+    final first = highlight;
+    if (first == null) return items;
+    final match = items.indexWhere((item) => item.$1 == first);
+    if (match <= 0) return items;
+    return [items[match], ...items.where((item) => item.$1 != first)];
+  }
 
   /// One-line taglines for the compact paywall rows; the full sentences in
   /// [kProBenefits] stay on the promo and celebration screens. A benefit
@@ -467,6 +532,7 @@ class _Benefits extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final items = _ordered;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -476,9 +542,9 @@ class _Benefits extends StatelessWidget {
         const SizedBox(height: 10),
         RuleGrid(
           children: [
-            for (var i = 0; i < _items.length; i++)
+            for (var i = 0; i < items.length; i++)
               RuleListTile(
-                showRule: i < _items.length - 1,
+                showRule: i < items.length - 1,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 child: Row(
                   children: [
@@ -488,8 +554,8 @@ class _Benefits extends StatelessWidget {
                       child: Text.rich(
                         TextSpan(
                           children: [
-                            TextSpan(text: _items[i].$1, style: AppTheme.bodyStrong),
-                            if (_taglines[_items[i].$1] case final tagline?)
+                            TextSpan(text: items[i].$1, style: AppTheme.bodyStrong),
+                            if (_taglines[items[i].$1] case final tagline?)
                               TextSpan(
                                 text: '  $tagline',
                                 style: AppTheme.bodyMuted.copyWith(fontSize: 12),

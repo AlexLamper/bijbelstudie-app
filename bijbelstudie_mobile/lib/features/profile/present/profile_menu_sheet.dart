@@ -18,6 +18,7 @@ import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import 'profile_provider.dart';
 import '../../premium/present/pro_access_provider.dart';
+import '../../premium/present/paywall_route.dart';
 
 /// The hamburger menu: everything the profile screen used to list as sections.
 ///
@@ -142,7 +143,7 @@ Future<void> showProfileMenuSheet(
                       label: 'BijbelStudie Pro',
                       showRule: false,
                       onTap: () =>
-                          go(() => context.push('/pro-intro?source=app_profile')),
+                          go(() => openPaywall(context, source: 'app_profile')),
                     ),
                 ],
               ),

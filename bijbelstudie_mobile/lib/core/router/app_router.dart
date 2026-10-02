@@ -11,6 +11,7 @@ import '../ui/lucide_icon.dart';
 import '../../features/friends/present/friends_screen.dart';
 import '../../features/admin/present/admin_screen.dart';
 import '../../features/premium/present/paywall_funnel_screen.dart';
+import '../../features/premium/present/paywall_route.dart';
 import '../../features/study/present/lesson/lesson_screen.dart';
 import '../../features/study/domain/chapter_study_models.dart';
 import '../../features/auth/present/auth_controller.dart';
@@ -469,7 +470,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/premium',
         // ?source= records which surface sent the user to the paywall.
-        builder: (context, state) => PremiumScreen(source: state.uri.queryParameters['source']),
+        // ?gate= is set when the reader was blocked on one specific thing and
+        // was sent straight here, skipping the pitch (see `openPaywall`); the
+        // paywall then names that reason above the price. Unknown or absent
+        // leaves the screen exactly as a browsing reader sees it.
+        builder: (context, state) => PremiumScreen(
+          source: state.uri.queryParameters['source'],
+          gate: PaywallGate.fromId(state.uri.queryParameters['gate']),
+        ),
       ),
       // The post-purchase celebration. Reached only by `pushReplacement` from
       // the paywall, so it takes the paywall's place in the stack.

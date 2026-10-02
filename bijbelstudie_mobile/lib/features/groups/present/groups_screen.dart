@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/groups_repository.dart';
+import '../../premium/present/paywall_route.dart';
 
 /// `/groepen` - the study groups the reader is in, plus the public ones.
 class GroupsScreen extends ConsumerWidget {
@@ -78,7 +79,8 @@ class GroupsScreen extends ConsumerWidget {
           action: limit && router != null
               ? SnackBarAction(
                   label: 'Bekijk Pro',
-                  onPressed: () => router.push('/pro-intro?source=app_groups'),
+                  onPressed: () =>
+                      openPaywallWith(router, gate: PaywallGate.groups),
                 )
               : null,
         ),

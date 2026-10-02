@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/price_framing.dart';
+import 'paywall_route.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
 
@@ -29,6 +29,10 @@ import 'pro_access_provider.dart';
 /// `commentary_pane.dart`) has been switched over to this widget so far. The
 /// AI-limit prompt in `study_screen.dart` (`_ProWall`) and the profile CTA
 /// still use their own hand-rolled blocks and can adopt this widget later.
+///
+/// Tapping it goes straight to the price, not through the pre-sell: this
+/// prompt only ever appears because the reader was already blocked on
+/// something, which is the one case the pitch has nothing left to ask.
 ///
 /// The price is never hardcoded - see the doc comment on `PriceFraming`. This
 /// widget reads the real annual `StoreProduct` from `premiumControllerProvider`,
@@ -69,11 +73,29 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
     });
   }
 
+  /// The gate this prompt's [UpgradePrompt.surface] stands for, so a reader
+  /// who taps it lands on the price with their own reason named rather than on
+  /// the three pitch screens - they stated what they wanted by hitting this
+  /// prompt. An unmapped surface falls back to the pitch, which is wordy but
+  /// never wrong.
+  PaywallGate? get _gate => switch (widget.surface) {
+    'commentary' => PaywallGate.commentary,
+    'ai_limit' => PaywallGate.aiLimit,
+    'original_text' => PaywallGate.originalText,
+    'offline' => PaywallGate.offline,
+    'resources' => PaywallGate.resources,
+    _ => null,
+  };
+
   void _handleTap() {
     ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {
       'surface': widget.surface,
     });
-    context.push('/pro-intro?source=app_study');
+    // Was `?source=app_study` for every surface this widget serves, so a
+    // commentary paywall reported itself as a study one and the contextual
+    // paywalls could not be ranked against each other at all. The gate owns
+    // its own source now.
+    openPaywall(context, gate: _gate);
   }
 
   @override

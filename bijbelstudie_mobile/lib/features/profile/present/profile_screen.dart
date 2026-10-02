@@ -23,6 +23,7 @@ import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
 import '../../premium/domain/store_copy.dart';
 import '../../premium/present/pro_access_provider.dart';
+import '../../premium/present/paywall_route.dart';
 import '../../referral/data/referral_repository.dart';
 import '../../referral/present/invite_section.dart';
 import 'profile_stats_provider.dart';
@@ -347,7 +348,7 @@ class _ProfileHeader extends ConsumerWidget {
                           AppTheme.radiusPill,
                         ),
                         onTap: () =>
-                            context.push('/pro-intro?source=app_profile'),
+                            openPaywall(context, source: 'app_profile'),
                         child: SiteBadge.teal(
                           'Bekijk Pro',
                           icon: Icons.workspace_premium_outlined,

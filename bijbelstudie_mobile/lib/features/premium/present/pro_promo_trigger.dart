@@ -9,9 +9,9 @@ import '../../auth/present/auth_controller.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/pro_promo_schedule.dart';
+import 'paywall_route.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
-import 'pro_promo_screen.dart';
 
 /// True only when it is *known* that a signed-in reader does not have Pro:
 /// the server profile has loaded and the store has answered. Anything still
@@ -34,10 +34,14 @@ final proPromoEligibleProvider = Provider.autoDispose<bool>((ref) {
   return !ref.watch(hasProProvider);
 });
 
-/// Wraps the main shell's body and opens [ProPromoScreen] over Start once the
+/// Wraps the main shell's body and opens the Pro pre-sell over Start once the
 /// rules in [ProPromoRules] allow it: a signed-in non-Pro reader, not in the
 /// first session, not during the tour, at most once per 24h and once per
 /// process, [ProPromoRules.showDelay] after Start came on screen.
+///
+/// This is the pre-sell's home. It used to open the static `ProPromoScreen`
+/// and hand off to the price from there; it now opens `/pro-intro` itself, for
+/// the reason spelled out in `_fire`.
 class ProPromoTrigger extends ConsumerStatefulWidget {
   const ProPromoTrigger({super.key, required this.child});
 
@@ -106,11 +110,20 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
 
     _doneThisProcess = true;
     unawaited(ProPromoSchedule.markShown());
-    final router = GoRouter.of(context);
-    final wantsPro = await Navigator.of(context, rootNavigator: true).push(ProPromoScreen.route());
-    if (wantsPro == true) {
-      unawaited(router.push('/premium?source=${ProPromoRules.paywallSource}'));
-    }
+    // The pre-sell itself is the interstitial now, in place of the static
+    // `ProPromoScreen` (still in the tree, no longer reachable) that used to
+    // sit here and then hand off to the price.
+    //
+    // This is the one surface the pitch is actually built for: a reader who
+    // opened the app, asked for nothing, and is being approached. Every other
+    // caller of the pitch was a reader already blocked on a specific feature,
+    // who now skips it (see `openPaywall`) - so without this the funnel would
+    // only ever run from Profiel, which nobody taps.
+    //
+    // Not stacked on top of the old promo screen: two pitches plus a price is
+    // five screens to a reader who did not ask for any of them. One pitch, and
+    // it ends by replacing itself with `/premium`.
+    openPaywall(context, source: ProPromoRules.paywallSource);
   }
 
   @override
