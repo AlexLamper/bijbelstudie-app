@@ -10,6 +10,7 @@ import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/segmented_track.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/chapter_end_detector.dart';
@@ -33,7 +34,10 @@ import 'plan_widgets.dart';
 /// uitleg in the commentary pane, the vraag on a quiet page - without moving
 /// the normal reader's position. A chapter or the uitleg ticks once it is
 /// scrolled to its end ([ChapterEndDetector]); the vraag as soon as it shows.
-/// "Volgende" always moves on, read or not.
+/// "Volgende" always moves on, read or not; "Vorige" and the segments in the
+/// bar go back, so a day can be walked in any order. The uitleg carries its
+/// own Bijbeltekst | Uitleg switch: studying is reading plus an explanation,
+/// so the chapter itself stays one tap away.
 class PlanReaderScreen extends ConsumerStatefulWidget {
   const PlanReaderScreen({super.key, required this.day, this.part = 0});
 
@@ -54,6 +58,10 @@ class _PlanReaderScreenState extends ConsumerState<PlanReaderScreen> {
 
   /// Study parts already sent this visit, so a rebuild never sends twice.
   final Set<String> _studySent = {};
+
+  /// Uitleg parts, by index, that currently show the chapter text instead of
+  /// the commentary. Per part, so flipping one does not flip another.
+  final Set<int> _chapterUnderUitleg = {};
   String? _recordedFor;
 
   String get _dayLabel => 'Bijbel in een jaar · dag ${widget.day}';
@@ -153,7 +161,7 @@ class _PlanReaderScreenState extends ConsumerState<PlanReaderScreen> {
       case PlanPartKind.chapter:
         content = _chapterContent(part.ref, versionId, book, settings, partKey);
       case PlanPartKind.uitleg:
-        content = _uitlegContent(versionId, book, part.ref.chapter, settings, partKey);
+        content = _uitlegWithText(part, index, versionId, book, settings, partKey);
       case PlanPartKind.vraag:
         if (!part.done) _markStudyOnce(BibleYearStudyPart.vraag);
         content = _PlanQuestion(
@@ -191,6 +199,7 @@ class _PlanReaderScreenState extends ConsumerState<PlanReaderScreen> {
               for (var i = 0; i < parts.length; i++)
                 parts[i].done ? 1.0 : (i == index ? _progress : 0.0),
             ],
+            onPart: parts.length > 1 ? _goTo : null,
             position: '${index + 1} van ${parts.length}',
             minutes: minutesLeft > 0 ? 'nog ± $minutesLeft min' : 'alles gelezen',
             onClose: _close,
@@ -222,6 +231,7 @@ class _PlanReaderScreenState extends ConsumerState<PlanReaderScreen> {
             },
             label: next == null ? 'Dag afronden' : 'Volgende: ${_partName(next)}',
             onPressed: next == null ? _finishDay : () => _goTo(index + 1),
+            onBack: index > 0 ? () => _goTo(index - 1) : null,
           ),
         ],
       ),
@@ -273,6 +283,51 @@ class _PlanReaderScreenState extends ConsumerState<PlanReaderScreen> {
     );
   }
 
+  /// The uitleg, with a switch back to the chapter it explains.
+  ///
+  /// Reading a commentary with the text out of reach is not studying, so the
+  /// part carries both. The uitleg shows first (that is what this part of the
+  /// day is for) and its tick still follows the commentary being read to the
+  /// end; the chapter side ticks the chapter itself, exactly as its own part
+  /// would.
+  Widget _uitlegWithText(
+    PlanPart part,
+    int index,
+    String versionId,
+    String book,
+    ReadingSettings settings,
+    String partKey,
+  ) {
+    final showsText = _chapterUnderUitleg.contains(index);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          child: SegmentedTrack(
+            segments: const [
+              SegmentedTrackSegment(label: 'Uitleg'),
+              SegmentedTrackSegment(label: 'Bijbeltekst'),
+            ],
+            selectedIndex: showsText ? 1 : 0,
+            onChanged: (choice) => setState(() {
+              _progress = 0;
+              if (choice == 1) {
+                _chapterUnderUitleg.add(index);
+              } else {
+                _chapterUnderUitleg.remove(index);
+              }
+            }),
+          ),
+        ),
+        Expanded(
+          child: showsText
+              ? _chapterContent(part.ref, versionId, book, settings, '$partKey/tekst')
+              : _uitlegContent(versionId, book, part.ref.chapter, settings, partKey),
+        ),
+      ],
+    );
+  }
+
   Widget _uitlegContent(
     String versionId,
     String book,
@@ -318,6 +373,7 @@ class PlanReaderBar extends StatelessWidget {
     required this.dayLabel,
     required this.title,
     required this.fills,
+    this.onPart,
     this.position,
     this.minutes,
     required this.onClose,
@@ -329,6 +385,9 @@ class PlanReaderBar extends StatelessWidget {
 
   /// One per part, 0..1.
   final List<double> fills;
+
+  /// Tapping a segment jumps to that part, forwards or back.
+  final ValueChanged<int>? onPart;
 
   /// "2 van 4".
   final String? position;
@@ -389,11 +448,11 @@ class PlanReaderBar extends StatelessWidget {
               ),
               if (fills.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  padding: const EdgeInsets.fromLTRB(12, 1, 12, 0),
                   child: Column(
                     children: [
-                      PlanPartSegments(fills: fills),
-                      const SizedBox(height: 8),
+                      PlanPartSegments(fills: fills, onTap: onPart),
+                      const SizedBox(height: 1),
                       Row(
                         children: [
                           if (position != null) Text(position!, style: meta),
@@ -415,9 +474,13 @@ class PlanReaderBar extends StatelessWidget {
 /// One thin bar per part: full when done, filled to the scroll position for
 /// the current part, empty for what comes.
 class PlanPartSegments extends StatelessWidget {
-  const PlanPartSegments({super.key, required this.fills});
+  const PlanPartSegments({super.key, required this.fills, this.onTap});
 
   final List<double> fills;
+
+  /// Jumps to a part. The bar itself stays 4px; the padding around it is
+  /// what turns each segment into an 18px-tall tap target.
+  final ValueChanged<int>? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -430,21 +493,28 @@ class PlanPartSegments extends StatelessWidget {
           for (var i = 0; i < fills.length; i++) ...[
             if (i > 0) const SizedBox(width: 4),
             Expanded(
-              child: ClipRRect(
-                key: ValueKey('plan-segment-$i'),
-                borderRadius: BorderRadius.circular(2),
-                child: SizedBox(
-                  height: 4,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ColoredBox(color: AppTheme.rule),
-                      FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: fills[i].clamp(0.0, 1.0),
-                        child: ColoredBox(color: AppTheme.teal),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap == null ? null : () => onTap!(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: ClipRRect(
+                    key: ValueKey('plan-segment-$i'),
+                    borderRadius: BorderRadius.circular(2),
+                    child: SizedBox(
+                      height: 4,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ColoredBox(color: AppTheme.rule),
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: fills[i].clamp(0.0, 1.0),
+                            child: ColoredBox(color: AppTheme.teal),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -458,11 +528,20 @@ class PlanPartSegments extends StatelessWidget {
 
 /// Under the text: how a part gets ticked, and the way onward.
 class PlanReaderFooter extends StatelessWidget {
-  const PlanReaderFooter({super.key, this.hint, required this.label, required this.onPressed});
+  const PlanReaderFooter({
+    super.key,
+    this.hint,
+    required this.label,
+    required this.onPressed,
+    this.onBack,
+  });
 
   final String? hint;
   final String label;
   final VoidCallback onPressed;
+
+  /// One part back. Null on the first part of the day.
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -487,7 +566,32 @@ class PlanReaderFooter extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            BibleYearPrimaryButton(label: label, height: 48, onPressed: onPressed),
+            if (onBack == null)
+              BibleYearPrimaryButton(label: label, height: 48, onPressed: onPressed)
+            else
+              Row(
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: TextButton(
+                      onPressed: onBack,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.inkSoft,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        minimumSize: const Size(44, 48),
+                      ),
+                      child: Text(
+                        'Vorige',
+                        style: AppTheme.bodyStrong.copyWith(fontSize: 14.5, color: AppTheme.inkSoft),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: BibleYearPrimaryButton(label: label, height: 48, onPressed: onPressed),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

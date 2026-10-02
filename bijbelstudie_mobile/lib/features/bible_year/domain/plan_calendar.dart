@@ -2,7 +2,8 @@ import '../data/bible_year_models.dart';
 
 /// How a plan day looks on the week strip and the month calendar.
 enum PlanDayState {
-  /// Every part done (chapters, and in 'studeren' the uitleg and the vraag).
+  /// Every chapter of the day read. In 'studeren' the uitleg and the vraag are
+  /// extra material, not a gate - see [PlanCalendar.isDone].
   done,
 
   /// In the past and not done: "staat open". Shown neutral, never as a warning.
@@ -163,9 +164,15 @@ class PlanCalendar {
     return parts;
   }
 
+  /// A day is done when every chapter of it is read.
+  ///
+  /// 'studeren' is the same plan with more to read, not a stricter one: the
+  /// uitleg and the vraag are extra material the reader ticks off, never a
+  /// gate on the day. That is what lets someone switch to 'studeren' halfway
+  /// through without a single finished day reopening behind them.
   bool isDone(int day) {
-    final parts = partsOf(day);
-    return parts.isNotEmpty && parts.every((p) => p.done);
+    final chapters = partsOf(day).where((p) => p.kind == PlanPartKind.chapter);
+    return chapters.isNotEmpty && chapters.every((p) => p.done);
   }
 
   PlanDayState stateOf(int day) {

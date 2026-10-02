@@ -205,7 +205,7 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
           ? today
           : today.copyWith(
               study: study,
-              todayDone: today.portions.every((p) => p.done) && study.done && today.dayNumber > 0,
+              todayDone: today.portions.every((p) => p.done) && today.dayNumber > 0,
             );
       state = AsyncData(
         current.copyWith(
