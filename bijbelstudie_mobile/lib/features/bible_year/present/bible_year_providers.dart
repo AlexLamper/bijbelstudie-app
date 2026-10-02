@@ -7,10 +7,14 @@ import '../../../core/data/payload_cache.dart';
 import '../../../core/data/provider_cache.dart';
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../dashboard/data/dashboard_models.dart';
+import '../../dashboard/present/dashboard_providers.dart';
 import '../data/bible_year_models.dart';
 import '../data/bible_year_repository.dart';
+import '../data/plan_read_store.dart';
 import '../domain/bible_year_display.dart';
 import '../domain/plan_calendar.dart';
+import '../domain/plan_read_set.dart';
 
 /// The state behind every "Bijbel in een jaar" surface in the app - the plan
 /// screen, the Studies block and the Start tab's card - so ticking a chapter
@@ -139,8 +143,12 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
     final current = state.value;
     final today = current?.today;
     final enrollment = current?.enrollment;
+    final keys = {for (final r in refs) bibleYearRefKey(r.code, r.chapter)};
+    // The enrollment the server answers with carries no `readRefs`, so this
+    // is where a mark is remembered: without it the tick is gone from the
+    // state the moment the mutation response lands.
+    unawaited(ref.read(planReadStoreProvider.notifier).mark(keys, read));
     if (current != null && today != null) {
-      final keys = {for (final r in refs) bibleYearRefKey(r.code, r.chapter)};
       state = AsyncData(
         current.copyWith(
           today: applyRefMark(today, refs, read),
@@ -159,9 +167,23 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
   /// plan, once. A no-op without a plan or when it is already read, so the
   /// reader can call it for every chapter it finishes.
   Future<String?> chapterReadToEnd(String code, int chapter) async {
-    final enrollment = state.value?.enrollment;
+    final current = state.value;
+    final enrollment = current?.enrollment;
     if (enrollment == null || !enrollment.isActive || code.isEmpty) return null;
-    if (enrollment.readRefs.contains(bibleYearRefKey(code, chapter))) return null;
+    final key = bibleYearRefKey(code, chapter);
+    // `enrollment.readRefs` is empty on every server answer (the DTO has no
+    // such field), so the guard asks the device's own marks and today's
+    // portions too - else every scroll to the end would POST again.
+    if (enrollment.readRefs.contains(key)) return null;
+    if (ref.read(planReadStoreProvider).read.contains(key)) return null;
+    final today = current?.today;
+    if (today != null) {
+      for (final portion in today.portions) {
+        for (final r in portion.refs) {
+          if (r.read && r.refKey == key) return null;
+        }
+      }
+    }
     return markRefs([BibleYearChapterKey(code, chapter)], true);
   }
 
@@ -225,6 +247,7 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
       final next = (state.value ?? const BibleYearState()).withMutation(json);
       _remember(next);
       state = AsyncData(next);
+      _clearDeviceUnticks();
       _notifyReminders();
       return null;
     } on BibleYearException catch (e, st) {
@@ -249,8 +272,19 @@ class BibleYearController extends AsyncNotifier<BibleYearState> {
         return _repository.restart(body);
       }
     });
-    if (error == null && ref.mounted) _notifyReminders();
+    if (error == null && ref.mounted) {
+      _clearDeviceUnticks();
+      _notifyReminders();
+    }
     return error;
+  }
+
+  /// A new run starts clean: an untick made in the run before it must not keep
+  /// a chapter grey in the new one.
+  void _clearDeviceUnticks() {
+    try {
+      unawaited(ref.read(planReadStoreProvider.notifier).clearUnread());
+    } catch (_) {}
   }
 
   /// The notification ladder reads the plan (`/notifications/schedule`), so a
@@ -332,8 +366,55 @@ final planCalendarProvider = Provider.autoDispose<AsyncValue<PlanCalendar?>>((re
       version: enrollment.scheduleVersion,
     )),
   );
+  final readRefs = ref.watch(planReadRefsProvider);
   return schedule.whenData(
-    (s) => PlanCalendar(enrollment: enrollment, schedule: s, todayDay: today.dayNumber),
+    (s) => PlanCalendar(
+      enrollment: enrollment,
+      schedule: s,
+      todayDay: today.dayNumber,
+      readRefs: readRefs,
+    ),
+  );
+});
+
+/// The reader's 66-book read map (`/dashboard`'s `readChapters`), which is
+/// what `POST /last-read` fills - how chapters read in the normal reader, on
+/// the website or before the plan began count towards the plan.
+///
+/// Followed off the Start tab when that tab holds it, so a chapter ticked
+/// there recolours the plan at once, but never built for this: colouring the
+/// plan must not cost a `/dashboard` request. Without the tab it comes off
+/// the payload that tab cached, which is the same map one fetch older - good
+/// enough for history, while today's ticks come from [planReadStoreProvider].
+final planReadChaptersProvider =
+    FutureProvider.autoDispose<Map<String, List<int>>>((ref) async {
+      ref.cacheFor(const Duration(minutes: 10));
+      if (ref.exists(dashboardProvider)) {
+        final live = ref.watch(dashboardProvider).value?.readChapters;
+        if (live != null) return live;
+      }
+      final raw = await PayloadCache.read(DashboardNotifier.cacheKey);
+      if (raw == null) return const {};
+      try {
+        return DashboardData.fromJson(raw).readChapters;
+      } catch (_) {
+        return const {};
+      }
+    });
+
+/// Every chapter read, as `readRefs` keys - the one set every plan surface
+/// decides "gelezen" on. See `planReadRefKeys` for why it has to be merged
+/// rather than read off the enrollment.
+final planReadRefsProvider = Provider.autoDispose<Set<String>>((ref) {
+  final state = ref.watch(bibleYearProvider).value;
+  final marks = ref.watch(planReadStoreProvider);
+  final readChapters = ref.watch(planReadChaptersProvider).value ?? const {};
+  return planReadRefKeys(
+    enrollmentRefs: state?.enrollment?.readRefs ?? const {},
+    today: state?.today,
+    readChapters: readChapters,
+    deviceRead: marks.read,
+    deviceUnread: marks.unread,
   );
 });
 

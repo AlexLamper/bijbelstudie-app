@@ -197,6 +197,17 @@ class _PlanSetupScreenState extends ConsumerState<PlanSetupScreen> {
     rescheduler.requestReschedule(contentChanged: false);
   }
 
+  /// True when the sheet still holds the running plan's own settings, so there
+  /// is nothing for the plan endpoint to write.
+  bool _samePlan(BibleYearEnrollment editing, BibleYearStartBody body) {
+    final zone = body.timeZone;
+    return body.planKey == editing.planKey &&
+        body.track == editing.track &&
+        body.mode == editing.mode &&
+        body.startDate == editing.startDate &&
+        (zone == null || zone.isEmpty || zone == editing.timeZone);
+  }
+
   Future<void> _submit({
     required BibleYearEnrollment? editing,
     required bool remind,
@@ -214,9 +225,17 @@ class _PlanSetupScreenState extends ConsumerState<PlanSetupScreen> {
       startDate: _startDate,
       timeZone: timeZone,
     );
-    final error = editing != null
-        ? await controller.updateSettings(body)
-        : await controller.start(body);
+    // The reminder lives in the notification prefs, not on the server, so a
+    // save that only moved the reminder has nothing to send - skip the plan
+    // call rather than ask the server to write the values it already has.
+    final String? error;
+    if (editing == null) {
+      error = await controller.start(body);
+    } else if (_samePlan(editing, body)) {
+      error = null;
+    } else {
+      error = await controller.updateSettings(body);
+    }
     if (!mounted) return;
     if (error != null) {
       setState(() => _pending = false);

@@ -69,15 +69,46 @@ String chapterLabel(BibleYearRef ref) =>
 /// Calendar maths of a running plan, mirroring `lib/bibleYear/progress.ts`:
 /// day N falls on startDate + N - 1 + shiftDays. Pure; build one per frame.
 class PlanCalendar {
-  PlanCalendar({required this.enrollment, required this.schedule, required this.todayDay});
+  PlanCalendar({
+    required this.enrollment,
+    required this.schedule,
+    required this.todayDay,
+    Set<String>? readRefs,
+  }) : readRefs = readRefs ?? enrollment.readRefs;
 
   final BibleYearEnrollment enrollment;
   final BibleYearSchedule schedule;
 
+  /// Every chapter read, as `readRefs` keys ("GEN.1"). Built by
+  /// `planReadRefKeys` from the server's answer, the dashboard's read map and
+  /// this device's own ticks - the enrollment DTO does not carry the list, so
+  /// `enrollment.readRefs` alone is empty. The one source every surface asks.
+  final Set<String> readRefs;
+
   /// The server's `today.dayNumber`: 0 before the start, else 1..totalDays.
   final int todayDay;
 
+  /// Chapters in the whole Bible, the denominator of [percentBible].
+  static const bibleChapters = 1189;
+
   int get totalDays => schedule.totalDays;
+
+  /// Chapters read: whichever is larger of the server's own `chaptersRead`
+  /// and the size of [readRefs].
+  ///
+  /// The server counts the plan's `readRefs`, a list it does not send, so it
+  /// may know of ticks this app cannot enumerate; [readRefs] knows of
+  /// chapters read before the plan began, which its count leaves out. Taking
+  /// the larger keeps the server's number and still never shows fewer
+  /// chapters than the green days already prove.
+  int get chaptersRead {
+    final derived = readRefs.length;
+    final reported = enrollment.chaptersRead;
+    return (derived > reported ? derived : reported).clamp(0, bibleChapters);
+  }
+
+  /// 0-100, unrounded - the surfaces that show it round it themselves.
+  double get percentBible => chaptersRead * 100 / bibleChapters;
 
   DateTime get _start {
     final parsed = DateTime.tryParse(enrollment.startDate);
@@ -102,7 +133,7 @@ class PlanCalendar {
 
   BibleYearScheduleDay? scheduleDay(int day) => schedule.dayAt(day);
 
-  bool isRead(BibleYearRef ref) => enrollment.readRefs.contains(ref.refKey);
+  bool isRead(BibleYearRef ref) => readRefs.contains(ref.refKey);
 
   bool studyPartDone(int day, BibleYearStudyPart part) =>
       enrollment.studyDone.contains(bibleYearStudyKey(day, part));

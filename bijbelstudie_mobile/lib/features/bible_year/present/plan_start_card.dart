@@ -217,7 +217,10 @@ class PlanStartCard extends StatelessWidget {
     final dayDone = rows.isNotEmpty && currentIndex < 0;
     final openDays = calendar?.openDays();
     final catchUp = openDays == null || openDays.isEmpty ? null : openDays.last;
-    final percent = enrollment.percentBible > 0 ? enrollment.percentBible : today.percentBible;
+    // The calendar's read set when it has loaded (the same one the green days
+    // and the plan screen's header use); the server's counts until then.
+    final percent = calendar?.percentBible ??
+        (enrollment.percentBible > 0 ? enrollment.percentBible : today.percentBible);
     final title = today.notStarted
         ? enrollment.startDate.isNotEmpty
               ? 'Je begint op ${formatDutchDate(enrollment.startDate, weekday: true)}'

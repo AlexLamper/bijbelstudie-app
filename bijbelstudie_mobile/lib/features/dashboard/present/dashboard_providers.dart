@@ -17,14 +17,17 @@ import '../data/dashboard_repository.dart';
 /// one when it arrives - the same trick `TreeStateNotifier` already used for
 /// the Profiel tab's tree. Nothing about what is rendered changes; only when.
 class DashboardNotifier extends AsyncNotifier<DashboardData> {
-  static const _cacheKey = 'dashboard';
+  /// The `PayloadCache` key of the last good `/dashboard` payload. Public so
+  /// the plan can read the reader's read map off it without a request
+  /// (`planReadChaptersProvider`).
+  static const cacheKey = 'dashboard';
 
   @override
   Future<DashboardData> build() async {
     ref.cacheFor();
     final repository = ref.watch(dashboardRepositoryProvider);
 
-    final cached = await PayloadCache.read(_cacheKey);
+    final cached = await PayloadCache.read(cacheKey);
     if (cached != null && state is AsyncLoading) {
       try {
         state = AsyncData(DashboardData.fromJson(cached));
@@ -37,7 +40,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // The card follows a switch on its own ([dailyVerseInVersionProvider]).
     final version = ref.read(readingSettingsProvider).lastVersionId;
     final data = await repository.getDashboard(version: version);
-    unawaited(PayloadCache.write(_cacheKey, data.raw));
+    unawaited(PayloadCache.write(cacheKey, data.raw));
     return data;
   }
 }

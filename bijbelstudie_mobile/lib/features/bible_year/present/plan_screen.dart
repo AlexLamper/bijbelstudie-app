@@ -207,10 +207,12 @@ class _StatusLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final enrollment = calendar.enrollment;
     final started = calendar.todayDay >= 1;
-    final read = enrollment.chaptersRead;
-    final raw = enrollment.percentBible.isFinite ? enrollment.percentBible : 0.0;
+    // Off the calendar's own read set, not the enrollment's counts: the same
+    // chapters that colour the week strip and the schema, so the number here
+    // and the green days can never tell different stories.
+    final read = calendar.chaptersRead;
+    final raw = calendar.percentBible;
     // Rounded, but never "100%" before the last chapter.
     final percent = read < _bibleChapters ? raw.round().clamp(0, 99) : 100;
 

@@ -131,6 +131,13 @@ class PlanTodayView {
   }
 
   int get behindDays => calendar?.openDays().length ?? today.behindDays;
+
+  /// 0-100 for the ring: the calendar's read set once it has loaded (the same
+  /// one the chips and the plan screen's header use), the server's counts
+  /// until then.
+  double get percentBible =>
+      calendar?.percentBible ??
+      (enrollment.percentBible > 0 ? enrollment.percentBible : today.percentBible);
 }
 
 /// The Start tab's main card while a reading plan runs and today is not
@@ -175,9 +182,7 @@ class PlanTodayCompactCard extends ConsumerWidget {
     final today = view.today;
     final catchUp = view.catchUpDay;
     final behind = view.behindDays;
-    final percent = view.enrollment.percentBible > 0
-        ? view.enrollment.percentBible
-        : today.percentBible;
+    final percent = view.percentBible;
     final title = today.notStarted
         ? view.enrollment.startDate.isNotEmpty
               ? 'Je begint op ${formatDutchDate(view.enrollment.startDate, weekday: true)}'
