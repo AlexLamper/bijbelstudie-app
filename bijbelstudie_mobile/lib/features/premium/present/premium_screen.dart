@@ -528,6 +528,7 @@ class _Benefits extends StatelessWidget {
     'Alle commentaren': 'Matthew Henry en Dachsel',
     'Grondtekst': 'Hebreeuws en Grieks',
     'Meer AI-vragen': '200 per dag',
+    'Onbeperkt notities': 'geen limiet van 10',
   };
 
   @override

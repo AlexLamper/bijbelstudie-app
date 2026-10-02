@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/analytics/analytics.dart';
 import '../../../../core/config/app_config.dart';
@@ -20,6 +19,7 @@ import '../../domain/tree_state.dart';
 import '../levensboom_avatar.dart';
 import '../levensboom_providers.dart';
 import '../tree_analytics.dart';
+import '../../../premium/present/paywall_route.dart';
 import '../tree_view.dart';
 import 'groei_tab.dart';
 import 'studio_tiles.dart';
@@ -123,7 +123,8 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
         action: pro && !ref.read(hasProProvider)
             ? SnackBarAction(
                 label: 'Bekijk Pro',
-                onPressed: () => context.push('/premium?source=app_levensboom'),
+                onPressed: () =>
+                    openPaywall(context, gate: PaywallGate.levensboom),
               )
             : null,
       ),

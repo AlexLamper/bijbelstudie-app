@@ -59,14 +59,22 @@ enum PaywallGate {
     source: 'app_groups',
     reason: 'Je kunt één groep gratis leiden.',
   ),
-  // No [benefit]: "Onbeperkt notities" is deliberately not in `kProBenefits`
-  // (see the comment there), so there is nothing in the list to lift. The
-  // reason line below says no more than the server's own
-  // `NOTE_LIMIT_REACHED` message the reader has just been shown.
+  // The studio's Pro-only species and scenes ("Ceder van de Libanon", "De
+  // hof"), which the studio itself announces as "er voor Pro-leden". No
+  // [benefit]: the tree's cosmetics are not sold on the paywall, so there is
+  // nothing in `kProBenefits` to lift.
+  levensboom(
+    id: 'levensboom',
+    source: 'app_levensboom',
+    reason: 'Deze stijlen voor je Levensboom horen bij Pro.',
+  ),
+  // The reason line says no more than the server's own `NOTE_LIMIT_REACHED`
+  // message the reader has just been shown, which names the number itself.
   notes(
     id: 'notities',
     source: 'app_notes',
     reason: 'Je hebt je gratis notities gebruikt.',
+    benefit: 'Onbeperkt notities',
   );
 
   const PaywallGate({

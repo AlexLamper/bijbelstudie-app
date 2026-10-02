@@ -55,6 +55,7 @@ class _ProCelebrationScreenState extends State<ProCelebrationScreen>
     'Alle commentaren': Icons.chat_bubble_outline,
     'Grondtekst': Icons.translate,
     'Meer AI-vragen': Icons.auto_awesome_outlined,
+    'Onbeperkt notities': Icons.edit_note_outlined,
   };
 
   @override

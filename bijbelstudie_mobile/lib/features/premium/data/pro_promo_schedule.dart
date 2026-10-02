@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tunables for the full-screen Pro promo (`ProPromoScreen`), in one place.
+/// Tunables for the 24h Pro pre-sell `ProPromoTrigger` opens over Start, in
+/// one place. It used to open a static `ProPromoScreen`; it now opens the
+/// pre-sell funnel itself, and that screen is gone.
 class ProPromoRules {
   const ProPromoRules._();
 
