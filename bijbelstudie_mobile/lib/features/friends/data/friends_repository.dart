@@ -12,7 +12,11 @@ final friendsRepositoryProvider = Provider((ref) {
 
 /// `/api/v1/friends/*`.
 ///
-/// The endpoints do not exist on the server yet. Every call therefore treats a
+/// The endpoints do not exist on the web platform yet (Next.js + Mongoose; see
+/// `docs/vriendenkring-plan.md` for the schemas, the shared
+/// `lib/friends/types.ts` contract and the phases).
+///
+/// Every call therefore treats a
 /// failure - 404 included - as "no vriendenkring": the Start tab shows the
 /// invitation card and nothing anywhere breaks. A preview build
 /// (`--dart-define=PREVIEW=true`) answers with canned posts instead, so the
