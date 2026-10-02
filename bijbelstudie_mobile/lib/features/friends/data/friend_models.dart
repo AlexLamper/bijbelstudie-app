@@ -142,6 +142,135 @@ class FriendsFeed {
   }
 }
 
+/// A person, as a kring list or a verzoek shows them. Never an e-mail: a kring
+/// is not a directory (the server does not send one either).
+class FriendSummary {
+  const FriendSummary({
+    required this.userId,
+    required this.name,
+    this.image,
+    this.streak = 0,
+    this.planDay,
+    this.planTotalDays,
+    this.friendsSince,
+  });
+
+  final String userId;
+  final String name;
+  final String? image;
+
+  /// Days in a row, for the row's flame. 0 when they have none.
+  final int streak;
+
+  /// "Dag 42 van 365" is built from these two; both null without a plan.
+  final int? planDay;
+  final int? planTotalDays;
+
+  final DateTime? friendsSince;
+
+  /// "Dag 42 van 365", or null for someone who runs no reading plan.
+  String? get planLabel =>
+      planDay == null || planTotalDays == null ? null : 'Dag $planDay van $planTotalDays';
+
+  factory FriendSummary.fromJson(Map<String, dynamic> json) {
+    final since = json['friendsSince'];
+    return FriendSummary(
+      userId: '${json['userId'] ?? ''}',
+      name: (json['name'] as String?)?.trim() ?? '',
+      image: (json['image'] as String?)?.trim(),
+      streak: (json['streak'] as num?)?.toInt() ?? 0,
+      planDay: (json['planDay'] as num?)?.toInt(),
+      planTotalDays: (json['planTotalDays'] as num?)?.toInt(),
+      friendsSince: since is String ? DateTime.tryParse(since)?.toLocal() : null,
+    );
+  }
+}
+
+/// `GET /friends`.
+class FriendsKring {
+  const FriendsKring({this.friends = const [], this.pendingIncoming = 0});
+
+  static const empty = FriendsKring();
+
+  final List<FriendSummary> friends;
+
+  /// So the Verzoeken tab can show a count without a second request.
+  final int pendingIncoming;
+
+  factory FriendsKring.fromJson(Map<String, dynamic> json) {
+    final raw = json['friends'];
+    return FriendsKring(
+      friends: raw is List
+          ? [
+              for (final item in raw)
+                if (item is Map<String, dynamic>) FriendSummary.fromJson(item),
+            ]
+          : const [],
+      pendingIncoming: (json['pendingIncoming'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// One pending verzoek, in either direction.
+class FriendRequestView {
+  const FriendRequestView({
+    required this.id,
+    required this.user,
+    this.status = 'pending',
+    this.source = 'code',
+    this.createdAt,
+  });
+
+  final String id;
+
+  /// The other person: the sender for an incoming verzoek, the recipient for
+  /// an outgoing one.
+  final FriendSummary user;
+
+  final String status;
+  final String source;
+  final DateTime? createdAt;
+
+  factory FriendRequestView.fromJson(Map<String, dynamic> json) {
+    final created = json['createdAt'];
+    final user = json['user'];
+    return FriendRequestView(
+      id: '${json['id'] ?? ''}',
+      user: user is Map<String, dynamic>
+          ? FriendSummary.fromJson(user)
+          : const FriendSummary(userId: '', name: ''),
+      status: (json['status'] as String?) ?? 'pending',
+      source: (json['source'] as String?) ?? 'code',
+      createdAt: created is String ? DateTime.tryParse(created)?.toLocal() : null,
+    );
+  }
+}
+
+/// `GET /friends/requests`.
+class FriendRequestsResponse {
+  const FriendRequestsResponse({this.incoming = const [], this.outgoing = const []});
+
+  static const empty = FriendRequestsResponse();
+
+  final List<FriendRequestView> incoming;
+  final List<FriendRequestView> outgoing;
+
+  bool get isEmpty => incoming.isEmpty && outgoing.isEmpty;
+
+  factory FriendRequestsResponse.fromJson(Map<String, dynamic> json) {
+    List<FriendRequestView> read(Object? raw) => raw is List
+        ? [
+            for (final item in raw)
+              if (item is Map<String, dynamic>) FriendRequestView.fromJson(item),
+          ]
+        : const [];
+    return FriendRequestsResponse(
+      incoming: read(json['incoming']),
+      outgoing: read(json['outgoing']),
+    );
+  }
+}
+
 const _months = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
   'juli', 'augustus', 'september', 'oktober', 'november', 'december',

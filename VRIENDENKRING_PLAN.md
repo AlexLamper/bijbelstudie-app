@@ -1,11 +1,18 @@
 # Vriendenkring — plan to make it functional
 
-Status: **the app UI exists, the backend does not.** The Start tab's header
-button, "Bij je vrienden" and `/vriendenkring` are built and shipped-safe: the
-repository treats every failure (404 included) as "no vriendenkring", so today
-every reader sees the invitation card and nothing breaks. A preview build
-(`--dart-define=PREVIEW=true`) renders canned posts for design review; that flag
-is hard-disabled in release.
+Status, 2026-10-02: **phases 1 and 2 are built.** The backend exists
+(`app/api/v1/friends/**`, five Mongoose collections, `lib/friends/`), the web
+platform has `/vriendenkring` plus a "Bij je vrienden" block on its dashboard,
+and the app has the Start tab block plus `/vriendenkring` with Feed | Vrienden
+| Verzoeken. Inviting works by link and by code on both clients.
+
+Still to do: **phase 3** (contacts, app-only), **phase 4** (share actions and
+server-side milestone posts) and **phase 5** (push, paging, a friend's
+Levensboom). `FRIENDS_CONTACT_PEPPER` is not set anywhere yet, so the discovery
+routes answer 503 - which is the intended "off" state until phase 3.
+
+Every surface still degrades to the invitation card when the server says
+nothing, which is what let the UI ship before the API existed.
 
 This plan is what turns it real, on **both clients**, including contact-based
 friend finding.
@@ -285,7 +292,7 @@ the kring saw, and deleting the note deletes the post.
 
 ## 9. Phases
 
-**Phase 1 — backend + wire contract** (web repo, branch off `levensboom`)
+**Phase 1 — backend + wire contract** (done; web repo, branch `vriendenkring` off `levensboom`)
 The five schemas, `lib/friends/{types,service,discovery,client}.ts`,
 `/friends/feed`, `/friends`, `/friends/requests`, likes, comments, `seen`,
 invite by code (reusing `referralOverview`'s code), and the five new entries in
@@ -294,7 +301,7 @@ invite by code (reusing `referralOverview`'s code), and the five new entries in
 pair invariants and the request state machine. **The app needs no change: it
 already calls these paths and lights up the moment they answer.**
 
-**Phase 2 — kring without contacts** (both clients)
+**Phase 2 — kring without contacts** (done, both clients)
 App: `/vriendenkring` gains Feed | Vrienden | Verzoeken, invite by code, link
 and QR, friend rows with streak and plan day, remove/block/report.
 Web: `app/vriendenkring` plus the dashboard block. After this it is a usable

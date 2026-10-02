@@ -60,3 +60,16 @@ final friendsFeedProvider =
 final friendsBadgeProvider = Provider<int>((ref) {
   return ref.watch(friendsFeedProvider).value?.newActivityCount ?? 0;
 });
+
+/// The kring itself (the Vrienden tab, and the rows a friend row needs).
+/// Separate from the feed so a heart does not refetch the people, and a
+/// removal does not refetch the posts.
+final friendsKringProvider = FutureProvider.autoDispose<FriendsKring>((ref) {
+  return ref.watch(friendsRepositoryProvider).getKring();
+});
+
+/// Pending verzoeken, in both directions.
+final friendsRequestsProvider =
+    FutureProvider.autoDispose<FriendRequestsResponse>((ref) {
+      return ref.watch(friendsRepositoryProvider).getRequests();
+    });
