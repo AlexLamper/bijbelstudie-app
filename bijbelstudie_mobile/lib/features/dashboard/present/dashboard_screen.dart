@@ -2,32 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/data/bible_books.dart';
 import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible_year/present/bible_year_providers.dart';
-import '../../bible_year/present/plan_start_card.dart';
+import '../../friends/present/friends_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
-import '../../studies/data/study_models.dart';
-import '../../studies/data/study_plan_store.dart';
-import '../../studies/present/studies_providers.dart';
-import '../../studies/present/study_banner.dart';
 import '../../study/present/study_pane_controller.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
-import 'continue_study_card.dart';
 import 'daily_verse_card.dart';
 import 'dashboard_providers.dart';
+import 'friends_section.dart';
+import 'home_main_card.dart';
+import 'widgets/home_header_actions.dart';
 import 'widgets/streak_ring.dart';
 
-/// `/dashboard` on www.bijbelstudie.io, folded into one column.
+/// `/dashboard`, folded into one column: header, one main card, the tekst van
+/// de dag, then "Bij je vrienden".
 ///
-/// The website lays this out as a wide main column plus a 280px sidebar; on a
-/// phone the two stack in the order the site prioritises them - hero, stats,
-/// book map, studies, then what the sidebar holds.
+/// The verse card is the point of the screen and has to be fully in view
+/// without scrolling, so at most one card sits above it and that card is
+/// compact. Aanbevolen studies, the book map and "Deze week" moved off this
+/// tab - the book map lives on `/profile/bijbel`, the week strip in the streak
+/// detail sheet.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -71,6 +71,7 @@ class DashboardScreen extends ConsumerWidget {
             color: AppTheme.teal,
             onRefresh: () async {
               ref.invalidate(dashboardProvider);
+              await ref.read(friendsFeedProvider.notifier).refresh();
               if (ref.exists(bibleYearProvider)) {
                 await ref.read(bibleYearProvider.notifier).refresh();
               }
@@ -150,10 +151,12 @@ class _DashboardBody extends ConsumerWidget {
               const SizedBox(width: 12),
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: HomeStreakIndicator(
-                  serverStreak: data.streak,
-                  freezes: data.freezes,
-                  weekDays: data.weekDays,
+                child: HomeHeaderActions(
+                  streak: HomeStreakIndicator(
+                    serverStreak: data.streak,
+                    freezes: data.freezes,
+                    weekDays: data.weekDays,
+                  ),
                 ),
               ),
             ],
@@ -161,535 +164,48 @@ class _DashboardBody extends ConsumerWidget {
         ),
 
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 40),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Bijbel in een jaar, first under the greeting: the plan card
-              // while a plan runs, else an invitation to begin one. The
-              // dashboard says whether a plan runs, so a reader without one
-              // costs no `/bible-year` request.
-              PlanStartSlot(planActive: data.bibleYearActive),
-
-              // "Waar je gebleven was" - the server's `resume` answer
-              // (same object as the website's card), or on an older server a
-              // study lesson in progress, else the last Bible chapter read.
+              // One main card, never two: the reading plan while a plan runs
+              // and today is unfinished, else "Waar je gebleven was", else
+              // nothing. Together with the verse card it is "je startpunt",
+              // which is what the tour's first step points at.
               TourAnchor(
                 id: TourAnchorIds.dashboardHero,
-                child: ContinueStudyCard(
-                  resume: data.resume,
-                  lastRead: data.lastRead,
-                  readChapters: data.readChapters,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // The card renders today's verse, or - offline - the newest one
-              // in its local archive. It is left out entirely only when there
-              // is neither, which is why the archive is consulted here too.
-              if (data.dailyVerse != null || hasArchivedVerse) ...[
-                DailyVerseCard(
-                  verse: data.dailyVerse,
-                  onOpenChapter: (book, chapter) =>
-                      _openChapter(context, ref, book: book, chapter: chapter),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Opens the study itself, not the chapter it happens to start
-              // in: a recommendation is an invitation to the study's own
-              // screen, where it can be read about and started.
-              _RecommendedStudiesCard(
-                onOpen: (study) => context.push('/studies/${study.id}'),
-              ),
-              const SizedBox(height: 16),
-
-              _BookMapCard(
-                readChapters: data.readChapters,
-                booksStarted: data.booksStarted,
-                onOpenBook: (book) =>
-                    _openChapter(context, ref, book: book, chapter: 1),
-              ),
-              const SizedBox(height: 16),
-
-              _WeeklyStatsCard(days: data.weekDays, total: data.weekTotal),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The 66-square contribution map. Tapping a square opens chapter 1 of that
-/// book; the site does the same on click and shows the ratio on hover, which
-/// here becomes a tap-to-select info line.
-class _BookMapCard extends StatefulWidget {
-  const _BookMapCard({
-    required this.readChapters,
-    required this.booksStarted,
-    required this.onOpenBook,
-  });
-
-  final Map<String, List<int>> readChapters;
-  final int booksStarted;
-  final void Function(String book) onOpenBook;
-
-  @override
-  State<_BookMapCard> createState() => _BookMapCardState();
-}
-
-class _BookMapCardState extends State<_BookMapCard> {
-  String? _selected;
-
-  int _read(String book) => widget.readChapters[book]?.length ?? 0;
-
-  double _ratio(String book) => _read(book) / BibleBooks.chaptersIn(book);
-
-  /// `progressColor` in `app/dashboard/page.tsx`.
-  Color _color(double ratio, ColorScheme scheme) {
-    if (ratio == 0) return scheme.surfaceContainerHighest;
-    if (ratio < 0.25) return AppTheme.teal.withValues(alpha: 0.22);
-    if (ratio < 0.50) return AppTheme.teal.withValues(alpha: 0.45);
-    if (ratio < 1.00) return AppTheme.teal.withValues(alpha: 0.72);
-    return AppTheme.teal;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Same header as "Aanbevolen studies", and like it without a
-          // leading icon chip: the title sits flush with the grid below.
-          SectionHeader(
-            title: 'Bijbelboeken',
-            description:
-                '${widget.booksStarted} van 66 '
-                '${widget.booksStarted == 1 ? 'boek' : 'boeken'} geopend',
-            actionLabel: 'Bekijken',
-            onAction: () => context.push('/profile/bijbel'),
-          ),
-          const SizedBox(height: 14),
-
-          // Legend: Minder ▢▢▢▢▢ Meer
-          Row(
-            children: [
-              Text(
-                'Minder',
-                style: AppTheme.overline.copyWith(letterSpacing: 0),
-              ),
-              const SizedBox(width: 6),
-              for (final ratio in const [0.0, 0.15, 0.37, 0.75, 1.0]) ...[
-                Container(
-                  width: 12,
-                  height: 12,
-                  margin: const EdgeInsets.only(right: 4),
-                  decoration: BoxDecoration(
-                    color: _color(ratio, scheme),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 2),
-              Text('Meer', style: AppTheme.overline.copyWith(letterSpacing: 0)),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          SizedBox(
-            height: 18,
-            child: _selected == null
-                ? Text('Tik op een boek voor details', style: AppTheme.caption)
-                : Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _selected,
-                          style: AppTheme.caption.copyWith(
-                            color: AppTheme.teal,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        TextSpan(
-                          text:
-                              ' - ${_read(_selected!)} van '
-                              '${BibleBooks.chaptersIn(_selected!)} hoofdstukken gelezen',
-                          style: AppTheme.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 12),
-
-          _TestamentGrid(
-            label: 'Oude Testament',
-            books: BibleBooks.oldTestament,
-            selected: _selected,
-            colorFor: (book) => _color(_ratio(book), scheme),
-            onTap: (book) =>
-                setState(() => _selected = _selected == book ? null : book),
-            onOpen: widget.onOpenBook,
-          ),
-          const SizedBox(height: 14),
-          _TestamentGrid(
-            label: 'Nieuwe Testament',
-            books: BibleBooks.newTestament,
-            selected: _selected,
-            colorFor: (book) => _color(_ratio(book), scheme),
-            onTap: (book) =>
-                setState(() => _selected = _selected == book ? null : book),
-            onOpen: widget.onOpenBook,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TestamentGrid extends StatelessWidget {
-  const _TestamentGrid({
-    required this.label,
-    required this.books,
-    required this.selected,
-    required this.colorFor,
-    required this.onTap,
-    required this.onOpen,
-  });
-
-  final String label;
-  final List<String> books;
-  final String? selected;
-  final Color Function(String book) colorFor;
-  final void Function(String book) onTap;
-  final void Function(String book) onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${label.toUpperCase()}  (${books.length} boeken)',
-          style: AppTheme.overline,
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 3,
-          runSpacing: 3,
-          children: [
-            for (final book in books)
-              GestureDetector(
-                onTap: () => onTap(book),
-                onDoubleTap: () => onOpen(book),
-                onLongPress: () => onOpen(book),
-                child: Tooltip(
-                  message: book,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: colorFor(book),
-                      borderRadius: BorderRadius.circular(3),
-                      border: selected == book
-                          ? Border.all(color: AppTheme.teal, width: 2)
-                          : null,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// "Aanbevolen studies" - up to four compact rows, each a picture and a
-/// promise rather than a line of text: the old plain list of type-pill +
-/// title sold none of them. Every row leans on [StudyBanner], the same 16:6
-/// artwork (with its painted fallback) that the studies tab and the detail
-/// screen use, so a recommendation looks the same wherever the reader meets
-/// it.
-class _RecommendedStudiesCard extends ConsumerWidget {
-  const _RecommendedStudiesCard({required this.onOpen});
-
-  final void Function(CuratedStudy study) onOpen;
-
-  /// Four small rows. Any more and the dashboard turns into the studies tab,
-  /// which is what "Bekijk alle" is for.
-  static const int _maxItems = 4;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final studies = ref.watch(curatedStudiesProvider);
-    final plans = ref.watch(studyPlansProvider);
-    final serverLessons =
-        ref.watch(serverStudyLessonsProvider).value ??
-        const <String, Set<int>>{};
-
-    // A finished study stays in the list - it is still a fair suggestion to
-    // revisit - but steps back so the unread ones read first.
-    Widget dim(CuratedStudy study, Widget child) => Opacity(
-      opacity:
-          isStudyFinished(
-            study: study,
-            plans: plans,
-            serverLessons: serverLessons,
-          )
-          ? 0.55
-          : 1,
-      child: child,
-    );
-
-    return AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: 'Aanbevolen studies',
-            actionLabel: 'Bekijk alle',
-            onAction: () => context.go('/studies'),
-          ),
-          const SizedBox(height: 14),
-          studies.when(
-            loading: () => const _RecommendedStudiesSkeleton(),
-            error: (_, _) => Text(
-              'Studies konden niet worden geladen.',
-              style: AppTheme.caption,
-            ),
-            data: (list) {
-              if (list.isEmpty) {
-                return Text(
-                  'Er zijn nog geen studies beschikbaar.',
-                  style: AppTheme.caption,
-                );
-              }
-              final shown = list.take(_maxItems).toList();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < shown.length; i++) ...[
-                    if (i > 0) const RuleLine(),
-                    dim(
-                      shown[i],
-                      _RecommendedStudyRow(
-                        study: shown[i],
-                        onTap: () => onOpen(shown[i]),
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One recommended study: banner thumbnail, title and lesson count.
-class _RecommendedStudyRow extends StatelessWidget {
-  const _RecommendedStudyRow({required this.study, required this.onTap});
-
-  final CuratedStudy study;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: StudyBanner(study: study),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    study.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.bodyStrong.copyWith(
-                      fontSize: 13,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${study.lessonCount} lessen · ±${study.minutesPerLesson} min',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.metaLabel,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.arrow_forward, size: 13, color: AppTheme.teal),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The recommendation card while the catalogue is still loading: four rows,
-/// in the shape they will land in.
-class _RecommendedStudiesSkeleton extends StatelessWidget {
-  const _RecommendedStudiesSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < 4; i++) ...[
-          if (i > 0) const SizedBox(height: 14),
-          Row(
-            children: [
-              const Skeleton(height: 52, width: 52, radius: AppTheme.radiusSm),
-              const SizedBox(width: 12),
-              Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Skeleton(height: 11, width: 150),
-                    SizedBox(height: 7),
-                    Skeleton(height: 9, width: 96),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    HomeMainCard(data: data),
+
+                    // The tekst van de dag has to be fully in view without
+                    // scrolling; everything above it is compact for its sake.
+                    // The card renders today's verse, or - offline - the
+                    // newest one in its local archive, which is why the
+                    // archive is consulted here too.
+                    if (data.dailyVerse != null || hasArchivedVerse)
+                      DailyVerseCard(
+                        verse: data.dailyVerse,
+                        onOpenChapter: (book, chapter) => _openChapter(
+                          context,
+                          ref,
+                          book: book,
+                          chapter: chapter,
+                        ),
+                      ),
                   ],
                 ),
               ),
+
+              // Below the fold on purpose: the reader scrolls to their
+              // vriendenkring, never past the verse to reach it.
+              const SizedBox(height: 28),
+              const FriendsSection(),
             ],
           ),
-        ],
+        ),
       ],
     );
   }
 }
-
-class _WeeklyStatsCard extends StatelessWidget {
-  const _WeeklyStatsCard({required this.days, required this.total});
-
-  final List<WeekDay> days;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final week = days.isEmpty
-        ? const ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
-              .map(
-                (l) =>
-                    WeekDay(label: l, count: 0, heightPct: 0, isToday: false),
-              )
-              .toList()
-        : days;
-
-    return AppCard(
-      radius: AppTheme.radiusMd,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bar_chart, size: 14, color: AppTheme.teal),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Deze week',
-                  style: AppTheme.caption.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: scheme.onSurface,
-                  ),
-                ),
-              ),
-              Text(
-                total == 0 ? 'Geen activiteit' : '$total× gelezen',
-                style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 64,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < week.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  Expanded(
-                    child: FractionallySizedBox(
-                      heightFactor: week[i].count > 0
-                          ? (week[i].heightPct.clamp(20, 100)) / 100
-                          : 0.30,
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: week[i].count > 0
-                              ? (week[i].isToday
-                                    ? AppTheme.teal
-                                    : AppTheme.teal.withValues(alpha: 0.4))
-                              : (week[i].isToday
-                                    ? AppTheme.teal.withValues(alpha: 0.25)
-                                    : scheme.surfaceContainerHighest),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(6),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              for (var i = 0; i < week.length; i++) ...[
-                if (i > 0) const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    week[i].label,
-                    textAlign: TextAlign.center,
-                    style: AppTheme.overline.copyWith(
-                      letterSpacing: 0,
-                      color: week[i].isToday
-                          ? AppTheme.teal
-                          : AppTheme.inkFaint,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-

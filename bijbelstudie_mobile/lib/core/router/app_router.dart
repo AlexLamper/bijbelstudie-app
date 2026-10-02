@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 import '../ui/lucide_icon.dart';
 
+import '../../features/friends/present/friends_screen.dart';
 import '../../features/admin/present/admin_screen.dart';
 import '../../features/premium/present/paywall_funnel_screen.dart';
 import '../../features/study/present/lesson/lesson_screen.dart';
@@ -371,6 +372,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           // persisted route or old deep link resolves instead of hitting the
           // not-found page.
           GoRoute(path: '/groups', redirect: (context, state) => '/dashboard'),
+          // Vriendenkring: the feed behind the Start tab's header button and
+          // "Alles bekijken". In the shell so the bottom nav stays, with Start
+          // lit - it is a corner of Start, not a tab of its own.
+          GoRoute(
+            path: '/vriendenkring',
+            builder: (context, state) => const FriendsScreen(),
+          ),
           // Bijbel in een jaar: Vandaag | Schema. In the shell so the bottom
           // nav stays, with Start lit (no tab of its own). `?tab=schema&day=`.
           GoRoute(

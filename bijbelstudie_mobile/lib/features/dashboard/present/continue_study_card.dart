@@ -27,6 +27,7 @@ class ContinueStudyCard extends ConsumerWidget {
     this.lastRead,
     this.readChapters = const {},
     this.onOpen,
+    this.compact = false,
   });
 
   /// The server's answer; null from an older server.
@@ -40,6 +41,10 @@ class ContinueStudyCard extends ConsumerWidget {
 
   /// Overrides navigation (tests). Defaults to [openResumeHref].
   final void Function(String href)? onOpen;
+
+  /// The Start tab's one-row variant (design 28b), so the tekst van de dag
+  /// stays in view. Elsewhere the card keeps its original two-part shape.
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,6 +69,7 @@ class ContinueStudyCard extends ConsumerWidget {
     return ResumeCardView(
       resume: shown,
       cover: coverFor(shown.primary),
+      compact: compact,
       onOpen: onOpen ?? (href) => openResumeHref(context, ref, href),
     );
   }
@@ -83,6 +89,7 @@ class ResumeCardView extends StatelessWidget {
     required this.resume,
     required this.onOpen,
     this.cover,
+    this.compact = false,
   });
 
   final DashboardResume resume;
@@ -90,6 +97,9 @@ class ResumeCardView extends StatelessWidget {
 
   /// The study's banner, square-cropped. Null for chapters and starts.
   final Widget? cover;
+
+  /// See [ContinueStudyCard.compact]: one row, with "Verder" as a pill.
+  final bool compact;
 
   /// Where the start state opens: the first chapter of the start book, as the
   /// card always did for a reader without progress.
@@ -106,6 +116,7 @@ class ResumeCardView extends StatelessWidget {
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final item = resume.primary;
+    if (compact) return _compact(context, item);
     switch (item.kind) {
       case ResumeKind.study:
         return _study(context, item);
@@ -144,6 +155,97 @@ class ResumeCardView extends StatelessWidget {
           onTap: () => onOpen(item.href),
         );
     }
+  }
+
+  /// Design 28b: thumbnail, eyebrow and title on one line, the lesson bar
+  /// under it, "Verder" on the right. The whole card is the tap target; the
+  /// pill is a label on it rather than a second button.
+  Widget _compact(BuildContext context, ResumeItem item) {
+    final scheme = Theme.of(context).colorScheme;
+    final progress = item.progress;
+    final isStudy = item.kind == ResumeKind.study;
+    final href = item.kind == ResumeKind.start ? startHref : item.href;
+    final chapter = item.kind == ResumeKind.chapter
+        ? resumeTargetFor(item.href)
+        : null;
+
+    final title = switch (item.kind) {
+      ResumeKind.start => 'Start je bijbelstudie',
+      ResumeKind.chapter when chapter is ResumeChapter =>
+        BibleBooks.toCanonical(chapter.book),
+      _ => item.title,
+    };
+    // "Les 6 van 50 · Gerechtvaardigd door geloof" -> "Les 6 van 50".
+    final line = switch (item.kind) {
+      ResumeKind.study => item.subtitle?.split(' · ').first.trim() ?? '',
+      ResumeKind.chapter when chapter is ResumeChapter =>
+        'Hoofdstuk ${chapter.chapter}',
+      ResumeKind.start => 'Lees dag voor dag door de Bijbel',
+      _ => item.subtitle ?? '',
+    };
+    final eyebrow = item.kind == ResumeKind.start
+        ? 'Begin met lezen'
+        : 'Waar je gebleven was';
+
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      onTap: () => onOpen(href),
+      child: Row(
+        children: [
+          if (isStudy)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              child: SizedBox.square(dimension: 44, child: cover ?? const _PaintedCover()),
+            )
+          else
+            IconChip(
+              icon: item.kind == ResumeKind.start
+                  ? Icons.auto_stories
+                  : Icons.menu_book_outlined,
+              size: 44,
+              iconSize: 20,
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(eyebrow, style: AppTheme.metaLabel.copyWith(color: AppTheme.teal)),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.bodyStrong.copyWith(fontSize: 14, color: scheme.onSurface),
+                ),
+                if (progress != null && progress.total > 0) ...[
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress.fraction,
+                      minHeight: 4,
+                      backgroundColor: scheme.outline,
+                      valueColor: AlwaysStoppedAnimation(AppTheme.teal),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (line.isNotEmpty)
+                  Text(
+                    line,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.bodyMuted.copyWith(fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _VerderPill(onTap: () => onOpen(href)),
+        ],
+      ),
+    );
   }
 
   Widget _row(
@@ -262,6 +364,36 @@ class ResumeCardView extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Verder" on the compact card: the same pill the plan card's "Lezen" is, so
+/// the two main cards read as one family.
+class _VerderPill extends StatelessWidget {
+  const _VerderPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Material(
+      color: AppTheme.tealFill,
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: Alignment.center,
+          child: Text(
+            'Verder',
+            style: AppTheme.pillLabel.copyWith(fontSize: 13, color: Colors.white),
+          ),
+        ),
       ),
     );
   }

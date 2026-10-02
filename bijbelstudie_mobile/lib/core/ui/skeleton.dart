@@ -213,36 +213,50 @@ class DashboardSkeleton extends StatelessWidget {
             color: scheme.surface,
             border: Border(bottom: BorderSide(color: scheme.outline)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: const [
-              Skeleton(height: 22, width: 200),
-              SizedBox(height: 10),
-              Skeleton(height: 12, width: 140),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 40),
-          child: Column(
-            children: [
-              SkeletonCard(
-                height: 150,
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Skeleton(height: 10, width: 120),
-                    SizedBox(height: 14),
-                    Skeleton(height: 20, width: 180),
-                    SizedBox(height: 20),
-                    Skeleton(height: 38, width: 150, radius: 12),
+                  children: [
+                    Skeleton(height: 22, width: 200),
+                    SizedBox(height: 10),
+                    Skeleton(height: 12, width: 140),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              SkeletonCard(height: 220, child: _cardHeader()),
-              const SizedBox(height: 16),
-              SkeletonCard(height: 170, child: _cardHeader()),
+              Skeleton.circle(44),
+              SizedBox(width: 8),
+              Skeleton(height: 44, width: 64, radius: 999),
+            ],
+          ),
+        ),
+        // The Start tab holds one compact main card and then the verse card,
+        // which is the full height it keeps once loaded - so nothing jumps
+        // when the real screen lands.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
+          child: Column(
+            children: [
+              SkeletonCard(
+                height: 118,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Row(
+                      children: [
+                        Skeleton.circle(44),
+                        SizedBox(width: 12),
+                        Skeleton(height: 14, width: 120),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    Skeleton(height: 28, width: 220, radius: 999),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SkeletonCard(height: 330, child: _cardHeader()),
             ],
           ),
         ),

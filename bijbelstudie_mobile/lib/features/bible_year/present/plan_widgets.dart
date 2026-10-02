@@ -194,7 +194,7 @@ class PlanProgressRing extends StatelessWidget {
             dimension: size,
             child: CircularProgressIndicator(
               value: value,
-              strokeWidth: 6,
+              strokeWidth: size <= 50 ? 4.5 : 6,
               strokeCap: StrokeCap.round,
               color: AppTheme.teal,
               backgroundColor: AppTheme.paperSunken,
@@ -202,7 +202,13 @@ class PlanProgressRing extends StatelessWidget {
           ),
           Text(
             '${percent.floor()}%',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.ink),
+            // Proportional so the Start tab's small ring still fits "100%";
+            // 68 (the plan screen's size) keeps its original 16.
+            style: TextStyle(
+              fontSize: size * 0.235,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.ink,
+            ),
           ),
         ],
       ),
