@@ -6,25 +6,22 @@ import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../levensboom/domain/catalog.dart';
-import '../../levensboom/domain/tree_state.dart';
 import '../../levensboom/present/levensboom_avatar.dart';
 import '../../levensboom/present/levensboom_providers.dart';
-import '../../levensboom/present/mini_tree.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/dashboard_models.dart';
 
 /// The detail panel behind the header streak/week-goal ring
-/// (`HomeStreakIndicator`). Explains, in plain Dutch, what the ring is
-/// counting, what today's actual value is, which of the last 7 days were
-/// done, how a freeze/grace day works, and how the goal itself is set - a
-/// daily streak or a "3x per week" week goal, depending on the reader's own
-/// study cadence.
+/// (`HomeStreakIndicator`). Says, in plain Dutch and as briefly as it can,
+/// what today's value is, which of the last 7 days were done, and what keeps
+/// the thing running - a daily streak or a "3x per week" week goal, depending
+/// on the reader's own study cadence. It is deliberately short: readers scan
+/// this sheet, they do not read it.
 ///
 /// All the numbers shown here come from the caller (`HomeStreakIndicator`,
 /// which already reads `retentionStoreProvider` and the dashboard's weekly
-/// data). The one thing the sheet reads on its own is `treeStateProvider`,
-/// for the same reason the header does: the mark at the top is the reader's
-/// own tree, and "beste reeks" lives on that state.
+/// data). The sheet reads `treeStateProvider` on its own only for the motion
+/// pref, the gold-ring accent and "beste reeks", which live on that state.
 Future<void> showStreakDetailSheet(
   BuildContext context, {
   required CadenceInfo cadence,
@@ -96,38 +93,29 @@ class _StreakDetailSheet extends ConsumerWidget {
     return streak > 0 ? '$streak ${_dayWord(streak)} op rij' : 'Nog geen reeks';
   }
 
-  /// The reader's own tree with the count in its badge - the header mark,
-  /// grown a step - or, for readers who switched the tree off, the plain
-  /// icon: "Boom verbergen" means no tree anywhere (TREE_FEATURE_PLAN §10).
-  Widget _mark(TreeState? tree) {
-    if (tree?.disabled == true) {
-      return IconChip(
-        icon: _isWeekGoal ? Icons.flag_outlined : Icons.local_fire_department,
-        color: _isWeekGoal ? AppTheme.teal : AppTheme.flame,
+  /// The very mark the reader just tapped in the header, a step larger: the
+  /// flame of `StreakFlamePill`, or its check for a week goal. It used to be
+  /// the reader's own Levensboom, but the tree reads as a profile avatar
+  /// rather than as the thing being explained - the header stopped using it
+  /// for that reason, and this sheet now follows.
+  Widget _mark() {
+    final target = cadence.weekGoalTarget;
+    return Semantics(
+      label: _isWeekGoal
+          ? '$completionsThisWeek van $target ${_lessonWord(target)} deze week'
+          : (freezes > 0
+                ? 'Reeks van $streak ${_dayWord(streak)}, met een vrije dag'
+                : 'Reeks van $streak ${_dayWord(streak)}'),
+      child: IconChip(
+        icon: _isWeekGoal
+            ? Icons.check_circle_outline
+            : Icons.local_fire_department,
+        color: _lit
+            ? (_isWeekGoal ? AppTheme.teal : AppTheme.flame)
+            : AppTheme.inkMuted,
         size: _kHeroSize,
-        iconSize: 28,
-      );
-    }
-    if (_isWeekGoal) {
-      final target = cadence.weekGoalTarget;
-      return MiniTree(
-        tree: tree,
-        badge: '$completionsThisWeek/$target',
-        semanticsLabel:
-            'Je boom - $completionsThisWeek van $target ${_lessonWord(target)} deze week',
-        dormant: completionsThisWeek <= 0,
-        size: _kHeroSize,
-      );
-    }
-    return MiniTree(
-      tree: tree,
-      badge: '$streak',
-      semanticsLabel: freezes > 0
-          ? 'Je boom - reeks van $streak ${_dayWord(streak)}, met een vrije dag'
-          : 'Je boom - reeks van $streak ${_dayWord(streak)}',
-      dormant: streak <= 0,
-      hasFreeze: freezes > 0,
-      size: _kHeroSize,
+        iconSize: 32,
+      ),
     );
   }
 
@@ -168,7 +156,7 @@ class _StreakDetailSheet extends ConsumerWidget {
                   accent: accent,
                   lit: _lit,
                   still: still,
-                  child: _mark(tree),
+                  child: _mark(),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -206,19 +194,12 @@ class _StreakDetailSheet extends ConsumerWidget {
             const SizedBox(height: 20),
             Text(
               _isWeekGoal
-                  ? 'Dit doel telt hoe vaak je deze week een les afrondt of een hoofdstuk leest.'
-                  : 'Deze reeks telt de dagen achter elkaar dat je een hoofdstuk leest of een studieles afrondt.',
+                  ? 'Je doel: $_cadenceLabel een hoofdstuk lezen of een les afronden.'
+                  : 'Elke dag een hoofdstuk lezen of een les afronden houdt je reeks lopend.',
               style: AppTheme.bodyMuted,
             ),
-            const SizedBox(height: 10),
-            Text(
-              _isWeekGoal
-                  ? 'Je studietempo staat op $_cadenceLabel. Rond dat aantal lessen af voor het einde van de week om je doel te halen.'
-                  : 'Je studietempo staat op "$_cadenceLabel". Lees je liever een paar vaste dagen per week? Dat stel je in bij de instellingen van je studie.',
-              style: AppTheme.bodyMuted,
-            ),
-            if (!_isWeekGoal) ...[
-              const SizedBox(height: 14),
+            if (!_isWeekGoal && freezes > 0) ...[
+              const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -226,20 +207,13 @@ class _StreakDetailSheet extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      freezes > 0
-                          ? 'Je hebt $freezes bevriezingsdag${freezes == 1 ? '' : 'en'} gespaard. Mis je toch een dag, dan redt een vrije dag je reeks automatisch - als Pro-lid kun je daarna nog een bevriezingsdag inzetten.'
-                          : 'Elke vijf dagen reeks verdien je een bevriezingsdag. Mis je een dag, dan blijft je reeks daarnaast nog één dag lang gespaard.',
+                      'Je hebt $freezes bevriezingsdag${freezes == 1 ? '' : 'en'} gespaard: mis je een dag, dan blijft je reeks staan.',
                       style: AppTheme.caption.copyWith(color: scheme.onSurface),
                     ),
                   ),
                 ],
               ),
             ],
-            const SizedBox(height: 10),
-            Text(
-              'Tip: lees op een vast moment van de dag - dan wordt het vanzelf een gewoonte.',
-              style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-            ),
             const SizedBox(height: 20),
             SiteButton(
               label: pick != null ? 'Verder met ${pick.study.title}' : 'Bekijk bijbelstudies',
