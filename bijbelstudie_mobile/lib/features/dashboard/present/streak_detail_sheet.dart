@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../levensboom/domain/catalog.dart';
-import '../../levensboom/present/levensboom_avatar.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/dashboard_models.dart';
@@ -21,7 +19,7 @@ import '../data/dashboard_models.dart';
 /// All the numbers shown here come from the caller (`HomeStreakIndicator`,
 /// which already reads `retentionStoreProvider` and the dashboard's weekly
 /// data). The sheet reads `treeStateProvider` on its own only for the motion
-/// pref, the gold-ring accent and "beste reeks", which live on that state.
+/// pref and "beste reeks", which live on that state.
 Future<void> showStreakDetailSheet(
   BuildContext context, {
   required CadenceInfo cadence,
@@ -46,8 +44,8 @@ Future<void> showStreakDetailSheet(
 
 const _kWeekdayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 
-/// The header mark is 48; the sheet shows the same object a step larger.
-const double _kHeroSize = 64;
+/// The header mark is 48; the sheet shows the same icon, plain, at this size.
+const double _kMarkSize = 40;
 
 String _dayWord(int n) => n == 1 ? 'dag' : 'dagen';
 String _lessonWord(int n) => n == 1 ? 'les' : 'lessen';
@@ -69,8 +67,8 @@ class _StreakDetailSheet extends ConsumerWidget {
 
   bool get _isWeekGoal => cadence.model == RetentionModel.weekGoal;
 
-  /// Whether there is anything to glow about yet: a running streak, or at
-  /// least one completion this week. Otherwise the mark stays muted.
+  /// Whether there is anything to show yet: a running streak, or at least
+  /// one completion this week. Otherwise the icon stays muted.
   bool get _lit => _isWeekGoal ? completionsThisWeek > 0 : streak > 0;
 
   /// "Elke dag", "3x per week (ma, wo, vr)", …
@@ -93,7 +91,7 @@ class _StreakDetailSheet extends ConsumerWidget {
     return streak > 0 ? '$streak ${_dayWord(streak)} op rij' : 'Nog geen reeks';
   }
 
-  /// The very mark the reader just tapped in the header, a step larger: the
+  /// The very mark the reader just tapped in the header, drawn plain: the
   /// flame of `StreakFlamePill`, or its check for a week goal. It used to be
   /// the reader's own Levensboom, but the tree reads as a profile avatar
   /// rather than as the thing being explained - the header stopped using it
@@ -106,15 +104,14 @@ class _StreakDetailSheet extends ConsumerWidget {
           : (freezes > 0
                 ? 'Reeks van $streak ${_dayWord(streak)}, met een vrije dag'
                 : 'Reeks van $streak ${_dayWord(streak)}'),
-      child: IconChip(
-        icon: _isWeekGoal
+      child: Icon(
+        _isWeekGoal
             ? Icons.check_circle_outline
             : Icons.local_fire_department,
         color: _lit
             ? (_isWeekGoal ? AppTheme.teal : AppTheme.flame)
             : AppTheme.inkMuted,
-        size: _kHeroSize,
-        iconSize: 32,
+        size: _kMarkSize,
       ),
     );
   }
@@ -131,14 +128,6 @@ class _StreakDetailSheet extends ConsumerWidget {
         (tree?.reducedMotion ?? false) ||
         MediaQuery.maybeDisableAnimationsOf(context) == true;
 
-    // The glow takes the accent the rest of the app already gives this
-    // reader: gold for a Pro ring, otherwise flame for a streak and teal for
-    // a week goal, matching the icon the sheet used to open with.
-    final gold = tree?.avatar.ring == TreeRing.goud;
-    final accent = gold
-        ? kGoldRing
-        : (_isWeekGoal ? AppTheme.teal : AppTheme.flame);
-
     final best = tree?.longestStreak ?? 0;
 
     return SafeArea(
@@ -152,12 +141,7 @@ class _StreakDetailSheet extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _Hero(
-                  accent: accent,
-                  lit: _lit,
-                  still: still,
-                  child: _mark(),
-                ),
+                _mark(),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -229,72 +213,6 @@ class _StreakDetailSheet extends ConsumerWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// The tapped header mark at sheet size: a soft accent glow behind it and a
-/// short settle-in on open, so the sheet reads as opening *out of* the ring
-/// the reader just tapped rather than appearing beside it. A single finite
-/// tween - nothing here loops - and skipped entirely under reduced motion.
-class _Hero extends StatelessWidget {
-  const _Hero({
-    required this.child,
-    required this.accent,
-    required this.lit,
-    required this.still,
-  });
-
-  final Widget child;
-  final Color accent;
-
-  /// No glow while there is nothing to glow about yet (streak 0, nothing
-  /// done this week); the mark itself is already muted then.
-  final bool lit;
-
-  final bool still;
-
-  /// Room for the glow to fall off around the mark.
-  static const double _box = _kHeroSize + 12;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: _box,
-      height: _box,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: still ? 1.0 : 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 650),
-        curve: Curves.easeOutCubic,
-        builder: (context, t, child) => Stack(
-          alignment: Alignment.center,
-          children: [
-            if (lit)
-              Positioned.fill(
-                child: Opacity(
-                  opacity: t,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          accent.withValues(alpha: 0.34),
-                          accent.withValues(alpha: 0),
-                        ],
-                        stops: const [0.3, 1],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            Transform.scale(
-              scale: 0.82 + 0.18 * t,
-              child: Opacity(opacity: t, child: child),
-            ),
-          ],
-        ),
-        child: child,
       ),
     );
   }
