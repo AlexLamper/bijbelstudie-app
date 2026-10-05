@@ -36,6 +36,30 @@ final pendingNotesTabProvider = NotifierProvider<PendingNotesTab, NotesTab?>(
   PendingNotesTab.new,
 );
 
+/// The one-shot bus for a write the server refused outside anyone's `await`.
+///
+/// A queued offline write is replayed by [NotesRepository.unawaitedFlush],
+/// which is fire-and-forget by design: there is no `try`/`catch` around it and
+/// no screen context to raise a SnackBar from. The repository pushes the
+/// refusal here instead, and whichever screen is up shows it through
+/// `listenForSyncRejections` (see `sync_rejection_notice.dart`).
+///
+/// Nothing is persisted. A refusal missed because no screen was listening is
+/// not worth waking the app for; the row is gone from the queue either way, so
+/// it cannot come back and vanish a second time.
+class SyncRejectionBus extends Notifier<SyncRejectedException?> {
+  @override
+  SyncRejectedException? build() => null;
+
+  void push(SyncRejectedException rejection) => state = rejection;
+
+  /// Consumed by whichever screen showed it, so it is shown exactly once.
+  void clear() => state = null;
+}
+
+final syncRejectionProvider =
+    NotifierProvider<SyncRejectionBus, SyncRejectedException?>(SyncRejectionBus.new);
+
 final readingHistoryProvider =FutureProvider.autoDispose<List<ReadingPosition>>((ref) {
   ref.cacheFor();
   return ref.watch(notesRepositoryProvider).listReadingHistory();
