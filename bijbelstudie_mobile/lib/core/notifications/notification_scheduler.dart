@@ -953,6 +953,11 @@ class NotificationScheduler {
 
     for (final type in NotifType.values) {
       if (type == NotifType.milestone) continue;
+      // A vriendenkring notification is not part of this batch: it was pushed
+      // by APNs or raised by the foreground pull, and a recompute runs on
+      // every resume. Cancelling it here would take a hartje out of the tray
+      // the moment the reader opened the app for anything else.
+      if (type.isSocial) continue;
       await service.cancelType(type);
     }
 

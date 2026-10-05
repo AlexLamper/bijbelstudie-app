@@ -13,10 +13,10 @@ import '../../commentary/present/original_verse_sheet.dart';
 import '../../crossrefs/present/crossref_providers.dart';
 import '../../crossrefs/present/crossref_sheet.dart';
 import '../../study/present/study_pane_controller.dart';
-import '../../premium/present/paywall_route.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
+import 'sync_rejection_notice.dart';
 
 /// What the sheet was dismissed with. Only the note needs one: everything else
 /// the sheet offers is done before it closes.
@@ -167,18 +167,9 @@ Future<void> showAddNoteDialog({
     container.invalidate(notesListProvider);
     await HapticFeedback.lightImpact();
   } on SyncRejectedException catch (e) {
-    messenger?.showSnackBar(
-      SnackBar(
-        content: Text(e.message),
-        action: e.proRequired && router != null
-            ? SnackBarAction(
-                label: 'Bekijk Pro',
-                onPressed: () =>
-                    openPaywallWith(router, gate: PaywallGate.notes),
-              )
-            : null,
-      ),
-    );
+    // Shared with the offline-queue flush, which refuses the same note for the
+    // same reason - just later, and with nobody awaiting it.
+    showSyncRejection(messenger, router, e);
   } catch (e) {
     // Anything else - a malformed response, a plugin blowing up - is still a
     // note the reader believes they saved. Say so rather than letting it

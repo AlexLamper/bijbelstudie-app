@@ -130,6 +130,13 @@ class NotificationArt {
         return _treeArt('tree-healthy', withLevel: true);
       case NotifType.dailyVerse:
       case NotifType.morning:
+      // The vriendenkring kinds are about somebody else, so the reader's own
+      // tree has no business on them. (They never reach this method anyway -
+      // they are not scheduled - but the switch is exhaustive.)
+      case NotifType.friendRequest:
+      case NotifType.friendAccepted:
+      case NotifType.postLike:
+      case NotifType.postComment:
         return Future.value(null);
     }
   }

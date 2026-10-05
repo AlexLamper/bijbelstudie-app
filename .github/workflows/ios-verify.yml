@@ -1,0 +1,53 @@
+name: iOS Build Check (no signing, no upload)
+
+# Proves that the iOS side still compiles and that every CocoaPods dependency
+# resolves, without certificates, without a provisioning profile and without
+# touching TestFlight. Use it after adding or bumping a plugin that has native
+# iOS code - `flutter_contacts` and `crypto` were the reason this exists.
+#
+# Manual only on purpose: `ios-release.yml` is the one that builds on a push to
+# main, and two macOS jobs per push would just burn minutes.
+on:
+  workflow_dispatch:
+
+jobs:
+  verify-ios-build:
+    name: Build Flutter iOS unsigned
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: bijbelstudie_mobile
+        run: flutter pub get
+
+      # Resolve pods explicitly rather than letting the build do it, so a
+      # dependency that cannot satisfy the project's iOS minimum fails here
+      # with the pod resolver's own error instead of inside xcodebuild.
+      - name: Install CocoaPods dependencies
+        working-directory: bijbelstudie_mobile/ios
+        run: pod install --repo-update
+
+      - name: Build Flutter iOS (unsigned)
+        working-directory: bijbelstudie_mobile
+        run: flutter build ios --no-codesign
+
+      - name: Report native iOS plugin registrations
+        working-directory: bijbelstudie_mobile
+        run: |
+          echo "Plugins registered on iOS:"
+          grep -E "registerWithRegistrar|import " ios/Runner/GeneratedPluginRegistrant.m || true

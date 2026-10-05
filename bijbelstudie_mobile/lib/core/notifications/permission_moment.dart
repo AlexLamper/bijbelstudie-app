@@ -8,6 +8,8 @@ import '../../features/settings/data/notification_prefs.dart';
 import 'notification_scheduler.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
+import 'social_notifications_store.dart';
+import 'social_push.dart';
 
 /// The earned moments at which the app may ask for notification permission
 /// (`AVATAR_NOTIFICATIONS_PLAN.md` §7).
@@ -33,6 +35,17 @@ enum PermissionMoment {
   /// explicit request for a reminder, so it is offered even when an earlier
   /// moment was declined (the OS decides whether its own dialog still shows).
   planReminder,
+
+  /// The vriendenkring moment: the reader just accepted a verzoek or sent one
+  /// of their own. The social case has to be asked for separately, because what
+  /// it asks for is different - "we laten je weten als er iets gebeurt in je
+  /// kring", not "een zetje op je studiedag" - and because it is the one point
+  /// where the reader has visibly chosen to have other people in the app.
+  ///
+  /// Like [planReminder] it is exempt from the shared one-shot guard (it has
+  /// one of its own, [SocialNotificationStore.askSpent]), and like every other
+  /// moment it is never offered at launch or in onboarding.
+  socialFirstFriend,
 }
 
 extension PermissionMomentCopy on PermissionMoment {
@@ -50,8 +63,24 @@ extension PermissionMomentCopy on PermissionMoment {
         return 'Je hebt iets bereikt.';
       case PermissionMoment.planReminder:
         return 'Je leesplan staat klaar.';
+      case PermissionMoment.socialFirstFriend:
+        return 'Je kring wordt groter.';
     }
   }
+
+  /// The question under [lead]. Only the vriendenkring moment asks something
+  /// else: it is not about a studiedag.
+  String get question => this == PermissionMoment.socialFirstFriend
+      ? 'Wil je het weten als er iets gebeurt in je kring?'
+      : 'Wil je een rustig zetje op je studiedag?';
+
+  /// The paragraph under [question].
+  String get explanation => this == PermissionMoment.socialFirstFriend
+      ? 'Dan laten we je weten wie je kring in wil, en wanneer iemand op je '
+          'bericht reageert. Niets anders, en je zet het met één tik weer uit.'
+      : "We sturen je hooguit één herinnering per dag, op het moment dat jij "
+          "kiest - nooit 's avonds laat, nooit als je die dag al bezig bent "
+          "geweest. Je zet het met één tik weer uit.";
 }
 
 /// Whether [moment] has actually happened yet, from what the store knows.
@@ -65,6 +94,9 @@ bool permissionMomentEarned(PermissionMoment moment, RetentionState state) {
     case PermissionMoment.firstLesson:
     case PermissionMoment.firstMilestone:
     case PermissionMoment.planReminder:
+    // Only the kring UI knows a verzoek was just sent or accepted, so the
+    // caller judges this one too.
+    case PermissionMoment.socialFirstFriend:
       return true;
     case PermissionMoment.chaptersRead:
       return state.completionsEver >= 3;
@@ -94,13 +126,19 @@ Future<bool> maybeAskForNotifications(
   final service = ref.read(notificationServiceProvider);
   final prefsCtl = ref.read(notificationPrefsProvider.notifier);
   final rescheduler = ref.read(notificationReschedulerProvider);
+  final social = moment == PermissionMoment.socialFirstFriend;
+  final registrar = ref.read(socialDeviceRegistrarProvider);
   await store.loaded;
   if (!context.mounted) return false;
   final state = ref.read(retentionStoreProvider);
   if (state.permissionAskedAfterFirstLesson &&
-      moment != PermissionMoment.planReminder) {
+      moment != PermissionMoment.planReminder &&
+      !social) {
     return false;
   }
+  // The vriendenkring ask has a guard of its own, so being exempt from the one
+  // above still only buys it one sheet, ever.
+  if (social && await SocialNotificationStore.askSpent()) return false;
 
   if (!permissionMomentEarned(moment, state)) return false;
 
@@ -110,6 +148,11 @@ Future<bool> maybeAskForNotifications(
     // them off themselves).
     await prefsCtl.enableIfUnset();
     rescheduler.requestReschedule();
+    // Permission is already there, so iOS can have its APNs token now. On
+    // Android this is a no-op - there is no push.
+    if (social) {
+      await registrar.ensureRegistered(signedIn: true, permitted: true);
+    }
     return false;
   }
   if (!context.mounted || _sheetOpen) return false;
@@ -124,12 +167,21 @@ Future<bool> maybeAskForNotifications(
   // Spent only once the sheet was really on screen: a context that went away
   // before it could open must not burn the one ask.
   await store.markPermissionAsked();
+  if (social) await SocialNotificationStore.markAskSpent();
   if (wants != true) return false;
 
   final granted = await service.requestPermission();
   if (granted) {
     await prefsCtl.setMasterEnabled(true);
-    await prefsCtl.setStudyReminder(enabled: true);
+    if (social) {
+      // They were asked about their kring, so that is what is switched on. The
+      // study reminder keeps whatever it had: turning it on here would be
+      // answering a question nobody was asked.
+      await SocialNotificationStore.setEnabled(true);
+      await registrar.ensureRegistered(signedIn: true, permitted: true);
+    } else {
+      await prefsCtl.setStudyReminder(enabled: true);
+    }
   }
   await prefsCtl.setPendingPermissionRequest(false);
   // Captured above; `ref` itself may belong to a disposed widget by now.
@@ -142,6 +194,16 @@ Future<bool> maybeAskForNotifications(
 ///
 /// [PermissionMoment.firstStreak] is tried first - "twee dagen op rij" is a
 /// better reason than a count - and both are no-ops until they are earned.
+/// The vriendenkring side: offered the moment a verzoek is accepted or sent.
+///
+/// That is the earned moment for the social notifications - the reader has just
+/// put another person in the app, so "wil je het weten als er iets gebeurt in
+/// je kring" answers a question they are already holding. It is never offered
+/// at launch, in onboarding, or on the first look at the kring, and the
+/// `askSpent` guard means a reader who says "nu niet" is not asked again.
+Future<void> maybeAskAfterFriendAction(BuildContext context, WidgetRef ref) =>
+    maybeAskForNotifications(context, ref, PermissionMoment.socialFirstFriend);
+
 Future<void> maybeAskAfterReading(BuildContext context, WidgetRef ref) async {
   if (await maybeAskForNotifications(context, ref, PermissionMoment.firstStreak)) {
     return;
@@ -245,7 +307,7 @@ class NotificationPermissionSheet extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Wil je een rustig zetje op je studiedag?',
+                                  moment.question,
                                   style: theme.textTheme.titleLarge,
                                 ),
                               ],
@@ -255,10 +317,7 @@ class NotificationPermissionSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        "We sturen je hooguit één herinnering per dag, op het "
-                        "moment dat jij kiest - nooit 's avonds laat, nooit "
-                        "als je die dag al bezig bent geweest. Je zet het met "
-                        "één tik weer uit.",
+                        moment.explanation,
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],

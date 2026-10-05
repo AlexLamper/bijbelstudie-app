@@ -14,6 +14,7 @@ import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'note_row.dart';
 import 'notes_providers.dart';
+import 'sync_rejection_notice.dart';
 import 'verse_action_sheet.dart';
 
 /// Everything the reader has written down, as a list they can scan.
@@ -70,6 +71,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
+    // A note queued offline can be refused by /sync on a flush the reader
+    // never awaited - the free note limit, most of all. This is the screen the
+    // note would otherwise vanish from, so the notice belongs here.
+    listenForSyncRejections(context, ref);
 
     return Scaffold(
       backgroundColor: AppTheme.surface,

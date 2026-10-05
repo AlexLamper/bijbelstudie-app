@@ -5,6 +5,14 @@
          the app asks for it only when the user turns the reminder on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Vriendenkring contact matching (VRIENDENKRING_PLAN.md §6). Optional:
+         the kring works entirely without it, through an invite link or code.
+         The in-app disclosure screen in features/friends/present/contacts/
+         runs before this runtime permission is ever requested, as the Play
+         "Personal and sensitive data" policy requires. Only salted hashes of
+         normalised numbers and addresses leave the phone, and they are not
+         retained. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <application
         android:label="BijbelStudie"
         android:name="${applicationName}"

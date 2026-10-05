@@ -9,8 +9,8 @@ import '../domain/bronnen_models.dart';
 import 'bronnen_providers.dart';
 
 /// `/bronnen` - the confessions, catechism booklets and liturgical forms of
-/// the Dutch Reformed tradition, read in the app itself (unlike Hulpbronnen,
-/// which links out). Grouped as the server groups them.
+/// the Dutch Reformed tradition, read in the app itself rather than linked
+/// out to. Grouped as the server groups them.
 class BronnenScreen extends ConsumerWidget {
   const BronnenScreen({super.key});
 
@@ -22,20 +22,41 @@ class BronnenScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // No top SafeArea: the header paints behind the status bar and pads its
+      // own content down, the same way the leesplan header does.
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
               decoration: BoxDecoration(
                 color: scheme.surface,
                 border: Border(bottom: BorderSide(color: scheme.outline)),
               ),
-              child: const GradientHeader(
-                title: 'Bronnen',
-                subtitle: 'Belijdenis, catechismus en formulieren',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 4),
+                    child: IconButton(
+                      tooltip: 'Terug',
+                      onPressed: () =>
+                          context.canPop() ? context.pop() : context.go('/dashboard'),
+                      icon: Icon(Icons.arrow_back_ios_new, size: 20, color: AppTheme.inkSoft),
+                      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 2, 20, 14),
+                    child: GradientHeader(
+                      title: 'Bronnen',
+                      subtitle: 'Belijdenis, catechismus en formulieren',
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(

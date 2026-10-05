@@ -83,7 +83,6 @@ class _UpgradePromptState extends ConsumerState<UpgradePrompt> {
     'ai_limit' => PaywallGate.aiLimit,
     'original_text' => PaywallGate.originalText,
     'offline' => PaywallGate.offline,
-    'resources' => PaywallGate.resources,
     _ => null,
   };
 

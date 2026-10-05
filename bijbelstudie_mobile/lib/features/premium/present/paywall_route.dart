@@ -49,11 +49,6 @@ enum PaywallGate {
     source: 'app_crossrefs',
     reason: 'Alle verwante bijbelteksten horen bij Pro.',
   ),
-  resources(
-    id: 'bronnen',
-    source: 'app_resources',
-    reason: 'Deze bronnen horen bij Pro.',
-  ),
   groups(
     id: 'groepen',
     source: 'app_groups',

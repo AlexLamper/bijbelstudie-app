@@ -15,6 +15,9 @@ import '../../../core/notifications/notification_scheduler.dart'
     show notificationReschedulerProvider;
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/notifications/retention_store.dart';
+import '../../../core/notifications/social_notifications_store.dart';
+import '../../../core/notifications/social_push.dart';
+import '../../../core/notifications/social_sync.dart';
 import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
 import '../../levensboom/data/levensboom_repository.dart';
@@ -169,6 +172,12 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       ref.read(notificationReschedulerProvider).requestReschedule();
     } catch (_) {}
+    // There is a session now, so an APNs token iOS already handed over at
+    // launch can finally be registered against it - no resume comes after a
+    // sign-in to do it. The same call brings the kring's cursor up to date.
+    try {
+      ref.read(socialSyncProvider).requestSync(force: true);
+    } catch (_) {}
   }
 
   /// Local notifications are per account: every armed one carries the
@@ -177,10 +186,31 @@ class AuthController extends AsyncNotifier<User?> {
   /// (streak mirror, celebrated milestones) stays - it is what keeps a
   /// returning reader from being congratulated twice - but its armed tags
   /// are dropped, since their one-shots were just cancelled. Never throws.
+  /// Withdraws this device's APNs token server-side.
+  ///
+  /// Has to run **before** the session is torn down: `DELETE
+  /// /notifications/devices` is authenticated, and a token left behind would
+  /// send this account's pushes to a phone that signed out of it - or, worse,
+  /// to whoever signs in next. It also stops iOS delivering to the install.
+  Future<void> _unregisterPushDevice() async {
+    try {
+      await ref
+          .read(socialDeviceRegistrarProvider)
+          .unregister()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Offline sign-out still has to work. The local token is forgotten
+      // either way, and the server row expires on a token Apple rejects.
+    }
+  }
+
   Future<void> _clearDeviceNotifications() async {
     try {
       await ref.read(notificationServiceProvider).cancelAllManaged();
     } catch (_) {}
+    // The cursor and the delivered ledger are this account's place in its own
+    // kring; the next reader must not inherit either.
+    await SocialNotificationStore.clearForSignOut();
     await NotificationScheduleRepository.clearCache();
     try {
       await ref
@@ -467,6 +497,10 @@ class AuthController extends AsyncNotifier<User?> {
   void signOutExpiredSession() {
     if (state.value == null) return; // already signed out
     state = const AsyncValue.data(null);
+    // The DELETE will 401 - the token is already gone - but the local token is
+    // forgotten and iOS stops delivering to this install either way. The server
+    // row dies when APNs reports the token as unregistered.
+    unawaited(_unregisterPushDevice());
     unawaited(_clearDeviceNotifications());
   }
 
@@ -482,6 +516,9 @@ class AuthController extends AsyncNotifier<User?> {
           .flushPendingChanges()
           .timeout(const Duration(seconds: 5));
     } catch (_) {}
+    // Before `repository.logout()`, which revokes the refresh token and clears
+    // local storage: the DELETE needs the bearer token that is about to go.
+    await _unregisterPushDevice();
     final repository = ref.read(authRepositoryProvider);
     await repository.logout();
     // Per-account state that lives on the device goes with the session.

@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/kring_share_action.dart';
 import '../../../core/ui/timed_snack_bar.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../dashboard/present/dashboard_providers.dart';
+import '../../friends/data/friend_models.dart' show FriendPostKind;
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
@@ -80,24 +82,54 @@ class NoteRow extends ConsumerWidget {
     );
   }
 
+  /// The note as text, without the reference: a reflection is its question and
+  /// its answer, anything else the verse it hangs off and what the reader
+  /// wrote. Shared by both share actions so the kring reads the same note the
+  /// system sheet would hand out.
+  String _body() {
+    return [
+      if (note.isStudyReflection) ...[
+        note.reflectionParts.question,
+        note.reflectionParts.answer,
+      ] else ...[
+        note.verseText.trim(),
+        note.noteText.trim(),
+      ],
+    ].where((part) => part.isNotEmpty).join('\n\n');
+  }
+
   Future<void> _menu(BuildContext context, WidgetRef ref) async {
-    final picked = await showNoteRowMenu(context, canShare: true);
+    final picked = await showNoteRowMenu(
+      context,
+      canShare: true,
+      canShareToKring: true,
+    );
     if (picked == null || !context.mounted) return;
 
     final kind = note.isHighlight ? 'Markering' : 'Notitie';
 
     if (picked == NoteRowAction.share) {
-      final text = [
-        if (note.isStudyReflection) ...[
-          note.reflectionParts.question,
-          note.reflectionParts.answer,
-        ] else ...[
-          note.verseText.trim(),
-          note.noteText.trim(),
-        ],
-        note.reference,
-      ].where((part) => part.isNotEmpty).join('\n\n');
+      final text = [_body(), note.reference]
+          .where((part) => part.isNotEmpty)
+          .join('\n\n');
       await shareRowText(context, text: text, subject: note.reference);
+      return;
+    }
+
+    if (picked == NoteRowAction.shareToKring) {
+      // A copy, not a view: the text as it reads at this tap. Editing the
+      // note afterwards leaves the post in the kring exactly as the kring
+      // read it, which is what VRIENDENKRING_PLAN.md §8 promises. The note's
+      // id travels as sourceId so the server can dedupe a double tap and so
+      // deleting the note can find the post again.
+      await shareIntoKring(
+        context,
+        ref,
+        kind: FriendPostKind.note,
+        body: _body(),
+        reference: note.reference,
+        sourceId: note.id,
+      );
       return;
     }
 
@@ -201,12 +233,22 @@ class ReflectionNoteBody extends StatelessWidget {
   }
 }
 
-enum NoteRowAction { share, delete }
+enum NoteRowAction { share, shareToKring, delete }
 
 /// Delen and Verwijderen, behind the row's `more_vert`. They used to be two
 /// always-visible icon buttons, which put two tap targets the reader almost
 /// never wants at the top right of every single row.
-Future<NoteRowAction?> showNoteRowMenu(BuildContext context, {required bool canShare}) {
+///
+/// [canShareToKring] adds the second, quite different share: "Delen" hands the
+/// note to the apps on the phone, "Deel met je vrienden" places a copy of it
+/// in the reader's vriendenkring. It is off unless a caller asks for it, so a
+/// screen that does not handle [NoteRowAction.shareToKring] can never be given
+/// it.
+Future<NoteRowAction?> showNoteRowMenu(
+  BuildContext context, {
+  required bool canShare,
+  bool canShareToKring = false,
+}) {
   return showModalBottomSheet<NoteRowAction>(
     context: context,
     backgroundColor: AppTheme.surface,
@@ -221,7 +263,21 @@ Future<NoteRowAction?> showNoteRowMenu(BuildContext context, {required bool canS
             ListTile(
               leading: Icon(Icons.ios_share, size: 20, color: AppTheme.inkSoft),
               title: Text('Delen', style: AppTheme.bodyStrong),
+              subtitle: canShareToKring
+                  ? Text('Via de apps op je telefoon', style: AppTheme.caption)
+                  : null,
               onTap: () => Navigator.of(sheetContext).pop(NoteRowAction.share),
+            ),
+          if (canShareToKring)
+            ListTile(
+              leading: Icon(Icons.group_outlined, size: 20, color: AppTheme.teal),
+              title: Text('Deel met je vrienden', style: AppTheme.bodyStrong),
+              subtitle: Text(
+                'In je vriendenkring in de app',
+                style: AppTheme.caption,
+              ),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(NoteRowAction.shareToKring),
             ),
           ListTile(
             leading: Icon(

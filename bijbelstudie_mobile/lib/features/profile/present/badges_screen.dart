@@ -25,12 +25,12 @@ class BadgesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Badges')),
+      appBar: AppBar(title: const Text('Beloningen')),
       body: statsAsync.when(
         loading: () => const _BadgesSkeleton(),
         error: (_, __) => AppEmptyState(
           icon: Icons.wifi_off_outlined,
-          title: 'Badges niet geladen',
+          title: 'Beloningen niet geladen',
           description: 'Controleer je verbinding en probeer het opnieuw.',
           action: SiteOutlineButton(
             label: 'Opnieuw proberen',
@@ -79,13 +79,13 @@ class _BadgesGrid extends StatelessWidget {
           title: 'Behaald',
           badges: earned,
           empty:
-              'Nog geen badge behaald. Elke gelezen dag, elk geopend boek en '
+              'Nog geen beloning behaald. Elke gelezen dag, elk geopend boek en '
               'elke notitie telt mee.',
         ),
         _shelf(
           title: 'Nog te behalen',
           badges: pending,
-          empty: 'Alles behaald. Nieuwe badges volgen.',
+          empty: 'Alles behaald. Nieuwe beloningen volgen.',
         ),
         const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
       ],
@@ -107,8 +107,8 @@ class _BadgesGrid extends StatelessWidget {
             child: SectionHeader(
               title: title,
               description: badges.length == 1
-                  ? '1 badge'
-                  : '${badges.length} badges',
+                  ? '1 beloning'
+                  : '${badges.length} beloningen',
             ),
           ),
         ),

@@ -111,7 +111,8 @@ jobs:
             --dart-define=USE_PRODUCTION_API=true \
             --dart-define=REVENUECAT_GOOGLE_KEY="${REVENUECAT_GOOGLE_KEY:-}" \
             --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}" \
-            --dart-define=TERMS_OF_USE_URL=https://www.bijbelstudie.io/algemene-voorwaarden
+            --dart-define=TERMS_OF_USE_URL=https://www.bijbelstudie.io/algemene-voorwaarden \
+            --dart-define=CONTACT_MATCHING=true
 
       # Play rejects an AAB signed with any other key, so fail here instead.
       - name: Verify upload key signature

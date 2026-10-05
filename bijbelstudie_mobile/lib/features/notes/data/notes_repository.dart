@@ -9,12 +9,15 @@ import '../../auth/present/auth_controller.dart';
 import '../../levensboom/domain/tree_state.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../domain/note_models.dart';
+import '../present/notes_providers.dart';
 
 final notesRepositoryProvider = Provider((ref) {
   return NotesRepository(
     ref.watch(apiClientProvider),
     ref.watch(contentCacheProvider),
     onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+    onSyncRejected: (rejection) =>
+        ref.read(syncRejectionProvider.notifier).push(rejection),
     account: () => AccountScope.resolve(ref.read(sessionAccountProvider)),
   );
 });
@@ -43,6 +46,41 @@ class SyncRejectedException implements Exception {
   String toString() => message;
 }
 
+/// Wording for the free note limit when the response carries none of its own.
+///
+/// `POST /notes` answers with the server's `NOTE_LIMIT_MESSAGE`, which names
+/// the number, and that is preferred wherever it is present. `POST /sync`
+/// rejects per change with `{id, reason}` only - no message - so a limit
+/// rejection coming back from a flush has nothing else to show.
+const kNoteLimitMessage =
+    'Je hebt je gratis notities gebruikt. Met Pro schrijf je onbeperkt notities.';
+
+/// Where [NotesRepository] reports a refusal nobody is awaiting: the offline
+/// queue's flush runs fire-and-forget ([NotesRepository.unawaitedFlush]), so
+/// there is no `try`/`catch` and no screen context at the moment `/sync` says
+/// no. Injected like [XpSink] to keep the data layer ignorant of Riverpod; a
+/// null sink (tests, preview mode) is a no-op.
+typedef SyncRejectionSink = void Function(SyncRejectedException rejection);
+
+/// What one flush of the offline queue settled.
+///
+/// [applied] is the count callers used to get back on its own. [limitRejection]
+/// is the one rejection the reader has to be told about: `/sync` refusing a
+/// queued note with `NOTE_LIMIT_REACHED`. That cannot be seen at write time -
+/// the server never answered, which is why the note was queued - so without
+/// this the note appeared in Notities and then vanished on the next refetch
+/// with nothing said.
+class FlushResult {
+  const FlushResult({required this.applied, this.limitRejection});
+
+  final int applied;
+
+  /// The free-note-limit refusal, ready for the same SnackBar and "Bekijk Pro"
+  /// action a refused single write gets. Null for `STALE` and `DELETED`, which
+  /// are settled and stay silent.
+  final SyncRejectedException? limitRejection;
+}
+
 /// True when [e] means the request never reached the server - a timeout, no
 /// signal, DNS failure, a 5xx - so queuing it for later is the right call.
 /// False means the server answered and said no, and replaying the same
@@ -60,13 +98,30 @@ SyncRejectedException _rejection(DioException e, String action) {
   if (data is Map && data['error'] == 'NOTE_LIMIT_REACHED') {
     final message = data['message'];
     return SyncRejectedException(
-      message is String && message.isNotEmpty
-          ? message
-          : 'Je hebt je gratis notities gebruikt. Met Pro schrijf je onbeperkt notities.',
+      message is String && message.isNotEmpty ? message : kNoteLimitMessage,
       proRequired: true,
     );
   }
   return SyncRejectedException(_rejectionMessage(e, action));
+}
+
+/// The free-note-limit entry in `/sync`'s `rejected` list, as the same
+/// exception a refused single write throws, or null when every rejection was a
+/// settled `STALE`/`DELETED`.
+///
+/// The server sends `{id, reason}` per rejected change (`SKIP_REASON` in
+/// `app/api/v1/sync/route.ts`); `message` is read anyway so a future server
+/// that does send one wins over [kNoteLimitMessage].
+SyncRejectedException? _limitRejection(Iterable<Map<String, dynamic>> rejected) {
+  for (final entry in rejected) {
+    if (entry['reason'] != 'NOTE_LIMIT_REACHED') continue;
+    final message = entry['message'];
+    return SyncRejectedException(
+      message is String && message.isNotEmpty ? message : kNoteLimitMessage,
+      proRequired: true,
+    );
+  }
+  return null;
 }
 
 String _rejectionMessage(DioException e, String action) {
@@ -88,8 +143,10 @@ class NotesRepository {
     this._apiClient,
     this._cache, {
     XpSink? onXp,
+    SyncRejectionSink? onSyncRejected,
     Future<String?> Function()? account,
   }) : _onXp = onXp,
+       _onSyncRejected = onSyncRejected,
        _account = account;
 
   final ApiClient _apiClient;
@@ -98,6 +155,10 @@ class NotesRepository {
   /// Forwards the `xp` a new note earned to the Levensboom. See [XpSink].
   /// Private so the test fakes that `implements` this class need not declare it.
   final XpSink? _onXp;
+
+  /// Forwards a refusal from the offline queue's flush to the UI. See
+  /// [SyncRejectionSink].
+  final SyncRejectionSink? _onSyncRejected;
 
   /// The signed-in account (or the last one, on an offline launch). The offline
   /// queue is tagged with it, and a flush only replays that account's writes:
@@ -299,37 +360,49 @@ class NotesRepository {
 
   /// Replays everything queued while offline. Safe to call often - it returns
   /// immediately when the queue is empty.
-  Future<int> flushPendingChanges() async {
+  Future<FlushResult> flushPendingChanges() async {
     final cache = _cache;
-    if (cache == null) return 0;
+    if (cache == null) return const FlushResult(applied: 0);
 
     // Only this account's writes: the token sent with /sync is theirs.
     final pending = await cache.pendingChanges(account: await _accountId());
-    if (pending.isEmpty) return 0;
+    if (pending.isEmpty) return const FlushResult(applied: 0);
 
     try {
       final response = await _apiClient.dio.post('/sync', data: {'changes': pending});
       final data = response.data as Map<String, dynamic>;
       final rejected = (data['rejected'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toSet();
+          .toList();
 
       // A rejected change is not a retryable failure: STALE means the server
-      // already has something newer and DELETED means the row is gone for good.
-      // Both are settled, so they leave the queue with the applied ones.
+      // already has something newer, DELETED means the row is gone for good,
+      // and NOTE_LIMIT_REACHED means no future flush will ever take it either.
+      // All three are settled, so they leave the queue with the applied ones.
+      //
+      // The first two are also nobody's business: the reader's own newer value
+      // is what they see anyway. The note limit is different - it drops a note
+      // they wrote and watched appear in Notities - so it is reported before
+      // the row goes, both to whoever awaited this flush and, because the
+      // usual caller is [unawaitedFlush], to the UI through _onSyncRejected.
+      final limit = _limitRejection(rejected);
       await cache.clearPendingChanges(pending.map((c) => c['id'] as String));
-      return pending.length - rejected.length;
+      if (limit != null) _onSyncRejected?.call(limit);
+      return FlushResult(
+        applied: pending.length - rejected.length,
+        limitRejection: limit,
+      );
     } on DioException {
       // Still offline. Leave the queue alone and try again next time.
-      return 0;
+      return const FlushResult(applied: 0);
     }
   }
 
   /// Fire-and-forget flush after a successful call - the connection is known
-  /// good at that moment, which is the cheapest possible trigger.
+  /// good at that moment, which is the cheapest possible trigger. Nothing
+  /// awaits the result here; a refusal worth telling the reader about travels
+  /// out through [SyncRejectionSink] instead.
   void unawaitedFlush() {
-    flushPendingChanges().catchError((_) => 0);
+    flushPendingChanges().catchError((_) => const FlushResult(applied: 0));
   }
 }

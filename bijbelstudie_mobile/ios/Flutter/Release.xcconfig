@@ -1,1 +1,15 @@
 #include "Generated.xcconfig"
+
+// Which APNs host this build's device tokens are valid on. Read by
+// Runner.entitlements as $(APS_ENVIRONMENT), because the Release configuration
+// signs manually against the App Store profile (CODE_SIGN_STYLE = Manual) and
+// Xcode only substitutes this value by itself under automatic signing - a
+// hardcoded `development` would be rejected by App Store validation, and a
+// hardcoded `production` could not be installed on a development build.
+//
+// The matching value is sent to the backend by
+// lib/core/notifications/social_repository.dart (`apnsEnvironment`), which keys
+// off kReleaseMode. `sandbox` there is the API's word for this `development`:
+// a token minted here only works against the host named here, and crossing them
+// comes back as `BadDeviceToken`.
+APS_ENVIRONMENT = production

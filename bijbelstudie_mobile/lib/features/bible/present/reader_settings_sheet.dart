@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../settings/data/reading_settings.dart';
+import '../../settings/present/settings_controls.dart';
 
 /// The reader's own typography controls, reachable from the reader bar.
 ///
@@ -59,21 +60,17 @@ class _ReaderSettingsSheet extends ConsumerWidget {
 
 /// The typography controls themselves, without a sheet around them.
 ///
-/// Split out so the study flow can offer the same controls from its own
-/// settings sheet. Reading a lesson is reading, and a reader who has sized the
-/// text once should not have to leave the lesson to do it again - but nor
-/// should the study flow grow a second, slightly different copy of these five
-/// controls that then drifts from this one.
+/// These are the very rows the Instellingen screen shows - [SettingsCard] over
+/// [readingDisplayRows] - so the two places look the same and cannot drift
+/// apart. Split out so the study flow can offer them from its own settings
+/// sheet too: reading a lesson is reading, and a reader who has sized the text
+/// once should not have to leave the lesson to do it again.
 ///
 /// Every change writes straight through [ReadingSettingsController], so
 /// whatever is behind the sheet reflows live and the choice is already
 /// persisted when the sheet closes.
 class ReaderTypographyControls extends ConsumerWidget {
-  const ReaderTypographyControls({super.key, this.showPreview = true});
-
-  /// The sample verse on top. Off on Instellingen, where the chips alone are
-  /// the control and there is no text behind them to judge by anyway.
-  final bool showPreview;
+  const ReaderTypographyControls({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,47 +81,13 @@ class ReaderTypographyControls extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showPreview) ...[
-          _Preview(settings: settings),
-          const SizedBox(height: 20),
-        ],
-        _ChipRow<ReaderFontSize>(
-          label: 'Tekstgrootte',
-          values: ReaderFontSize.values,
-          selected: settings.fontSize,
-          labelOf: (v) => v.label,
-          onChanged: controller.setFontSize,
-        ),
-        const SizedBox(height: 14),
-        _ChipRow<ReaderFontFamily>(
-          label: 'Lettertype',
-          values: ReaderFontFamily.values,
-          selected: settings.fontFamily,
-          labelOf: (v) => v.label,
-          onChanged: controller.setFontFamily,
-        ),
-        const SizedBox(height: 14),
-        _ChipRow<ReaderLineHeight>(
-          label: 'Regelafstand',
-          values: ReaderLineHeight.values,
-          selected: settings.lineHeight,
-          labelOf: (v) => v.label,
-          onChanged: controller.setLineHeight,
-        ),
-        const SizedBox(height: 14),
-        _ChipRow<ReaderLetterSpacing>(
-          label: 'Letterafstand',
-          values: ReaderLetterSpacing.values,
-          selected: settings.letterSpacing,
-          labelOf: (v) => v.label,
-          onChanged: controller.setLetterSpacing,
-        ),
-        const SizedBox(height: 4),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Versnummers tonen'),
-          value: settings.showVerseNumbers,
-          onChanged: controller.setShowVerseNumbers,
+        // The sample verse on top: in the reader there is text behind the
+        // sheet, but in a lesson sheet - and under a keyboard-height sheet -
+        // there may be none to judge the choice by.
+        _Preview(settings: settings),
+        const SizedBox(height: 16),
+        SettingsCard(
+          children: readingDisplayRows(settings: settings, controller: controller),
         ),
       ],
     );
@@ -165,46 +128,6 @@ class _Preview extends StatelessWidget {
           color: Theme.of(context).textTheme.bodyLarge?.color,
         ),
       ),
-    );
-  }
-}
-
-class _ChipRow<T> extends StatelessWidget {
-  const _ChipRow({
-    required this.label,
-    required this.values,
-    required this.selected,
-    required this.labelOf,
-    required this.onChanged,
-  });
-
-  final String label;
-  final List<T> values;
-  final T selected;
-  final String Function(T value) labelOf;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final value in values)
-              ChoiceChip(
-                label: Text(labelOf(value)),
-                selected: value == selected,
-                onSelected: (_) => onChanged(value),
-              ),
-          ],
-        ),
-      ],
     );
   }
 }

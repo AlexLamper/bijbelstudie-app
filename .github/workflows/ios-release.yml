@@ -215,7 +215,8 @@ jobs:
             --dart-define=APPLE_SERVICE_ID="$APPLE_SERVICE_ID" \
             --dart-define=APPLE_REDIRECT_URI="$APPLE_REDIRECT_URI" \
             --dart-define=GOOGLE_IOS_CLIENT_ID="${GOOGLE_IOS_CLIENT_ID:-}" \
-            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}"
+            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}" \
+            --dart-define=CONTACT_MATCHING=true
 
       - name: Archive and export signed IPA
         working-directory: bijbelstudie_mobile/ios
@@ -259,6 +260,22 @@ jobs:
             else
               echo "::warning::Export succeeded, but com.apple.developer.applesignin is missing from app entitlements in IPA."
               echo "::warning::Apple Sign In may fail at runtime (AuthorizationError 1000) unless the profile/capability setup is corrected."
+            fi
+
+            # aps-environment has to be `production` in a build that goes to
+            # TestFlight. It comes from $(APS_ENVIRONMENT) in Runner.entitlements
+            # (ios/Flutter/Release.xcconfig), because this target signs manually
+            # and Xcode only substitutes that value under automatic signing - so
+            # a wrong value here is silent: push just never arrives, and the app
+            # falls back to local notifications. Warning, not a failure: a build
+            # with no push is still a shippable build.
+            APS_ENV=$(/usr/libexec/PlistBuddy -c "Print aps-environment" "$ENTITLEMENTS_PATH" 2>/dev/null || true)
+            if [ "$APS_ENV" = "production" ]; then
+              echo "Verified: aps-environment is production in exported IPA."
+            elif [ -z "$APS_ENV" ]; then
+              echo "::warning::aps-environment is missing from the IPA. Enable Push Notifications on the App ID and regenerate the provisioning profile - see docs/ios-release-setup.md Step 1b."
+            else
+              echo "::warning::aps-environment is '$APS_ENV', expected 'production'. Vriendenkring push will not arrive on this build; check APS_ENVIRONMENT in ios/Flutter/Release.xcconfig."
             fi
           else
             echo "::warning::Could not read codesign entitlements from exported app. Continuing because IPA export succeeded."

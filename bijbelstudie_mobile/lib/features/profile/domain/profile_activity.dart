@@ -16,7 +16,7 @@ extension ProfileActivityFilterX on ProfileActivityFilter {
     ProfileActivityFilter.highlights => 'Markeringen',
     ProfileActivityFilter.notes => 'Notities',
     ProfileActivityFilter.studies => 'Bijbelstudies',
-    ProfileActivityFilter.badges => 'Badges',
+    ProfileActivityFilter.badges => 'Beloningen',
   };
 
   IconData get icon => switch (this) {
@@ -34,7 +34,7 @@ extension ProfileActivityFilterX on ProfileActivityFilter {
     ProfileActivityFilter.highlights => 'Nog geen markeringen',
     ProfileActivityFilter.notes => 'Nog geen notities',
     ProfileActivityFilter.studies => 'Nog geen bijbelstudies',
-    ProfileActivityFilter.badges => 'Nog geen badges',
+    ProfileActivityFilter.badges => 'Nog geen beloningen',
   };
 
   /// The empty-state line for this tab. The feed is assembled locally, so an
@@ -49,7 +49,7 @@ extension ProfileActivityFilterX on ProfileActivityFilter {
     ProfileActivityFilter.studies =>
       'Start een bijbelstudie om je voortgang hier terug te zien.',
     ProfileActivityFilter.badges =>
-      'Lees, markeer en schrijf notities om je eerste badge te verdienen.',
+      'Lees, markeer en schrijf notities om je eerste beloning te verdienen.',
   };
 
   bool matches(ProfileActivityKind kind) => switch (this) {

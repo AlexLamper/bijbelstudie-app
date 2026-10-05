@@ -6,5 +6,29 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- Push Notifications, for the vriendenkring notifications on iOS
+	     (AppDelegate.swift -> lib/core/notifications/social_push.dart).
+
+	     `$(APS_ENVIRONMENT)` rather than a literal: the Release configuration
+	     signs manually against `BijbelStudie App Store CI`, and Xcode only
+	     rewrites this value by itself under automatic signing. A hardcoded
+	     `development` is rejected by App Store validation; a hardcoded
+	     `production` cannot be installed on a development build. The value is
+	     set per configuration in ios/Flutter/Debug.xcconfig (development),
+	     ios/Flutter/Release.xcconfig (production) and, for Profile, in
+	     project.pbxproj - Profile shares the Release xcconfig but is signed with
+	     a development profile. It must be defined for every configuration: an
+	     undefined variable makes this an empty string, which fails to sign.
+
+	     The app sends the matching word to the backend from
+	     lib/core/notifications/social_repository.dart; `sandbox` there is the
+	     API's name for `development` here.
+
+	     This file only claims the entitlement. The Push Notifications capability
+	     still has to be enabled on the App ID in the Apple Developer portal and
+	     the provisioning profiles regenerated afterwards - see
+	     docs/ios-release-setup.md. -->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 </dict>
 </plist>

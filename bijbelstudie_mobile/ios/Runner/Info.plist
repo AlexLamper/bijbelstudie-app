@@ -78,5 +78,11 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Vriendenkring contact matching (VRIENDENKRING_PLAN.md §6). The
+	     disclosure screen in features/friends/present/contacts/ runs before
+	     this dialog ever appears; contacts are optional and the app works
+	     without them (App Store Review 5.1.1(i) and 5.1.2). -->
+	<key>NSContactsUsageDescription</key>
+	<string>Zo kunnen we zien welke van je contacten BijbelStudie al gebruiken. We sturen alleen versleutelde codes.</string>
 	</dict>
 	</plist>

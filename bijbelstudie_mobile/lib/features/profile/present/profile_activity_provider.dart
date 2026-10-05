@@ -107,7 +107,7 @@ final profileActivityProvider = Provider.autoDispose<List<ProfileActivity>>((
       ProfileActivity(
         id: 'badge-${badge.definition.id}',
         kind: ProfileActivityKind.badge,
-        actionLabel: 'behaalde een badge',
+        actionLabel: 'behaalde een beloning',
         badge: badge,
       ),
     );

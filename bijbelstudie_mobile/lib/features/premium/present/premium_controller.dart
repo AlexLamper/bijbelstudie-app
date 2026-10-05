@@ -10,7 +10,6 @@ import '../../bible/present/bible_providers.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
-import '../../resources/data/resources_repository.dart';
 import '../data/purchase_service.dart';
 import '../domain/store_copy.dart';
 
@@ -546,12 +545,11 @@ class PremiumController extends Notifier<PremiumState> {
     if (!ref.mounted) return;
     if (serverPro) {
       // Everything the server served while this account was free carries a
-      // `locked` flag baked into the payload. Drop it now, so a commentary,
-      // grondtekst or library the reader returns to is fetched again as Pro
-      // rather than still showing the upgrade prompt until a restart.
+      // `locked` flag baked into the payload. Drop it now, so a commentary or
+      // grondtekst the reader returns to is fetched again as Pro rather than
+      // still showing the upgrade prompt until a restart.
       ref.invalidate(commentaryChapterProvider);
       ref.invalidate(originalChapterProvider);
-      ref.invalidate(resourceLibraryProvider);
       state = state.copyWith(status: PurchaseStatus.success);
       return;
     }
