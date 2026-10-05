@@ -6,8 +6,10 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/kring_share_action.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
+import '../../friends/data/friend_models.dart' show FriendPostKind;
 import '../../levensboom/domain/verse_scene.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_background_store.dart';
@@ -68,6 +70,10 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
 
   /// True while the share image is being rendered, so a second tap waits.
   bool _sharing = false;
+
+  /// The same guard for the kring share, which is a request rather than a
+  /// render: one tap, one post.
+  bool _kringSharing = false;
 
   @override
   void dispose() {
@@ -258,7 +264,13 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
                 version,
                 attribution,
               ),
-              onMore: () => _showMore(book, chapter, verseNumber),
+              onMore: () => _showMore(
+                book,
+                chapter,
+                verseNumber,
+                text: text,
+                reference: reference,
+              ),
             ),
           ),
         ),
@@ -381,7 +393,47 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
     }
   }
 
-  Future<void> _showMore(String book, int chapter, int? verseNumber) async {
+  /// Posts today's verse in the reader's own vriendenkring.
+  ///
+  /// A different action from [_share] beside it, and deliberately not the same
+  /// button: that one hands a PNG to the system share sheet, out of the app;
+  /// this one places a copy of the verse in the kring. The sheet row says so
+  /// in words. Nothing posts by itself - VRIENDENKRING_PLAN.md §8 allows a
+  /// verse in the kring only on this tap.
+  Future<void> _shareWithFriends(String text, String reference) async {
+    if (_kringSharing) return;
+    _kringSharing = true;
+    try {
+      await shareIntoKring(
+        context,
+        ref,
+        kind: FriendPostKind.verse,
+        body: text,
+        reference: reference,
+        // The day, which is what the server dedupes a verse post on: one
+        // tekst van de dag per day, however often the row is tapped.
+        sourceId: _todayKey(),
+      );
+    } finally {
+      _kringSharing = false;
+    }
+  }
+
+  /// `2026-10-05` - today, in the local date the reader read the verse on.
+  static String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _showMore(
+    String book,
+    int chapter,
+    int? verseNumber, {
+    required String text,
+    required String reference,
+  }) async {
     final action = await showModalBottomSheet<_MoreAction>(
       context: context,
       builder: (context) => const _MoreSheet(),
@@ -393,6 +445,8 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
         _openChapterAtVerse(book, chapter, verseNumber);
       case _MoreAction.history:
         await _showHistorySheet(context);
+      case _MoreAction.shareWithFriends:
+        await _shareWithFriends(text, reference);
     }
   }
 
@@ -1013,7 +1067,7 @@ class _AnimatedHeartButtonState extends State<_AnimatedHeartButton>
   }
 }
 
-enum _MoreAction { readChapter, history }
+enum _MoreAction { readChapter, history, shareWithFriends }
 
 class _MoreSheet extends StatelessWidget {
   const _MoreSheet();
@@ -1035,6 +1089,20 @@ class _MoreSheet extends StatelessWidget {
             leading: Icon(Icons.history, color: AppTheme.inkMuted),
             title: Text('Bekijk voorgaande dagen', style: AppTheme.bodyStrong),
             onTap: () => Navigator.of(context).pop(_MoreAction.history),
+          ),
+          // Not the share button on the card: that one hands the verse to the
+          // apps on the phone. This places it in the reader's own kring, and
+          // the second line is there so the two are not mistaken for each
+          // other.
+          ListTile(
+            leading: Icon(Icons.group_outlined, color: AppTheme.teal),
+            title: Text('Deel met je vrienden', style: AppTheme.bodyStrong),
+            subtitle: Text(
+              'In je vriendenkring in de app',
+              style: AppTheme.caption,
+            ),
+            onTap: () =>
+                Navigator.of(context).pop(_MoreAction.shareWithFriends),
           ),
           const SizedBox(height: 8),
         ],
