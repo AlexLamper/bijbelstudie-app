@@ -215,7 +215,8 @@ jobs:
             --dart-define=APPLE_SERVICE_ID="$APPLE_SERVICE_ID" \
             --dart-define=APPLE_REDIRECT_URI="$APPLE_REDIRECT_URI" \
             --dart-define=GOOGLE_IOS_CLIENT_ID="${GOOGLE_IOS_CLIENT_ID:-}" \
-            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}"
+            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}" \
+            --dart-define=CONTACT_MATCHING=true
 
       - name: Archive and export signed IPA
         working-directory: bijbelstudie_mobile/ios
