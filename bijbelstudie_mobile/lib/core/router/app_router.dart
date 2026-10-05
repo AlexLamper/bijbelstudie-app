@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 import '../ui/lucide_icon.dart';
 
+import '../../features/friends/present/friend_profile_screen.dart';
 import '../../features/friends/present/friends_screen.dart';
 import '../../features/admin/present/admin_screen.dart';
 import '../../features/premium/present/paywall_funnel_screen.dart';
@@ -44,7 +45,6 @@ import '../../features/profile/present/badges_screen.dart';
 import '../../features/profile/present/favorite_verses_screen.dart';
 import '../../features/profile/present/bible_progress_screen.dart';
 import '../../features/profile/present/profile_screen.dart';
-import '../../features/resources/present/resources_screen.dart';
 import '../../features/search/present/search_screen.dart';
 import '../../features/settings/present/settings_screen.dart';
 import '../../features/studies/present/studies_screen.dart';
@@ -55,9 +55,9 @@ import '../../features/study/present/study_screen.dart';
 
 /// Bottom tabs, mirroring the website's sidebar
 /// (`components/layout/app-sidebar.tsx`): Dashboard, Bijbelstudie, Studies,
-/// Notities, Hulpbronnen - trimmed to the five that fit a phone bar, with
-/// Hulpbronnen reachable from the dashboard's "Snel naar" card and from
-/// Profiel. Groepen is hidden for the MVP: no tab, no links, and `/groups`
+/// Notities, Bronnen - trimmed to the five that fit a phone bar, with
+/// Bronnen reachable from the Profiel menu.
+/// Groepen is hidden for the MVP: no tab, no links, and `/groups`
 /// redirects to the dashboard so a stale deep link cannot strand anyone.
 class MainScaffold extends ConsumerWidget {
   const MainScaffold({super.key, required this.child});
@@ -184,7 +184,6 @@ class MainScaffold extends ConsumerWidget {
     }
     // Sections without their own tab still highlight where they belong.
     if (location.startsWith('/read') || location.startsWith('/commentary')) return 1;
-    if (location.startsWith('/resources')) return 0;
     if (location.startsWith('/bronnen')) return 0;
     if (location.startsWith('/search')) return 1;
     return 0;
@@ -363,8 +362,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile/bijbel',
             builder: (context, state) => const BibleProgressScreen(),
           ),
-          // Reachable from the dashboard and Profiel rather than the tab bar.
-          GoRoute(path: '/resources', builder: (context, state) => const ResourcesScreen()),
           // Bronnen: belijdenis, catechismus en formulieren, read in the app.
           // Reached from the Profiel menu. A work and its reader sit outside
           // the shell (below) with a back arrow.
@@ -379,6 +376,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/vriendenkring',
             builder: (context, state) => const FriendsScreen(),
+          ),
+          // One person, mirroring the website's `/vriendenkring/[userId]`.
+          // In the shell beside the kring itself, because it is the same
+          // corner of Start: every name and face in the feed, the kring and
+          // the verzoeken opens this.
+          //
+          // There is no opt-in to wait for - `GET /friends/:userId` answers
+          // for anyone the reader may look at and 404s for exactly the people
+          // they may not - so a name is always a link, and the screen itself
+          // decides what the 404 says.
+          GoRoute(
+            path: '/vriendenkring/:userId',
+            builder: (context, state) =>
+                FriendProfileScreen(userId: state.pathParameters['userId'] ?? ''),
           ),
           // Bijbel in een jaar: Vandaag | Schema. In the shell so the bottom
           // nav stays, with Start lit (no tab of its own). `?tab=schema&day=`.

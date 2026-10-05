@@ -70,6 +70,17 @@ dependencies:
   # file in the binary, nothing to keep in sync between the two platforms.
   audioplayers: ^6.1.0
 
+  # Vriendenkring phase 3 - contact matching (VRIENDENKRING_PLAN.md §6). The
+  # only new dependency the whole plan adds. It asks for the contacts
+  # permission itself, so there is no `permission_handler` here.
+  #
+  # Pinned to 2.1.x: every flutter_contacts from 2.2.0 up requires Dart
+  # >=3.12.0 and this project is on 3.8.0.
+  flutter_contacts: ^2.1.0
+  # HMAC-SHA256 for the on-device contact hashes. Already in the lock file as a
+  # transitive dependency; made direct because `lib/` now imports it.
+  crypto: ^3.0.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

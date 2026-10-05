@@ -10,20 +10,25 @@ import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../../core/ui/segmented_track.dart';
 import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
+import '../../friends/present/contacts/contact_discovery_providers.dart'
+    show contactDiscoveryOfferedProvider;
+import '../../friends/present/contacts/findable_switch.dart';
 import '../../levensboom/present/levensboom_providers.dart';
 import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/notification_prefs.dart';
 import '../data/reading_settings.dart';
+import 'settings_controls.dart';
 import 'theme_mode_provider.dart';
+import 'vriendenkring_copy.dart' as kring;
+import 'vriendenkring_settings_provider.dart';
 
 /// Settings, as one ruled list: titled groups divided by full-bleed rules, each
-/// a run of [_SettingsRow]s - label left, control / switch / chevron right.
+/// a run of [SettingsRow]s - label left, control / switch / chevron right.
 /// Choices are made in place: Thema is a segmented control on its row, and the
 /// reading preferences are the same chip rows the reader's Weergave sheet uses.
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -106,102 +111,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // same controller, so the two places cannot drift apart.
           _SettingsGroup(
             title: 'Leesweergave',
-            children: [
-              _SegmentRow<ReaderFontSize>(
-                label: 'Tekstgrootte',
-                values: ReaderFontSize.values,
-                selected: settings.fontSize,
-                valueLabel: (v) => v.label,
-                onChanged: controller.setFontSize,
-                segment: (v, color) => Text(
-                  'A',
-                  style: TextStyle(
-                    fontFamily: AppTheme.sansFontName,
-                    fontSize: switch (v) {
-                      ReaderFontSize.small => 12,
-                      ReaderFontSize.base => 15,
-                      ReaderFontSize.large => 18,
-                      ReaderFontSize.xlarge => 21,
-                    },
-                    height: 1.2,
-                    color: color,
-                  ),
-                ),
-              ),
-              _SegmentRow<ReaderFontFamily>(
-                label: 'Lettertype',
-                values: ReaderFontFamily.values,
-                selected: settings.fontFamily,
-                valueLabel: (v) => v.label,
-                onChanged: controller.setFontFamily,
-                segment: (v, color) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Aa',
-                      style: TextStyle(
-                        fontFamily: v.fontName,
-                        fontSize: 18,
-                        height: 1.2,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      v.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              _SegmentRow<ReaderLineHeight>(
-                label: 'Regelafstand',
-                values: ReaderLineHeight.values,
-                selected: settings.lineHeight,
-                valueLabel: (v) => v.label,
-                onChanged: controller.setLineHeight,
-                segment: (v, color) => _LineSpacingGlyph(
-                  gap: switch (v) {
-                    ReaderLineHeight.snug => 2,
-                    ReaderLineHeight.normal => 3.5,
-                    ReaderLineHeight.relaxed => 5,
-                    ReaderLineHeight.loose => 6.5,
-                  },
-                  color: color,
-                ),
-              ),
-              _SegmentRow<ReaderLetterSpacing>(
-                label: 'Letterafstand',
-                values: ReaderLetterSpacing.values,
-                selected: settings.letterSpacing,
-                valueLabel: (v) => v.label,
-                onChanged: controller.setLetterSpacing,
-                // The stored steps, exaggerated so they can be told apart at
-                // this size.
-                segment: (v, color) => Text(
-                  'abc',
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontFamily: AppTheme.sansFontName,
-                    fontSize: 14,
-                    letterSpacing: v.points * 2,
-                    color: color,
-                  ),
-                ),
-              ),
-              _SettingsRow(
-                label: 'Versnummers tonen',
-                switchValue: settings.showVerseNumbers,
-                onSwitchChanged: controller.setShowVerseNumbers,
-              ),
-            ],
+            children: readingDisplayRows(
+              settings: settings,
+              controller: controller,
+            ),
           ),
 
           const _NotificationsSection(),
 
           const _LevensboomSection(),
+
+          const _VriendenkringSection(),
 
           _SettingsGroup(
             title: 'Opgeslagen tekst',
@@ -226,7 +146,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
             children: [
-              _SettingsRow(
+              SettingsRow(
                 label: 'Cache',
                 subtitle: _cacheBytes == null
                     ? 'Berekenen…'
@@ -234,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 trailing: _RowButton(label: 'Cache legen', onPressed: _clearCache),
               ),
               if (_pendingChanges > 0)
-                _SettingsRow(
+                SettingsRow(
                   label: 'Synchronisatie',
                   subtitle:
                       '$_pendingChanges wijziging${_pendingChanges == 1 ? '' : 'en'} wacht'
@@ -302,7 +222,7 @@ class _NotificationsSection extends ConsumerWidget {
         return _SettingsGroup(
           title: 'Meldingen',
           children: [
-            _SettingsRow(
+            SettingsRow(
               label: 'Herinneringen',
               subtitle: status.permitted
                   ? 'Hooguit twee per dag.'
@@ -334,7 +254,7 @@ class _NotificationsSection extends ConsumerWidget {
               },
             ),
             if (master) ...[
-              _SettingsRow(
+              SettingsRow(
                 label: 'Ochtend',
                 subtitle: 'Je taak van vandaag, met de tekst van de dag',
                 trailing: _TimeButton(
@@ -368,7 +288,7 @@ class _NotificationsSection extends ConsumerWidget {
                   ),
                 ),
               const _SubHeading('Inhoud'),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Tekst van de dag',
                 switchValue: prefs.verseEnabled,
                 onSwitchChanged: (v) async {
@@ -376,7 +296,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Leesplan',
                 subtitle: 'Bijbel in een jaar',
                 switchValue: prefs.planEnabled,
@@ -385,7 +305,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Studie',
                 subtitle: 'De les waar je gebleven was',
                 switchValue: prefs.studyEnabled,
@@ -398,7 +318,7 @@ class _NotificationsSection extends ConsumerWidget {
                 'Overige meldingen',
                 caption: 'Alleen op een dag waarop er nog ruimte is.',
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Reeks bijna kwijt',
                 switchValue: prefs.streakAtRiskEnabled,
                 onSwitchChanged: (v) async {
@@ -406,7 +326,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Onafgemaakte les',
                 switchValue: prefs.lessonHalfwayEnabled,
                 onSwitchChanged: (v) async {
@@ -415,7 +335,7 @@ class _NotificationsSection extends ConsumerWidget {
                 },
               ),
               if (hasWeekGoal)
-                _SettingsRow(
+                SettingsRow(
                   label: 'Weekdoel',
                   switchValue: prefs.weeklyGoalEnabled,
                   onSwitchChanged: (v) async {
@@ -423,7 +343,7 @@ class _NotificationsSection extends ConsumerWidget {
                     bump();
                   },
                 ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Mijlpalen',
                 switchValue: prefs.milestonesEnabled,
                 onSwitchChanged: (v) async {
@@ -431,7 +351,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: 'Weer welkom (afwezigheid)',
                 switchValue: prefs.dormantEnabled,
                 onSwitchChanged: (v) async {
@@ -448,7 +368,7 @@ class _NotificationsSection extends ConsumerWidget {
                   bump();
                 },
               ),
-              _SettingsRow(
+              SettingsRow(
                 label: prefs.snoozedNow
                     ? 'Meldingen weer aanzetten voor vandaag'
                     : 'Sla vandaag over',
@@ -524,15 +444,15 @@ class _LevensboomSection extends ConsumerWidget {
     return _SettingsGroup(
       title: 'Voortgang',
       children: [
-        _SettingsRow(
+        SettingsRow(
           label: 'Boom tonen',
-          subtitle: 'Je XP, niveau en badges lopen door',
+          subtitle: 'Je XP, niveau en beloningen lopen door',
           switchValue: !(tree?.disabled ?? false),
           onSwitchChanged: tree == null
               ? null
               : (value) => notifier.setPrefs(disabled: !value),
         ),
-        _SettingsRow(
+        SettingsRow(
           label: 'Minder beweging',
           subtitle: 'Geen wiegen, deeltjes of groei-animatie',
           switchValue: tree?.reducedMotion ?? false,
@@ -540,17 +460,17 @@ class _LevensboomSection extends ConsumerWidget {
               ? null
               : (value) => notifier.setPrefs(reducedMotion: value),
         ),
-        _SettingsRow(
+        SettingsRow(
           label: 'Openbaar profiel',
           subtitle:
               'Een pagina op de website met je boom, je voornaam, je niveau en je '
-              'badges. Nooit je e-mail, reeks of leesgeschiedenis.',
+              'beloningen. Nooit je e-mail, reeks of leesgeschiedenis.',
           switchValue: tree?.publicProfile ?? false,
           onSwitchChanged:
               tree == null ? null : (value) => notifier.setPublicProfile(value),
         ),
         if (tree != null && tree.publicProfile) ...[
-          _SettingsRow(
+          SettingsRow(
             label: 'Kopieer link',
             trailing: Icon(Icons.link, size: 20, color: AppTheme.teal),
             onTap: () async {
@@ -567,7 +487,7 @@ class _LevensboomSection extends ConsumerWidget {
               }
             },
           ),
-          _SettingsRow(
+          SettingsRow(
             label: 'Bekijken op de website',
             trailing: Icon(Icons.open_in_new, size: 18, color: AppTheme.teal),
             // The page lives on the website; it opens in the browser, like
@@ -585,9 +505,216 @@ class _LevensboomSection extends ConsumerWidget {
   }
 }
 
+/// The Vriendenkring controls, mirroring the website's panel of the same name
+/// (`components/settings/vriendenkringCopy.ts`, reused word for word in
+/// `vriendenkring_copy.dart`).
+///
+/// Four switches: who may find you, and permission for each of the three
+/// things that could land in your kring. Only Mijlpalen is read by the server
+/// today, so the paragraph under the card says so out loud instead of letting
+/// two switches imply an automatic sharing that no code does - a tekst van de
+/// dag and a notitie reach the kring only through their own "Deel met je
+/// vrienden".
+///
+/// Every switch writes one named path and then adopts whatever the server says
+/// the settings now are; see [vriendenkringSettingsProvider].
+class _VriendenkringSection extends ConsumerWidget {
+  const _VriendenkringSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final settings = ref.watch(vriendenkringSettingsProvider).value;
+    final notifier = ref.read(vriendenkringSettingsProvider.notifier);
+    final share = settings?.autoShare;
+
+    // Whether contact matching exists at all in this build and on this server.
+    // It decides which of the two findability controls is drawn, and the
+    // important word is "which": `POST /friends/discovery/hashes` sets
+    // `discoverable` itself (service.ts), so the contacts tile and the plain
+    // switch below write the same field, and exactly one of them may be on
+    // screen. See the slot comment further down.
+    final contactsOffered = ref.watch(contactDiscoveryOfferedProvider).value == true;
+
+    // Null while the settings are still coming in, or after a failed read:
+    // the rows then render dimmed and unflippable rather than inviting a tap
+    // that would write a value nobody has read yet.
+    ValueChanged<bool>? flip(VriendenkringSwitch which) {
+      if (settings == null) return null;
+      return (value) async {
+        final messenger = ScaffoldMessenger.of(context);
+        final result = await notifier.setSwitch(which, value);
+        // Only a failure is worth a SnackBar: the switch itself is the
+        // confirmation when it lands. The line is the server's own.
+        if (!result.ok) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      };
+    }
+
+    return _SettingsGroup(
+      title: kring.vriendenkringSectionTitle,
+      footer: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
+          child: Text(kring.autoShareFootnote, style: AppTheme.caption),
+        ),
+      ],
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+          child: Text(
+            kring.vriendenkringSectionSubtitle,
+            style: AppTheme.caption,
+          ),
+        ),
+        // ---------------------------------------------------------------
+        // THE CONTACTS FLOW - the slot that was left here, now filled.
+        //
+        // There is exactly one findability control, as the slot asked, but it
+        // is the contacts tile rather than the plain switch when contact
+        // matching is live. Both write `discoverable`: the plain row writes
+        // only the flag, while the tile also uploads (or deletes) the hashed
+        // number and e-mail that make the flag mean anything. A flag on
+        // without hashes is a promise nobody can keep - no address book can
+        // match you - and turning the plain row off leaves the hashes behind,
+        // so the tile is the honest one wherever it can take.
+        //
+        // When contact matching is off (no `CONTACT_MATCHING` dart-define or
+        // no server pepper) the tile renders nothing by itself, so the plain
+        // row stands in and the section is never left with a lone header.
+        // ---------------------------------------------------------------
+        if (!contactsOffered)
+          SettingsRow(
+            label: kring.discoverableLabel,
+            subtitle: kring.discoverableHint,
+            switchValue: settings?.discoverable ?? false,
+            onSwitchChanged: flip(VriendenkringSwitch.discoverable),
+          ),
+        if (contactsOffered) const _FindableRow(),
+        // Only when there is something to forget: offering it to a reader who
+        // never made themselves findable is a row that does nothing and a
+        // sentence that worries them for no reason.
+        if (contactsOffered && (settings?.hasContactHashes ?? false))
+          const _ForgetContactsRow(),
+
+        SettingsRow(
+          label: kring.autoShareMilestonesLabel,
+          subtitle: kring.autoShareMilestonesHint,
+          switchValue: share?.milestones ?? true,
+          onSwitchChanged: flip(VriendenkringSwitch.milestones),
+        ),
+        SettingsRow(
+          label: kring.autoShareVersesLabel,
+          subtitle: kring.autoShareVersesHint,
+          switchValue: share?.verses ?? false,
+          onSwitchChanged: flip(VriendenkringSwitch.verses),
+        ),
+        SettingsRow(
+          label: kring.autoShareNotesLabel,
+          subtitle: kring.autoShareNotesHint,
+          switchValue: share?.notes ?? false,
+          onSwitchChanged: flip(VriendenkringSwitch.notes),
+        ),
+        // Only when there is something to forget. Offering it to a reader who
+        // never let the app read their contacts is a row that does nothing
+        // and a sentence that worries them for no reason.
+        //
+        // Skipped when contact matching is live: [ForgetContactsTile] above
+        // is then the one way out, and it clears the app's own local traces
+        // (the matched ids, the recorded disclosure, the findability mirror)
+        // as well as the hashes on the server, which this row cannot.
+        if (!contactsOffered && settings != null && settings.hasContactHashes)
+          SettingsRow(
+            label: kring.forgetContactsLabel,
+            subtitle: kring.forgetContactsHint,
+            trailing: _RowButton(
+              label: kring.forgetContactsAction,
+              onPressed: () => _forgetContacts(context, notifier),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Confirms, then really deletes - the hashes are gone server-side, which is
+  /// the whole point of the row, so it may not happen on a mis-tap.
+  Future<void> _forgetContacts(
+    BuildContext context,
+    VriendenkringSettingsNotifier notifier,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(kring.forgetContactsConfirmTitle),
+        content: const Text(kring.forgetContactsConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annuleren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: const Text(kring.forgetContactsConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await notifier.forgetContacts();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? kring.forgetContactsDone : 'Dat is niet gelukt. Probeer het later nog eens.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+/// [FindableSwitchTile] as a settings row, so it gets the card's hairlines.
+///
+/// The tile draws its own [AppCard] by default, which would be a card inside a
+/// card here; `showCard: false` hands over the bare row and this adds the
+/// padding the rest of the group uses. It self-gates on
+/// `contactDiscoveryOfferedProvider` too, so this is belt and braces.
+class _FindableRow extends StatelessWidget implements SettingsRowLike {
+  const _FindableRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 12, 12, 12),
+      child: FindableSwitchTile(showCard: false),
+    );
+  }
+}
+
+/// "Mijn contactgegevens vergeten" as a settings row. See [_FindableRow].
+class _ForgetContactsRow extends StatelessWidget implements SettingsRowLike {
+  const _ForgetContactsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(8, 2, 8, 2),
+      child: Align(alignment: Alignment.centerLeft, child: ForgetContactsTile()),
+    );
+  }
+}
+
 /// A reminder with a time: the switch arms it, the time button (only shown
 /// while armed) opens the picker. Tapping the row itself flips the switch.
-class _NotifTimeRow extends StatelessWidget implements _SettingsRowLike {
+class _NotifTimeRow extends StatelessWidget implements SettingsRowLike {
   const _NotifTimeRow({
     required this.title,
     required this.enabled,
@@ -606,7 +733,7 @@ class _NotifTimeRow extends StatelessWidget implements _SettingsRowLike {
 
   @override
   Widget build(BuildContext context) {
-    return _SettingsRow(
+    return SettingsRow(
       label: title,
       subtitle: subtitle ?? (enabled ? 'Elke keer om ${_fmtMinutes(minutes)}' : 'Uit'),
       trailing: enabled ? _TimeButton(minutes: minutes, onPicked: onPickTime) : null,
@@ -616,7 +743,7 @@ class _NotifTimeRow extends StatelessWidget implements _SettingsRowLike {
   }
 }
 
-class _QuietHoursRow extends StatelessWidget implements _SettingsRowLike {
+class _QuietHoursRow extends StatelessWidget implements SettingsRowLike {
   const _QuietHoursRow({
     required this.startMinutes,
     required this.endMinutes,
@@ -630,7 +757,7 @@ class _QuietHoursRow extends StatelessWidget implements _SettingsRowLike {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    return _SettingsRow(
+    return SettingsRow(
       label: 'Stille uren',
       subtitle: 'Geen meldingen tussen deze tijden',
       trailing: Row(
@@ -689,11 +816,6 @@ class _TimeButton extends StatelessWidget {
   }
 }
 
-/// Marker for widgets that render as a [_SettingsRow]; [_SettingsGroup] only
-/// draws a hairline between two neighbours that both carry it, so cards and
-/// paragraphs inside a group are never underlined.
-abstract interface class _SettingsRowLike {}
-
 /// One block of the settings list: a small uppercase title over a card that
 /// holds its [children], with hairlines between consecutive rows. [footer]
 /// sits under the card, on the page, for notes and anything that is a card of
@@ -714,7 +836,6 @@ class _SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -723,29 +844,9 @@ class _SettingsGroup extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(32, 0, 32, 8),
           child: Eyebrow(title),
         ),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            border: Border.all(color: scheme.outline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                if (i > 0 &&
-                    children[i - 1] is _SettingsRowLike &&
-                    children[i] is _SettingsRowLike)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: RuleLine(),
-                  ),
-                children[i],
-              ],
-            ],
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SettingsCard(children: children),
         ),
         ...footer,
       ],
@@ -827,6 +928,11 @@ class _ThemeTile extends StatelessWidget {
       ),
     };
 
+    // The container insets its child by the border width, so the mini screen has
+    // to clip to the border's inner curve - the container's own clip follows the
+    // outer radius, which lets the child's corners cover the border there.
+    final borderWidth = selected ? 2.0 : 1.0;
+
     return Semantics(
       button: true,
       selected: selected,
@@ -848,10 +954,14 @@ class _ThemeTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                 border: Border.all(
                   color: selected ? AppTheme.teal : AppTheme.rule,
-                  width: selected ? 2 : 1,
+                  width: borderWidth,
                 ),
               ),
-              child: screen,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd - borderWidth),
+                clipBehavior: Clip.antiAlias,
+                child: screen,
+              ),
             ),
             const SizedBox(height: 6),
             Row(
@@ -926,179 +1036,6 @@ class _RightHalfClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(_RightHalfClipper oldClipper) => false;
-}
-
-/// A Leesweergave row: label left, the current value right, and under both a
-/// full-width [SegmentedTrack] whose segments show the choice rather than name
-/// it.
-class _SegmentRow<T> extends StatelessWidget implements _SettingsRowLike {
-  const _SegmentRow({
-    required this.label,
-    required this.values,
-    required this.selected,
-    required this.valueLabel,
-    required this.onChanged,
-    required this.segment,
-  });
-
-  final String label;
-  final List<T> values;
-  final T selected;
-  final String Function(T value) valueLabel;
-  final ValueChanged<T> onChanged;
-  final Widget Function(T value, Color color) segment;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: AppTheme.bodyLead.copyWith(
-                    color: AppTheme.ink,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(valueLabel(selected), style: AppTheme.bodyMuted),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SegmentedTrack(
-            segments: [
-              for (final v in values)
-                SegmentedTrackSegment(
-                  semanticLabel: valueLabel(v),
-                  builder: (context, _, color) => segment(v, color),
-                ),
-            ],
-            selectedIndex: values.indexOf(selected),
-            onChanged: (i) {
-              if (values[i] != selected) onChanged(values[i]);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Three short lines with [gap] between them - the Regelafstand glyph.
-class _LineSpacingGlyph extends StatelessWidget {
-  const _LineSpacingGlyph({required this.gap, required this.color});
-
-  final double gap;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget line() => Container(
-      width: 20,
-      height: 2,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(1),
-      ),
-    );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [line(), SizedBox(height: gap), line(), SizedBox(height: gap), line()],
-    );
-  }
-}
-
-/// One row of a [_SettingsGroup]: label and optional subtitle on the left; on
-/// the right - only the ones that apply, in this order - a custom trailing
-/// widget, a switch or a chevron (rows that open something). A switch row flips
-/// its switch when tapped.
-class _SettingsRow extends StatelessWidget implements _SettingsRowLike {
-  const _SettingsRow({
-    required this.label,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-    this.switchValue,
-    this.onSwitchChanged,
-  }) : assert(switchValue == null || onTap == null,
-            'a switch row toggles on tap; it cannot also open something');
-
-  final String label;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final bool? switchValue;
-  final ValueChanged<bool>? onSwitchChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    final isSwitch = switchValue != null;
-    final dimmed = isSwitch && onSwitchChanged == null;
-    final tap = onTap ??
-        (isSwitch && onSwitchChanged != null
-            ? () => onSwitchChanged!(!switchValue!)
-            : null);
-    final showChevron =
-        onTap != null && !isSwitch && trailing == null;
-    final inkColor = dimmed ? AppTheme.inkFaint : AppTheme.ink;
-
-    final content = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 52),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: AppTheme.bodyLead.copyWith(
-                      color: inkColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle!, style: AppTheme.caption),
-                  ],
-                ],
-              ),
-            ),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-            if (isSwitch) ...[
-              const SizedBox(width: 8),
-              Switch(
-                value: switchValue!,
-                onChanged: onSwitchChanged,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ],
-            if (showChevron) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right, size: 20, color: AppTheme.inkFaint),
-            ],
-          ],
-        ),
-      ),
-    );
-
-    if (tap == null) return content;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(onTap: tap, child: content),
-    );
-  }
 }
 
 String _formatBytes(int bytes) {

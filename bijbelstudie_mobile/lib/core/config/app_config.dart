@@ -65,6 +65,21 @@ class AppConfig {
     defaultValue: 'https://www.bijbelstudie.io/algemene-voorwaarden',
   );
 
+  /// Contact matching in de Vriendenkring (`VRIENDENKRING_PLAN.md` §6),
+  /// behind its own flag so a store reviewer pushing back on reading an
+  /// address book can be answered with one rebuild rather than a hotfix.
+  ///
+  /// Off by default: phase 3 ships dark and is switched on deliberately with
+  ///   flutter build ipa --dart-define=CONTACT_MATCHING=true
+  ///
+  /// This only governs whether the app offers the feature. The server has its
+  /// own kill switch (`FRIENDS_CONTACT_PEPPER` unset answers 503 on every
+  /// `/friends/discovery/*` route), and both have to be on.
+  static const bool contactMatchingEnabled = bool.fromEnvironment(
+    'CONTACT_MATCHING',
+    defaultValue: false,
+  );
+
   /// Get the appropriate API base URL based on build mode
   /// Debug builds use localhost for local development
   /// Release builds use production URL

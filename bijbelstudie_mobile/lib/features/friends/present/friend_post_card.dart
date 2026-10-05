@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/friend_models.dart';
+import 'friend_tap_target.dart';
 
 /// One post in the vriendenkring feed: who, when, what, and the heart /
 /// reaction / more row under it.
@@ -14,12 +15,18 @@ class FriendPostCard extends StatelessWidget {
   const FriendPostCard({
     super.key,
     required this.post,
+    this.onAuthorTap,
     this.onLike,
     this.onComment,
     this.onMore,
   });
 
   final FriendPost post;
+
+  /// Opens the author's `/vriendenkring/<id>` profile. Null leaves the byline
+  /// as plain text, which is what a card without a feed behind it gets.
+  final VoidCallback? onAuthorTap;
+
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onMore;
@@ -36,28 +43,41 @@ class FriendPostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              FriendAvatar(name: post.authorName, image: post.authorImage),
-              const SizedBox(width: 10),
+              // The face and the name are one target: a byline that opens the
+              // person is what makes the kring feel like people rather than
+              // rows, and it was dead text here until the profile screen
+              // existed.
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.authorName.isEmpty ? 'Een vriend' : post.authorName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.bodyStrong.copyWith(
-                        fontSize: 14,
-                        color: scheme.onSurface,
+                child: FriendTapTarget(
+                  onTap: onAuthorTap,
+                  child: Row(
+                    children: [
+                      FriendAvatar(name: post.authorName, image: post.authorImage),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              post.authorName.isEmpty ? 'Een vriend' : post.authorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTheme.bodyStrong.copyWith(
+                                fontSize: 14,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            Text(
+                              '${_kindLabel(post.kind)} · ${friendPostWhen(post.createdAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTheme.caption.copyWith(fontSize: 12),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${_kindLabel(post.kind)} · ${friendPostWhen(post.createdAt)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.caption.copyWith(fontSize: 12),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               _IconAction(
@@ -221,53 +241,16 @@ class _IconAction extends StatelessWidget {
   }
 }
 
-/// The sheet behind the heart's neighbour: a reaction, sent to the server.
-/// Returns the text, or null when the reader backs out.
-Future<String?> showFriendCommentSheet(BuildContext context) {
-  final controller = TextEditingController();
-  return showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        18,
-        20,
-        20 + MediaQuery.of(sheetContext).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Reageren', style: AppTheme.displayBase),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            autofocus: true,
-            maxLines: 3,
-            minLines: 2,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(hintText: 'Schrijf een reactie'),
-          ),
-          const SizedBox(height: 14),
-          SiteButton(
-            label: 'Plaatsen',
-            onPressed: () {
-              final text = controller.text.trim();
-              Navigator.of(sheetContext).pop(text.isEmpty ? null : text);
-            },
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-/// The `...` sheet: copy the reader's own link to the post, or report it.
+/// The `...` sheet: copy the post's text, report it, or block its author.
+///
+/// Blocking only appears when the server told us who wrote the post, because
+/// `POST /friends/:userId/block` needs that id; [onBlock] is what asks for
+/// confirmation (see `showFriendBlockDialog`).
 Future<void> showFriendPostMoreSheet(
   BuildContext context, {
   required FriendPost post,
   required VoidCallback onReport,
+  VoidCallback? onBlock,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -299,6 +282,19 @@ Future<void> showFriendPostMoreSheet(
               onReport();
             },
           ),
+          if (onBlock != null && post.authorId.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.block_outlined),
+              title: Text(
+                post.authorName.isEmpty
+                    ? 'Deze persoon blokkeren'
+                    : '${post.authorName} blokkeren',
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onBlock();
+              },
+            ),
           const SizedBox(height: 8),
         ],
       ),
