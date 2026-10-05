@@ -866,7 +866,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                         _start();
                       },
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 16),
               Center(
                 child: InkWell(
                   onTap: () => context.canPop() ? context.pop() : context.go('/studies'),

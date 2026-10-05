@@ -268,7 +268,7 @@ abstract final class BadgeCatalog {
   /// award still shows up instead of silently disappearing.
   static BadgeDefinition _awarded(String id) => BadgeDefinition(
     id: id,
-    label: 'Badge',
+    label: 'Beloning',
     description: 'Toegekend door BijbelStudie',
     icon: Icons.military_tech_outlined,
     tone: BadgeTone.ai,

@@ -136,7 +136,7 @@ class _ProfileBody extends ConsumerWidget {
         const _QuickActions(),
 
         const SizedBox(height: 28),
-        const SectionHeader(title: 'Badges'),
+        const SectionHeader(title: 'Beloningen'),
         const SizedBox(height: 12),
         const _BadgesCard(),
 
@@ -524,7 +524,7 @@ class _QuickCard extends StatelessWidget {
 /// Earned medallions lead, then whatever is nearest to done - the order
 /// [BadgeCatalog.resolve] hands out - so a new account sees a row of grey
 /// discs waiting to be filled rather than an empty card. The whole card is the
-/// tap target; the "Bekijk alle badges" line says where it goes.
+/// tap target; the "Bekijk alle beloningen" line says where it goes.
 class _BadgesCard extends ConsumerWidget {
   const _BadgesCard();
 
@@ -558,7 +558,7 @@ class _BadgesCard extends ConsumerWidget {
                 child: badges.isEmpty
                     ? Text(
                         'Zodra je voortgang is geladen, verschijnen je '
-                        'badges hier.',
+                        'beloningen hier.',
                         style: AppTheme.bodyMuted,
                       )
                     : _BadgeCluster(badges: badges),
@@ -598,7 +598,7 @@ class _BadgesCard extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                'Bekijk alle badges',
+                'Bekijk alle beloningen',
                 style: AppTheme.caption.copyWith(
                   color: AppTheme.teal,
                   fontWeight: FontWeight.w600,

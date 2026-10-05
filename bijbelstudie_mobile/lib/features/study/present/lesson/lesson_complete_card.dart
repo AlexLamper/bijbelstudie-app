@@ -28,7 +28,7 @@ import '../../domain/lesson_models.dart';
 /// than the id itself: a coded string on a celebration screen would only add
 /// to a reader's doubt about whether the achievement is real.
 String _newBadgeLabel(String id) =>
-    BadgeCatalog.serverBadges[id]?.label ?? 'Nieuwe badge';
+    BadgeCatalog.serverBadges[id]?.label ?? 'Nieuwe beloning';
 
 /// What a finished lesson looks like: what it did to the reader's tree, what
 /// it earned, and the way on.

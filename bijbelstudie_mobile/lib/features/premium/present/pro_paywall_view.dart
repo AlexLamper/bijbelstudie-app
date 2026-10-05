@@ -252,7 +252,9 @@ class _VerseHeader extends StatelessWidget {
                 child: const ColoredBox(color: Color(0xFF2A4A3A)),
               ),
             ),
-            const Positioned(left: 24, right: 64, top: 44, bottom: 56, child: _VerseText()),
+            // The status bar sits over the top of the hero, so the verse box is
+            // shifted down to read as centred in the part of it that shows.
+            const Positioned(left: 24, right: 64, top: 60, bottom: 40, child: _VerseText()),
             Positioned(
               top: 52,
               right: 16,

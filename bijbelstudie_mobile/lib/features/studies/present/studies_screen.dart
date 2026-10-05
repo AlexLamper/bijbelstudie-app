@@ -369,6 +369,12 @@ class _Header extends ConsumerWidget {
 /// Compact entry to the reading plan, top-right of the header. Replaces the
 /// old row under the catalogue (DAILY_HABIT_PLAN.md §4) - the plan still has
 /// its own row in the menu, this is just a way in from the studies page.
+///
+/// A [SiteOutlineButton] like every other secondary action in the app, sized
+/// down to sit beside the screen title instead of carrying its own teal-tinted
+/// one-off design. Border, radius, label style and press feedback all come
+/// from the shared widget, so this reads as the same control as the outline
+/// buttons on the plan, profile and premium screens.
 class _BibleYearButton extends StatelessWidget {
   const _BibleYearButton();
 
@@ -378,32 +384,13 @@ class _BibleYearButton extends StatelessWidget {
     return Tooltip(
       message: 'Bijbel in een jaar',
       child: Semantics(
-        button: true,
         label: 'Bijbel in een jaar',
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => context.push(bibleYearPath),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppTheme.tealTint,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.calendar_month_outlined, size: 16, color: AppTheme.tealStrong),
-                const SizedBox(width: 5),
-                Text(
-                  'Jaarplan',
-                  style: AppTheme.pillLabel.copyWith(
-                    fontSize: 12,
-                    color: AppTheme.tealStrong,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        child: SiteOutlineButton(
+          label: 'Jaarplan',
+          icon: Icons.calendar_month_outlined,
+          expand: false,
+          height: 36,
+          onPressed: () => context.push(bibleYearPath),
         ),
       ),
     );

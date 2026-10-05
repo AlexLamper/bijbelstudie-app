@@ -20,6 +20,7 @@ import '../../dashboard/data/dashboard_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
+import '../../notes/present/sync_rejection_notice.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
@@ -374,6 +375,9 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
   @override
   Widget build(BuildContext context) {
     final location = ref.watch(readerLocationProvider);
+    // Notes are written here, and a note queued offline is refused by /sync on
+    // a later flush nobody awaited. See `sync_rejection_notice.dart`.
+    listenForSyncRejections(context, ref);
 
     // Nothing is painted until the stored location is known. Opening on Genesis
     // 1 and swapping it out a moment later is the reset being fixed here, and a

@@ -224,7 +224,7 @@ class _LevensboomStudioScreenState extends ConsumerState<LevensboomStudioScreen>
                     Text('Je boom staat uit', style: AppTheme.metaLabel),
                     const SizedBox(height: 6),
                     Text(
-                      'Je XP, niveau en badges lopen gewoon door - alleen de boom '
+                      'Je XP, niveau en beloningen lopen gewoon door - alleen de boom '
                       'wordt niet getoond.',
                       style: AppTheme.bodyMuted,
                     ),
