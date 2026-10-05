@@ -12,11 +12,13 @@ Bundle identifier for this app: **`com.bijbel-studie.app`**
 
 ---
 
-## Step 1 — Register the App ID and enable Sign in with Apple
+## Step 1 — Register the App ID and enable Sign in with Apple + Push
 
 1. [Apple Developer portal](https://developer.apple.com) → **Identifiers** →
    register App ID `com.bijbel-studie.app`.
 2. Enable the **Sign In with Apple** capability on it.
+3. Enable **Push Notifications** on it as well, for the vriendenkring
+   notifications. See *Step 1b* below for what else push needs.
 
 This is not optional. The workflow **hard-fails** if the provisioning profile
 does not carry `com.apple.developer.applesignin`:
@@ -28,6 +30,42 @@ Provisioning profile is missing Sign in with Apple entitlement.
 That check exists because the entitlement silently missing from the IPA produces
 a runtime `AuthorizationError 1000` that is very hard to diagnose on a device.
 Generate the profile **after** enabling the capability (Step 4), never before.
+
+---
+
+## Step 1b — Push Notifications (vriendenkring)
+
+Only iOS gets push; Android polls `GET /api/v1/notifications/social` on
+foreground instead, by the owner's decision not to take on Firebase.
+
+1. App ID → enable **Push Notifications** (Step 1), then regenerate the
+   provisioning profile (Step 4). A profile minted before this does not carry
+   `aps-environment` and signing fails.
+2. **Keys** → new key with **Apple Push Notifications service (APNs)** → the
+   `.p8` downloads once. Put it, its Key ID and your Team ID on Vercel as the
+   backend's APNs variables (website repo, `lib/push/apns.ts`).
+   Until they are set, `POST /api/v1/notifications/devices` answers
+   `503 PUSH_NOT_CONFIGURED` and the app keeps to local notifications — which is
+   a working state, not a broken one.
+3. `aps-environment` in `ios/Runner/Runner.entitlements` is
+   **`$(APS_ENVIRONMENT)`**, not a literal, because the Release configuration
+   signs manually (`CODE_SIGN_STYLE = Manual`) and Xcode only rewrites that
+   value by itself under automatic signing:
+
+   | Configuration | Value | Set in |
+   |---|---|---|
+   | Debug | `development` | `ios/Flutter/Debug.xcconfig` |
+   | Release | `production` | `ios/Flutter/Release.xcconfig` |
+   | Profile | `development` | `project.pbxproj` (it shares the Release xcconfig) |
+
+   Every configuration must define it: undefined makes the entitlement an empty
+   string, which fails to sign. The app sends the matching word to the backend
+   from `lib/core/notifications/social_repository.dart` — `sandbox` there is the
+   API's name for `development` here, and a token sent to the wrong host comes
+   back as `BadDeviceToken`, which the sender reads as a dead device.
+
+   Verify once on the first archive:
+   `codesign -d --entitlements - Runner.app` should print `production`.
 
 ---
 

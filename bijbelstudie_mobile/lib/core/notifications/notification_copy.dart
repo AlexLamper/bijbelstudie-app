@@ -208,7 +208,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
         '{book} helemaal doorgelezen. Op naar het volgende boek.'),
     VariantTemplate('ms7', '100 dagen',
         'Honderd dagen. Wat klein begon, is nu een vast deel van je dag.'),
-    VariantTemplate('ms8', 'Nieuw zegel verdiend',
+    VariantTemplate('ms8', 'Nieuwe beloning verdiend',
         'Er staat een nieuwe mijlpaal op je profiel.'),
   ],
   // Fired once, at exactly two days away - before the tree visibly wilts, never

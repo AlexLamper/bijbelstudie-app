@@ -69,6 +69,25 @@ enum NotifType {
   /// The evening slot: only on a day the app was not opened. Today's is
   /// cancelled the moment the app opens; tomorrow's and later stay armed.
   evening,
+
+  // ── Vriendenkring (SOCIAL_NOTIFICATIONS) ─────────────────────────────────
+  // The four social kinds. Unlike everything above they are never *scheduled*:
+  // they are shown the moment they are known, either by a real APNs push on
+  // iOS or by `SocialSync` raising a local one on Android. They therefore have
+  // no copy variants, no art and no place in the daily ladder - see
+  // [NotifTypeX.isSocial], which keeps the scheduler's cancel-everything pass
+  // off them.
+  /// Somebody wants to join your vriendenkring.
+  friendRequest,
+
+  /// A request you sent was accepted.
+  friendAccepted,
+
+  /// A hartje on one of your posts.
+  postLike,
+
+  /// A reaction on one of your posts.
+  postComment,
 }
 
 extension NotifTypeX on NotifType {
@@ -85,6 +104,25 @@ extension NotifTypeX on NotifType {
     NotifType.treeWilting => 'treeWilting',
     NotifType.morning => 'morning',
     NotifType.evening => 'evening',
+    NotifType.friendRequest => 'friendRequest',
+    NotifType.friendAccepted => 'friendAccepted',
+    NotifType.postLike => 'postLike',
+    NotifType.postComment => 'postComment',
+  };
+
+  /// A vriendenkring notification: pushed or pulled, never scheduled.
+  ///
+  /// Three things hang off this. The scheduler's per-recompute "cancel every
+  /// type" pass skips them (a foreground would otherwise wipe a push out of
+  /// the tray); they carry no "Later vandaag" action; and `NotificationPrefs`
+  /// has no switch for them, so their own switch lives in
+  /// `SocialNotificationStore` until a settings row exists.
+  bool get isSocial => switch (this) {
+    NotifType.friendRequest ||
+    NotifType.friendAccepted ||
+    NotifType.postLike ||
+    NotifType.postComment => true,
+    _ => false,
   };
 
   /// Android channel this type is delivered on (§4.2).
@@ -98,6 +136,10 @@ extension NotifTypeX on NotifType {
     NotifType.dailyVerse => 'daily_verse',
     NotifType.dormant || NotifType.treeWilting => 'winback',
     NotifType.morning || NotifType.evening => 'daily',
+    NotifType.friendRequest ||
+    NotifType.friendAccepted ||
+    NotifType.postLike ||
+    NotifType.postComment => 'social',
   };
 
   /// The engagement nudges (§4.4): the ones that carry "Later vandaag" and
@@ -108,6 +150,12 @@ extension NotifTypeX on NotifType {
     NotifType.milestone ||
     NotifType.morning ||
     NotifType.evening => false,
+    // "Later vandaag" makes no sense for a hartje: there is nothing to put
+    // off. They also never count towards the day's reading nudges.
+    NotifType.friendRequest ||
+    NotifType.friendAccepted ||
+    NotifType.postLike ||
+    NotifType.postComment => false,
     _ => true,
   };
 
@@ -116,6 +164,13 @@ extension NotifTypeX on NotifType {
   /// The two daily slots outrank every other scheduled type: the others only
   /// ever fill a day that still has room under the daily total.
   int get priority => switch (this) {
+    // The social kinds never compete for a day - they are not scheduled and
+    // `applyDailyCap` never sees them - so the number is only here to keep the
+    // switch exhaustive.
+    NotifType.friendRequest ||
+    NotifType.friendAccepted ||
+    NotifType.postLike ||
+    NotifType.postComment => 0,
     NotifType.milestone => 100,
     NotifType.morning => 99,
     NotifType.evening => 98,
@@ -155,6 +210,14 @@ extension NotifTypeX on NotifType {
     // date's slot is known without a lookup.
     NotifType.morning => List.generate(14, (i) => 1500 + i),
     NotifType.evening => List.generate(14, (i) => 1520 + i),
+    // Five ids each, used round-robin (`SocialNotificationStore.nextSlot`), so
+    // a handful of hartjes can sit in the tray together instead of replacing
+    // one another. Beyond five the oldest is overwritten, which is the right
+    // outcome: nobody wants eleven of these stacked up.
+    NotifType.friendRequest => const [1600, 1601, 1602, 1603, 1604],
+    NotifType.friendAccepted => const [1610, 1611, 1612, 1613, 1614],
+    NotifType.postLike => const [1620, 1621, 1622, 1623, 1624],
+    NotifType.postComment => const [1630, 1631, 1632, 1633, 1634],
   };
 }
 
@@ -261,6 +324,13 @@ final _allowedRoutes = <RegExp>[
   RegExp(r'^/profile/boom$'),
   // A lesson, optionally on a step (the keys are frozen, see StudyStep).
   RegExp(r'^/studie/[A-Za-z0-9%._~-]+/\d+(\?stap=(intro|context|word|depth|quiz|reflection))?$'),
+  // Vriendenkring: the feed, one of its tabs, one post's thread, and one
+  // person's profile. `?tab=` and `?post=` are what a social notification
+  // carries; `/vriendenkring` itself already ignores an unknown query, so
+  // these are safe to send before the screen reads them (see
+  // SOCIAL_NOTIFICATIONS in `social_notifications.dart`).
+  RegExp(r'^/vriendenkring(\?(tab=(feed|vrienden|verzoeken)|post=[A-Za-z0-9._~-]+))?$'),
+  RegExp(r'^/vriendenkring/[A-Za-z0-9._~-]+$'),
 ];
 
 /// The routes a notification may open. Server-sent routes
@@ -579,6 +649,15 @@ class NotificationService {
       'Weer welkom',
       description: 'Een zachte groet na een tijd afwezig',
       importance: Importance.low,
+    ),
+    // Android has no push: these are raised locally from the foreground pull
+    // (`SocialSync`). One channel for all four kinds, so a reader who does not
+    // want them has one switch to find in the Android settings.
+    AndroidNotificationChannel(
+      'social',
+      'Vriendenkring',
+      description: 'Verzoeken, hartjes en reacties van je vrienden',
+      importance: Importance.defaultImportance,
     ),
   ];
 

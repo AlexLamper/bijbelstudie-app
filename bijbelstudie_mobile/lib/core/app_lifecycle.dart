@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/levensboom/present/levensboom_providers.dart';
 import 'notifications/notification_scheduler.dart';
 import 'notifications/retention_store.dart';
+import 'notifications/social_sync.dart';
 
 /// Re-runs the notification scheduler at launch and on every foreground
 /// (`RETENTION_PLAN.md` §4.1). Because
@@ -80,6 +81,12 @@ void _onForeground(Ref ref) {
   ref
       .read(notificationReschedulerProvider)
       .requestReschedule(contentChanged: false);
+  // The vriendenkring pull. Foreground-triggered only: there is no timer and no
+  // polling loop behind this, and it throttles itself to one request a minute.
+  // On Android it is the whole of the social notifications (no push exists
+  // there); on iOS it only reconciles the badge and the cursor with what APNs
+  // already delivered.
+  ref.read(socialSyncProvider).requestSync();
 }
 
 void _cancelTodayEvening(Ref ref) {
