@@ -56,22 +56,36 @@ class NoteRow extends ConsumerWidget {
           if (note.isStudyReflection)
             ReflectionNoteBody(note: note)
           else if (note.noteText.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               note.noteText,
-              style: AppTheme.bodyMuted.copyWith(height: 1.6, color: AppTheme.ink),
+              style: AppTheme.bodyMuted.copyWith(
+                fontSize: 16,
+                height: 1.55,
+                color: AppTheme.ink,
+              ),
             ),
           ],
           if (!note.isStudyReflection && note.verseText.trim().isNotEmpty) ...[
-            const SizedBox(height: 9),
+            const SizedBox(height: 10),
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(width: 2, color: AppTheme.tealSoft),
-                  const SizedBox(width: 10),
+                  Container(width: 3, color: AppTheme.tealSoft),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: Text(note.verseText, style: AppTheme.verseFragment),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        note.verseText,
+                        style: AppTheme.verseFragment.copyWith(
+                          fontSize: 16,
+                          height: 1.65,
+                          color: AppTheme.inkMuted,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -383,12 +397,16 @@ class NoteMetaLine extends StatelessWidget {
         Flexible(
           child: Text(
             reference,
-            style: AppTheme.pillLabel.copyWith(color: AppTheme.teal),
+            style: AppTheme.pillLabel.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.teal,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        const SizedBox(width: 9),
+        const SizedBox(width: 8),
         Container(
           width: 3,
           height: 3,
@@ -397,12 +415,18 @@ class NoteMetaLine extends StatelessWidget {
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 9),
-        Text(
-          date,
-          style: AppTheme.caption.copyWith(
-            fontSize: 12.5,
-            color: AppTheme.inkFaint,
+        const SizedBox(width: 8),
+        // Takes the rest of the line, so the dot stays by the reference it
+        // belongs to instead of drifting out to the menu.
+        Expanded(
+          child: Text(
+            date,
+            style: AppTheme.caption.copyWith(
+              fontSize: 14,
+              color: AppTheme.inkFaint,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -431,6 +455,12 @@ class NoteListRow extends StatelessWidget {
   /// padding, letting the button reach into it without moving the glyph.
   static const double _menuWidth = 44;
 
+  /// The row's own insets. The menu reaches into the right one, so the glyph
+  /// does not move when its tap target grows to 44.
+  static const double _padLeft = 24;
+  static const double _padTop = 20;
+  static const double _padRight = 24;
+
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
@@ -439,13 +469,20 @@ class NoteListRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
+        // A lighter line than the screen's own rules: inside a list of notes it
+        // separates rather than frames.
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppTheme.rule)),
+          border: Border(bottom: BorderSide(color: AppTheme.paperSunken)),
         ),
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 17, _menuWidth, 17),
+              padding: const EdgeInsets.fromLTRB(
+                _padLeft,
+                _padTop,
+                _menuWidth,
+                22,
+              ),
               child: child,
             ),
             Positioned(
@@ -463,12 +500,15 @@ class NoteListRow extends StatelessWidget {
                   // back down to where the row's own padding used to put it,
                   // so it doesn't visibly move when the target grows.
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 17, right: 16),
+                    padding: const EdgeInsets.only(
+                      top: _padTop,
+                      right: _padRight,
+                    ),
                     child: Align(
                       alignment: Alignment.topRight,
                       child: Icon(
                         Icons.more_vert,
-                        size: 17,
+                        size: 18,
                         color: AppTheme.inkFaint,
                       ),
                     ),

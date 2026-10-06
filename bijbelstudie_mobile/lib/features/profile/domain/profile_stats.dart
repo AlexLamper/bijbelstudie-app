@@ -17,6 +17,7 @@ class ProfileStats {
     required this.notesCount,
     required this.highlightsCount,
     required this.serverBadgeIds,
+    this.activeDaysThisYear,
   });
 
   /// The Protestant canon - the denominator behind "... van 66 boeken".
@@ -33,6 +34,12 @@ class ProfileStats {
   final int chaptersRead;
   final int notesCount;
   final int highlightsCount;
+
+  /// Distinct days this calendar year on which the reader opened something,
+  /// counted server-side in Amsterdam days (`GET /dashboard`). Null from a
+  /// server that predates the field, and then simply not shown - the device
+  /// only ever sees the last 7 days, so there is nothing honest to guess with.
+  final int? activeDaysThisYear;
 
   /// Badge ids the server has already granted, as `lib/gamification.ts`
   /// writes them.

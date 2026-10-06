@@ -998,6 +998,10 @@ class AppUnderlineTabs extends StatelessWidget {
     this.activeColor,
     this.padding = EdgeInsets.zero,
     this.bottomGap = 10,
+    this.labelSize,
+    this.underlineWidth = 2,
+    this.underlineRadius = 0,
+    this.underlineOffset = 0,
   });
 
   final List<String> labels;
@@ -1020,6 +1024,20 @@ class AppUnderlineTabs extends StatelessWidget {
   /// Space between the label and its underline.
   final double bottomGap;
 
+  /// Overrides [AppTheme.tabLabel]'s own size, for a row that sets its tabs
+  /// larger than the ones inside a pane do.
+  final double? labelSize;
+
+  final double underlineWidth;
+
+  /// Rounds the ends of the underline. 0 - a square bar - everywhere but the
+  /// Notities header.
+  final double underlineRadius;
+
+  /// Moves the underline down by this much without changing the row's height,
+  /// so it can sit ON a container's bottom border rather than above it.
+  final double underlineOffset;
+
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
@@ -1041,42 +1059,52 @@ class AppUnderlineTabs extends StatelessWidget {
                   if (i != selectedIndex) AppHaptics.selection();
                   onChanged(i);
                 },
-                // The underline is a border on the label's own box rather
-                // than a sized bar: inside a horizontal scroll there is no
-                // width to stretch a bar to.
-                child: Container(
-                  padding: EdgeInsets.only(bottom: bottomGap),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: i == selectedIndex ? accent : Colors.transparent,
-                        width: 2,
-                      ),
-                    ),
-                  ),
+                // `IntrinsicWidth` so the underline can stretch to the label's
+                // own width: inside a horizontal scroll there is no width to
+                // stretch a bar to otherwise.
+                child: IntrinsicWidth(
                   child: Builder(
                     builder: (context) {
-                      final color = i == selectedIndex
-                          ? accent
-                          : AppTheme.inkFaint;
-                      return Row(
+                      final selected = i == selectedIndex;
+                      final color = selected ? accent : AppTheme.inkFaint;
+                      return Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (leadingIcons[i] != null) ...[
-                            Icon(
-                              leadingIcons[i],
-                              size: 14,
-                              color: leadingIconColors[i] ?? color,
-                            ),
-                            const SizedBox(width: 5),
-                          ],
-                          Text(
-                            labels[i],
-                            style: AppTheme.tabLabel.copyWith(
-                              fontWeight: i == selectedIndex
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: color,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (leadingIcons[i] != null) ...[
+                                Icon(
+                                  leadingIcons[i],
+                                  size: 14,
+                                  color: leadingIconColors[i] ?? color,
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                labels[i],
+                                style: AppTheme.tabLabel.copyWith(
+                                  fontSize: labelSize,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                  color: color,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: bottomGap),
+                          Transform.translate(
+                            offset: Offset(0, underlineOffset),
+                            child: Container(
+                              height: underlineWidth,
+                              decoration: BoxDecoration(
+                                color: selected ? accent : Colors.transparent,
+                                borderRadius: BorderRadius.circular(
+                                  underlineRadius,
+                                ),
+                              ),
                             ),
                           ),
                         ],

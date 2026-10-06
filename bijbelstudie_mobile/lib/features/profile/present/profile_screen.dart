@@ -2,7 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
@@ -17,7 +19,6 @@ import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
 import '../data/profile_repository.dart';
 import '../domain/profile_stats.dart';
-import 'badge_medallion.dart';
 import 'profile_activity_feed.dart';
 import 'profile_menu_sheet.dart';
 import 'profile_provider.dart';
@@ -120,66 +121,81 @@ class _ProfileBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The top bar and the identity row carry their own insets (24 left, 20
+     // right) so the name can start further from the edge than the cards do;
+    // everything below shares one 20 gutter.
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+      padding: EdgeInsets.zero,
       // Always scrollable, so the pull-to-refresh around it works on a body
       // that happens to be shorter than the screen.
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        _HeaderBar(profile: profile),
-        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 10, 20, 0),
+          child: _HeaderBar(profile: profile),
+        ),
         // The progress tree is the picture in this header - see [ProgressTreeAvatar],
         // which also owns the level-up celebration.
-        _ProfileHeader(profile: profile),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 14, 20, 0),
+          child: _ProfileHeader(profile: profile),
+        ),
 
-        const SizedBox(height: 22),
-        const _QuickActions(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _StatTiles(),
 
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Beloningen'),
-        const SizedBox(height: 12),
-        const _BadgesCard(),
+              const SizedBox(height: 22),
+              const _BadgesCard(),
 
-        // Brings its own header and spacing, and renders nothing when the
-        // invite data is unavailable.
-        const InviteSection(),
+              // Brings its own header and spacing, and renders nothing when the
+              // invite data is unavailable.
+              const InviteSection(),
 
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Activiteit'),
-        const SizedBox(height: 12),
-        ProfileActivityFeed(profile: profile),
+              const SizedBox(height: 22),
+              const ProfileSectionHeading('Activiteit'),
+              const SizedBox(height: 10),
+              ProfileActivityFeed(profile: profile),
 
-        const SizedBox(height: 20),
+              const SizedBox(height: 20),
         // Provenance, not decoration: App Store review checks it on scripture
         // apps (guideline 5.2), so a blanket "publiek domein" that is no longer
         // true of everything shipped is worse than saying nothing. Two sources
         // are licensed rather than public domain - the NBG-vertaling 1951 and
         // KingComments - and both are named here for that reason.
-        Text(
-          'De meeste vertalingen en commentaren in deze app zijn publiek '
-          'domein. De NBG-vertaling 1951 en KingComments (Ger de Koning) '
-          'worden met toestemming van de rechthebbenden aangeboden. De '
-          'grondtekst komt van STEPBible (TAHOT/TAGNT) en is beschikbaar onder '
-          'CC BY 4.0.',
-          style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
-        ),
+              Text(
+                'De meeste vertalingen en commentaren in deze app zijn publiek '
+                'domein. De NBG-vertaling 1951 en KingComments (Ger de Koning) '
+                'worden met toestemming van de rechthebbenden aangeboden. De '
+                'grondtekst komt van STEPBible (TAHOT/TAGNT) en is beschikbaar '
+                'onder CC BY 4.0.',
+                style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
+              ),
 
-        const SizedBox(height: 24),
-        SiteOutlineButton(
-          label: 'Uitloggen',
-          icon: Icons.logout,
-          onPressed: () async {
-            await ref.read(authControllerProvider.notifier).logout();
-            if (context.mounted) context.go('/login');
-          },
-        ),
-        const SizedBox(height: 8),
+              const SizedBox(height: 24),
+              SiteOutlineButton(
+                label: 'Uitloggen',
+                icon: Icons.logout,
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (context.mounted) context.go('/login');
+                },
+              ),
+              const SizedBox(height: 8),
         // Guideline 5.1.1(v): deletion must be reachable without leaving the
         // app, so it stays on the screen itself rather than in the menu sheet.
-        TextButton(
-          onPressed: () => _confirmDelete(context, ref),
-          style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
-          child: const Text('Account verwijderen'),
+              TextButton(
+                onPressed: () => _confirmDelete(context, ref),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.destructive,
+                ),
+                child: const Text('Account verwijderen'),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -241,8 +257,35 @@ class _ProfileBody extends ConsumerWidget {
   }
 }
 
-/// The top bar: the section label on the left, the two icons that lead
-/// somewhere real on the right.
+/// The heading above a section on Profiel: 18 bold, indented 4 so it sits over
+/// the card's text rather than over its border.
+///
+/// Its own widget rather than [SectionHeader] because these two carry nothing
+/// but a title - no eyebrow, no description, no action - and the sections on
+/// Profiel are set a little larger than the ones on the other tabs.
+class ProfileSectionHeading extends StatelessWidget {
+  const ProfileSectionHeading(this.title, {super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title,
+        style: AppTheme.displayTitle.copyWith(
+          fontSize: 18,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// The top bar: the section label on the left, the three controls that lead
+/// somewhere real on the right - share the app, settings, the rest of the menu.
 ///
 /// A scan / QR button belongs here in the layout being followed, but this app
 /// has nothing to scan - no invite codes in the UI, no plan-sharing links - so
@@ -252,29 +295,91 @@ class _HeaderBar extends ConsumerWidget {
 
   final ProfileModel profile;
 
+  /// What the share button hands out: the product, not the reader. The personal
+  /// invite link is its own card further down ([InviteSection]) and gives away
+  /// a week of Pro, which is not what a bare share button should do.
+  Future<void> _shareApp(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    try {
+      await Share.share(
+        'Ik gebruik BijbelStudie om de Bijbel te lezen en te studeren: '
+        '${AppConfig.siteUrl}',
+        sharePositionOrigin: origin,
+      );
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delen is niet gelukt.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      children: [
-        const Expanded(child: Eyebrow('Profiel')),
-        IconButton(
-          tooltip: 'Instellingen',
-          icon: const Icon(Icons.settings_outlined, size: 22),
-          color: AppTheme.inkSoft,
-          onPressed: () => context.push('/settings'),
-        ),
-        IconButton(
-          tooltip: 'Menu',
-          icon: const Icon(Icons.menu, size: 22),
-          color: AppTheme.inkSoft,
-          onPressed: () => showProfileMenuSheet(context, ref, profile),
-        ),
-      ],
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          const Expanded(child: Eyebrow('Profiel')),
+          Builder(
+            builder: (shareContext) => _HeaderIcon(
+              tooltip: 'Deel de app',
+              icon: Icons.ios_share,
+              onPressed: () => _shareApp(shareContext),
+            ),
+          ),
+          const SizedBox(width: 4),
+          _HeaderIcon(
+            tooltip: 'Instellingen',
+            icon: Icons.settings_outlined,
+            onPressed: () => context.push('/settings'),
+          ),
+          const SizedBox(width: 4),
+          _HeaderIcon(
+            tooltip: 'Menu',
+            icon: Icons.menu,
+            onPressed: () => showProfileMenuSheet(context, ref, profile),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Name and status pills on the left, the avatar on the right.
+/// One of the three controls in the top bar: a 42 tap target around a 22 glyph,
+/// with none of [IconButton]'s own padding, so the three sit 4 apart.
+class _HeaderIcon extends StatelessWidget {
+  const _HeaderIcon({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      icon: Icon(icon, size: 22),
+      color: AppTheme.ink,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+      visualDensity: VisualDensity.compact,
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// Name and status chips on the left, the avatar on the right.
+///
+/// No e-mail address: it is not something the reader needs to be told, it is
+/// the longest string on the screen, and for an Apple Hide-My-Email account it
+/// is noise. The two chips under the name say the things that do change.
 class _ProfileHeader extends ConsumerWidget {
   const _ProfileHeader({required this.profile});
 
@@ -286,94 +391,186 @@ class _ProfileHeader extends ConsumerWidget {
         ? 'Gebruiker'
         : profile.name.trim();
     final stats = ref.watch(profileStatsProvider).value;
+    final isPro = profile.isPro || ref.watch(hasProProvider);
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      name,
-                      style: AppTheme.displayMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  _RenameButton(profile: profile),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                profile.email,
-                style: AppTheme.bodyMuted.copyWith(fontSize: 12),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (profile.isPro || ref.watch(hasProProvider))
-                    // Opens the subscriber's status and the manage-
-                    // subscription link; /premium never shows them prices.
-                    InkWell(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                      onTap: () => context.push('/premium'),
-                      child: SiteBadge.positive(
-                        profile.isProFromWeb ? 'Pro via web' : 'Pro actief',
-                        icon: Icons.workspace_premium_outlined,
-                      ),
-                    )
-                  else
-                    // Guideline 3.1.1: only a non-subscriber is offered the
-                    // purchase route.
-                    //
-                    // The tour anchor sits on this pill alone. On the row that
-                    // holds it - where it used to be - the spotlight also took
-                    // in the streak badge beside it, so the step about Pro
-                    // pointed at two unrelated things. The step is filtered out
-                    // for a subscriber, so the branch that has no pill needs no
-                    // anchor.
-                    TourAnchor(
-                      id: TourAnchorIds.profilePro,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(
-                          AppTheme.radiusPill,
+          // Up 4, so the name's cap height lines up with the top of the ring
+          // rather than its text box doing.
+          child: Transform.translate(
+            offset: const Offset(0, -4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: AppTheme.displayMedium.copyWith(
+                          fontSize: 29,
+                          letterSpacing: -0.6,
                         ),
-                        onTap: () =>
-                            openPaywall(context, source: 'app_profile'),
-                        child: SiteBadge.teal(
-                          'Bekijk Pro',
-                          icon: Icons.workspace_premium_outlined,
-                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  if (stats != null)
-                    SiteBadge.vermilion(
-                      '${stats.streak} ${stats.streak == 1 ? 'dag' : 'dagen'} reeks',
-                      icon: Icons.local_fire_department_outlined,
-                    ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    _RenameButton(profile: profile),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 5,
+                  children: [
+                    if (isPro)
+                      // Opens the subscriber's status and the manage-
+                      // subscription link; /premium never shows them prices.
+                      _StatusChip(
+                        onTap: () => context.push('/premium'),
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        children: [
+                          const _ChipWord(
+                            'PRO',
+                            bold: true,
+                            color: _ChipColor.pro,
+                          ),
+                          _ChipWord(
+                            profile.isProFromWeb ? 'via web' : 'actief',
+                          ),
+                        ],
+                      )
+                    else
+                      // Guideline 3.1.1: only a non-subscriber is offered the
+                      // purchase route. The tour anchor sits on this chip
+                      // alone - on the row it used to be on, the spotlight also
+                      // took in the streak chip beside it.
+                      TourAnchor(
+                        id: TourAnchorIds.profilePro,
+                        child: _StatusChip(
+                          onTap: () =>
+                              openPaywall(context, source: 'app_profile'),
+                          padding: const EdgeInsets.symmetric(horizontal: 7),
+                          children: const [
+                            _ChipWord('PRO', bold: true, color: _ChipColor.pro),
+                            _ChipWord('bekijk'),
+                          ],
+                        ),
+                      ),
+                    if (stats != null)
+                      _StatusChip(
+                        onTap: () => context.go('/dashboard'),
+                        padding: const EdgeInsets.fromLTRB(5, 0, 7, 0),
+                        children: [
+                          Icon(
+                            Icons.local_fire_department,
+                            size: 11,
+                            color: AppTheme.flame,
+                          ),
+                          _ChipWord(
+                            '${stats.streak} '
+                            '${stats.streak == 1 ? 'dag' : 'dagen'}',
+                            bold: true,
+                            color: _ChipColor.ink,
+                          ),
+                          const _ChipWord('reeks'),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         // The picture is the progress tree, which falls back to the initials
         // avatar while the tree loads or when the reader has switched it off.
         // Nothing sits on top of it: the rename control is beside the name.
         ProgressTreeAvatar(
-          size: 84,
-          fallback: ProfileAvatar(profile: profile, size: 84),
+          size: 96,
+          fallback: ProfileAvatar(profile: profile, size: 96),
         ),
       ],
+    );
+  }
+}
+
+/// Which of the three inks a word in a chip takes.
+enum _ChipColor { pro, ink, muted }
+
+/// One word inside a [_StatusChip]. Two sizes of nothing: every word is 10, and
+/// only the weight and the colour change, so the chips stay 20 high whatever
+/// goes in them.
+class _ChipWord extends StatelessWidget {
+  const _ChipWord(this.text, {this.bold = false, this.color = _ChipColor.muted});
+
+  final String text;
+  final bool bold;
+  final _ChipColor color;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Text(
+      text,
+      style: TextStyle(
+        fontFamily: AppTheme.sansFontName,
+        fontSize: 10,
+        height: 1,
+        fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+        letterSpacing: color == _ChipColor.pro ? 0.4 : null,
+        color: switch (color) {
+          _ChipColor.pro => AppTheme.tealStrong,
+          _ChipColor.ink => AppTheme.ink,
+          _ChipColor.muted => AppTheme.inkMuted,
+        },
+      ),
+    );
+  }
+}
+
+/// A 20-high pill under the name. Small enough that it reads as a label rather
+/// than a button, so the whole chip is the tap target instead of carrying one.
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.children,
+    required this.padding,
+    this.onTap,
+  });
+
+  final List<Widget> children;
+  final EdgeInsets padding;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final chip = Container(
+      height: 20,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppTheme.paperRaised,
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+        border: Border.all(color: AppTheme.ruleStrong),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 3),
+            children[i],
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return chip;
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      onTap: onTap,
+      child: chip,
     );
   }
 }
@@ -404,62 +601,54 @@ class _RenameButton extends ConsumerWidget {
   }
 }
 
-/// One row of four compact cards, each to a destination or figure this app
-/// really has.
+/// The three figures worth the top of the screen: books opened, days in the app
+/// this year, and the streak.
 ///
-/// Bladwijzers and Notities both land on `/notes`, which is where both lists
-/// live; there is no route parameter to preselect a tab. The icons are kept
-/// to the theme's neutral ink tones - no per-tile colour palette - so the row
-/// reads as one restrained unit rather than a set of clashing chips.
-class _QuickActions extends ConsumerWidget {
-  const _QuickActions();
+/// It used to be four tiles, two of which (Bladwijzers, Notities) only repeated
+/// what the Notities tab in the tab bar already leads to. Three leaves each tile
+/// wide enough for a two-line label and a number at a readable size.
+class _StatTiles extends ConsumerWidget {
+  const _StatTiles();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarks = ref.watch(bookmarksProvider).value?.length;
     final stats = ref.watch(profileStatsProvider).value;
+    final streak = stats?.streak;
 
     // IntrinsicHeight, not `CrossAxisAlignment.stretch`: inside a ListView the
-    // Row has no bounded height to stretch into, and the four cards still
-    // have to end level even when one label wraps.
+    // Row has no bounded height to stretch into, and the tiles still have to
+    // end level when one label wraps.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: _QuickCard(
-              icon: Icons.bookmark_border,
-              label: 'Bladwijzers',
-              value: bookmarks?.toString(),
-              onTap: () => context.go('/notes'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _QuickCard(
-              icon: Icons.edit_note_outlined,
-              label: 'Notities',
-              value: stats?.notesCount.toString(),
-              onTap: () => context.go('/notes'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _QuickCard(
-              icon: Icons.menu_book_outlined,
+            child: _StatTile(
               label: 'Bijbelboeken',
-              value: stats == null
-                  ? null
-                  : '${stats.booksRead}/${ProfileStats.canonBooks}',
+              value: stats?.booksRead.toString(),
+              unit: '/${ProfileStats.canonBooks}',
+              unitGap: 1,
               onTap: () => context.push('/profile/bijbel'),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
-            child: _QuickCard(
-              icon: Icons.local_fire_department_outlined,
+            child: _StatTile(
+              label: 'Dagen in de app dit jaar',
+              // Null on a server that predates the field: the device only sees
+              // the last 7 days, so there is nothing honest to fall back on.
+              value: stats?.activeDaysThisYear?.toString(),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _StatTile(
               label: 'Leesreeks',
-              value: stats?.streak.toString(),
+              icon: Icons.local_fire_department,
+              iconColor: AppTheme.flame,
+              value: streak?.toString(),
+              unit: streak == 1 ? 'dag' : 'dagen',
+              unitGap: 4,
               onTap: () => context.go('/dashboard'),
             ),
           ),
@@ -469,144 +658,174 @@ class _QuickActions extends ConsumerWidget {
   }
 }
 
-class _QuickCard extends StatelessWidget {
-  const _QuickCard({
-    required this.icon,
+/// One figure: its label up top, the number under it.
+///
+/// A plain [Container] rather than [AppCard]: these three carry a soft shadow
+/// and no border, which is the one card shape in the app that does.
+class _StatTile extends StatelessWidget {
+  const _StatTile({
     required this.label,
-    required this.onTap,
-    this.value,
+    required this.value,
+    this.unit,
+    this.unitGap = 4,
+    this.icon,
+    this.iconColor,
+    this.onTap,
   });
 
-  final IconData icon;
   final String label;
-  final VoidCallback onTap;
 
-  /// Null while the figure has not loaded yet.
+  /// Null while the figure has not loaded, or when the server cannot give it.
   final String? value;
+  final String? unit;
+  final double unitGap;
+  final IconData? icon;
+  final Color? iconColor;
+  final VoidCallback? onTap;
+
+  /// Two lines of the 9/1.35 label, always reserved. It keeps the three numbers
+  /// on one line as each other whether a label wraps or not.
+  static const double _labelHeight = 25;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: AppTheme.inkSoft),
-          const SizedBox(height: 6),
-          Text(
-            value ?? '-',
-            style: AppTheme.statNumber.copyWith(
-              fontSize: 15,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: AppTheme.caption.copyWith(fontSize: 10),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+    AppTheme.dependOn(context);
+
+    final tile = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppTheme.paperRaised,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.ink.withValues(alpha: 0.06),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
           ),
         ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          SizedBox(
+            height: _labelHeight,
+            child: Text(
+              label.toUpperCase(),
+              style: AppTheme.overline.copyWith(
+                fontSize: 9,
+                letterSpacing: 0.7,
+                height: 1.35,
+                color: AppTheme.inkFaint,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 22, color: iconColor),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  value ?? '-',
+                  style: AppTheme.statNumber.copyWith(
+                    fontSize: 21,
+                    letterSpacing: -0.6,
+                    height: 1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (unit != null && value != null) ...[
+                SizedBox(width: unitGap),
+                Text(
+                  unit!,
+                  style: TextStyle(
+                    fontFamily: AppTheme.sansFontName,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    height: 1,
+                    color: AppTheme.inkFaint,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return tile;
+    return Pressable(
+      scale: 0.98,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: tile,
       ),
     );
   }
 }
 
-/// The badge shelf: how many are unlocked, then the shelf itself.
-/// The badge cabinet's front: the first few medallions, the tally, and the way
-/// in to the rest ([BadgesScreen] at `/profile/badges`).
+/// The badge cabinet's front: the tally, the way in to the rest
+/// ([BadgesScreen] at `/profile/badges`), and the last few earned.
 ///
-/// Earned medallions lead, then whatever is nearest to done - the order
-/// [BadgeCatalog.resolve] hands out - so a new account sees a row of grey
-/// discs waiting to be filled rather than an empty card. The whole card is the
-/// tap target; the "Bekijk alle beloningen" line says where it goes.
+/// Earned only, newest first. The grey "not yet" discs that used to fill the row
+/// said nothing the tally does not, and a shelf of locks is a poor reward for
+/// having earned twelve things. The whole card is the tap target; the chevron
+/// says where it goes.
 class _BadgesCard extends ConsumerWidget {
   const _BadgesCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final badges = ref.watch(profileBadgesProvider);
-    final unlocked = badges.where((badge) => badge.unlocked).length;
-    final pending = badges.where((badge) => !badge.unlocked);
-    final next = pending.isEmpty ? null : pending.first;
+    if (badges.isEmpty) return const _BadgesSkeleton();
 
-    final String footer;
-    if (badges.isEmpty) {
-      footer = 'Nog niets te tonen';
-    } else if (next == null) {
-      footer = 'Alles behaald';
-    } else {
-      footer =
-          'Volgende: ${next.definition.label} '
-          '(${next.value}/${next.definition.target})';
-    }
+    final earned = badges.where((badge) => badge.unlocked).toList();
 
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      padding: EdgeInsets.zero,
       onTap: () => context.push('/profile/badges'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: badges.isEmpty
-                    ? Text(
-                        'Zodra je voortgang is geladen, verschijnen je '
-                        'beloningen hier.',
-                        style: AppTheme.bodyMuted,
-                      )
-                    : _BadgeCluster(badges: badges),
-              ),
-              if (badges.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$unlocked',
-                      style: AppTheme.statNumber.copyWith(fontSize: 24),
-                    ),
-                    Text(
-                      'van ${badges.length}',
-                      style: AppTheme.caption.copyWith(
-                        color: AppTheme.inkFaint,
-                      ),
-                    ),
-                  ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 14, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Beloningen', style: AppTheme.displayTitle),
+                ),
+                Text(
+                  '${earned.length} van ${badges.length}',
+                  style: AppTheme.caption.copyWith(fontSize: 13),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  size: 17,
+                  color: AppTheme.ruleStrong,
                 ),
               ],
-            ],
+            ),
           ),
-          const SizedBox(height: 14),
-          const RuleLine(),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  footer,
-                  style: AppTheme.caption,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Bekijk alle beloningen',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.teal,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 3),
-              Icon(Icons.chevron_right, size: 14, color: AppTheme.teal),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: earned.isEmpty
+                ? Text(
+                    'Je eerste beloning komt zodra je een paar dagen op rij '
+                    'leest.',
+                    style: AppTheme.bodyMuted,
+                  )
+                : _BadgeCluster(earned: earned),
           ),
         ],
       ),
@@ -614,28 +833,28 @@ class _BadgesCard extends ConsumerWidget {
   }
 }
 
-/// The first medallions, overlapping like coins laid out on a table - the
-/// leftmost on top - with a "+n" disc for the ones that did not fit.
+/// The last few earned badges, overlapping like coins laid out on a table - the
+/// leftmost, newest one on top - with a "+n" disc for the ones that did not fit.
 class _BadgeCluster extends StatelessWidget {
-  const _BadgeCluster({required this.badges});
+  const _BadgeCluster({required this.earned});
 
-  final List<BadgeProgress> badges;
+  /// Earned badges in the order they were granted, oldest first.
+  final List<BadgeProgress> earned;
 
-  /// How many discs the row holds; the last one turns into "+n" when needed.
-  static const int _slots = 5;
-  static const double _size = 46;
+  /// How many discs are drawn before the rest become "+n".
+  static const int _shown = 4;
+  static const double _size = 36;
 
-  /// Distance between medallion centres; the rest of each disc overlaps.
-  static const double _step = 34;
+  /// Distance between disc centres: 7 less than the width, which is the overlap.
+  static const double _step = _size - 7;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final overflow = badges.length > _slots
-        ? badges.length - (_slots - 1)
-        : 0;
-    final shown = overflow > 0 ? badges.take(_slots - 1).toList() : badges;
-    final slots = shown.length + (overflow > 0 ? 1 : 0);
+    AppTheme.dependOn(context);
+    // Newest first, so the disc on top is the one just won.
+    final newest = earned.reversed.take(_shown).toList();
+    final overflow = earned.length - newest.length;
+    final slots = newest.length + (overflow > 0 ? 1 : 0);
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -646,39 +865,67 @@ class _BadgeCluster extends StatelessWidget {
           children: [
             if (overflow > 0)
               Positioned(
-                left: shown.length * _step,
-                child: Container(
-                  width: _size,
-                  height: _size,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.surfaceContainerHighest,
-                    border: Border.all(color: scheme.surface, width: 2),
-                  ),
+                left: newest.length * _step,
+                child: _Disc(
+                  fill: AppTheme.paperSunken,
+                  border: AppTheme.paperSunken,
                   child: Text(
                     '+$overflow',
                     style: AppTheme.bodyStrong.copyWith(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: AppTheme.inkMuted,
                     ),
                   ),
                 ),
               ),
-            // Painted right to left, so each medallion lies over its neighbour.
-            for (var i = shown.length - 1; i >= 0; i--)
+            // Painted right to left, so each disc lies over its neighbour.
+            for (var i = newest.length - 1; i >= 0; i--)
               Positioned(
                 left: i * _step,
-                child: BadgeMedallion(
-                  badge: shown[i],
-                  size: _size,
-                  outline: scheme.surface,
-                  lock: false,
+                child: _Disc(
+                  fill: AppTheme.tealTint,
+                  border: AppTheme.teal,
+                  child: Icon(
+                    newest[i].definition.icon,
+                    size: 16,
+                    color: AppTheme.tealStrong,
+                  ),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One disc in the cluster. The white ring is a shadow rather than a second
+/// border, so it sits outside the 36 and the discs still overlap by exactly 7.
+class _Disc extends StatelessWidget {
+  const _Disc({required this.fill, required this.border, required this.child});
+
+  final Color fill;
+  final Color border;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _BadgeCluster._size,
+      height: _BadgeCluster._size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fill,
+        border: Border.all(color: border, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.paperRaised,
+            spreadRadius: 2.5,
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }
@@ -689,30 +936,26 @@ class _BadgesSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SkeletonCard(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Skeleton.circle(46),
-              SizedBox(width: 6),
-              Skeleton.circle(46),
-              SizedBox(width: 6),
-              Skeleton.circle(46),
-              SizedBox(width: 6),
-              Skeleton.circle(46),
-              Spacer(),
-              Skeleton(height: 24, width: 32),
+              Expanded(child: Skeleton(height: 16, width: 110)),
+              Skeleton(height: 13, width: 64),
             ],
           ),
           SizedBox(height: 14),
-          Skeleton(height: 1, radius: 0),
-          SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: Skeleton(height: 12, width: 150)),
-              Skeleton(height: 12, width: 110),
+              Skeleton.circle(36),
+              SizedBox(width: 2),
+              Skeleton.circle(36),
+              SizedBox(width: 2),
+              Skeleton.circle(36),
+              SizedBox(width: 2),
+              Skeleton.circle(36),
             ],
           ),
         ],
@@ -730,52 +973,43 @@ class _ProfileSkeleton extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
         const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Skeleton(height: 22, width: 170),
-                  SizedBox(height: 10),
-                  Skeleton(height: 12, width: 190),
-                  SizedBox(height: 14),
-                  Skeleton(height: 22, width: 130, radius: 999),
+                  Skeleton(height: 26, width: 170),
+                  SizedBox(height: 9),
+                  Skeleton(height: 20, width: 150, radius: 999),
                 ],
               ),
             ),
-            SizedBox(width: 16),
-            Skeleton.circle(84),
+            SizedBox(width: 12),
+            Skeleton.circle(96),
           ],
         ),
         const SizedBox(height: 22),
-        const Skeleton(height: 48, radius: 12),
-        const SizedBox(height: 14),
         const Row(
           children: [
             Expanded(
-              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 74, child: SizedBox.shrink()),
             ),
-            SizedBox(width: 8),
+            SizedBox(width: 10),
             Expanded(
-              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 74, child: SizedBox.shrink()),
             ),
-            SizedBox(width: 8),
+            SizedBox(width: 10),
             Expanded(
-              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: SkeletonCard(height: 84, child: SizedBox.shrink()),
+              child: SkeletonCard(height: 74, child: SizedBox.shrink()),
             ),
           ],
         ),
-        const SizedBox(height: 28),
-        const Skeleton(height: 16, width: 120),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
         const _BadgesSkeleton(),
-        const SizedBox(height: 28),
-        const Skeleton(height: 16, width: 100),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
+        const Skeleton(height: 18, width: 100),
+        const SizedBox(height: 10),
         const SkeletonCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

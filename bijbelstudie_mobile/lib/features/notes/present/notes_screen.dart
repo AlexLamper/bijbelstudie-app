@@ -122,8 +122,9 @@ class _Header extends ConsumerWidget {
     final notes = ref.watch(notesListProvider).value?.length ?? 0;
     final highlights = ref.watch(highlightsListProvider).value?.length ?? 0;
 
+    // No horizontal padding on the container: the rule under the tabs runs the
+    // full width of the screen while everything above it is inset 24.
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         border: Border(bottom: BorderSide(color: AppTheme.rule)),
@@ -131,46 +132,70 @@ class _Header extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                  'JOUW STUDIE',
-                  style: AppTheme.eyebrow.copyWith(fontSize: 11),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+            child: Row(
+              // The label and the counts sit on one baseline, not on one box
+              // bottom: the two sizes differ by 0.5 and the eye sees the drop.
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    'JOUW STUDIE',
+                    style: AppTheme.eyebrow.copyWith(
+                      fontSize: 12.5,
+                      letterSpacing: 2,
+                    ),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
+                Text(
                   '${_plural(notes, 'notitie', 'notities')} · '
                   '${_plural(highlights, 'markering', 'markeringen')}',
                   style: AppTheme.caption.copyWith(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     color: AppTheme.inkFaint,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
           TourAnchor(
             id: TourAnchorIds.notesTabs,
             child: AnimatedBuilder(
-              animation: controller,
+              // The controller only notifies once the index has settled; the
+              // animation tracks the swipe, so the mark hands over with it.
+              animation: controller.animation ?? controller,
               builder: (context, _) => AppUnderlineTabs(
                 labels: const ['Notities', 'Markeringen', 'Bladwijzers'],
-                gap: 22,
-                bottomGap: 11,
-                selectedIndex: controller.index,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                gap: 26,
+                bottomGap: 13,
+                labelSize: 15.5,
+                underlineWidth: 2.5,
+                underlineRadius: 2,
+                // Onto the container's own border rather than above it.
+                underlineOffset: 1,
+                selectedIndex: _headerTab,
                 onChanged: controller.animateTo,
               ),
             ),
           ),
-          const SizedBox(height: 4),
         ],
       ),
     );
+  }
+
+  /// Which tab the header marks while a swipe is in progress.
+  ///
+  /// `controller.index` is stale for the whole gesture - it only moves on the
+  /// scroll-end notification - so the mark used to jump only once the page had
+  /// settled. A tap sets the target index up front (`indexIsChanging`), which is
+  /// the one case where the index is the right answer and the animation is not.
+  int get _headerTab {
+    final animation = controller.animation;
+    if (controller.indexIsChanging || animation == null) return controller.index;
+    return animation.value.round();
   }
 
   static String _plural(int count, String one, String many) =>

@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../premium/present/pro_access_provider.dart';
 import '../../profile/present/profile_provider.dart';
+import '../../profile/present/profile_screen.dart' show ProfileSectionHeading;
 import '../data/referral_repository.dart';
 
 const _months = [
@@ -34,9 +35,9 @@ class InviteSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 28),
-        const SectionHeader(title: 'Nodig een vriend uit'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
+        const ProfileSectionHeading('Nodig een vriend uit'),
+        const SizedBox(height: 10),
         _InviteCard(overview: overview),
       ],
     );
@@ -114,7 +115,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     final isPro = ref.watch(hasProProvider);
 
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.all(16),
+      radius: 18,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -124,18 +126,21 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                 'via jouw link een account, dan krijgt die meteen een week Pro.'}'
             '${overview.youEarn ? ' Gaat je vriend echt aan de slag, dan krijg '
                 'jij er ook een week bij.' : ''}',
-            style: AppTheme.bodyMuted,
+            style: AppTheme.bodyMuted.copyWith(
+              fontSize: 14.5,
+              height: 1.5,
+              color: AppTheme.inkSoft,
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Builder(
             builder: (buttonContext) => SiteButton(
               label: 'Deel je link',
               icon: Icons.ios_share,
-              height: 44,
               onPressed: () => _share(buttonContext),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           // The link itself, as on the website's card, with copy as an icon
           // control - two labelled buttons side by side do not fit a phone.
           Container(

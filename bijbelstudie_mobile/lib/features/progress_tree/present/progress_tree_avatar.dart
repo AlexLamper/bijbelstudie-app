@@ -12,6 +12,14 @@ import 'tree_view.dart';
 const Color kGoldRing = Color(0xFFD4A017);
 const Color kGoldRingLight = Color(0xFFF6D77A);
 
+/// The unfilled part of the gold ring - a warm track rather than a tinted
+/// gold, so the filled arc still reads as the thing that moved.
+const Color kGoldRingTrack = Color(0xFFF1E7C8);
+
+/// The level disc under a gold ring: a shade down from the ring itself, so the
+/// number sits on it without the two melting together.
+const Color kGoldLevelBadge = Color(0xFFC9A23A);
+
 /// The progress tree *as* the profile picture, not as a card beside it.
 ///
 /// The tree fills the round frame the picture used to occupy, with the XP bar
@@ -78,10 +86,13 @@ class _ProgressTreeAvatarState extends ConsumerState<ProgressTreeAvatar> {
 
     _maybeCelebrate();
 
-    final stroke = (widget.size * 0.045).clamp(3.0, 5.0);
-    final badge = widget.size * 0.32;
+    // 4 at the Profiel size of 96, which is where the proportions were drawn.
+    final stroke = (widget.size * 0.042).clamp(3.0, 5.0);
+    final badge = widget.size * 0.29;
     final gold = tree.avatar.ring == TreeRing.goud;
     final ringColor = gold ? kGoldRing : AppTheme.teal;
+    final badgeColor = gold ? kGoldLevelBadge : AppTheme.tealStrong;
+    final level = '${tree.level}';
 
     return GestureDetector(
       onTap: () => context.push('/profile/boom'),
@@ -89,6 +100,9 @@ class _ProgressTreeAvatarState extends ConsumerState<ProgressTreeAvatar> {
         width: widget.size,
         height: widget.size,
         child: Stack(
+          // The level disc hangs a little outside the ring; without this the
+          // parent clips the two pixels it sticks out by.
+          clipBehavior: Clip.none,
           children: [
             // The XP bar, bent around the picture.
             Positioned.fill(
@@ -96,7 +110,7 @@ class _ProgressTreeAvatarState extends ConsumerState<ProgressTreeAvatar> {
                 value: tree.progress.clamp(0.0, 1.0),
                 strokeWidth: stroke,
                 strokeCap: StrokeCap.round,
-                backgroundColor: gold ? kGoldRing.withValues(alpha: 0.18) : AppTheme.rule,
+                backgroundColor: gold ? kGoldRingTrack : AppTheme.rule,
                 color: ringColor,
               ),
             ),
@@ -120,29 +134,35 @@ class _ProgressTreeAvatarState extends ConsumerState<ProgressTreeAvatar> {
               ),
             ),
             // Bottom-left, because the edit control on Profiel owns the
-            // bottom-right corner.
+            // bottom-right corner. It sits 2 outside the ring on both axes, so
+            // the disc reads as laid on the avatar rather than cut into it.
             Positioned(
-              left: 0,
-              bottom: 0,
+              left: -2,
+              bottom: 2,
               child: Container(
                 constraints: BoxConstraints(minWidth: badge),
                 height: badge,
-                padding: const EdgeInsets.symmetric(horizontal: 5),
+                // A circle for the one and two digits every real level has;
+                // three would need a pill, and the padding gives it one.
+                padding: EdgeInsets.symmetric(
+                  horizontal: level.length > 2 ? 5 : 0,
+                ),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: ringColor,
+                  color: badgeColor,
                   shape: BoxShape.rectangle,
                   borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                   border: Border.all(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    width: 2,
+                    width: 2.5,
                   ),
                 ),
                 child: Text(
-                  '${tree.level}',
-                  style: AppTheme.metaLabel.copyWith(
+                  level,
+                  style: AppTheme.bodyStrong.copyWith(
                     color: Colors.white,
-                    fontSize: badge * 0.5,
+                    fontSize: badge * 0.46,
+                    fontWeight: FontWeight.w700,
                     height: 1,
                   ),
                 ),

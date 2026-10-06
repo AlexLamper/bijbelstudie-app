@@ -42,6 +42,13 @@ class AppConfig {
     defaultValue: false,
   );
 
+  /// The product's own site, shared from Profiel's share button. Not an API
+  /// base and not a legal link, so it is kept apart from both.
+  static const String siteUrl = String.fromEnvironment(
+    'SITE_URL',
+    defaultValue: 'https://www.bijbelstudie.io',
+  );
+
   // Legal links used in subscription and account flows.
   // Override per environment via dart-define if needed.
   static const String privacyPolicyUrl = String.fromEnvironment(

@@ -43,6 +43,7 @@ final profileStatsProvider = Provider.autoDispose<AsyncValue<ProfileStats>>((
       // rather than as a guess.
       highlightsCount: highlights?.length ?? 0,
       serverBadgeIds: tree?.badges ?? data.badges,
+      activeDaysThisYear: data.activeDaysThisYear,
     );
   });
 });
