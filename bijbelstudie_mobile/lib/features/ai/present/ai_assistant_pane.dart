@@ -383,7 +383,7 @@ class _EmptyPrompt extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
             child: Icon(
-              Icons.auto_awesome,
+              Icons.smart_toy_outlined,
               size: 20,
               color: AppTheme.assistant,
             ),

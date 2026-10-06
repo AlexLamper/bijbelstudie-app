@@ -685,7 +685,7 @@ class _ProgressTreeHeroState extends ConsumerState<_ProgressTreeHero> {
                   const Spacer(),
                   if (onOpenAssistant != null)
                     _HeroButton(
-                      icon: Icons.auto_awesome,
+                      icon: Icons.smart_toy_outlined,
                       label: 'AI-assistent',
                       onTap: onOpenAssistant,
                     ),

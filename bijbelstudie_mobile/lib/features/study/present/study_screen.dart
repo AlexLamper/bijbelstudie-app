@@ -155,6 +155,16 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
     initialIndex: ref.read(studyPaneProvider).materialsTab,
   );
 
+  /// Which tab the label row marks. `index` alone only moves once a swipe has
+  /// settled, so the header sat a tab behind the pane for the whole drag; the
+  /// controller's animation carries the fractional position while the finger
+  /// is down, and rounding it hands the mark over halfway across. A tap sets
+  /// the index up front and animates afterwards, so that case reads the index
+  /// and the new tab lights up at once instead of mid-animation.
+  int get _headerTab => _tabController.indexIsChanging
+      ? _tabController.index
+      : _tabController.animation!.value.round();
+
   @override
   void initState() {
     super.initState();
@@ -206,7 +216,10 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                   child: TourAnchor(
                     id: TourAnchorIds.studyMaterialsTabs,
                     child: AnimatedBuilder(
-                      animation: _tabController,
+                      // The animation, not the controller itself: the
+                      // controller only notifies on a settled index change,
+                      // the animation ticks along with the drag.
+                      animation: _tabController.animation!,
                       builder: (context, _) => AppUnderlineTabs(
                         // "AI-assistent" spelled out does not fit beside the
                         // other four at 390px; the purple glyph is what marks
@@ -226,9 +239,9 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                           // sign Grondtekst is Pro-gated is the paywall you
                           // hit after tapping.
                           if (!isPro) 1: Icons.lock_outline,
-                          4: Icons.auto_awesome,
+                          4: Icons.smart_toy_outlined,
                         },
-                        // The assistant's sparkle keeps its teal whether the
+                        // The assistant's robot keeps its teal whether the
                         // tab is selected or not: it is the one tab that is
                         // metered and Pro-upsold, and the mark is what says
                         // so before you tap it. The Pro lock on Grondtekst
@@ -237,7 +250,7 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
                         // The row runs to both screen edges, so it is inset
                         // back out of the 16px page margin.
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        selectedIndex: _tabController.index,
+                        selectedIndex: _headerTab,
                         onChanged: _tabController.animateTo,
                       ),
                     ),

@@ -683,7 +683,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                   child: Row(
                     children: [
-                      Icon(Icons.auto_awesome, size: 16, color: AppTheme.teal),
+                      Icon(Icons.smart_toy_outlined, size: 16, color: AppTheme.teal),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text('AI-assistent', style: AppTheme.bodyStrong),
@@ -880,7 +880,7 @@ class _TopBar extends StatelessWidget {
               if (onOpenAssistant != null)
                 IconButton(
                   onPressed: onOpenAssistant,
-                  icon: const Icon(Icons.auto_awesome),
+                  icon: const Icon(Icons.smart_toy_outlined),
                   tooltip: 'Vraag de AI-assistent',
                   color: AppTheme.teal,
                 ),
