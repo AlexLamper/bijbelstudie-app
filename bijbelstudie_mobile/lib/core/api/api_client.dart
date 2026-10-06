@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import '../../features/auth/data/auth_local_storage.dart';
+import '../../features/bible/domain/copy_policy.dart';
 import '../config/app_config.dart';
 
 /// Called when the refresh token is dead and the user has to log in again.
@@ -32,7 +33,17 @@ class ApiClient {
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 15),
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        // What this build can honour. The API only lists and serves a
+        // copy-restricted translation to a client that says it respects the
+        // limit, because an installed build from before the limit existed
+        // cannot be fixed - see features/bible/domain/copy_policy.dart and the
+        // website's lib/bibleCopyPolicy.ts. Drop this header and the licensed
+        // translations disappear from the picker.
+        capabilitiesHeader: copyGuardCapability,
+      },
     );
 
     dio = Dio(options);

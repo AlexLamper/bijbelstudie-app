@@ -1,4 +1,5 @@
 import '../../../core/data/text_format.dart';
+import 'copy_policy.dart';
 
 // Shapes confirmed against the running backend (GET /api/v1/...), not
 // inferred from route names.
@@ -59,7 +60,8 @@ class ChapterContent {
     required this.attribution,
     this.locked = false,
     this.fromCache = false,
-  });
+    bool? copyRestricted,
+  }) : _copyRestricted = copyRestricted;
 
   final String sourceId;
   final String book;
@@ -76,6 +78,18 @@ class ChapterContent {
   /// True when the reader is showing text that came off disk with no network.
   final bool fromCache;
 
+  /// What the server said about copying this translation, when it said
+  /// anything. Null for a chapter cached before the field existed, and for the
+  /// commentary and grondtekst envelopes that share this shape.
+  final bool? _copyRestricted;
+
+  /// True when this translation's text may not be copied or shared in bulk.
+  ///
+  /// The server's answer wins; the id list in `copy_policy.dart` is the
+  /// fallback, so a chapter that came off disk from an older build is still
+  /// treated correctly. See that file for the whole policy.
+  bool get copyRestricted => _copyRestricted ?? isCopyRestricted(sourceId);
+
   factory ChapterContent.fromJson(Map<String, dynamic> json, {bool fromCache = false}) {
     return ChapterContent(
       sourceId: json['id'] as String? ?? '',
@@ -88,17 +102,25 @@ class ChapterContent {
       attribution: normaliseDashes(json['attribution'] as String? ?? ''),
       locked: json['locked'] as bool? ?? false,
       fromCache: fromCache,
+      copyRestricted: json['copyRestricted'] as bool?,
     );
   }
 
   String get reference => '$book $chapter';
 
   /// Plain text for the share sheet, with verse numbers inline.
-  String shareText({Iterable<int>? onlyVerses}) {
+  ///
+  /// Null when this would hand out more of a copy-restricted translation than
+  /// [maxCopyVerses] verses - a whole chapter, usually. Nullable rather than
+  /// clamped or thrown: the caller has something honest to do with it (share
+  /// the reference and a link instead of the words), and a null cannot be
+  /// ignored by accident the way a silently shortened string could.
+  String? shareText({Iterable<int>? onlyVerses}) {
     final wanted = onlyVerses?.toSet();
     final selected = wanted == null
         ? verses
         : verses.where((v) => wanted.contains(v.number)).toList();
+    if (copyRestricted && selected.length > maxCopyVerses) return null;
     final body = selected.map((v) => '${v.number} ${v.text}').join('\n');
     return '$body\n\n$reference - $attribution';
   }

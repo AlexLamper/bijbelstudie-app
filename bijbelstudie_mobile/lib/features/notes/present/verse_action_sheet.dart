@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
+import '../../bible/domain/copy_policy.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/hsv_verse_sheet.dart';
 import '../../commentary/present/commentary_jump.dart';
@@ -567,10 +568,19 @@ class _VerseActionSheet extends ConsumerWidget {
     if (context.mounted) Navigator.of(context).pop();
   }
 
+  /// One verse, cited. This row is allowed on every translation, including the
+  /// copy-restricted ones (`copy_policy.dart`): a single verse with its source
+  /// named is the thing a reader actually wants, and the thing no licence
+  /// objects to. The attribution is part of the payload, not a nice touch -
+  /// for licensed text it is the condition the quotation rests on.
   Future<void> _copy(BuildContext context, String reference) async {
     await Clipboard.setData(
       ClipboardData(
-        text: '${verse.text}\n\n$reference - ${chapter.attribution}',
+        text: formatVerseForCopy(
+          text: verse.text,
+          reference: reference,
+          attribution: chapter.attribution,
+        ),
       ),
     );
     if (!context.mounted) return;

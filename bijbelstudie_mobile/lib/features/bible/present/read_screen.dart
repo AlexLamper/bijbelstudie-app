@@ -27,6 +27,7 @@ import '../../settings/data/reading_settings.dart';
 import '../../bible_year/present/plan_reader_tick.dart';
 import '../../study/domain/chapter_study_models.dart';
 import '../domain/bible_models.dart';
+import '../domain/copy_policy.dart';
 import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
 import 'chapter_end_detector.dart';
@@ -907,6 +908,16 @@ class ReaderChapterBody extends StatelessWidget {
           chapter.attribution,
           style: AppTheme.bodyMuted.copyWith(fontSize: 11),
         ),
+        // Said once, under the chapter, beside the notice it belongs with -
+        // not as a dialog over the text a reader is trying to read. The verse
+        // sheet's Kopiëren row is what it points at.
+        if (chapter.copyRestricted) ...[
+          const SizedBox(height: 6),
+          Text(
+            copyRestrictedNotice,
+            style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+          ),
+        ],
       ],
     );
   }
@@ -1212,6 +1223,12 @@ class _ChapterNav extends ConsumerWidget {
 }
 
 /// Shares a whole chapter through the system share sheet.
+///
+/// A copy-restricted translation (`copy_policy.dart`) has no whole-chapter
+/// text to give: `shareText` returns null and what goes out is the reference
+/// alone, which is what the reader's correspondent needs in order to look the
+/// passage up in that translation themselves.
 Future<void> shareChapter(ChapterContent chapter) {
-  return Share.share(chapter.shareText(), subject: chapter.reference);
+  final text = chapter.shareText();
+  return Share.share(text ?? chapter.reference, subject: chapter.reference);
 }

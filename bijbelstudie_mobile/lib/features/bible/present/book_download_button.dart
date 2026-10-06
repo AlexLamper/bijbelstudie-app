@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../premium/present/pro_access_provider.dart';
 import '../data/bible_repository.dart';
+import '../domain/copy_policy.dart';
 import 'bible_providers.dart';
 
 /// The book downloads that are running right now, by book.
@@ -183,6 +184,17 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
 
   @override
   Widget build(BuildContext context) {
+    // A copy-restricted translation is not downloadable as a whole book. The
+    // reader may keep a verse (a note, a bookmark, the clipboard); putting
+    // every chapter of a licensed translation on the device is the bulk copy
+    // the licence does not cover. See features/bible/domain/copy_policy.dart.
+    if (isCopyRestricted(widget.versionId)) {
+      return Text(
+        copyRestrictedOfflineNotice,
+        style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+      );
+    }
+
     final progress = ref.watch(bookDownloadsProvider)[_bookRef];
     // Store or server: flips the moment a purchase completes.
     final isPro = ref.watch(hasProProvider);
