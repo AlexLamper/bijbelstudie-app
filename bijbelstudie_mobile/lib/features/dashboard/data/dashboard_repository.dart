@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../levensboom/domain/tree_state.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/domain/tree_state.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import 'daily_verse_store.dart';
 import 'dashboard_models.dart';
 
@@ -22,7 +22,7 @@ class DashboardRepository {
 
   final ApiClient _apiClient;
 
-  /// Forwards the `xp` a call earned to the Levensboom, so the tree animates
+  /// Forwards the `xp` a call earned to the progress tree, so the tree animates
   /// without a second request. See [XpSink].
   ///
   /// Private on purpose: `preview_data.dart` and the widget tests `implements`

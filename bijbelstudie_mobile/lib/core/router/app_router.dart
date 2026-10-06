@@ -34,8 +34,8 @@ import '../../features/bronnen/present/section_reader_screen.dart';
 import '../../features/bronnen/present/work_screen.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
-import '../../features/levensboom/present/levensboom_tab_icon.dart';
-import '../../features/levensboom/present/studio/levensboom_studio_screen.dart';
+import '../../features/progress_tree/present/progress_tree_tab_icon.dart';
+import '../../features/progress_tree/present/studio/progress_tree_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
 import '../../features/premium/present/pro_access_provider.dart';
@@ -247,7 +247,7 @@ class _NavItem extends StatelessWidget {
                 // The Profiel tab wears the reader's own tree - the same face as
                 // the dashboard header and the website's navbar.
                 child: item.route == '/profile'
-                    ? LevensboomTabIcon(active: active)
+                    ? ProgressTreeTabIcon(active: active)
                     : item.lucide != null
                     ? LucideIcon(
                         item.lucide!,
@@ -336,11 +336,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/studies', builder: (context, state) => const StudiesScreen()),
           GoRoute(path: '/notes', builder: (context, state) => const NotesScreen()),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
-          // Levensboom. Nested under Profiel rather than given a tab of its
+          // ProgressTree. Nested under Profiel rather than given a tab of its
           // own: it is one account's own thing to look at, not a section.
           GoRoute(
             path: '/profile/boom',
-            builder: (context, state) => LevensboomStudioScreen(
+            builder: (context, state) => ProgressTreeStudioScreen(
               initialTab: state.uri.queryParameters['tab'],
             ),
           ),

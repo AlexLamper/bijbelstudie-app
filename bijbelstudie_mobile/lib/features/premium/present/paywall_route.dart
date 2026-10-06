@@ -58,10 +58,12 @@ enum PaywallGate {
   // hof"), which the studio itself announces as "er voor Pro-leden". No
   // [benefit]: the tree's cosmetics are not sold on the paywall, so there is
   // nothing in `kProBenefits` to lift.
-  levensboom(
+  // The id and the analytics source keep the old word so the funnel keeps
+  // one continuous history; the surface itself is Voortgang.
+  progressTree(
     id: 'levensboom',
     source: 'app_levensboom',
-    reason: 'Deze stijlen voor je Levensboom horen bij Pro.',
+    reason: 'Deze stijlen voor je boom horen bij Pro.',
   ),
   // The reason line says no more than the server's own `NOTE_LIMIT_REACHED`
   // message the reader has just been shown, which names the number itself.

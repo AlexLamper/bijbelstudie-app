@@ -8,7 +8,7 @@ and the app has the Start tab block plus `/vriendenkring` with Feed | Vrienden
 
 Still to do: **phase 3** (contacts, app-only), **phase 4** (share actions and
 server-side milestone posts) and **phase 5** (push, paging, a friend's
-Levensboom). `FRIENDS_CONTACT_PEPPER` is not set anywhere yet, so the discovery
+ProgressTree). `FRIENDS_CONTACT_PEPPER` is not set anywhere yet, so the discovery
 routes answer 503 - which is the intended "off" state until phase 3.
 
 Every surface still degrades to the invitation card when the server says
@@ -320,7 +320,7 @@ the server-side milestone posts.
 
 **Phase 5 — polish**
 Push on a new request and on a reaction (the notifications feature exists),
-feed pagination via `before`, and a friend's Levensboom on their row.
+feed pagination via `before`, and a friend's ProgressTree on their row.
 
 ## 10. Tests
 

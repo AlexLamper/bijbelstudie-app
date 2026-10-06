@@ -220,7 +220,7 @@ class FriendSummary {
   /// to turn it into a line.
   final int? mutualCount;
 
-  /// Whether `/gebruiker/<userId>` - this person's public levensboom - exists.
+  /// Whether `/gebruiker/<userId>` - this person's public progress tree - exists.
   ///
   /// Optional and additive like [mutualCount] (`publicProfile?: boolean` in
   /// `lib/friends/types.ts`, derived server-side from `isPublicTree`): an

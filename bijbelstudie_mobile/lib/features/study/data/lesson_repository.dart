@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../levensboom/domain/tree_state.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/domain/tree_state.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../studies/data/enrollment_models.dart';
 import '../domain/lesson_models.dart';
 
 final lessonRepositoryProvider = Provider((ref) {
   return LessonRepository(
     ref.watch(apiClientProvider),
-    // The XP a finished lesson earns grows the Levensboom the moment the
+    // The XP a finished lesson earns grows the progress tree the moment the
     // completing write returns - the same bus the streak and notes use.
     onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
   );
@@ -43,7 +43,7 @@ class LessonRepository {
 
   final ApiClient _apiClient;
 
-  /// Forwards the `xp` object of a completing write to the Levensboom. See
+  /// Forwards the `xp` object of a completing write to the progress tree. See
   /// [XpSink]. Null in tests and wherever no tree is listening.
   final XpSink? _onXp;
 

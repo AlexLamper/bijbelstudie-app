@@ -6,8 +6,8 @@ import '../../../core/api/api_client.dart';
 import '../../../core/data/account_scope.dart';
 import '../../../core/db/content_cache.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../levensboom/domain/tree_state.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/domain/tree_state.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../domain/note_models.dart';
 import '../present/notes_providers.dart';
 
@@ -152,7 +152,7 @@ class NotesRepository {
   final ApiClient _apiClient;
   final ContentCache? _cache;
 
-  /// Forwards the `xp` a new note earned to the Levensboom. See [XpSink].
+  /// Forwards the `xp` a new note earned to the progress tree. See [XpSink].
   /// Private so the test fakes that `implements` this class need not declare it.
   final XpSink? _onXp;
 

@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/dashboard/data/daily_verse_store.dart';
-import '../../features/levensboom/data/notification_canvas.dart';
-import '../../features/levensboom/domain/tree_state.dart';
-import '../../features/levensboom/domain/verse_scene.dart';
-import '../../features/levensboom/present/levensboom_providers.dart';
+import '../../features/progress_tree/data/notification_canvas.dart';
+import '../../features/progress_tree/domain/tree_state.dart';
+import '../../features/progress_tree/domain/verse_scene.dart';
+import '../../features/progress_tree/present/progress_tree_providers.dart';
 import 'notification_service.dart';
 import 'retention_store.dart';
 

@@ -16,8 +16,8 @@ import '../../bible/present/offline_library_sheet.dart';
 import '../../friends/present/contacts/contact_discovery_providers.dart'
     show contactDiscoveryOfferedProvider;
 import '../../friends/present/contacts/findable_switch.dart';
-import '../../levensboom/present/levensboom_providers.dart';
-import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
+import '../../progress_tree/present/progress_tree_providers.dart';
+import '../../progress_tree/present/studio/progress_tree_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/notification_prefs.dart';
@@ -119,7 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const _NotificationsSection(),
 
-          const _LevensboomSection(),
+          const _ProgressTreeSection(),
 
           const _VriendenkringSection(),
 
@@ -428,13 +428,13 @@ class _SubHeading extends StatelessWidget {
   }
 }
 
-/// The Levensboom controls, mirroring the website's Instellingen section.
+/// The progress tree controls, mirroring the website's Instellingen section.
 ///
 /// Turning the tree off is purely visual - XP, levels and badges keep accruing
 /// - which the copy has to say out loud, or the toggle reads as "stop counting
 /// my progress".
-class _LevensboomSection extends ConsumerWidget {
-  const _LevensboomSection();
+class _ProgressTreeSection extends ConsumerWidget {
+  const _ProgressTreeSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

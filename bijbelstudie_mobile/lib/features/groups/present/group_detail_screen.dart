@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/groups_repository.dart';
-import '../../levensboom/present/tree_view.dart';
+import '../../progress_tree/present/tree_view.dart';
 
 /// `/groepen/[id]` - the group's wall, its roster, and the invite code.
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -222,7 +222,7 @@ class _GroupHeader extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final member = detail.members[index];
-                final card = member.levensboom;
+                final card = member.progressTree;
                 return Chip(
                   visualDensity: VisualDensity.compact,
                   // The member's own tree, when they show one; initials

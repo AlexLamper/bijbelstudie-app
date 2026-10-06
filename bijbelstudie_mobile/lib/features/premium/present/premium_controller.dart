@@ -7,7 +7,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/config/revenuecat_config.dart';
 import '../../bible/present/bible_providers.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';

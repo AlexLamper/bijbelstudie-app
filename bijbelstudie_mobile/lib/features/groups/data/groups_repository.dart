@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../levensboom/domain/public_tree_card.dart';
+import '../../progress_tree/domain/public_tree_card.dart';
 
 final groupsRepositoryProvider = Provider((ref) {
   return GroupsRepository(ref.watch(apiClientProvider));
@@ -60,7 +60,7 @@ class GroupMember {
     required this.role,
     required this.isSelf,
     this.image,
-    this.levensboom,
+    this.progressTree,
   });
 
   final String userId;
@@ -69,9 +69,11 @@ class GroupMember {
   final bool isSelf;
   final String? image;
 
-  /// The member's Levensboom, enough to draw it. Null when switched off or
+  /// The member's progress tree, enough to draw it. Null when switched off or
   /// when the server predates the card.
-  final PublicTreeCard? levensboom;
+  /// From the `levensboom` wire key, which keeps the old word for installed
+  /// builds and for the stored field (see the website's models/User.js).
+  final PublicTreeCard? progressTree;
 
   bool get isLeader => role == 'leader';
 
@@ -82,7 +84,7 @@ class GroupMember {
       role: json['role'] as String? ?? 'member',
       isSelf: json['isSelf'] as bool? ?? false,
       image: json['image'] as String?,
-      levensboom: PublicTreeCard.fromJson(json['levensboom']),
+      progressTree: PublicTreeCard.fromJson(json['levensboom']),
     );
   }
 }

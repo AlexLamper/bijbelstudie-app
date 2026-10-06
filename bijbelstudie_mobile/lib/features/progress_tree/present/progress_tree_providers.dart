@@ -1,0 +1,236 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/data/provider_cache.dart';
+import '../data/progress_tree_repository.dart';
+import '../domain/catalog.dart';
+import '../domain/species.dart';
+import '../domain/tree_state.dart';
+
+/// The tree's state, and the bus every XP-earning screen pushes into.
+///
+/// There is no realtime infrastructure anywhere in this product - every call is
+/// request/response - so the pattern is the one the streak flow already uses:
+/// the server owns the arithmetic and returns the `GrantResult`, the client
+/// applies it immediately so the bar moves and leaves unfurl without a second
+/// round trip, and the next fetch reconciles. Both sides run the same level
+/// curve, so they agree.
+
+/// What a studio tap came back with.
+class SaveOutcome {
+  const SaveOutcome.ok() : failed = false, error = null, label = null;
+
+  const SaveOutcome.failed(this.error, this.label) : failed = true;
+
+  final bool failed;
+  final String? error;
+
+  /// "Niveau 8", when the server refused a locked pick.
+  final String? label;
+
+  bool get locked => error == 'ITEM_LOCKED';
+
+  /// The server answered, but has no `PATCH /levensboom`: a website
+  /// deployment older than this app (404), or one whose route lacks the
+  /// method (405).
+  bool get routeMissing => error == 'HTTP_404' || error == 'HTTP_405';
+
+  /// The host was never reached.
+  bool get offline => error == 'NETWORK';
+
+  /// What the reader is told when the save [failed] and no rule [label]
+  /// applies. Generic on purpose for everything else: a 500 or a refused
+  /// token is nothing they can act on from here.
+  String get message {
+    if (routeMissing) {
+      return 'De server kent deze functie nog niet. Werk de website bij en probeer het opnieuw.';
+    }
+    if (offline) return 'Geen verbinding. Probeer het later opnieuw.';
+    return 'Opslaan is niet gelukt. Probeer het nog eens.';
+  }
+}
+
+class TreeStateNotifier extends AsyncNotifier<TreeState> {
+  @override
+  Future<TreeState> build() async {
+    ref.cacheFor();
+    final repository = ref.watch(progressTreeRepositoryProvider);
+
+    // Show the cached tree while the request is in flight, so the Profiel tab
+    // never opens on an empty sky.
+    final cached = await repository.cached();
+    if (cached != null && state is AsyncLoading) {
+      state = AsyncData(cached);
+    }
+
+    return repository.fetch();
+  }
+
+  Future<void> refresh() async {
+    final repository = ref.read(progressTreeRepositoryProvider);
+    try {
+      state = AsyncData(await repository.fetch());
+    } catch (_) {
+      // Keep whatever is on screen. A failed refresh must never blank the tree.
+    }
+  }
+
+  /// Applies an XP grant returned by an action endpoint. A level-up may have
+  /// unlocked an item only the server can confirm, so one follows.
+  void applyGrant(XpGrant grant) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(current.applyGrant(grant));
+    // A plain unawaited call, not `Future(...)`: that would schedule a Timer,
+    // and a Timer left pending when a screen is torn down is a test failure
+    // (and a wasted wake-up) for nothing.
+    if (grant.levelledUp) unawaited(refresh());
+  }
+
+  /// Called when the celebration for [level] has been shown.
+  Future<void> markSeen(int level) async {
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(lastSeenLevel: level));
+    }
+    try {
+      await ref.read(progressTreeRepositoryProvider).markSeen(level: level);
+    } catch (_) {
+      // Worst case it celebrates once more on the next cold start.
+    }
+  }
+
+  Future<void> setPrefs({bool? reducedMotion, bool? disabled}) async {
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(
+        current.copyWith(reducedMotion: reducedMotion, disabled: disabled),
+      );
+    }
+    try {
+      await ref
+          .read(progressTreeRepositoryProvider)
+          .markSeen(reducedMotion: reducedMotion, disabled: disabled);
+    } catch (_) {
+      // Cosmetic; the next toggle retries the write.
+    }
+  }
+
+  /// Optimistic write of the studio choice: the stage repaints at once, the
+  /// server answers with the resolved block, and a refusal rolls back.
+  Future<SaveOutcome> _write(
+    Map<String, Object?> body,
+    TreeState Function(TreeState current)? optimistic,
+  ) async {
+    final before = state.value;
+    if (before != null && optimistic != null) {
+      state = AsyncData(optimistic(before));
+    }
+    final repository = ref.read(progressTreeRepositoryProvider);
+    final result = await repository.patchAvatar(body);
+    final tree = result.tree;
+    if (tree != null) {
+      final current = state.value ?? before;
+      if (current != null) {
+        final merged = current.mergeTree(tree);
+        state = AsyncData(merged);
+        await repository.cache(merged);
+      }
+      return const SaveOutcome.ok();
+    }
+    if (before != null && optimistic != null) state = AsyncData(before);
+    return SaveOutcome.failed(result.error, result.label);
+  }
+
+  Future<SaveOutcome> setAvatar(AvatarChoice next) {
+    return _write(next.toJson(), (current) => current.copyWith(chosen: next, avatar: next));
+  }
+
+  /// Onboarding's "Planten": species plus the planted marker.
+  Future<SaveOutcome> plant(TreeSpecies species) {
+    return _write(
+      {'species': kSpeciesIds[species], 'planted': true, 'introSeen': true},
+      (current) => current.copyWith(
+        chosen: current.chosen.copyWith(species: species),
+        avatar: current.avatar.copyWith(species: species),
+        planted: true,
+        introSeen: true,
+      ),
+    );
+  }
+
+  Future<void> markIntroSeen() async {
+    await _write({'introSeen': true}, (current) => current.copyWith(introSeen: true));
+  }
+
+  Future<void> markItemsSeen(List<String> keys) async {
+    if (keys.isEmpty) return;
+    await _write(
+      {'seenItems': keys},
+      (current) => current.copyWith(seenItems: {...current.seenItems, ...keys}),
+    );
+  }
+
+  Future<SaveOutcome> setPublicProfile(bool value) {
+    return _write({'publicProfile': value}, (current) => current.copyWith(publicProfile: value));
+  }
+}
+
+// autoDispose so that switching accounts can drop it outright (see
+// `cacheFor`); `cacheFor` keeps it alive in normal use as before. A keep-alive
+// provider can only be rebuilt, and a rebuild keeps the previous reader's tree
+// readable through `.value` until the new one lands.
+final treeStateProvider = AsyncNotifierProvider.autoDispose<TreeStateNotifier, TreeState>(
+  TreeStateNotifier.new,
+);
+
+/// The one-shot animation bus.
+///
+/// A screen that has just earned XP pushes the grant here; the tree animates it
+/// if it happens to be mounted, and the celebration route reads [pendingLevelUp]
+/// either way. Nothing is persisted - a level-up that is missed because no tree
+/// was on screen is picked up from `lastSeenLevel` on the next fetch.
+class TreeAnimationEvent {
+  const TreeAnimationEvent({required this.grant, required this.at});
+
+  final XpGrant grant;
+  final DateTime at;
+}
+
+class TreeAnimationBus extends Notifier<TreeAnimationEvent?> {
+  @override
+  TreeAnimationEvent? build() => null;
+
+  void push(Object? rawXp) {
+    final grant = XpGrant.fromJson(rawXp);
+    if (grant == null) return;
+    ref.read(treeStateProvider.notifier).applyGrant(grant);
+    state = TreeAnimationEvent(grant: grant, at: DateTime.now());
+  }
+
+  /// Consumed by whichever widget rendered it, so it fires exactly once.
+  void clear() => state = null;
+}
+
+final treeAnimationEventProvider =
+    NotifierProvider<TreeAnimationBus, TreeAnimationEvent?>(TreeAnimationBus.new);
+
+/// The level whose celebration is owed, or null. Covers both routes in: an
+/// XP call that levelled up just now, and a level-up earned on another device.
+final pendingLevelUpProvider = Provider.autoDispose<int?>((ref) {
+  final tree = ref.watch(treeStateProvider).value;
+  if (tree == null || tree.disabled) return null;
+  return tree.shouldCelebrate ? tree.level : null;
+});
+
+/// Onboarding's species pick, held here so the wizard's finish step can read
+/// it after the page that set it has gone.
+class PlantChoice extends Notifier<TreeSpecies> {
+  @override
+  TreeSpecies build() => kDefaultSpecies;
+
+  void set(TreeSpecies species) => state = species;
+}
+
+final plantChoiceProvider = NotifierProvider<PlantChoice, TreeSpecies>(PlantChoice.new);

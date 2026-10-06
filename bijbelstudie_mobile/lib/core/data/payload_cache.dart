@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// The last good response for a screen that would otherwise open on a skeleton.
 ///
-/// Same idea as `LevensboomRepository`'s tree cache, generalised: the Start and
+/// Same idea as `ProgressTreeRepository`'s tree cache, generalised: the Start and
 /// Profiel tabs both gate on a single request, so on a cold start the reader
 /// watched a skeleton for as long as the server took. With this the screen
 /// renders its real content on the first frame and the request replaces it when

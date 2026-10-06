@@ -17,10 +17,14 @@ Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
   `domain/` (entities), `present/` (screens + Riverpod providers).
   Features: `ai auth bible commentary dashboard feedback groups levensboom notes
   onboarding premium profile resources search settings studies study`.
-- `features/levensboom/` is the tree avatar. `domain/tree_generator.dart`,
-  `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/levensboom/*.ts` in the
-  website repo line for line; `test/levensboom_parity_test.dart` asserts the same
-  counts as the website's fixtures. Edit both repos in one pass.
+- `features/progress_tree/` is the tree avatar - "Voortgang" to the reader, "je
+  boom" for the object, `progressTree`/`ProgressTree` in code. `domain/tree_generator.dart`,
+  `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/progressTree/*.ts` in the
+  website repo line for line; `test/progress_tree_growth_test.dart` holds the website's own
+  outputs and asserts the same numbers. Edit both repos in one pass.
+  Three things keep the old word `levensboom` on purpose: the `levensboom` key in
+  the payloads this app parses, the `/levensboom` endpoint, and the analytics ids
+  (`levensboom`, `app_levensboom`). They are wire and history, not naming.
 - `test/` — test files plus `screenshot_fixtures.dart`. **Gitignored** (local-only,
   not on GitHub); keep writing tests there, they just are not committed.
 
@@ -43,6 +47,13 @@ sign_in_with_apple (auth).
 - Repositories take the `ApiClient`; screens never call Dio directly.
 - Auth is `Authorization: Bearer <jwt>` against `/api/v1/*`; the website's
   cookie auth is a different client and irrelevant here.
+- Licensed translations may be read but not harvested: `features/bible/domain/copy_policy.dart`
+  holds the id list (mirror of the website's `lib/bibleCopyPolicy.ts`). Reader verses stay plain
+  `Text.rich` — never `SelectableText`/`SelectionArea` for scripture. Whole-chapter share and the
+  bulk offline download are refused for a restricted translation; the verse sheet's Kopiëren row
+  (one verse + citation) stays on for every translation. `ApiClient` sends
+  `X-Bs-Capabilities: copy-guard`; drop that header and the licensed translations vanish from the
+  picker, by server design.
 - Release/signing work is documented in `docs/ios-release-setup.md` and
   `docs/handoff-manual-steps.md` — read those before touching iOS signing,
   and don't re-derive it from the Xcode project.

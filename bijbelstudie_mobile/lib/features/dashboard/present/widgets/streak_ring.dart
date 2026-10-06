@@ -14,7 +14,7 @@ import 'home_header_actions.dart';
 /// The header's streak button (`RETENTION_PLAN.md` §3.1): a pill with an
 /// orange flame and the number of days in a row.
 ///
-/// It replaces the miniature Levensboom that used to sit here with a number in
+/// It replaces the miniature ProgressTree that used to sit here with a number in
 /// its corner - that read as a profile avatar, not as a streak, and the avatar
 /// is already in the tab bar. The tree itself is unchanged on Profiel and in
 /// the detail sheet.

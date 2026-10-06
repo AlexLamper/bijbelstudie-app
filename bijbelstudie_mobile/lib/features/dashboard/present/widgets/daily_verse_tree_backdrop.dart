@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../levensboom/domain/verse_scene.dart';
-import '../../../levensboom/present/levensboom_providers.dart';
-import '../../../levensboom/present/tree_view.dart';
+import '../../../progress_tree/domain/verse_scene.dart';
+import '../../../progress_tree/present/progress_tree_providers.dart';
+import '../../../progress_tree/present/tree_view.dart';
 import 'daily_verse_photo.dart';
 
 /// The "Tekst van de dag" card's background.
 ///
-/// The reader's own Levensboom when there is one to show - the same
+/// The reader's own progress tree when there is one to show - the same
 /// [TreeView] "Mijn voortgang" draws, seed and all, so the tree behind the
 /// verse is never a stock illustration. The day's photo ([DailyVersePhoto])
 /// is the fallback: `Boom verbergen`, no seed yet, or

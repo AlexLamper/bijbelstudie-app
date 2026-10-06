@@ -10,7 +10,7 @@ import '../../../core/ui/kring_share_action.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/read_screen.dart' show pendingVerseAnchorProvider;
 import '../../friends/data/friend_models.dart' show FriendPostKind;
-import '../../levensboom/domain/verse_scene.dart';
+import '../../progress_tree/domain/verse_scene.dart';
 import '../../settings/data/reading_settings.dart';
 import '../data/daily_verse_background_store.dart';
 import '../data/daily_verse_store.dart';
@@ -26,7 +26,7 @@ import 'widgets/daily_verse_share_image.dart';
 /// Modelled on the verse-of-the-day card in the YouVersion app: a full-bleed
 /// background, an eyebrow and the reference at the top left, the verse
 /// itself set large and left-aligned in the middle, and a centred row of
-/// actions along the bottom. The background is the reader's own Levensboom
+/// actions along the bottom. The background is the reader's own progress tree
 /// (see [DailyVerseBackdrop]) once it has loaded, and a painted landscape
 /// before then or when there is no tree to show.
 ///
@@ -62,7 +62,7 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
   String? _rememberedKey;
   bool _syncedArchive = false;
 
-  /// The background pages (Levensboom, photo), swiped sideways on the card.
+  /// The background pages (ProgressTree, photo), swiped sideways on the card.
   late final DailyVersePaging _paging = DailyVersePaging(
     this,
     initial: ref.read(dailyVerseBackgroundProvider).index,

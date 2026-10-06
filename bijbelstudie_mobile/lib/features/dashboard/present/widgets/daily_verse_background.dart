@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../levensboom/domain/verse_scene.dart';
+import '../../../progress_tree/domain/verse_scene.dart';
 import '../../data/daily_verse_background_store.dart';
 import 'daily_verse_photo.dart';
 import 'daily_verse_tree_backdrop.dart';
 
 /// One of the card's backgrounds, full bleed.
 ///
-/// [DailyVerseBackground.tree] is the reader's Levensboom (itself falling back
+/// [DailyVerseBackground.tree] is the reader's progress tree (itself falling back
 /// to the day's photo while there is no tree to show);
 /// [DailyVerseBackground.photo] is the day's nature photo.
 class DailyVerseBackgroundView extends StatelessWidget {

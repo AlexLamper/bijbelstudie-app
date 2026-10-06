@@ -107,7 +107,7 @@ class NotificationPrefs {
       'lessonHalfway' => lessonHalfwayEnabled,
       'weeklyGoal' => weeklyGoalEnabled,
       'milestone' => milestonesEnabled,
-      // The Levensboom nudge is a win-back message with a friendlier subject,
+      // The progress tree nudge is a win-back message with a friendlier subject,
       // so it rides the "we hebben je gemist" toggle rather than adding a
       // switch nobody would know to look for.
       'dormant' || 'treeWilting' => dormantEnabled,

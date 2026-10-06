@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../levensboom/domain/verse_scene.dart';
+import '../../../progress_tree/domain/verse_scene.dart';
 import '../../data/daily_verse_background_store.dart';
 import 'daily_verse_background.dart';
 import 'daily_verse_photo.dart';

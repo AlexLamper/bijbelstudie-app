@@ -14,8 +14,8 @@ import '../../../ai/present/ai_assistant_pane.dart';
 import '../../../dashboard/data/dashboard_repository.dart';
 import '../../../dashboard/present/dashboard_providers.dart';
 import '../../../feedback/data/review_prompt.dart';
-import '../../../levensboom/present/levensboom_celebration.dart';
-import '../../../levensboom/present/levensboom_providers.dart';
+import '../../../progress_tree/present/progress_tree_celebration.dart';
+import '../../../progress_tree/present/progress_tree_providers.dart';
 import '../../../settings/data/reading_settings.dart';
 import '../../../studies/data/enrollment_models.dart';
 import '../../../studies/data/enrollment_repository.dart';
@@ -308,7 +308,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
     final tree = ref.read(treeStateProvider).value;
     final level = ref.read(pendingLevelUpProvider);
     if (tree == null || level == null) return;
-    await showLevensboomCelebration(
+    await showProgressTreeCelebration(
       context,
       ref,
       seed: tree.seed,

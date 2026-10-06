@@ -213,7 +213,7 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
   ],
   // Fired once, at exactly two days away - before the tree visibly wilts, never
   // after. No variant says the tree could die, because it cannot: health floors
-  // at 0.3 server-side (lib/levensboom/health.ts) precisely so this copy never
+  // at 0.3 server-side (lib/progressTree/health.ts) precisely so this copy never
   // has to threaten. The server pool in `lib/notificationCopy.ts` overrides
   // these when `GET /notifications/copy?type=tree_wilting` has been fetched.
   NotifType.treeWilting: [

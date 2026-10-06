@@ -20,8 +20,8 @@ import '../../../core/notifications/social_push.dart';
 import '../../../core/notifications/social_sync.dart';
 import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
-import '../../levensboom/data/levensboom_repository.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/data/progress_tree_repository.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../premium/present/premium_controller.dart';
 import '../../profile/data/profile_repository.dart';
@@ -154,7 +154,7 @@ class AuthController extends AsyncNotifier<User?> {
     // by an expired session did not, and a request still in flight during
     // sign-out can write the previous reader's payload back afterwards.
     await PayloadCache.clearAll();
-    await LevensboomRepository.clearCache();
+    await ProgressTreeRepository.clearCache();
     // Publishing a different account id resets every session-scoped provider
     // (see [sessionAccountProvider]).
     state = AsyncValue.data(user);
@@ -522,7 +522,7 @@ class AuthController extends AsyncNotifier<User?> {
     final repository = ref.read(authRepositoryProvider);
     await repository.logout();
     // Per-account state that lives on the device goes with the session.
-    await LevensboomRepository.clearCache();
+    await ProgressTreeRepository.clearCache();
     await PayloadCache.clearAll();
     await _clearDeviceNotifications();
 

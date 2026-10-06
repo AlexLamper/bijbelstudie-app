@@ -9,7 +9,7 @@ enum DailyVerseBackground {
   /// The day's nature photo (`assets/images/daytext/`), the default.
   photo,
 
-  /// The reader's own Levensboom.
+  /// The reader's own progress tree.
   tree,
 }
 

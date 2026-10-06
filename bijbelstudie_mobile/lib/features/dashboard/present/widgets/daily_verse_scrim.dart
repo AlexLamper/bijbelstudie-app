@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../levensboom/domain/palette.dart' show DayPhase, timeOfDayForHour;
+import '../../../progress_tree/domain/palette.dart' show DayPhase, timeOfDayForHour;
 
 /// The dark wash between photo and text.
 ///

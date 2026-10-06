@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/levensboom/present/levensboom_providers.dart';
+import '../features/progress_tree/present/progress_tree_providers.dart';
 import 'notifications/notification_scheduler.dart';
 import 'notifications/retention_store.dart';
 import 'notifications/social_sync.dart';

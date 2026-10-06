@@ -5,7 +5,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../domain/profile_stats.dart';
 
 /// One badge as a medallion: a tinted disc inside a ring, the way the
-/// Levensboom avatar wears its XP ring.
+/// ProgressTree avatar wears its XP ring.
 ///
 /// Three states share one shape, so a row of them reads as a collection rather
 /// than as three kinds of tile:

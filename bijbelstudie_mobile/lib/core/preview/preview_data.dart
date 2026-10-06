@@ -11,8 +11,8 @@ import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
-import '../../features/levensboom/domain/tree_state.dart';
-import '../../features/levensboom/present/levensboom_providers.dart';
+import '../../features/progress_tree/domain/tree_state.dart';
+import '../../features/progress_tree/present/progress_tree_providers.dart';
 import '../../features/notes/domain/note_models.dart';
 import '../../features/notes/present/notes_providers.dart';
 import '../../features/profile/data/profile_model.dart';
@@ -234,7 +234,7 @@ class PreviewData {
     badges: const ['firstlesson', 'completed1'],
   );
 
-  /// A Levensboom worth looking at: level 12, so the canopy, the blossom, the
+  /// A progress tree worth looking at: level 12, so the canopy, the blossom, the
   /// first three vruchten and the bird are all unlocked, and healthy, so it is
   /// the tree a reader who keeps up sees. `lastSeenLevel` matches the level on
   /// purpose - otherwise the celebration dialog would fire over every preview
@@ -293,7 +293,7 @@ class PreviewData {
         highlightsListProvider.overrideWith((ref) async => highlights),
         bookmarksProvider.overrideWith((ref) async => const <Bookmark>[]),
         readingHistoryProvider.overrideWith((ref) async => history),
-        // Without this the Levensboom on Profiel sits on its loading skeleton
+        // Without this the progress tree on Profiel sits on its loading skeleton
         // forever - and a skeleton shimmers on a repeating controller, which is
         // what makes `pumpAndSettle` in the widget tests never return.
         treeStateProvider.overrideWith(PreviewTreeNotifier.new),

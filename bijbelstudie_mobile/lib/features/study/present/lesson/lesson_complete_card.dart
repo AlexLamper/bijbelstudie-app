@@ -8,13 +8,13 @@ import '../../../../core/analytics/analytics.dart';
 import '../../../../core/notifications/retention_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
-import '../../../levensboom/domain/catalog.dart';
-import '../../../levensboom/domain/growth.dart' show levelForXp, positionForXp, taper;
-import '../../../levensboom/domain/tree_state.dart';
-import '../../../levensboom/present/levensboom_avatar.dart';
-import '../../../levensboom/present/levensboom_providers.dart';
-import '../../../levensboom/present/tree_analytics.dart';
-import '../../../levensboom/present/tree_view.dart';
+import '../../../progress_tree/domain/catalog.dart';
+import '../../../progress_tree/domain/growth.dart' show levelForXp, positionForXp, taper;
+import '../../../progress_tree/domain/tree_state.dart';
+import '../../../progress_tree/present/progress_tree_avatar.dart';
+import '../../../progress_tree/present/progress_tree_providers.dart';
+import '../../../progress_tree/present/tree_analytics.dart';
+import '../../../progress_tree/present/tree_view.dart';
 import '../../../profile/domain/profile_stats.dart' show BadgeCatalog;
 import '../../domain/chapter_study_models.dart';
 import '../../domain/lesson_models.dart';
@@ -373,7 +373,7 @@ class LessonCompleteCard extends ConsumerWidget {
                   animate: !still,
                   // The tree comes toward the reader; everything under it rises.
                   scale: true,
-                  child: _LevensboomHero(
+                  child: _ProgressTreeHero(
                     tree: tree,
                     summary: summary,
                     repeat: repeat,
@@ -557,7 +557,7 @@ class _Figure extends StatelessWidget {
 /// The XP grant has already reached the tree state through the animation bus
 /// by the time this builds, so the tree drawn is the result. When the lesson
 /// grew the tree, it grows from where it stood before this lesson's XP to
-/// where it stands now (growth v2, LEVENSBOOM_GROWTH_PLAN.md §9.2): within a
+/// where it stands now (growth v2, PROGRESS_TREE_GROWTH_PLAN.md §9.2): within a
 /// level the young wood lengthens and the camera eases out a little; across a
 /// level-up the new wood grows out of its parent's tip. So the change is seen
 /// happening rather than found done. The website's `LessonTreeMoment`.
@@ -565,8 +565,8 @@ class _Figure extends StatelessWidget {
 /// It used to be a bordered card inset in the page with a headline and an XP
 /// bar under it. Run to the edges instead, the tree is the screen, and the
 /// numbers it was captioned with read better as the figure strip below.
-class _LevensboomHero extends ConsumerStatefulWidget {
-  const _LevensboomHero({
+class _ProgressTreeHero extends ConsumerStatefulWidget {
+  const _ProgressTreeHero({
     required this.tree,
     required this.summary,
     required this.repeat,
@@ -583,10 +583,10 @@ class _LevensboomHero extends ConsumerStatefulWidget {
   final VoidCallback? onOpenAssistant;
 
   @override
-  ConsumerState<_LevensboomHero> createState() => _LevensboomHeroState();
+  ConsumerState<_ProgressTreeHero> createState() => _ProgressTreeHeroState();
 }
 
-class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
+class _ProgressTreeHeroState extends ConsumerState<_ProgressTreeHero> {
   static const double _height = 300;
 
   /// Where the tree stood before this lesson's XP. Captured once: a later
@@ -597,7 +597,7 @@ class _LevensboomHeroState extends ConsumerState<_LevensboomHero> {
   @override
   void initState() {
     super.initState();
-    // The in-level growth moment (LEVENSBOOM_GROWTH_PLAN.md §9.2, §13): where
+    // The in-level growth moment (PROGRESS_TREE_GROWTH_PLAN.md §9.2, §13): where
     // the tree stood before this lesson's XP and where it stands now. Once per
     // finished lesson, and only when it actually grew the tree.
     final gained = widget.repeat ? 0 : widget.summary.xpAwarded;

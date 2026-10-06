@@ -10,8 +10,8 @@ import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/display_name.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../dashboard/present/dashboard_providers.dart';
-import '../../levensboom/present/levensboom_avatar.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/present/progress_tree_avatar.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../notes/present/notes_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../data/profile_model.dart';
@@ -128,7 +128,7 @@ class _ProfileBody extends ConsumerWidget {
       children: [
         _HeaderBar(profile: profile),
         const SizedBox(height: 14),
-        // The Levensboom is the picture in this header - see [LevensboomAvatar],
+        // The progress tree is the picture in this header - see [ProgressTreeAvatar],
         // which also owns the level-up celebration.
         _ProfileHeader(profile: profile),
 
@@ -366,10 +366,10 @@ class _ProfileHeader extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 16),
-        // The picture is the Levensboom, which falls back to the initials
+        // The picture is the progress tree, which falls back to the initials
         // avatar while the tree loads or when the reader has switched it off.
         // Nothing sits on top of it: the rename control is beside the name.
-        LevensboomAvatar(
+        ProgressTreeAvatar(
           size: 84,
           fallback: ProfileAvatar(profile: profile, size: 84),
         ),

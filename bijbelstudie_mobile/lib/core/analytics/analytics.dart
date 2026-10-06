@@ -30,7 +30,7 @@ class AnalyticsEvents {
   static const crossRefOpened = 'crossref_opened';
   static const crossRefFollowed = 'crossref_followed';
 
-  /// The tree's own funnel (LEVENSBOOM_GROWTH_PLAN.md §13). Numbers travel as
+  /// The tree's own funnel (PROGRESS_TREE_GROWTH_PLAN.md §13). Numbers travel as
   /// strings, which the server's number and boolean props accept.
   ///
   /// `level`, `step`, `phase` (the phase id) and `floored` ('true'/'false').

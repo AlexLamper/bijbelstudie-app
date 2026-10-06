@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/config/preview_config.dart';
 import '../../auth/present/auth_controller.dart';
-import '../../levensboom/domain/tree_state.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/domain/tree_state.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 
 final studyProgressRepositoryProvider = Provider((ref) {
   return StudyProgressRepository(
@@ -29,7 +29,7 @@ class StudyProgressRepository {
 
   final ApiClient _apiClient;
 
-  /// Forwards the `xp` a finished lesson earned to the Levensboom. See [XpSink].
+  /// Forwards the `xp` a finished lesson earned to the progress tree. See [XpSink].
   /// Private so the test fakes that `implements` this class need not declare it.
   final XpSink? _onXp;
 

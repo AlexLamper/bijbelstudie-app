@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/levensboom/domain/tree_state.dart';
-import '../../features/levensboom/present/levensboom_providers.dart';
-import '../../features/levensboom/present/mini_tree.dart';
+import '../../features/progress_tree/domain/tree_state.dart';
+import '../../features/progress_tree/present/progress_tree_providers.dart';
+import '../../features/progress_tree/present/mini_tree.dart';
 import '../../features/settings/data/notification_prefs.dart';
 import 'notification_scheduler.dart';
 import 'notification_service.dart';
@@ -289,7 +289,7 @@ class NotificationPermissionSheet extends StatelessWidget {
                               tree: tree,
                               badge: '${tree.level}',
                               semanticsLabel:
-                                  'Je Levensboom, niveau ${tree.level}',
+                                  'Je boom, niveau ${tree.level}',
                               size: 56,
                             ),
                             const SizedBox(width: 14),

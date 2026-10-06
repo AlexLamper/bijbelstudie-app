@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../../features/levensboom/data/tree_image.dart';
+import '../../features/progress_tree/data/tree_image.dart';
 import 'daily_slots.dart' show kMaxNotificationsPerDay;
 import 'retention_store.dart' show parseSentTag, retentionDayKey;
 
@@ -59,7 +59,7 @@ enum NotifType {
   /// Legacy, like [studyReminder]: the verse now rides in the morning slot.
   dailyVerse,
   /// "Je boom mist wat licht" - fired at exactly two days away, before the
-  /// Levensboom visibly wilts (TREE_FEATURE_PLAN.md §5.6). No channel of its
+  /// ProgressTree visibly wilts (TREE_FEATURE_PLAN.md §5.6). No channel of its
   /// own and no toggle of its own: it is a win-back nudge and rides the ones
   /// `dormant` already has.
   treeWilting,
@@ -754,7 +754,7 @@ class NotificationService {
     return midnight.add(Duration(days: 1, minutes: quiet.endMinutes));
   }
 
-  /// [images], when given, put the reader's Levensboom on the notification:
+  /// [images], when given, put the reader's progress tree on the notification:
   /// the scene as Android's big picture and the iOS attachment, the portrait as
   /// Android's large icon. Rendered on-device by `tree_image.dart`.
   ///

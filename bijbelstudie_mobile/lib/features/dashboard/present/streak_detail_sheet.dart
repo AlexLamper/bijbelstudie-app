@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../levensboom/present/levensboom_providers.dart';
+import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../studies/present/studies_providers.dart';
 import '../data/dashboard_models.dart';
 
@@ -93,7 +93,7 @@ class _StreakDetailSheet extends ConsumerWidget {
 
   /// The very mark the reader just tapped in the header, drawn plain: the
   /// flame of `StreakFlamePill`, or its check for a week goal. It used to be
-  /// the reader's own Levensboom, but the tree reads as a profile avatar
+  /// the reader's own progress tree, but the tree reads as a profile avatar
   /// rather than as the thing being explained - the header stopped using it
   /// for that reason, and this sheet now follows.
   Widget _mark() {

@@ -7,7 +7,7 @@ import '../../../core/notifications/permission_moment.dart'
     show maybeAskAfterFriendAction;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../../levensboom/present/studio/levensboom_studio_screen.dart' show publicProfileUrl;
+import '../../progress_tree/present/studio/progress_tree_studio_screen.dart' show publicProfileUrl;
 import '../data/friend_models.dart';
 import '../data/friends_failure.dart';
 import '../data/friends_repository.dart';

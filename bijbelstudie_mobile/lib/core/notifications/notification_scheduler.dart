@@ -10,8 +10,8 @@ import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/present/dashboard_providers.dart';
 import '../../features/feedback/data/review_prompt.dart';
-import '../../features/levensboom/data/tree_image.dart';
-import '../../features/levensboom/present/levensboom_providers.dart';
+import '../../features/progress_tree/data/tree_image.dart';
+import '../../features/progress_tree/present/progress_tree_providers.dart';
 import '../../features/settings/data/notification_prefs.dart';
 import '../../features/studies/data/enrollment_models.dart';
 import '../../features/studies/data/enrollment_repository.dart';
@@ -904,7 +904,7 @@ class NotificationScheduler {
 
     // ── treeWilting (TREE_FEATURE_PLAN.md §5.6) ──────────────────────────
     //
-    // Exactly two days away, and only then: the Levensboom drops to 0.75 health
+    // Exactly two days away, and only then: the progress tree drops to 0.75 health
     // on day two and only *looks* wilted from day three, so this arrives while
     // there is still nothing to feel bad about. The server's own
     // `daysSinceActive` is used when the tree happens to be loaded; otherwise
