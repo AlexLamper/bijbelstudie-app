@@ -23,6 +23,11 @@ import 'home_header_actions.dart';
 /// pill with `done/target` and a check rather than a flame, since a flame
 /// would say something untrue about what is being counted.
 ///
+/// When the run is only standing because a banked freeze covers the missed
+/// day(s), the flame becomes a frost snowflake - same pill, same shape, a
+/// freezing colour - so the reader can see that the streak is being held rather
+/// than earned today.
+///
 /// Tapping it opens [showStreakDetailSheet], which explains whichever of the
 /// two this reader is actually looking at.
 class HomeStreakIndicator extends ConsumerWidget {
@@ -31,10 +36,16 @@ class HomeStreakIndicator extends ConsumerWidget {
     required this.serverStreak,
     required this.freezes,
     required this.weekDays,
+    this.freezeHolding = false,
   });
 
   final int serverStreak;
   final int freezes;
+
+  /// The run is standing on a banked freeze, not on today's reading: the pill
+  /// shows a frost snowflake instead of the flame. The server decides it
+  /// (`lib/streak.ts`), so both clients agree about what the mark means.
+  final bool freezeHolding;
 
   /// The same 7-day activity strip the "Deze week" card renders, reused here
   /// so the detail sheet doesn't need a second source of truth for it.
@@ -81,15 +92,19 @@ class HomeStreakIndicator extends ConsumerWidget {
         cadence: cadence,
         streak: serverStreak,
         freezes: freezes,
+        freezeHolding: freezeHolding,
         completionsThisWeek: thisWeek,
         weekDays: weekDays,
       ),
       child: StreakFlamePill(
         label: '$serverStreak',
         dormant: serverStreak <= 0,
-        semanticsLabel: freezes > 0
-            ? 'Reeks van $serverStreak $days, met een vrije dag'
-            : 'Reeks van $serverStreak $days',
+        frozen: freezeHolding,
+        semanticsLabel: freezeHolding
+            ? 'Reeks van $serverStreak $days, bevroren met een vriesdag'
+            : (freezes > 0
+                  ? 'Reeks van $serverStreak $days, met een vriesdag gespaard'
+                  : 'Reeks van $serverStreak $days'),
       ),
     );
   }

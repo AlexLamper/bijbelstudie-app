@@ -164,6 +164,14 @@ class AppTheme {
   /// `#EA580C` - orange-600, the streak flame.
   static const Color lightFlame = Color(0xFFEA580C);
 
+  /// `#0284C7` - sky-600, the streak freeze: the flame's counterpart, same
+  /// weight, a cold hue. Deliberately not the brand teal, which already means
+  /// "done" everywhere else in the app.
+  static const Color lightFrost = Color(0xFF0284C7);
+
+  /// `#F0F9FF` - sky-50, behind [lightFrost].
+  static const Color lightFrostTint = Color(0xFFF0F9FF);
+
   /// `rgba(234,88,12,0.08)` flattened - the streak pill background.
   static const Color lightFlameTint = Color(0xFFFFF7ED);
 
@@ -233,6 +241,8 @@ class AppTheme {
 
   static const Color darkFlame = Color(0xFFFB923C);
   static const Color darkFlameTint = Color(0xFF3A2413);
+  static const Color darkFrost = Color(0xFF38BDF8);
+  static const Color darkFrostTint = Color(0xFF13293A);
   static const Color darkVermilion = darkFlame;
   static const Color darkVermilionStrong = Color(0xFFFDBA74);
   static const Color darkPositive = Color(0xFF34D399);
@@ -291,6 +301,10 @@ class AppTheme {
 
   static Color get flame => _c(lightFlame, darkFlame);
   static Color get flameTint => _c(lightFlameTint, darkFlameTint);
+
+  /// The streak freeze. Same role as [flame], a freezing colour.
+  static Color get frost => _c(lightFrost, darkFrost);
+  static Color get frostTint => _c(lightFrostTint, darkFrostTint);
   static Color get vermilion => flame;
   static Color get vermilionStrong =>
       _c(lightVermilionStrong, darkVermilionStrong);

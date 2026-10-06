@@ -27,6 +27,7 @@ Future<void> showStreakDetailSheet(
   required int freezes,
   required int completionsThisWeek,
   required List<WeekDay> weekDays,
+  bool freezeHolding = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -36,6 +37,7 @@ Future<void> showStreakDetailSheet(
       cadence: cadence,
       streak: streak,
       freezes: freezes,
+      freezeHolding: freezeHolding,
       completionsThisWeek: completionsThisWeek,
       weekDays: weekDays,
     ),
@@ -55,6 +57,7 @@ class _StreakDetailSheet extends ConsumerWidget {
     required this.cadence,
     required this.streak,
     required this.freezes,
+    required this.freezeHolding,
     required this.completionsThisWeek,
     required this.weekDays,
   });
@@ -62,6 +65,10 @@ class _StreakDetailSheet extends ConsumerWidget {
   final CadenceInfo cadence;
   final int streak;
   final int freezes;
+
+  /// The run is standing on a freeze, not on today's reading - see
+  /// `HomeStreakIndicator`. The mark and the explainer both change for it.
+  final bool freezeHolding;
   final int completionsThisWeek;
   final List<WeekDay> weekDays;
 
@@ -70,6 +77,10 @@ class _StreakDetailSheet extends ConsumerWidget {
   /// Whether there is anything to show yet: a running streak, or at least
   /// one completion this week. Otherwise the icon stays muted.
   bool get _lit => _isWeekGoal ? completionsThisWeek > 0 : streak > 0;
+
+  /// The same swap the header pill makes: snowflake for flame while a freeze is
+  /// holding the run up.
+  bool get _frozen => !_isWeekGoal && freezeHolding && streak > 0;
 
   /// "Elke dag", "3x per week (ma, wo, vr)", …
   String get _cadenceLabel {
@@ -101,15 +112,17 @@ class _StreakDetailSheet extends ConsumerWidget {
     return Semantics(
       label: _isWeekGoal
           ? '$completionsThisWeek van $target ${_lessonWord(target)} deze week'
-          : (freezes > 0
-                ? 'Reeks van $streak ${_dayWord(streak)}, met een vrije dag'
+          : (freezeHolding
+                ? 'Reeks van $streak ${_dayWord(streak)}, bevroren met een vriesdag'
                 : 'Reeks van $streak ${_dayWord(streak)}'),
       child: Icon(
         _isWeekGoal
             ? Icons.check_circle_outline
-            : Icons.local_fire_department,
+            : (_frozen ? Icons.ac_unit : Icons.local_fire_department),
         color: _lit
-            ? (_isWeekGoal ? AppTheme.teal : AppTheme.flame)
+            ? (_isWeekGoal
+                  ? AppTheme.teal
+                  : (_frozen ? AppTheme.frost : AppTheme.flame))
             : AppTheme.inkMuted,
         size: _kMarkSize,
       ),
@@ -182,16 +195,18 @@ class _StreakDetailSheet extends ConsumerWidget {
                   : 'Elke dag een hoofdstuk lezen of een les afronden houdt je reeks lopend.',
               style: AppTheme.bodyMuted,
             ),
-            if (!_isWeekGoal && freezes > 0) ...[
+            if (!_isWeekGoal && (freezes > 0 || freezeHolding)) ...[
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.ac_unit, size: 16, color: AppTheme.teal),
+                  Icon(Icons.ac_unit, size: 16, color: AppTheme.frost),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Je hebt $freezes bevriezingsdag${freezes == 1 ? '' : 'en'} gespaard: mis je een dag, dan blijft je reeks staan.',
+                      freezeHolding
+                          ? 'Een vriesdag houdt je reeks heel voor de dag die je oversloeg. Lees je vandaag, dan loopt hij gewoon door.'
+                          : 'Je hebt $freezes vriesdag${freezes == 1 ? '' : 'en'} gespaard: mis je een dag, dan blijft je reeks staan. Je krijgt er een bij elke zevende dag op rij.',
                       style: AppTheme.caption.copyWith(color: scheme.onSurface),
                     ),
                   ),

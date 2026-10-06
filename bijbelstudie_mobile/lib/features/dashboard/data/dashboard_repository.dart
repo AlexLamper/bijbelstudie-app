@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../progress_tree/domain/tree_state.dart';
 import '../../progress_tree/present/progress_tree_providers.dart';
+import '../present/dashboard_providers.dart';
 import 'daily_verse_store.dart';
 import 'dashboard_models.dart';
 
@@ -14,11 +15,17 @@ final dashboardRepositoryProvider = Provider((ref) {
     // Read lazily inside the callback, so this provider does not depend on the
     // tree - the dashboard has to work whether or not anything is watching it.
     onXp: (xp) => ref.read(treeAnimationEventProvider.notifier).push(xp),
+    onStreak: (echo) => ref.read(streakEchoProvider.notifier).push(echo),
   );
 });
 
+/// Where a write endpoint's streak lands. See [StreakEcho].
+typedef StreakSink = void Function(StreakEcho? echo);
+
 class DashboardRepository {
-  DashboardRepository(this._apiClient, {XpSink? onXp}) : _onXp = onXp;
+  DashboardRepository(this._apiClient, {XpSink? onXp, StreakSink? onStreak})
+    : _onXp = onXp,
+      _onStreak = onStreak;
 
   final ApiClient _apiClient;
 
@@ -29,6 +36,11 @@ class DashboardRepository {
   /// this class, and a public field would oblige every one of those fakes to
   /// declare a member they have no use for.
   final XpSink? _onXp;
+
+  /// Forwards the streak a write endpoint reported to the Start tab's header,
+  /// so it does not keep showing the number from before this call. Private for
+  /// the same reason as [_onXp].
+  final StreakSink? _onStreak;
 
   /// One request for the whole tab. The website makes six; on a phone that is
   /// six round trips before anything renders.
@@ -77,6 +89,10 @@ class DashboardRepository {
       );
       // Null on a chapter already marked read, which is the common case.
       _onXp?.call((response.data as Map?)?['xp']);
+      // Reading a chapter advances the streak server-side now, so the header
+      // has to hear about it: the Start tab may well be served from the cached
+      // payload written before this read.
+      _onStreak?.call(StreakEcho.fromJson(response.data));
     } catch (_) {
       // best effort
     }
@@ -99,16 +115,20 @@ class DashboardRepository {
 
   /// Advances the daily streak, once per calendar day.
   ///
-  /// The server owns every rule here: it bumps at most once a day, spends a
-  /// freeze to bridge a missed day when the account is Pro, hands out a freeze
-  /// every fifth day, and re-evaluates the badges. Returns null when the call
-  /// did not go through, which the caller treats as "no celebration", never as
-  /// "streak lost".
+  /// The server owns every rule here: it bumps at most once per Dutch calendar
+  /// day, spends banked freezes to bridge missed days (every account, not just
+  /// Pro), hands out a freeze on every seventh day, and re-evaluates the
+  /// badges. Returns null when the call did not go through, which the caller
+  /// treats as "no celebration", never as "streak lost".
+  ///
+  /// Reading a chapter does this too, server-side, inside `POST /last-read` -
+  /// this call is for a finished lesson, which is not a chapter read.
   Future<StreakResult?> bumpStreak() async {
     try {
       final response = await _apiClient.dio.post('/streak');
       final data = response.data as Map<String, dynamic>;
       _onXp?.call(data['xp']);
+      _onStreak?.call(StreakEcho.fromJson(data));
       return StreakResult.fromJson(data);
     } catch (_) {
       return null;

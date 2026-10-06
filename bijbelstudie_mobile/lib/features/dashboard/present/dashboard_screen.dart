@@ -111,6 +111,7 @@ class _DashboardBody extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final hasArchivedVerse =
         ref.watch(dailyVerseStoreProvider).history.isNotEmpty;
+    final echo = ref.watch(streakEchoProvider);
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -153,8 +154,11 @@ class _DashboardBody extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 2),
                 child: HomeHeaderActions(
                   streak: HomeStreakIndicator(
-                    serverStreak: data.streak,
-                    freezes: data.freezes,
+                    // The echo wins when there is one: a chapter read in this
+                    // session advanced the streak after this payload was built.
+                    serverStreak: echo?.streak ?? data.streak,
+                    freezes: echo?.freezes ?? data.freezes,
+                    freezeHolding: echo?.freezeHolding ?? data.freezeHolding,
                     weekDays: data.weekDays,
                   ),
                 ),

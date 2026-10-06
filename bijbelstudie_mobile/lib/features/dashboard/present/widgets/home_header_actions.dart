@@ -119,6 +119,7 @@ class StreakFlamePill extends StatelessWidget {
     required this.semanticsLabel,
     this.icon = Icons.local_fire_department,
     this.dormant = false,
+    this.frozen = false,
     this.height = 44,
   });
 
@@ -133,13 +134,22 @@ class StreakFlamePill extends StatelessWidget {
   /// away and the header does not change shape.
   final bool dormant;
 
+  /// The run is standing on a banked freeze rather than on today's reading: the
+  /// same pill, a snowflake instead of the flame, in [AppTheme.frost]. Nothing
+  /// else about it changes - a reader should recognise it as the same thing in
+  /// another state, not wonder what new badge they earned.
+  final bool frozen;
+
   final double height;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final scheme = Theme.of(context).colorScheme;
-    final tint = dormant ? AppTheme.inkMuted : AppTheme.flame;
+    final tint = dormant
+        ? AppTheme.inkMuted
+        : (frozen ? AppTheme.frost : AppTheme.flame);
+    final mark = frozen && !dormant ? Icons.ac_unit : icon;
 
     return Semantics(
       label: semanticsLabel,
@@ -155,7 +165,7 @@ class StreakFlamePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: tint),
+            Icon(mark, size: 20, color: tint),
             const SizedBox(width: 5),
             Text(
               label,

@@ -196,6 +196,8 @@ class DashboardData {
     required this.isPro,
     required this.streak,
     required this.freezes,
+    this.freezeHolding = false,
+    this.activeDaysThisYear,
     required this.readChapters,
     required this.weekDays,
     required this.weekTotal,
@@ -218,9 +220,19 @@ class DashboardData {
   final bool isPro;
   final int streak;
 
-  /// Days the streak can survive without a completed task. Earned one per five
-  /// days server-side; only a Pro account may spend one.
+  /// Days the streak can survive without a completed task. Earned one per seven
+  /// days server-side, and spendable by every account.
   final int freezes;
+
+  /// The run is only standing because freezes will cover the missed day(s) -
+  /// nothing has been read today. The server decides this (`lib/streak.ts`);
+  /// the header paints a snowflake instead of a flame for it. False from a
+  /// server that predates the field.
+  final bool freezeHolding;
+
+  /// Distinct days this calendar year with reading activity, in Amsterdam days.
+  /// Null from a server that predates the field (or a cached payload it wrote).
+  final int? activeDaysThisYear;
 
   /// Book name -> the chapter numbers already read.
   final Map<String, List<int>> readChapters;
@@ -304,6 +316,8 @@ class DashboardData {
       isPro: user['isPro'] as bool? ?? false,
       streak: (json['streak'] as num?)?.toInt() ?? 0,
       freezes: (json['freezes'] as num?)?.toInt() ?? 0,
+      freezeHolding: json['freezeHolding'] as bool? ?? false,
+      activeDaysThisYear: (json['activeDaysThisYear'] as num?)?.toInt(),
       readChapters: _canonicaliseProgress(rawProgress),
       weekDays: (weekly['days'] as List? ?? const [])
           .map((d) => WeekDay.fromJson(d as Map<String, dynamic>))

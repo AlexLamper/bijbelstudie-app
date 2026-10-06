@@ -39,7 +39,7 @@ class MiniTree extends StatelessWidget {
   /// Streak 0 / nothing done yet: the same muted treatment the ring had.
   final bool dormant;
 
-  /// A banked freeze, shown as a small teal snowflake at the bottom-left - out
+  /// A banked freeze, shown as a small frost snowflake at the bottom-left - out
   /// of the badge's corner rather than floating over the canopy.
   final bool hasFreeze;
 
@@ -89,12 +89,12 @@ class MiniTree extends StatelessWidget {
                 bottom: size * 0.06,
                 child: _Chip(
                   height: size * 0.34,
-                  background: AppTheme.tealTint,
-                  border: AppTheme.teal.withValues(alpha: 0.5),
+                  background: AppTheme.frostTint,
+                  border: AppTheme.frost.withValues(alpha: 0.5),
                   child: Icon(
                     Icons.ac_unit,
                     size: size * 0.20,
-                    color: AppTheme.teal,
+                    color: AppTheme.frost,
                   ),
                 ),
               ),
