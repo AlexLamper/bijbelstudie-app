@@ -298,12 +298,17 @@ class _HeaderBar extends ConsumerWidget {
   /// What the share button hands out: the product, not the reader. The personal
   /// invite link is its own card further down ([InviteSection]) and gives away
   /// a week of Pro, which is not what a bare share button should do.
+  ///
+  /// The text names what the app does - lezen, uitleg, aantekeningen, leesplan -
+  /// instead of claiming the sender loves it. A testimonial someone else wrote
+  /// is the one thing nobody forwards.
   Future<void> _shareApp(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
     final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
     try {
       await Share.share(
-        'Ik gebruik BijbelStudie om de Bijbel te lezen en te studeren: '
+        'Met BijbelStudie lees je de Bijbel met uitleg erbij, maak je '
+        'aantekeningen en volg je een leesplan. Kijk zelf even: '
         '${AppConfig.siteUrl}',
         sharePositionOrigin: origin,
       );

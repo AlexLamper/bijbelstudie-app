@@ -166,8 +166,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
             ],
           ),
+
+          const _SocialsSection(),
         ],
       ),
+    );
+  }
+}
+
+/// One account the app can be followed on: the row's label, the handle under
+/// it, the icon in its trailing slot and the profile it opens.
+class _SocialLink {
+  const _SocialLink({
+    required this.name,
+    required this.handle,
+    required this.url,
+    required this.icon,
+  });
+
+  final String name;
+  final String handle;
+  final String url;
+  final IconData icon;
+}
+
+/// The accounts that exist. Facebook and YouTube are coming and are one entry
+/// each when they do - [_SocialsSection] draws whatever is in this list, so no
+/// widget has to be touched for a third or fourth network.
+const List<_SocialLink> _socialLinks = [
+  _SocialLink(
+    name: 'Instagram',
+    handle: '@bijbelstudie.io',
+    url: 'https://www.instagram.com/bijbelstudie.io',
+    icon: Icons.photo_camera_outlined,
+  ),
+  _SocialLink(
+    name: 'TikTok',
+    handle: '@bijbelstudie.io',
+    url: 'https://www.tiktok.com/@bijbelstudie.io',
+    icon: Icons.music_note_outlined,
+  ),
+];
+
+/// "Volg ons" as the last group of the list: there for anyone who scrolls to
+/// the end, never in front of a setting. Material has no brand glyphs, so each
+/// row carries a plain icon next to the network's name, and the open_in_new
+/// next to it says what the tap does - the profile opens in the browser or in
+/// the network's own app, like every other external link in the app.
+class _SocialsSection extends StatelessWidget {
+  const _SocialsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return _SettingsGroup(
+      title: 'Volg ons',
+      children: [
+        for (final link in _socialLinks)
+          SettingsRow(
+            label: link.name,
+            subtitle: link.handle,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(link.icon, size: 18, color: AppTheme.inkMuted),
+                const SizedBox(width: 8),
+                Icon(Icons.open_in_new, size: 18, color: AppTheme.teal),
+              ],
+            ),
+            onTap: () {
+              final uri = Uri.tryParse(link.url);
+              if (uri != null) {
+                launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+      ],
     );
   }
 }
