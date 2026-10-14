@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
@@ -19,10 +20,34 @@ import 'commentary_format.dart';
 /// long - Matthew Henry on Genesis 1 verse 1 is eleven kilobytes - and this
 /// sits in a ListView that rebuilds its children as they scroll.
 class CommentaryBody extends StatefulWidget {
-  const CommentaryBody({super.key, required this.text, required this.settings});
+  const CommentaryBody({
+    super.key,
+    required this.text,
+    required this.settings,
+    this.selectable = true,
+    this.onQuote,
+  });
 
   final String text;
   final ReadingSettings settings;
+
+  /// Whether the reader may drag a cursor through this text.
+  ///
+  /// False for a licensed commentary - see
+  /// `features/commentary/domain/commentary_copy_policy.dart`. With no
+  /// [SelectionArea] around them the blocks are plain `Text.rich`, which has no
+  /// selection, no handles and so no copy item in any toolbar: the same stance
+  /// the reader's own verses take for a restricted translation.
+  final bool selectable;
+
+  /// Called with the text the reader picked out, to hang a note off it.
+  ///
+  /// Both paths end here, which is the point: when [selectable] is true the
+  /// selection toolbar grows an "Aantekening maken" item and hands over the
+  /// selection; when it is false a long press on one block hands over that
+  /// block. A licensed commentary therefore takes notes without becoming
+  /// copyable. Null leaves the text inert.
+  final ValueChanged<String>? onQuote;
 
   @override
   State<CommentaryBody> createState() => _CommentaryBodyState();
@@ -30,6 +55,10 @@ class CommentaryBody extends StatefulWidget {
 
 class _CommentaryBodyState extends State<CommentaryBody> {
   late List<CommentaryBlock> _blocks = parseCommentary(widget.text);
+
+  /// What is selected right now, cached from [SelectionArea.onSelectionChanged]
+  /// so the toolbar item can quote it. Not state the build depends on.
+  String? _selection;
 
   @override
   void didUpdateWidget(covariant CommentaryBody oldWidget) {
@@ -68,17 +97,72 @@ class _CommentaryBodyState extends State<CommentaryBody> {
         );
       }
 
-      children.add(_block(block, base, suppressTop: children.isEmpty));
+      final rendered = _block(block, base, suppressTop: children.isEmpty);
+      // Only where a selection cannot do the job: inside a SelectionArea a
+      // long press starts a selection, and a gesture stealing that would take
+      // the reader's copy away rather than add anything.
+      children.add(
+        widget.selectable || widget.onQuote == null
+            ? rendered
+            : Semantics(
+                onLongPressHint: 'Aantekening maken',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: () => _quote(block),
+                  child: rendered,
+                ),
+              ),
+      );
     }
+
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+
+    // A licensed commentary stops here: no SelectionArea, so no handles and no
+    // toolbar to carry a copy item. The long press on each block above is the
+    // way in for a note.
+    if (!widget.selectable) return column;
 
     // Selectable, as the flat `SelectableText` this replaced was. One area per
     // entry, so a drag cannot run off into the next verse's commentary.
     return SelectionArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
+      onSelectionChanged: (content) => _selection = content?.plainText,
+      contextMenuBuilder: widget.onQuote == null
+          ? null
+          : _contextMenu,
+      child: column,
     );
+  }
+
+  /// The platform's own selection toolbar with one item added, so copy, share
+  /// and lookup keep working exactly as they did on a public-domain commentary.
+  Widget _contextMenu(BuildContext context, SelectableRegionState state) {
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: state.contextMenuAnchors,
+      buttonItems: [
+        ...state.contextMenuButtonItems,
+        ContextMenuButtonItem(
+          label: 'Aantekening maken',
+          onPressed: () {
+            final selection = _selection;
+            state.hideToolbar();
+            if (selection != null && selection.trim().isNotEmpty) {
+              widget.onQuote?.call(selection);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Long press on one block of a non-selectable commentary: quote that block.
+  void _quote(CommentaryBlock block) {
+    final text = block.spans.map((span) => span.text).join().trim();
+    if (text.isEmpty) return;
+    HapticFeedback.selectionClick();
+    widget.onQuote?.call(text);
   }
 
   Widget _block(

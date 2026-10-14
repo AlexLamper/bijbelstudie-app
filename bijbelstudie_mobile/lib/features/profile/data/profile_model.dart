@@ -15,7 +15,7 @@ class ReadingPreferences {
 
   const ReadingPreferences({
     this.translation = 'statenvertaling',
-    this.commentary = 'matthew_henry_nl',
+    this.commentary = 'kingcomments_nl',
     this.fontSize = 'base',
     this.fontFamily = 'serif',
     this.lineHeight = 'relaxed',
@@ -28,7 +28,7 @@ class ReadingPreferences {
     final data = json ?? const <String, dynamic>{};
     return ReadingPreferences(
       translation: data['translation'] as String? ?? 'statenvertaling',
-      commentary: data['commentary'] as String? ?? 'matthew_henry_nl',
+      commentary: data['commentary'] as String? ?? 'kingcomments_nl',
       fontSize: data['fontSize'] as String? ?? 'base',
       fontFamily: data['fontFamily'] as String? ?? 'serif',
       lineHeight: data['lineHeight'] as String? ?? 'relaxed',

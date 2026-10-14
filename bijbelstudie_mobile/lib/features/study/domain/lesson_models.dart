@@ -82,7 +82,7 @@ class LessonPayload {
           .whereType<Map<String, dynamic>>()
           .map(LessonTranslation.fromJson)
           .toList(growable: false),
-      commentaryId: json['commentaryId'] as String? ?? 'matthew_henry_nl',
+      commentaryId: json['commentaryId'] as String? ?? 'kingcomments_nl',
       content: LessonContent.fromJson(
         (json['content'] as Map<String, dynamic>?) ?? const {},
       ),

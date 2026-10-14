@@ -11,11 +11,17 @@ import 'commentary_jump.dart';
 /// hidden - tapping it still goes somewhere useful, the entry before it,
 /// which is usually where that verse is being discussed. Resolves to the
 /// tapped verse number (0 for the introduction), or null when dismissed.
+///
+/// [sharedVerses] holds the verses that are discussed under another number -
+/// verse 2 of a "Verzen 1-3" entry - mapped to that entry's label. They are
+/// not dimmed: the commentator did write about them, and the jump lands on the
+/// paragraph that does.
 Future<int?> showVerseJumpSheet({
   required BuildContext context,
   required List<int> entryNumbers,
   required int verseCount,
   int? currentEntry,
+  Map<int, String> sharedVerses = const {},
 }) {
   return showModalBottomSheet<int>(
     context: context,
@@ -30,6 +36,7 @@ Future<int?> showVerseJumpSheet({
       entryNumbers: entryNumbers,
       verseCount: verseCount,
       currentEntry: currentEntry,
+      sharedVerses: sharedVerses,
     ),
   );
 }
@@ -40,6 +47,7 @@ class VerseJumpSheet extends StatelessWidget {
     required this.entryNumbers,
     required this.verseCount,
     this.currentEntry,
+    this.sharedVerses = const {},
   });
 
   /// Verse numbers that have an entry, ascending; 0 is the introduction.
@@ -50,6 +58,10 @@ class VerseJumpSheet extends StatelessWidget {
 
   /// The entry currently at the top of the commentary, marked in the grid.
   final int? currentEntry;
+
+  /// Verses discussed inside an entry filed under another number, mapped to
+  /// that entry's label ('1-3'). Offered as covered, not dimmed.
+  final Map<int, String> sharedVerses;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +112,8 @@ class VerseJumpSheet extends StatelessWidget {
                 ),
               ),
             ),
-            if (hasEntry.length < verseCount + (hasIntro ? 1 : 0))
+            if (hasEntry.length + sharedVerses.length <
+                verseCount + (hasIntro ? 1 : 0))
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
                 child: Text(
@@ -116,10 +129,13 @@ class VerseJumpSheet extends StatelessWidget {
   }
 
   Widget _cellFor(BuildContext context, int verse, Set<int> hasEntry) {
-    final available = hasEntry.contains(verse);
+    final shared = sharedVerses[verse];
+    final available = hasEntry.contains(verse) || shared != null;
     final String semanticsLabel;
-    if (available) {
+    if (hasEntry.contains(verse)) {
       semanticsLabel = 'Vers $verse';
+    } else if (shared != null) {
+      semanticsLabel = 'Vers $verse, samen met vers $shared';
     } else {
       final index = commentaryEntryIndexFor(entryNumbers, verse);
       final fallback = index == null ? null : entryNumbers[index];

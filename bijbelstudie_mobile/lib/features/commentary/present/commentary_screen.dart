@@ -67,7 +67,13 @@ class _CommentaryScreenState extends ConsumerState<CommentaryScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  CommentaryPane(location: location, settings: settings),
+                  CommentaryPane(
+                    location: location,
+                    settings: settings,
+                    // The screen a tap on a commentary note lands on: this
+                    // pane is the one that takes the anchor and scrolls to it.
+                    followNoteAnchor: true,
+                  ),
                   OriginalTextPane(location: location),
                 ],
               ),

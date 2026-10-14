@@ -8,8 +8,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/kring_share_action.dart';
 import '../../../core/ui/timed_snack_bar.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../commentary/domain/commentary_copy_policy.dart';
+import '../../commentary/domain/commentary_note_anchor.dart';
+import '../../commentary/present/commentary_note_target.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../friends/data/friend_models.dart' show FriendPostKind;
+import '../../settings/data/reading_settings.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
 import 'notes_providers.dart';
@@ -29,14 +33,27 @@ class NoteRow extends ConsumerWidget {
   /// throw the reader out of the study they are in.
   final bool tapOpensReader;
 
+  /// The commentary section this note hangs off, or null for a note on a bible
+  /// verse. Read out of the note's own tags - see `CommentaryNoteAnchor`.
+  CommentaryNoteAnchor? get _anchor => CommentaryNoteAnchor.fromTags(
+    note.tags,
+    book: note.book,
+    chapter: note.chapter,
+  );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
+    final anchor = _anchor;
 
     return NoteListRow(
       onMenu: () => _menu(context, ref),
       onTap: tapOpensReader
           ? () {
+              if (anchor != null) {
+                _openCommentary(context, ref, anchor);
+                return;
+              }
               ref
                   .read(readerLocationProvider.notifier)
                   .openChapter(book: note.book, chapter: note.chapter);
@@ -53,6 +70,7 @@ class NoteRow extends ConsumerWidget {
                 ? note.color.fill(Theme.of(context).brightness)
                 : null,
           ),
+          if (anchor != null) CommentaryNoteLine(anchor: anchor),
           if (note.isStudyReflection)
             ReflectionNoteBody(note: note)
           else if (note.noteText.trim().isNotEmpty) ...[
@@ -96,20 +114,59 @@ class NoteRow extends ConsumerWidget {
     );
   }
 
+  /// Puts the reader back in the commentary this note was written in: the
+  /// chapter, the commentator, and the section the anchor names.
+  ///
+  /// The source is set first, because the pane on `/commentary` loads whatever
+  /// commentary the reader last chose; the anchor is what it scrolls to once
+  /// that chapter is up.
+  void _openCommentary(
+    BuildContext context,
+    WidgetRef ref,
+    CommentaryNoteAnchor anchor,
+  ) {
+    ref
+        .read(readerLocationProvider.notifier)
+        .openChapter(book: anchor.book, chapter: anchor.chapter);
+    ref
+        .read(readingSettingsProvider.notifier)
+        .setLastCommentary(anchor.commentaryId);
+    ref.read(pendingCommentaryNoteProvider.notifier).set(anchor);
+    context.go('/commentary');
+  }
+
   /// The note as text, without the reference: a reflection is its question and
   /// its answer, anything else the verse it hangs off and what the reader
   /// wrote. Shared by both share actions so the kring reads the same note the
   /// system sheet would hand out.
+  ///
+  /// One exception, and it is the whole point of the copy guard: a note on a
+  /// licensed commentary shares what the reader wrote and where they wrote it,
+  /// never the commentary's own words. Keeping that fragment in the reader's
+  /// private note is fine; putting it on the clipboard or in the kring is the
+  /// redistribution no licence here covers.
   String _body() {
+    final anchor = _anchor;
+    final quoteStaysHere =
+        anchor != null && isCommentaryCopyRestricted(anchor.commentaryId);
+
     return [
       if (note.isStudyReflection) ...[
         note.reflectionParts.question,
         note.reflectionParts.answer,
       ] else ...[
-        note.verseText.trim(),
+        if (!quoteStaysHere) note.verseText.trim(),
         note.noteText.trim(),
       ],
     ].where((part) => part.isNotEmpty).join('\n\n');
+  }
+
+  /// The line a share signs off with. A commentary note names its commentator,
+  /// which is attribution rather than text and travels freely.
+  String _shareReference() {
+    final anchor = _anchor;
+    if (anchor == null) return note.reference;
+    return '${note.reference} - ${commentaryDisplayName(anchor.commentaryId)}';
   }
 
   Future<void> _menu(BuildContext context, WidgetRef ref) async {
@@ -123,10 +180,11 @@ class NoteRow extends ConsumerWidget {
     final kind = note.isHighlight ? 'Markering' : 'Notitie';
 
     if (picked == NoteRowAction.share) {
-      final text = [_body(), note.reference]
+      final reference = _shareReference();
+      final text = [_body(), reference]
           .where((part) => part.isNotEmpty)
           .join('\n\n');
-      await shareRowText(context, text: text, subject: note.reference);
+      await shareRowText(context, text: text, subject: reference);
       return;
     }
 
@@ -141,7 +199,7 @@ class NoteRow extends ConsumerWidget {
         ref,
         kind: FriendPostKind.note,
         body: _body(),
-        reference: note.reference,
+        reference: _shareReference(),
         sourceId: note.id,
       );
       return;
@@ -243,6 +301,42 @@ class ReflectionNoteBody extends StatelessWidget {
           Text(answer, style: AppTheme.bodyMuted.copyWith(height: 1.5, color: AppTheme.ink)),
         ],
       ],
+    );
+  }
+}
+
+/// Says a note hangs off a commentary rather than off the bible text, and which
+/// commentator and section - the same two words the pane pills that entry with,
+/// so the row names the spot the way the reader saw it.
+///
+/// Kept to one quiet line, like "Reflectie uit je studie" above: the note the
+/// reader wrote is still the row's subject.
+class CommentaryNoteLine extends StatelessWidget {
+  const CommentaryNoteLine({super.key, required this.anchor});
+
+  final CommentaryNoteAnchor anchor;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.menu_book_outlined, size: 13, color: AppTheme.teal),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              'Commentaar: ${commentaryDisplayName(anchor.commentaryId)}, '
+              '${anchor.sectionLabel.toLowerCase()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.caption.copyWith(fontSize: 12, color: AppTheme.teal),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

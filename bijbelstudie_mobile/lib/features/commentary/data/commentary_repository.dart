@@ -39,10 +39,16 @@ class CommentaryRepository {
 
   /// One commentary chapter.
   ///
-  /// Two shapes come back from the corpus and both are normal:
+  /// Three shapes come back from the corpus and all are normal:
   ///  - Matthew Henry keys its chapter introduction as verse **0**;
-  ///  - Dachsel's entries are HTML fragments (`<ol><li><div class="s9">...`).
-  /// The renderer handles both; see `commentary_format.dart`.
+  ///  - Dachsel's entries are HTML fragments (`<ol><li><div class="s9">...`);
+  ///  - KingComments keys a *chunk* of verses rather than a verse. `1 Petrus 2`
+  ///    arrives as six entries - 1, 3, 9, 13, 18, 22 - while the text inside
+  ///    them is written verse by verse, each one opening with its own
+  ///    `<p><i><a href="#b60.2.4">1Pt 2:4</a>.</i>`. Taking the keys for the
+  ///    verses covered is what used to leave 1Pt 2:4 out of "Ga naar vers".
+  /// The renderer handles the markup; see `commentary_format.dart`. Which
+  /// verses a payload really covers is `commentary_entries.dart`.
   Future<ChapterContent> getChapter(String commentaryId, String book, int chapter) async {
     final path = '/commentaries/$commentaryId/${Uri.encodeComponent(book)}/$chapter';
 

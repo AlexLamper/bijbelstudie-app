@@ -154,7 +154,7 @@ class ReadingSettings {
     this.themeMode = ThemeMode.light,
     this.dailyReminderMinutes,
     this.lastVersionId = 'statenvertaling',
-    this.lastCommentaryId = 'matthew_henry_nl',
+    this.lastCommentaryId = 'kingcomments_nl',
     this.lastBook,
     this.lastChapter,
     this.lastLocationAt,
@@ -298,7 +298,7 @@ class ReadingSettingsController extends Notifier<ReadingSettings> {
       },
       dailyReminderMinutes: prefs.getInt(_kReminder),
       lastVersionId: prefs.getString(_kLastVersion) ?? 'statenvertaling',
-      lastCommentaryId: prefs.getString(_kLastCommentary) ?? 'matthew_henry_nl',
+      lastCommentaryId: prefs.getString(_kLastCommentary) ?? 'kingcomments_nl',
       lastBook: prefs.getString(_kLastBook),
       lastChapter: prefs.getInt(_kLastChapter),
       lastLocationAt: storedAt == null

@@ -11,10 +11,15 @@ import '../../../core/ui/lazy_scroll.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../notes/present/verse_action_sheet.dart';
 import '../../premium/present/upgrade_prompt.dart';
 import '../../settings/data/reading_settings.dart';
+import '../data/commentary_entries.dart';
+import '../domain/commentary_copy_policy.dart';
+import '../domain/commentary_note_anchor.dart';
 import 'commentary_body.dart';
 import 'commentary_jump.dart';
+import 'commentary_note_target.dart';
 import 'verse_jump_sheet.dart';
 
 /// The Commentaar tab of the study page, locked to whatever the reader shows.
@@ -33,6 +38,7 @@ class CommentaryPane extends ConsumerStatefulWidget {
     required this.settings,
     this.onSourceSelected,
     this.followReader = false,
+    this.followNoteAnchor = false,
   });
 
   final ReaderLocation location;
@@ -48,6 +54,12 @@ class CommentaryPane extends ConsumerStatefulWidget {
   /// standalone commentary screen would otherwise swallow a target meant for it.
   final bool followReader;
 
+  /// True for the pane on the standalone `/commentary` screen, the one a tap on
+  /// a commentary note in the Notities list lands on. Only that pane consumes
+  /// [pendingCommentaryNoteProvider], for the same reason [followReader] is not
+  /// everyone's.
+  final bool followNoteAnchor;
+
   @override
   ConsumerState<CommentaryPane> createState() => _CommentaryPaneState();
 }
@@ -61,9 +73,10 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
   final Map<int, GlobalKey> _entryKeys = {};
   String? _entryKeysFor;
 
-  /// The chapter [_entries] was filtered from, so the filter runs once per
+  /// The chapter [_entries] was built from, so the work runs once per
   /// chapter rather than on every build.
   ChapterContent? _entriesOf;
+  CommentaryEntries _entryList = CommentaryEntries.empty;
   List<Verse> _entries = const [];
 
   /// The entry at the top of the list once scrolling last came to rest. Null
@@ -77,6 +90,7 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
   /// True between accepting a pending target and the post-frame callback that
   /// clears it, so a second build in between does not act on it twice.
   bool _consumingPending = false;
+  bool _consumingPendingNote = false;
 
   static const double _listTopPadding = 16;
 
@@ -108,12 +122,15 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
   List<Verse> _entriesFor(ChapterContent chapter) {
     if (!identical(chapter, _entriesOf)) {
       _entriesOf = chapter;
-      // Empty entries were always skipped when rendering; filtering them out
-      // up front keeps list index and entry index the same thing.
-      _entries = [
-        for (final verse in chapter.verses)
-          if (verse.text.trim().isNotEmpty) verse,
-      ];
+      // Which verses a payload really covers is not the same as its keys:
+      // KingComments keys chunks and carries the verse boundaries inside the
+      // markup. Empty entries are dropped there too, which keeps list index
+      // and entry index the same thing. See commentary_entries.dart.
+      _entryList = commentaryEntriesOf(
+        chapter,
+        commentaryId: widget.settings.lastCommentaryId,
+      );
+      _entries = _entryList.entries;
     }
     return _entries;
   }
@@ -134,11 +151,17 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
     final pending = widget.followReader
         ? ref.watch(pendingCommentaryVerseProvider)
         : null;
+    final pendingNote = widget.followNoteAnchor
+        ? ref.watch(pendingCommentaryNoteProvider)
+        : null;
 
     final chapter = chapterAsync.value;
     final entries = chapter == null ? const <Verse>[] : _entriesFor(chapter);
     if (chapterAsync.hasValue && chapter != null && pending != null) {
       _schedulePendingJump(entries);
+    }
+    if (chapterAsync.hasValue && chapter != null && pendingNote != null) {
+      _schedulePendingNoteJump();
     }
 
     final topEntry = entries.isEmpty
@@ -189,6 +212,13 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
 
   Widget _buildList(ChapterContent chapter, List<Verse> entries) {
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    // The commentary envelope says nothing about copying yet, so this is the
+    // local list's answer - with the envelope's flag honoured the moment the
+    // API starts sending one. See `commentary_copy_policy.dart`.
+    final restricted = isCommentaryCopyRestricted(
+      chapter.sourceId,
+      serverRestricted: chapter.copyRestricted ? true : null,
+    );
 
     Widget entry(int index) {
       final verse = entries[index];
@@ -199,6 +229,8 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
         isLast: index == entries.length - 1,
         pulse: _pulsingEntry == verse.number,
         reduceMotion: reduceMotion,
+        copyRestricted: restricted,
+        onAddNote: (excerpt) => _addNote(chapter, verse, excerpt),
       );
     }
 
@@ -213,6 +245,16 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
           chapter.attribution,
           style: AppTheme.bodyMuted.copyWith(fontSize: 11),
         ),
+        // Said once, at the foot, beside the attribution it belongs with -
+        // rather than as a refusal sprung on the reader when they reach for a
+        // selection handle that is not there.
+        if (restricted) ...[
+          const SizedBox(height: 6),
+          Text(
+            commentaryCopyRestrictedNotice(chapter.sourceId),
+            style: AppTheme.bodyMuted.copyWith(fontSize: 11),
+          ),
+        ],
       ],
     );
 
@@ -272,6 +314,80 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
       }
       unawaited(_jumpToVerse(_entries, target.verse));
     });
+  }
+
+  /// The same one-shot dance as [_schedulePendingJump], for a tap on a
+  /// commentary note in the Notities list.
+  ///
+  /// The anchor names its own commentary, and the source the pane is showing is
+  /// the reader's persisted choice. When the two disagree the anchor is left
+  /// pending and the choice is changed instead: the rebuild that follows loads
+  /// the right commentary, and this runs again with a chapter the anchor
+  /// actually points into.
+  void _schedulePendingNoteJump() {
+    if (_consumingPendingNote) return;
+    _consumingPendingNote = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _consumingPendingNote = false;
+      if (!mounted) return;
+      final anchor = ref.read(pendingCommentaryNoteProvider);
+      if (anchor == null) return;
+      if (anchor.book != widget.location.book ||
+          anchor.chapter != widget.location.chapter) {
+        ref.read(pendingCommentaryNoteProvider.notifier).consume();
+        return;
+      }
+      if (anchor.commentaryId != widget.settings.lastCommentaryId) {
+        ref
+            .read(readingSettingsProvider.notifier)
+            .setLastCommentary(anchor.commentaryId);
+        return;
+      }
+      ref.read(pendingCommentaryNoteProvider.notifier).consume();
+      unawaited(_jumpToVerse(_entries, anchor.section));
+    });
+  }
+
+  /// Opens the app's one note editor on a passage of this commentary.
+  ///
+  /// [excerpt] is what the reader picked out - a selection on a public-domain
+  /// commentary, one block on a licensed one - and null when they asked for the
+  /// whole entry from its label. Either way it is cut to
+  /// [maxCommentaryExcerptChars] before it is stored, and the anchor in the
+  /// tags is what brings them back here.
+  Future<void> _addNote(
+    ChapterContent chapter,
+    Verse entry,
+    String? excerpt,
+  ) async {
+    final commentaryId = chapter.sourceId;
+    final restricted = isCommentaryCopyRestricted(
+      commentaryId,
+      serverRestricted: chapter.copyRestricted ? true : null,
+    );
+    final anchor = CommentaryNoteAnchor(
+      commentaryId: commentaryId,
+      book: chapter.book,
+      chapter: chapter.chapter,
+      section: entry.number,
+    );
+
+    await showAddNoteDialog(
+      context: context,
+      ref: ref,
+      book: chapter.book,
+      chapter: chapter.chapter,
+      // Entry 0 is the chapter introduction, not a verse. A note on it hangs
+      // off the chapter, so its reference reads "Genesis 1" rather than the
+      // nonsense "Genesis 1:0"; the section still travels in the tags.
+      verse: entry.number == 0 ? null : entry.number,
+      verseText: commentaryExcerpt(excerpt ?? entry.text),
+      translation: commentaryId,
+      tags: anchor.toTags(),
+      headerLabel:
+          '${commentaryDisplayName(commentaryId)} - ${anchor.sectionLabel}',
+      excerptNotice: restricted ? commentaryNoteExcerptNotice : null,
+    );
   }
 
   /// Scrolls to the entry covering [verse] and pulses its label.
@@ -365,6 +481,7 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
     final picked = await showVerseJumpSheet(
       context: context,
       entryNumbers: numbers,
+      sharedVerses: _entryList.sharedVerses,
       verseCount: verseCount,
       currentEntry: currentEntry,
     );
@@ -632,6 +749,8 @@ class _CommentaryEntry extends StatelessWidget {
     required this.isLast,
     this.pulse = false,
     this.reduceMotion = false,
+    this.copyRestricted = false,
+    this.onAddNote,
   });
 
   final Verse entry;
@@ -641,6 +760,14 @@ class _CommentaryEntry extends StatelessWidget {
   /// True right after a jump landed here.
   final bool pulse;
   final bool reduceMotion;
+
+  /// Licensed commentary: the text is not selectable, so a note is made from a
+  /// block rather than from a selection.
+  final bool copyRestricted;
+
+  /// Called with the fragment the reader picked out, or null for "this whole
+  /// entry" - which is what the button beside the label asks for.
+  final ValueChanged<String?>? onAddNote;
 
   @override
   Widget build(BuildContext context) {
@@ -666,10 +793,62 @@ class _CommentaryEntry extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _VerseLabel(label, pulse: pulse, reduceMotion: reduceMotion),
+          Row(
+            children: [
+              _VerseLabel(label, pulse: pulse, reduceMotion: reduceMotion),
+              const Spacer(),
+              // The one affordance that is visible. On a licensed commentary
+              // it is the only one a tap can find, so it is not optional
+              // there; on a public-domain commentary it stands beside the
+              // selection toolbar's own "Aantekening maken" for a reader who
+              // wants the entry whole.
+              if (onAddNote != null)
+                _AddNoteButton(onPressed: () => onAddNote!(null)),
+            ],
+          ),
           const SizedBox(height: 10),
-          CommentaryBody(text: entry.text, settings: settings),
+          CommentaryBody(
+            text: entry.text,
+            settings: settings,
+            selectable: !copyRestricted,
+            onQuote: onAddNote == null
+                ? null
+                : (excerpt) => onAddNote!(excerpt),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Aantekening", beside an entry's label.
+///
+/// A labelled button rather than a bare icon: the gesture that makes a note
+/// out of part of the text is a long press on a licensed commentary and a
+/// selection on a free one, and neither is something a reader finds by
+/// guessing. This says the feature is here, and takes the whole entry for the
+/// reader who does not want to aim.
+class _AddNoteButton extends StatelessWidget {
+  const _AddNoteButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: Icon(Icons.note_add_outlined, size: 16, color: AppTheme.teal),
+      label: Text(
+        'Aantekening',
+        style: AppTheme.caption.copyWith(fontSize: 12, color: AppTheme.teal),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
       ),
     );
   }

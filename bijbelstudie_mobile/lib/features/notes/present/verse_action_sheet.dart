@@ -109,9 +109,10 @@ Future<void> showVerseActionSheet({
 /// manual refresh.
 ///
 /// The one note editor in the app: [showVerseActionSheet] calls this for a
-/// single verse, and the empty state of the Notities tab in
-/// `study_screen.dart` calls it for the chapter as a whole, with [verse] left
-/// `null`.
+/// single verse, the empty state of the Notities tab in `study_screen.dart`
+/// calls it for the chapter as a whole, with [verse] left `null`, and
+/// `commentary_pane.dart` calls it for a passage of commentary, with [tags]
+/// carrying the anchor back to it.
 ///
 /// Everything the save needs - the repository, the container to invalidate
 /// through, the messenger to complain to - is captured *before* the dialog is
@@ -127,6 +128,20 @@ Future<void> showAddNoteDialog({
   int? verse,
   String verseText = '',
   required String translation,
+
+  /// Saved with the note. `commentary_pane.dart` passes
+  /// `CommentaryNoteAnchor.toTags()` here, which is what makes a note findable
+  /// as a commentary note afterwards.
+  List<String> tags = const [],
+
+  /// Shown instead of the bare reference at the head of the editor, for a note
+  /// whose spot is not a verse ("KingComments - Vers 3"). The note itself still
+  /// carries the plain reference.
+  String? headerLabel,
+
+  /// A line under the quoted fragment. Used where the fragment is from a
+  /// licensed commentary, to say that the quotation stays in the note.
+  String? excerptNotice,
 }) async {
   final repository = ref.read(notesRepositoryProvider);
   final container = ProviderScope.containerOf(context, listen: false);
@@ -145,8 +160,11 @@ Future<void> showAddNoteDialog({
         top: Radius.circular(AppTheme.radiusLg),
       ),
     ),
-    builder: (sheetContext) =>
-        _NoteEditorSheet(reference: reference, verseText: verseText),
+    builder: (sheetContext) => _NoteEditorSheet(
+      reference: headerLabel ?? reference,
+      verseText: verseText,
+      excerptNotice: excerptNotice,
+    ),
   );
 
   if (text == null || text.isEmpty) return;
@@ -161,6 +179,7 @@ Future<void> showAddNoteDialog({
         verseText: verseText,
         noteText: text,
         translation: translation,
+        tags: tags,
         isHighlight: false,
         updatedAt: DateTime.now(),
       ),
@@ -196,10 +215,15 @@ Future<void> showAddNoteDialog({
 /// Owning it here ties its lifetime to the field that uses it, which is the
 /// only place that knows when that is over.
 class _NoteEditorSheet extends StatefulWidget {
-  const _NoteEditorSheet({required this.reference, required this.verseText});
+  const _NoteEditorSheet({
+    required this.reference,
+    required this.verseText,
+    this.excerptNotice,
+  });
 
   final String reference;
   final String verseText;
+  final String? excerptNotice;
 
   @override
   State<_NoteEditorSheet> createState() => _NoteEditorSheetState();
@@ -263,11 +287,22 @@ class _NoteEditorSheetState extends State<_NoteEditorSheet> {
                     ),
                     if (widget.verseText.isNotEmpty) ...[
                       const SizedBox(height: 6),
+                      // Plain Text, never selectable: on a licensed commentary
+                      // this fragment is the one place its words are shown
+                      // outside the reader, and the note is allowed to keep
+                      // them - not to hand them on.
                       Text(
                         widget.verseText,
-                        maxLines: 2,
+                        maxLines: widget.excerptNotice == null ? 2 : 4,
                         overflow: TextOverflow.ellipsis,
                         style: AppTheme.verseFragment,
+                      ),
+                    ],
+                    if (widget.excerptNotice != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.excerptNotice!,
+                        style: AppTheme.caption.copyWith(fontSize: 11.5),
                       ),
                     ],
                     const SizedBox(height: 16),
