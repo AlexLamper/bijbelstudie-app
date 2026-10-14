@@ -26,7 +26,8 @@ import 'study_pane_controller.dart';
 /// The website shows the chapter and the study materials side by side on a
 /// wide screen and a two-button pane switcher below `lg`. A phone is always
 /// below `lg`, so this is the switcher variant: **Bijbel** and **Studie**,
-/// with the materials pane carrying the site's five tabs.
+/// with the materials pane carrying the site's five tabs. The two sides also
+/// sit in a pager, so the switch is not the only way across - see [_panes].
 class StudyScreen extends ConsumerStatefulWidget {
   const StudyScreen({super.key});
 
@@ -43,6 +44,42 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
 
   bool? _lastShowMaterials;
 
+  /// The two sides sit side by side in a pager, so a horizontal drag moves
+  /// between them and follows the finger across instead of the switch in the
+  /// title row being the only way over. Bijbel is the first page because that
+  /// is the order the switch itself reads in: drag left off the chapter to
+  /// reach Studie, right off Studie to come back to the chapter.
+  late final PageController _panes = PageController(
+    initialPage: ref.read(studyPaneProvider).showMaterials ? 1 : 0,
+  );
+
+  @override
+  void dispose() {
+    _panes.dispose();
+    super.dispose();
+  }
+
+  /// Walks the pager over to whatever else set [studyPaneProvider]: the switch
+  /// in the title row, the guided tour, a verse sheet opening its commentary.
+  /// A drag reports its own page change halfway across, so a sync that only
+  /// confirms where the pager is already heading leaves the finger alone.
+  void _followPane(bool showMaterials) {
+    if (!_panes.hasClients) return;
+    final target = showMaterials ? 1 : 0;
+    final current = (_panes.page ?? _panes.initialPage.toDouble()).round();
+    if (current == target) return;
+    final reduced = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduced) {
+      _panes.jumpToPage(target);
+      return;
+    }
+    _panes.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Held in a provider rather than local state so the guided tour can walk
@@ -50,11 +87,16 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     final showMaterials = ref.watch(
       studyPaneProvider.select((pane) => pane.showMaterials),
     );
+    ref.listen(
+      studyPaneProvider.select((pane) => pane.showMaterials),
+      (_, next) => _followPane(next),
+    );
     // The reader's tool row collapses on scroll; the title row above it stays.
     // Only the Bijbel side collapses - the materials pane keeps its own 6.
     final toolRowHidden = !showMaterials && !ref.watch(readerChromeVisibleProvider);
-    // Flipping panes swaps the whole body at once, so the gap snaps with it
-    // rather than gliding over a pane that did not move. Otherwise it follows
+    // Flipping panes hands the body over in one go - a drag carries both of
+    // them with it - so the gap snaps with it rather than gliding over a pane
+    // that has already moved on. Otherwise it follows
     // the tool row on the same duration and curve (ReaderChromeReveal's
     // easeOutCubic forward / easeInCubic reverse is easeOutCubic in time both
     // ways), and snaps under reduced motion just as the row does.
@@ -112,19 +154,35 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
                 child: MediaQuery.removePadding(
                   context: context,
                   removeTop: true,
-                  // IndexedStack so switching panes does not lose the reader's
-                  // scroll offset or an in-flight AI answer.
-                  child: IndexedStack(
-                    index: showMaterials ? 1 : 0,
+                  // Both pages stay mounted - see _LivePane - so switching
+                  // panes does not lose the reader's scroll offset or an
+                  // in-flight AI answer, which the IndexedStack the pager
+                  // replaced did not either.
+                  child: PageView(
+                    controller: _panes,
+                    // The switch in the title row reads the same provider, so
+                    // writing the page back is what keeps the two in step
+                    // whichever one moved first. A drag reports its page
+                    // change halfway across, and the switch lights up there.
+                    onPageChanged: (page) {
+                      final panes = ref.read(studyPaneProvider.notifier);
+                      if (page == 1) {
+                        panes.showMaterials();
+                      } else {
+                        panes.showReader();
+                      }
+                    },
                     children: [
-                      const ReadScreen(embedded: true),
+                      const _LivePane(child: ReadScreen(embedded: true)),
                       // The Bijbel side's tool row carries its own top
                       // padding; the materials tabs keep the 6 they always
                       // had under the shared title row.
                       if (restored)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
-                          child: StudyMaterialsPane(),
+                        const _LivePane(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: StudyMaterialsPane(),
+                          ),
                         )
                       else
                         const AppLoader(),
@@ -137,6 +195,31 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Holds one page of the section pager together while the other one is up.
+/// A [PageView] lets go of the page it is not showing, which would send the
+/// reader back to the top of the chapter and lose whatever the assistant was
+/// part way through writing; the IndexedStack this replaced kept both.
+class _LivePane extends StatefulWidget {
+  const _LivePane({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_LivePane> createState() => _LivePaneState();
+}
+
+class _LivePaneState extends State<_LivePane>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -183,6 +266,53 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// How far a drag has to pull past Commentaar before the section pager
+  /// takes it over.
+  static const double _handoffSlop = 28;
+
+  double _pastFirstTab = 0;
+
+  /// The tabs own every horizontal drag inside this pane, so Studie has none
+  /// of its own to give the section pager. Commentaar is the leftmost tab and
+  /// the Bijbel side sits to its left, so the drag that can only mean "back to
+  /// the chapter" is the one pulling past Commentaar with nowhere left to go:
+  /// once it has pulled far enough, the pager takes over and carries it.
+  ///
+  /// Clamping physics report that pull as overscroll and hold the offset in
+  /// range, bouncing physics let the offset leave the range instead, so both
+  /// are measured. Only the tabs' own viewport counts: `depth` keeps the photo
+  /// carousel on Info and the lists inside the tabs out of it, and a fling
+  /// settling into the edge has no drag on it to read.
+  bool _handleTabOverscroll(ScrollNotification notification) {
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.horizontal) {
+      return false;
+    }
+    if (notification is ScrollStartNotification ||
+        notification is ScrollEndNotification) {
+      _pastFirstTab = 0;
+      return false;
+    }
+    if (notification is OverscrollNotification) {
+      if (notification.dragDetails == null || notification.overscroll >= 0) {
+        return false;
+      }
+      _pastFirstTab -= notification.overscroll;
+    } else if (notification is ScrollUpdateNotification) {
+      if (notification.dragDetails == null) return false;
+      final beyond =
+          notification.metrics.minScrollExtent - notification.metrics.pixels;
+      if (beyond > _pastFirstTab) _pastFirstTab = beyond;
+    } else {
+      return false;
+    }
+    if (_pastFirstTab >= _handoffSlop) {
+      _pastFirstTab = 0;
+      ref.read(studyPaneProvider.notifier).showReader();
+    }
+    return false;
   }
 
   @override
@@ -261,26 +391,31 @@ class _StudyMaterialsPaneState extends ConsumerState<StudyMaterialsPane>
           ),
         ),
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              CommentaryPane(
-                location: location,
-                settings: settings,
-                followReader: true,
-              ),
-              // The server already truncates this to the free preview and
-              // reports `locked` when it did, so the pane itself decides what
-              // to show - see the doc comment on OriginalTextPane.
-              OriginalTextPane(location: location),
-              _GeneralInfoPane(book: location.book, chapter: location.chapter),
-              _ChapterNotesPane(
-                book: location.book,
-                chapter: location.chapter,
-                versionId: location.versionId,
-              ),
-              const AiAssistantPane(),
-            ],
+          // Pulling past the first tab leaves Studie for Bijbel - see
+          // _handleTabOverscroll.
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleTabOverscroll,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                CommentaryPane(
+                  location: location,
+                  settings: settings,
+                  followReader: true,
+                ),
+                // The server already truncates this to the free preview and
+                // reports `locked` when it did, so the pane itself decides
+                // what to show - see the doc comment on OriginalTextPane.
+                OriginalTextPane(location: location),
+                _GeneralInfoPane(book: location.book, chapter: location.chapter),
+                _ChapterNotesPane(
+                  book: location.book,
+                  chapter: location.chapter,
+                  versionId: location.versionId,
+                ),
+                const AiAssistantPane(),
+              ],
+            ),
           ),
         ),
       ],
