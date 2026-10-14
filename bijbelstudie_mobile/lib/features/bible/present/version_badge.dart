@@ -6,6 +6,10 @@ import '../domain/version_catalog.dart';
 
 /// The short code of a translation, drawn as a fixed square.
 ///
+/// This is the picker's visual anchor: a reader looking for the
+/// Statenvertaling is looking for `SV`, and type is a better handle for that
+/// than any icon would be.
+///
 /// Fixed on purpose: `SV` and `HS1917` sit in the same box, so the column of
 /// badges down the left of the picker stays a column. Long codes shrink to
 /// fit rather than widening the square, and the catalog caps the code length
@@ -18,8 +22,11 @@ class VersionBadge extends StatelessWidget {
 
   final String code;
 
-  /// The currently open translation gets the accent treatment, matching the
-  /// check mark on its row.
+  /// The currently open translation gets the solid accent, matching the check
+  /// mark on its card.
+  ///
+  /// Solid rather than tinted: the selected card is itself tinted now, and a
+  /// tinted badge on a tinted card is a badge you cannot see.
   final bool selected;
 
   final double size;
@@ -27,7 +34,7 @@ class VersionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final foreground = selected ? AppTheme.lapis : AppTheme.inkSoft;
+    final foreground = selected ? Colors.white : AppTheme.inkSoft;
 
     return Semantics(
       label: 'Afkorting $code',
@@ -35,11 +42,11 @@ class VersionBadge extends StatelessWidget {
         width: size,
         height: size,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.lapisTint : AppTheme.paperSunken,
-          border: Border.all(color: selected ? AppTheme.lapis : AppTheme.rule),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          color: selected ? AppTheme.teal : AppTheme.paperSunken,
+          border: Border.all(color: selected ? AppTheme.tealStrong : AppTheme.rule),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -49,7 +56,7 @@ class VersionBadge extends StatelessWidget {
             softWrap: false,
             style: TextStyle(
               fontFamily: AppTheme.sansFontName,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
               height: 1,
@@ -62,12 +69,15 @@ class VersionBadge extends StatelessWidget {
   }
 }
 
-/// A real section header for a language group: globe, language name, and how
-/// many translations are in it.
+/// The heading above a language group of translations: the language name and
+/// how many translations are under it.
 ///
-/// Replaces the hairline-with-a-word separator, which read as a divider
-/// rather than as the start of a section. The count is deliberately quieter
-/// than the name - it is a detail of the section, not a second heading.
+/// Type only. Two things went: the grey band, which made a heading look like
+/// one more tappable row in a list of tappable rows, and the globe, which said
+/// nothing the word `Nederlands` had not already said. What is left is the
+/// app's own group-label treatment - uppercase teal, the same heading the
+/// reader's canon groups carry - sitting on whatever the sheet's background
+/// is, with the count behind it in the quietest ink the palette has.
 class LanguageSectionHeader extends StatelessWidget {
   const LanguageSectionHeader({super.key, required this.label, required this.count});
 
@@ -81,33 +91,15 @@ class LanguageSectionHeader extends StatelessWidget {
       header: true,
       label: '$label, $count vertalingen',
       excludeSemantics: true,
-      child: Container(
-        width: double.infinity,
-        color: AppTheme.paperSunken,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(2, 16, 2, 10),
         child: Row(
           children: [
-            Icon(Icons.language, size: 16, color: AppTheme.inkMuted),
+            Text(label.toUpperCase(), style: AppTheme.groupLabel),
             const SizedBox(width: 8),
             Text(
-              label,
-              style: TextStyle(
-                fontFamily: AppTheme.sansFontName,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-                color: AppTheme.ink,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '$count',
-              style: TextStyle(
-                fontFamily: AppTheme.sansFontName,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.inkFaint,
-              ),
+              count == 1 ? '1 vertaling' : '$count vertalingen',
+              style: AppTheme.metaLabel.copyWith(letterSpacing: 0.3),
             ),
           ],
         ),
