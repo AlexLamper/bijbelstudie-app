@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
 import '../data/ai_repository.dart';
+import 'ai_conversation_store.dart';
 import 'ai_report_sheet.dart';
 
 /// The AI-assistent tab of the study page.
@@ -30,28 +31,13 @@ class AiAssistantPane extends ConsumerStatefulWidget {
 class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final List<AiTurn> _turns = [];
 
-  bool _sending = false;
-  String? _error;
-
-  /// Whether [_error] is the daily cap rather than a network or server fault.
-  /// Only the cap is a paywall: offering Pro as the answer to "the assistant is
-  /// unreachable" sells nothing and reads as opportunism.
-  bool _errorIsQuota = false;
-
-  /// Whether [_error] is a dead session, which needs a way back to the login
-  /// screen rather than a retry that will fail the same way.
-  bool _errorIsAuth = false;
-  AiQuota? _quota;
-
-  /// Set when the assistant cannot answer *any* question right now: the server
-  /// reports no model key, or there is no session behind the request. Both are
-  /// known before the user types, so the composer is disabled and the reason
-  /// stated - letting someone write a question that is guaranteed to fail is
-  /// the silent failure this pane used to have.
-  String? _blocked;
-  bool _blockedIsAuth = false;
+  // The transcript, the quota and the error state all live in
+  // [aiConversationStoreProvider], not here. This pane is one tab of a
+  // `TabBarView`: its element is destroyed as soon as the reader swipes two
+  // tabs away or leaves the study page, and anything held in this State goes
+  // with it. Only the composer and the scroll position are view state and may
+  // be rebuilt.
 
   static const _suggestions = [
     'Wat is de kern van dit hoofdstuk?',
@@ -62,7 +48,15 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
   @override
   void initState() {
     super.initState();
-    _loadQuota();
+    // A read of a notifier, never a watch, and deferred one microtask so the
+    // first frame is not rebuilt from inside its own build.
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(aiConversationStoreProvider.notifier).loadQuota();
+    });
+    // Returning to a conversation that is still there should land on the
+    // newest answer rather than the top of the transcript.
+    _scrollToEnd(animate: false);
   }
 
   @override
@@ -72,123 +66,59 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     super.dispose();
   }
 
-  Future<void> _loadQuota() async {
-    try {
-      final quota = await ref.read(aiRepositoryProvider).getQuota();
-      if (!mounted) return;
-      setState(() {
-        _quota = quota;
-        // A deployment without GEMINI_API_KEY answers every question with a
-        // 503. The quota call is the only place that is knowable up front, and
-        // it used to be thrown away here.
-        _blocked = quota.configured
-            ? null
-            : 'De AI-assistent is momenteel niet beschikbaar.';
-        _blockedIsAuth = false;
-      });
-    } on AiAuthRequired catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _blocked = e.message;
-        _blockedIsAuth = true;
-      });
-    } catch (_) {
-      // A network blip. The composer still works, and a question that really
-      // cannot be sent reports it itself.
-    }
+  /// What a question asked right now is about, and so where its answer is
+  /// filed. Reading another chapter or another translation is another key, so
+  /// a kept answer can never be shown against the wrong text.
+  AiContextKey _contextKey() {
+    final location = ref.read(readerLocationProvider);
+    return AiContextKey(
+      surface: widget.surface,
+      versionId: location.versionId,
+      book: location.book,
+      chapter: location.chapter,
+    );
   }
 
   Future<void> _send(String raw) async {
     final message = raw.trim();
-    if (message.isEmpty || _sending || _blocked != null) return;
+    if (message.isEmpty) return;
+
+    final key = _contextKey();
+    final store = ref.read(aiConversationStoreProvider);
+    // A question already in flight for this chapter is not sent twice.
+    if (store.blocked != null || store.conversationFor(key).isSending) return;
 
     // Dismiss the soft keyboard now that the send is actually going ahead -
     // covers the send button, the field's own submit action, and the
     // suggestion chips alike, since all three land here.
     FocusScope.of(context).unfocus();
-
-    final location = ref.read(readerLocationProvider);
-    final history = List<AiTurn>.from(_turns);
-
-    setState(() {
-      _turns.add(AiTurn(role: 'user', content: message));
-      _sending = true;
-      _error = null;
-      _errorIsQuota = false;
-      _errorIsAuth = false;
-      _controller.clear();
-    });
+    _controller.clear();
     _scrollToEnd();
 
-    try {
-      final reply = await ref
-          .read(aiRepositoryProvider)
-          .askReply(
-            message: message,
-            history: history,
-            book: location.book,
-            chapter: location.chapter,
-            version: location.versionId,
-          );
-      if (!mounted) return;
-      setState(() {
-        _turns.add(
-          AiTurn(role: 'assistant', content: reply.text, model: reply.model),
-        );
-        _sending = false;
-      });
-    } on AiQuotaExceeded catch (e) {
-      if (!mounted) return;
-      _failTurn(message, e.message, isQuota: true);
-      // The one moment this surface actually refuses the user, which is what
-      // `paywall_hit` means. The branches below are faults, not gates: the
-      // server also answers 429 for `AI_BUSY`, and counting that as a paywall
-      // both lied to the user and inflated the funnel.
-      ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {
-        'surface': 'ai_limit',
-      });
-    } on AiAuthRequired catch (e) {
-      if (!mounted) return;
-      _failTurn(message, e.message, isAuth: true);
-    } catch (e) {
-      if (!mounted) return;
-      _failTurn(message, '$e'.replaceFirst('Exception: ', ''));
+    // The request is owned by the store, so an answer that lands while this
+    // pane is unmounted is kept instead of thrown away with the widget.
+    final restore = await ref
+        .read(aiConversationStoreProvider.notifier)
+        .ask(key: key, message: message);
+    if (!mounted) return;
+    // A question that never reached the model goes back into the composer, so
+    // retrying is one tap and nothing the reader typed is lost.
+    if (restore != null && _controller.text.isEmpty) {
+      _controller.text = restore;
     }
-    _loadQuota();
     _scrollToEnd();
   }
 
-  /// Rolls back the question that never reached the model.
-  ///
-  /// Leaving its bubble in the transcript would show an unanswered turn and,
-  /// worse, send it again as history on the next question - the model would be
-  /// asked to continue from something it never saw. The text goes back into the
-  /// composer so retrying is one tap and nothing the user typed is lost.
-  void _failTurn(
-    String message,
-    String error, {
-    bool isQuota = false,
-    bool isAuth = false,
-  }) {
-    setState(() {
-      if (_turns.isNotEmpty &&
-          _turns.last.isUser &&
-          _turns.last.content == message) {
-        _turns.removeLast();
-      }
-      if (_controller.text.isEmpty) _controller.text = message;
-      _error = error;
-      _errorIsQuota = isQuota;
-      _errorIsAuth = isAuth;
-      _sending = false;
-    });
-  }
-
-  void _scrollToEnd() {
+  void _scrollToEnd({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
+      final end = _scrollController.position.maxScrollExtent;
+      if (!animate) {
+        _scrollController.jumpTo(end);
+        return;
+      }
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        end,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
       );
@@ -197,16 +127,35 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
 
   @override
   Widget build(BuildContext context) {
-    final quota = _quota;
-    final blocked = _blocked;
+    // Watched, so moving to another chapter repaints against that chapter's
+    // own conversation rather than the one just left.
+    final location = ref.watch(readerLocationProvider);
+    final store = ref.watch(aiConversationStoreProvider);
+    final conversation = store.conversationFor(
+      AiContextKey(
+        surface: widget.surface,
+        versionId: location.versionId,
+        book: location.book,
+        chapter: location.chapter,
+      ),
+    );
+
+    final turns = conversation.turns;
+    final sending = conversation.isSending;
+    final quota = store.quota;
+    final blocked = store.blocked;
 
     // A standing block outranks a per-question error: it is the reason the
     // question could not be sent at all.
-    final notice = blocked ?? _error;
-    final showLoginCta = blocked != null ? _blockedIsAuth : _errorIsAuth;
+    final notice = blocked ?? conversation.error;
+    final showLoginCta = blocked != null
+        ? store.blockedIsAuth
+        : conversation.errorKind == AiErrorKind.auth;
     // A subscriber at their limit is not offered Pro again (3.1.1).
     final showProCta =
-        blocked == null && _errorIsQuota && !ref.watch(hasProProvider);
+        blocked == null &&
+        conversation.errorKind == AiErrorKind.quota &&
+        !ref.watch(hasProProvider);
 
     return Column(
       children: [
@@ -221,7 +170,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
             ),
           ),
         Expanded(
-          child: _turns.isEmpty
+          child: turns.isEmpty
               ? _EmptyPrompt(
                   onPick: _send,
                   suggestions: _suggestions,
@@ -230,12 +179,12 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
               : ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: _turns.length + (_sending ? 1 : 0),
+                  itemCount: turns.length + (sending ? 1 : 0),
                   itemBuilder: (context, index) {
-                    if (index >= _turns.length) return const _TypingBubble();
-                    final turn = _turns[index];
+                    if (index >= turns.length) return const _TypingBubble();
+                    final turn = turns[index];
                     if (turn.isUser) return _TurnBubble(turn: turn);
-                    final previous = index > 0 ? _turns[index - 1] : null;
+                    final previous = index > 0 ? turns[index - 1] : null;
                     return _TurnBubble(
                       turn: turn,
                       onReport: () => showAiReportSheet(
@@ -333,7 +282,7 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
                 height: 44,
                 width: 44,
                 child: FilledButton(
-                  onPressed: _sending || blocked != null
+                  onPressed: sending || blocked != null
                       ? null
                       : () => _send(_controller.text),
                   style: FilledButton.styleFrom(
