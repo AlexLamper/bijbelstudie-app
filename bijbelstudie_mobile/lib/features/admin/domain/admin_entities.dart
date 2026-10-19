@@ -455,6 +455,7 @@ class AdminAccount {
     this.currentPeriodEnd,
     this.createdAt,
     this.lastStreakDate,
+    this.compedProUntil,
   });
 
   final String id;
@@ -496,6 +497,11 @@ class AdminAccount {
   final DateTime? createdAt;
   final DateTime? lastStreakDate;
 
+  /// End of a time-limited Pro grant ("1 maand Pro cadeau"), or null. The
+  /// server expires it with a daily sweep, so this is the promise made, not a
+  /// live entitlement check - the account can be Pro a day longer.
+  final DateTime? compedProUntil;
+
   String get displayName => name.trim().isEmpty ? 'Naamloos' : name.trim();
 
   /// First letter, for the avatar circle.
@@ -503,6 +509,12 @@ class AdminAccount {
     final source = name.trim().isEmpty ? email : name.trim();
     return source.isEmpty ? '?' : source.substring(0, 1).toUpperCase();
   }
+
+  /// Whether a free Pro month may be given. Mirrors /beheer/gebruikers on the
+  /// website: never offered to an account that is already paying, because the
+  /// grant writes `subscribed` and the next webhook would fight it.
+  bool get canReceiveComp =>
+      !storePremium && (subscriptionStatus == null || subscriptionStatus!.isEmpty);
 
   factory AdminAccount.fromJson(Map<String, dynamic> json) {
     return AdminAccount(
@@ -528,12 +540,23 @@ class AdminAccount {
       noteCount: _int(json['noteCount']) ?? 0,
       createdAt: _date(json['createdAt']),
       lastStreakDate: _date(json['lastStreakDate']),
+      compedProUntil: _date(json['compedProUntil']),
     );
   }
 
-  AdminAccount copyWith({bool? isAdmin, bool? subscribed}) {
+  AdminAccount copyWith({
+    bool? isAdmin,
+    bool? subscribed,
+    bool? isComped,
+    DateTime? compedProUntil,
+  }) {
     final nextAdmin = isAdmin ?? this.isAdmin;
     final nextSubscribed = subscribed ?? this.subscribed;
+    // Setting `subscribed` by hand ends a grant on the server either way
+    // (lib/adminUsers.ts), so a plain toggle drops the date instead of leaving
+    // a dead one on the row. Passing a date is the grant itself.
+    final nextCompedUntil =
+        compedProUntil ?? (subscribed == null ? this.compedProUntil : null);
     return AdminAccount(
       id: id,
       name: name,
@@ -544,7 +567,7 @@ class AdminAccount {
       // Effective Pro follows the same OR the server applies, so a toggled row
       // does not have to be re-fetched to look right.
       isPro: nextSubscribed || storePremium || nextAdmin,
-      isComped: isComped,
+      isComped: isComped ?? this.isComped,
       storePremium: storePremium,
       storePremiumPlatform: storePremiumPlatform,
       subscriptionStatus: subscriptionStatus,
@@ -559,6 +582,7 @@ class AdminAccount {
       noteCount: noteCount,
       createdAt: createdAt,
       lastStreakDate: lastStreakDate,
+      compedProUntil: nextCompedUntil,
     );
   }
 }

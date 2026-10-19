@@ -154,6 +154,55 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
     }
   }
 
+  /// "1 maand Pro cadeau": one month of Pro that ends by itself. Confirmed
+  /// first because this hands a real person paid access from a list of rows.
+  Future<void> _confirmGift() async {
+    final again = _account.compedProUntil != null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(again ? '1 maand Pro opnieuw geven?' : '1 maand Pro cadeau?'),
+        content: Text(
+          '${_account.displayName} (${_account.email}) krijgt een maand Pro, '
+          'vanaf vandaag. Het stopt daarna vanzelf en er wordt nooit iets '
+          'afgeschreven.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuleren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Geven'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _run(
+      () async {
+        final until = await ref
+            .read(adminRepositoryProvider)
+            .grantFreePro(_account.id);
+        // The server owns the date, so take the one it answered with rather
+        // than compute a second one here.
+        if (mounted) {
+          setState(() {
+            _account = _account.copyWith(
+              subscribed: true,
+              isComped: true,
+              compedProUntil: until,
+            );
+          });
+        }
+      },
+      describe: again
+          ? 'Pro cadeau opnieuw gegeven, een maand vanaf vandaag'
+          : 'Pro cadeau gegeven, een maand vanaf vandaag',
+    );
+  }
+
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -248,7 +297,12 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                 children: [
                   if (account.isPro) SiteBadge.vermilion('Pro'),
                   if (account.isAdmin) SiteBadge.teal('Beheerder'),
-                  if (account.isComped) SiteBadge.neutral('Gratis toegekend'),
+                  if (account.compedProUntil != null)
+                    SiteBadge.neutral(
+                      'Cadeau tot ${adminDate(account.compedProUntil)}',
+                    )
+                  else if (account.isComped)
+                    SiteBadge.neutral('Gratis toegekend'),
                   if (account.storePremium)
                     SiteBadge.neutral(
                       account.storePremiumPlatform == 'apple'
@@ -291,6 +345,11 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                       label: 'Loopt tot',
                       value: adminDate(account.currentPeriodEnd),
                     ),
+                    if (account.compedProUntil != null)
+                      AdminStatRow(
+                        label: 'Pro cadeau tot',
+                        value: adminDate(account.compedProUntil),
+                      ),
                     AdminStatRow(
                       label: 'Stripe-klant',
                       value: account.hasStripe ? 'Ja' : 'Nee',
@@ -368,6 +427,26 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                         next: account.copyWith(isAdmin: value),
                       ),
               ),
+              if (account.canReceiveComp) ...[
+                const SizedBox(height: 14),
+                Text(
+                  account.compedProUntil == null
+                      ? 'Een cadeau stopt vanzelf. Daarna valt het account terug '
+                            'naar gratis en wordt er nooit iets afgeschreven. De '
+                            'gebruiker krijgt hier geen bericht van.'
+                      : 'Opnieuw geven zet de einddatum op een maand vanaf '
+                            'vandaag; het komt niet bij de huidige periode op.',
+                  style: AppTheme.caption,
+                ),
+                const SizedBox(height: 8),
+                SiteOutlineButton(
+                  label: account.compedProUntil == null
+                      ? '1 maand Pro cadeau'
+                      : '1 maand Pro opnieuw geven',
+                  icon: Icons.card_giftcard_outlined,
+                  onPressed: _busy ? null : _confirmGift,
+                ),
+              ],
               const SizedBox(height: 14),
               SiteOutlineButton(
                 label: 'Account verwijderen',

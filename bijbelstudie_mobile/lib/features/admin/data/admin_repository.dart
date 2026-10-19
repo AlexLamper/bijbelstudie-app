@@ -95,6 +95,27 @@ class AdminRepository {
     }
   }
 
+  /// Gives [months] whole months of Pro - the app's half of "1 maand Pro
+  /// cadeau" on the website. The server writes `subscribed: true` plus an end
+  /// date and expires it with a daily sweep, so there is nothing to undo here
+  /// and the account never becomes a paying customer.
+  ///
+  /// Returns the end date the server stored, or null when it sent none back.
+  Future<DateTime?> grantFreePro(String id, {int months = 1}) async {
+    try {
+      final response = await _apiClient.dio.patch(
+        '/admin/users/$id',
+        data: {'compMonths': months},
+      );
+      final data = response.data;
+      final user = data is Map<String, dynamic> ? data['user'] : null;
+      final until = user is Map<String, dynamic> ? user['compedProUntil'] : null;
+      return until is String ? DateTime.tryParse(until)?.toLocal() : null;
+    } on DioException catch (e) {
+      throw _describe(e, 'cadeau', fallback: 'Pro cadeau geven mislukt.');
+    }
+  }
+
   /// Permanently removes the account and its notes.
   Future<void> deleteUser(String id) async {
     try {
