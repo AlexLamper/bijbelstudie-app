@@ -527,3 +527,35 @@ wacht tot de CI-run klaar is en de AAB neerzet. Voortgang staat in
 
 Een push met alleen markdown/docs start geen run (`paths-ignore`); het script
 stopt dan na 5 minuten zonder fout.
+
+## Play Console-aanbevelingen (oktober 2026)
+
+Play Console zet drie aanbevelingen bij Release 1.1.4. Nagekeken op 19 oktober
+2026; twee waren al geregeld, een doen we bewust niet.
+
+**1. Weergave van rand tot rand.** Al in orde. `lib/main.dart` zet
+`SystemUiMode.edgeToEdge`, we targeten SDK 36 (dus de handhaving geldt en we
+kiezen er zelf voor), en de insets worden door de hele app met `SafeArea`
+opgevangen (ongeveer 80 plekken in 58 bestanden). De melding van Play is een
+algemene waarschuwing voor elke app die SDK 35 of hoger target, niet een
+gevonden fout: er staat ook "misschien". Niets te wijzigen. Wel een keer zelf
+bekijken op een Android 15-toestel, want dat kan geen enkele controle hier.
+
+**2. Beeindigde API's (`setStatusBarColor`, `setNavigationBarColor`,
+`setNavigationBarDividerColor`).** Onze kant is al geregeld:
+`lib/core/platform/android_sdk.dart` vraagt het API-niveau op via
+`MainActivity.getSdkInt`, en `AppTheme._legacyBarColor` laat die drie velden
+leeg op API 35 en hoger (onder 35 zijn ze de enige manier om beide systeembalken
+transparant te houden). Dat zat al in 1.1.4, precies de release die Play
+aanwijst, en de melding komt dus niet uit onze Dart-code maar uit de bytecode
+van Flutter zelf: `PlatformPlugin` in de Android-embedding van Flutter 3.32
+roept die API's aan, ongeacht of de velden leeg zijn. De plekken die Play noemt
+(`G2.b.v`, `T3.d.onCreate`, `Y4.z.v`) zijn versluierde engine-klassen, geen
+bestanden van ons. Dit verdwijnt pas bij een upgrade van de Flutter-SDK (we
+staan op 3.32 van mei 2025). Niet los repareren.
+
+**3. R8 en AGP 9.0.** Bewust niet. We staan op AGP 8.7.3 met Gradle 8.12; AGP 9
+vraagt Gradle 9, Java 17 en een eigen migratie, en de Gradle-plugin van Flutter
+3.32 ondersteunt AGP 9 niet. Dat is de bouwketen van een app die live staat
+omgooien voor een beetje geheugenwinst. Hoort bij de Flutter-upgrade van punt 2,
+niet bij een losse release.
