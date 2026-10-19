@@ -6,9 +6,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../domain/plan_calendar.dart';
 import 'bible_year_providers.dart';
+import 'plan_stop_action.dart';
 import 'plan_widgets.dart';
 
-/// Leesplan · Vandaag: the open-day notice, today's parts and tomorrow.
+/// Leesplan · Vandaag: the open-day notice, today's parts, tomorrow, and the
+/// way to stop the plan.
 class PlanTodayTab extends ConsumerWidget {
   const PlanTodayTab({super.key, required this.calendar, required this.onShowDay});
 
@@ -49,6 +51,10 @@ class PlanTodayTab extends ConsumerWidget {
             const SizedBox(height: 12),
             _TomorrowCard(calendar: calendar, day: tomorrow, onTap: () => onShowDay(tomorrow)),
           ],
+          // The way out, quiet and at the end: a running plan should be easy
+          // to stop and hard to stop by accident.
+          const SizedBox(height: 18),
+          const PlanStopButton(),
         ],
       ),
     );

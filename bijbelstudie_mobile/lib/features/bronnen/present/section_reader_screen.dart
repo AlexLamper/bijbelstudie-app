@@ -119,6 +119,82 @@ class _BronSectionPagerState extends ConsumerState<BronSectionPager> {
     _controller.jumpToPage(target);
   }
 
+  void _goTo(int target) {
+    if (target < 0 || target >= _work.sections.length) return;
+    _controller.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Future<void> _showOptions() {
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+      ),
+      builder: (sheetContext) => Consumer(
+        builder: (context, ref, _) {
+          final expandAll = ref.watch(bronExpandAllProvider);
+          void toggle(bool on) => ref.read(bronExpandAllProvider.notifier).set(on);
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              16 + MediaQuery.paddingOf(sheetContext).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Eyebrow('Leesopties'),
+                const SizedBox(height: 4),
+                InkWell(
+                  onTap: () => toggle(!expandAll),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Schriftteksten voluit',
+                                style: AppTheme.bodyLead.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Toon de bijbelverzen direct onder de tekst',
+                                style: AppTheme.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: expandAll,
+                          onChanged: toggle,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _openRef(BronRef r) {
     if (!r.isResolved) return;
     final verses = r.verses;
@@ -165,20 +241,10 @@ class _BronSectionPagerState extends ConsumerState<BronSectionPager> {
             icon: const Icon(Icons.format_list_bulleted),
             tooltip: 'Inhoud',
           ),
-          PopupMenuButton<String>(
-            tooltip: 'Meer',
-            onSelected: (value) {
-              if (value == 'expand') {
-                ref.read(bronExpandAllProvider.notifier).set(!expandAll);
-              }
-            },
-            itemBuilder: (_) => [
-              CheckedPopupMenuItem<String>(
-                value: 'expand',
-                checked: expandAll,
-                child: const Text('Schriftteksten voluit'),
-              ),
-            ],
+          IconButton(
+            onPressed: _showOptions,
+            icon: const Icon(Icons.tune),
+            tooltip: 'Leesopties',
           ),
         ],
       ),
@@ -192,6 +258,10 @@ class _BronSectionPagerState extends ConsumerState<BronSectionPager> {
           fontSize: fontSize,
           expandAll: expandAll,
           onOpenRef: _openRef,
+          previous: i > 0 ? _work.sections[i - 1].head : null,
+          next: i < _work.sections.length - 1 ? _work.sections[i + 1].head : null,
+          onPrevious: () => _goTo(i - 1),
+          onNext: () => _goTo(i + 1),
         ),
       ),
     );

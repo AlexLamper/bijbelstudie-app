@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_widgets.dart';
 import '../domain/bronnen_models.dart';
 
 /// Opens the app's Bible reader at a resolved reference.
@@ -19,6 +20,10 @@ class BronSectionView extends StatelessWidget {
     this.fontSize = 17,
     this.expandAll = false,
     this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 48),
+    this.previous,
+    this.next,
+    this.onPrevious,
+    this.onNext,
   });
 
   final BronSection section;
@@ -26,6 +31,13 @@ class BronSectionView extends StatelessWidget {
   final double fontSize;
   final bool expandAll;
   final EdgeInsets padding;
+
+  /// The neighbouring sections, for the footer. A null side has no button; no
+  /// neighbours at all (a single-section work) means no footer.
+  final BronSectionHead? previous;
+  final BronSectionHead? next;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +75,32 @@ class BronSectionView extends StatelessWidget {
               onOpenRef: onOpenRef,
             ),
           },
+        if (previous != null || next != null) ...[
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: previous == null
+                    ? const SizedBox.shrink()
+                    : SiteOutlineButton(
+                        label: previous!.label,
+                        icon: Icons.arrow_back,
+                        onPressed: onPrevious,
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: next == null
+                    ? const SizedBox.shrink()
+                    : SiteButton(
+                        label: next!.label,
+                        trailingIcon: Icons.arrow_forward,
+                        onPressed: onNext,
+                      ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

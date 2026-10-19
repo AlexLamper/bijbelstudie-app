@@ -167,11 +167,15 @@ class BibleYearEyebrow extends StatelessWidget {
 }
 
 /// A two-button confirm dialog. Resolves true on confirm.
+///
+/// [destructive] colours the confirm label red - for an action that ends
+/// something (stopping the plan), not for one that only moves it.
 Future<bool> showBibleYearConfirm(
   BuildContext context, {
   required String title,
   required Widget content,
   required String confirmLabel,
+  bool destructive = false,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -185,7 +189,9 @@ Future<bool> showBibleYearConfirm(
         ),
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          style: TextButton.styleFrom(foregroundColor: AppTheme.tealStrong),
+          style: TextButton.styleFrom(
+            foregroundColor: destructive ? AppTheme.destructive : AppTheme.tealStrong,
+          ),
           child: Text(confirmLabel),
         ),
       ],
