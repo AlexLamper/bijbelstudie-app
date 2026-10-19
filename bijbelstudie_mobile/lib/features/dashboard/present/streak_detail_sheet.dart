@@ -102,6 +102,23 @@ class _StreakDetailSheet extends ConsumerWidget {
     return streak > 0 ? '$streak ${_dayWord(streak)} op rij' : 'Nog geen reeks';
   }
 
+  /// What the vriesdag line says. Three states, because all three are worth
+  /// saying: one is holding the reeks up right now, there are some in the bank,
+  /// or there are none yet and the reader should know how to get one.
+  String get _freezeLine {
+    final word = freezes == 1 ? 'vriesdag' : 'vriesdagen';
+    if (freezeHolding) {
+      return 'Een vriesdag houdt je reeks heel voor de dag die je oversloeg. '
+          'Je hebt er nog $freezes over. Lees je vandaag, dan loopt je reeks gewoon door.';
+    }
+    if (freezes > 0) {
+      return 'Je hebt $freezes $word gespaard: mis je een dag, dan blijft je reeks staan. '
+          'Je krijgt er een bij elke zevende dag op rij.';
+    }
+    return 'Nog geen vriesdagen. Lees zeven dagen op rij, dan krijg je er een: '
+        'die vangt een dag op die je mist.';
+  }
+
   /// The very mark the reader just tapped in the header, drawn plain: the
   /// flame of `StreakFlamePill`, or its check for a week goal. It used to be
   /// the reader's own progress tree, but the tree reads as a profile avatar
@@ -195,7 +212,10 @@ class _StreakDetailSheet extends ConsumerWidget {
                   : 'Elke dag een hoofdstuk lezen of een les afronden houdt je reeks lopend.',
               style: AppTheme.bodyMuted,
             ),
-            if (!_isWeekGoal && (freezes > 0 || freezeHolding)) ...[
+            // Always said, also at nul vriesdagen: a reader who does not know
+            // the freeze exists cannot count on it, and the one who finds out
+            // the day a reeks of 21 dagen ends finds out too late.
+            if (!_isWeekGoal) ...[
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,9 +224,7 @@ class _StreakDetailSheet extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      freezeHolding
-                          ? 'Een vriesdag houdt je reeks heel voor de dag die je oversloeg. Lees je vandaag, dan loopt hij gewoon door.'
-                          : 'Je hebt $freezes vriesdag${freezes == 1 ? '' : 'en'} gespaard: mis je een dag, dan blijft je reeks staan. Je krijgt er een bij elke zevende dag op rij.',
+                      _freezeLine,
                       style: AppTheme.caption.copyWith(color: scheme.onSurface),
                     ),
                   ),
@@ -233,9 +251,17 @@ class _StreakDetailSheet extends ConsumerWidget {
   }
 }
 
+/// What the screen reader says about one day of the strip.
+String _dayStatus(WeekDay day) {
+  if (day.count > 0) return '${day.label}: gelezen';
+  if (day.frozen) return '${day.label}: vriesdag gebruikt, je reeks bleef staan';
+  return '${day.label}: niets gelezen';
+}
+
 /// A compact Ma-Zo strip: a filled dot for a day with activity, an outline for
-/// one without, and a teal ring around today. The same 7-day data the "Deze
-/// week" card on the dashboard renders, so the two never disagree.
+/// one without, a frost snowflake for a day a vriesdag covered, and a teal ring
+/// around today. The same 7-day data the server hands the header, so the strip
+/// and the pill never disagree.
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip({required this.days, required this.still});
 
@@ -255,18 +281,24 @@ class _WeekStrip extends StatelessWidget {
         for (var i = 0; i < week.length; i++) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              children: [
-                _WeekDot(day: week[i], order: i, still: still),
-                const SizedBox(height: 6),
-                Text(
-                  week[i].label,
-                  style: AppTheme.overline.copyWith(
-                    letterSpacing: 0,
-                    color: week[i].isToday ? AppTheme.teal : AppTheme.inkFaint,
+            // One node per day, so "vriesdag gebruikt" is spoken instead of a
+            // bare weekday with an unexplained shape next to it.
+            child: Semantics(
+              label: _dayStatus(week[i]),
+              excludeSemantics: true,
+              child: Column(
+                children: [
+                  _WeekDot(day: week[i], order: i, still: still),
+                  const SizedBox(height: 6),
+                  Text(
+                    week[i].label,
+                    style: AppTheme.overline.copyWith(
+                      letterSpacing: 0,
+                      color: week[i].isToday ? AppTheme.teal : AppTheme.inkFaint,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -275,11 +307,11 @@ class _WeekStrip extends StatelessWidget {
   }
 }
 
-/// One day of the strip. Done days pop in left to right when the sheet opens,
-/// so the week reads as being counted up rather than as a static chart. Each
-/// dot is its own finite tween on a shared timeline (an [Interval] per
-/// position), and days without activity - and every day under reduced
-/// motion - are simply drawn.
+/// One day of the strip. Done days - and days a vriesdag carried - pop in left
+/// to right when the sheet opens, so the week reads as being counted up rather
+/// than as a static chart. Each dot is its own finite tween on a shared
+/// timeline (an [Interval] per position), and days without activity - and every
+/// day under reduced motion - are simply drawn.
 class _WeekDot extends StatelessWidget {
   const _WeekDot({required this.day, required this.order, required this.still});
 
@@ -291,19 +323,30 @@ class _WeekDot extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final done = day.count > 0;
+    // A day a vriesdag covered: not a tick, because nothing was read, and not
+    // an empty outline either, because the reeks never stopped. Its own mark,
+    // in the freeze's own colour - the whole point is that the reader can see
+    // at a glance which day was saved.
+    final frozen = !done && day.frozen;
 
     final dot = Container(
       width: 28,
       height: 28,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: done ? AppTheme.teal : scheme.surfaceContainerHighest,
+        color: done
+            ? AppTheme.teal
+            : (frozen ? AppTheme.frost : scheme.surfaceContainerHighest),
         border: day.isToday ? Border.all(color: AppTheme.teal, width: 2) : null,
       ),
-      child: done ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+      child: done
+          ? const Icon(Icons.check, size: 14, color: Colors.white)
+          : (frozen
+                ? const Icon(Icons.ac_unit, size: 14, color: Colors.white)
+                : null),
     );
 
-    if (still || !done) return dot;
+    if (still || !(done || frozen)) return dot;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),

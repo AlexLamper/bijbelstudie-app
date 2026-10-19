@@ -42,6 +42,7 @@ class WeekDay {
     required this.count,
     required this.heightPct,
     required this.isToday,
+    this.frozen = false,
   });
 
   final String label;
@@ -49,12 +50,19 @@ class WeekDay {
   final int heightPct;
   final bool isToday;
 
+  /// Nothing was read on this day, but a vriesdag covered it - so the strip
+  /// draws a snowflake instead of the hole that would read as the day the
+  /// reeks died. The server decides it (`lib/streak.ts` `frozenDays`); false
+  /// from a server that predates the field, or a cached payload it wrote.
+  final bool frozen;
+
   factory WeekDay.fromJson(Map<String, dynamic> json) {
     return WeekDay(
       label: json['label'] as String? ?? '',
       count: (json['count'] as num?)?.toInt() ?? 0,
       heightPct: (json['heightPct'] as num?)?.toInt() ?? 0,
       isToday: json['isToday'] as bool? ?? false,
+      frozen: json['frozen'] as bool? ?? false,
     );
   }
 }

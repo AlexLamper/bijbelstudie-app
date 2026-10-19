@@ -488,6 +488,25 @@ class _ProfileHeader extends ConsumerWidget {
                           const _ChipWord('reeks'),
                         ],
                       ),
+                    // The vriesdagen, beside the reeks they protect. Without a
+                    // number here the bank was invisible until one was spent -
+                    // or until a reeks ended that one should have saved.
+                    if (stats != null && stats.freezes > 0)
+                      _StatusChip(
+                        onTap: () => context.go('/dashboard'),
+                        padding: const EdgeInsets.fromLTRB(5, 0, 7, 0),
+                        children: [
+                          Icon(Icons.ac_unit, size: 11, color: AppTheme.frost),
+                          _ChipWord(
+                            '${stats.freezes}',
+                            bold: true,
+                            color: _ChipColor.ink,
+                          ),
+                          _ChipWord(
+                            stats.freezes == 1 ? 'vriesdag' : 'vriesdagen',
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ],
