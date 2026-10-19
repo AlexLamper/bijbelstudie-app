@@ -42,12 +42,22 @@ class AppConfig {
     defaultValue: false,
   );
 
-  /// The product's own site, shared from Profiel's share button. Not an API
-  /// base and not a legal link, so it is kept apart from both.
+  /// The product's own site. Not an API base and not a legal link, so it is
+  /// kept apart from both.
   static const String siteUrl = String.fromEnvironment(
     'SITE_URL',
     defaultValue: 'https://www.bijbelstudie.io',
   );
+
+  /// The smart app link, which is what Profiel's share button hands out.
+  ///
+  /// `/app` reads the recipient's device and redirects: an iPhone to the App
+  /// Store, an Android phone to Google Play (live since 17 October 2026), a
+  /// desktop to the site itself. The website owns that decision in
+  /// `lib/mobilePlatform.ts` `appLinkTarget`, so sharing this instead of a bare
+  /// [siteUrl] means nobody lands on a page whose only job is to ask which
+  /// phone they have.
+  static String get appLinkUrl => '$siteUrl/app';
 
   // Legal links used in subscription and account flows.
   // Override per environment via dart-define if needed.

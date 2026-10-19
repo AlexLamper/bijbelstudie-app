@@ -302,6 +302,10 @@ class _HeaderBar extends ConsumerWidget {
   /// The text names what the app does - lezen, uitleg, aantekeningen, leesplan -
   /// instead of claiming the sender loves it. A testimonial someone else wrote
   /// is the one thing nobody forwards.
+  ///
+  /// It links to [AppConfig.appLinkUrl], not the bare site: now that the app is
+  /// in Google Play as well, `/app` puts the recipient in their own store
+  /// instead of on a page that asks which phone they have.
   Future<void> _shareApp(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
     final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
@@ -309,7 +313,7 @@ class _HeaderBar extends ConsumerWidget {
       await Share.share(
         'Met BijbelStudie lees je de Bijbel met uitleg erbij, maak je '
         'aantekeningen en volg je een leesplan. Kijk zelf even: '
-        '${AppConfig.siteUrl}',
+        '${AppConfig.appLinkUrl}',
         sharePositionOrigin: origin,
       );
     } on Exception {

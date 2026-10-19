@@ -1,5 +1,11 @@
 # Plan voor Claude: Google Play-release BijbelStudie
 
+> **Afgerond: de app staat sinds 17 oktober 2026 in Google Play.** Dit plan is
+> uitgevoerd; lees het als verslag, niet als takenlijst. De website-kant van de
+> launch (Play-knop in de hero, `/app`-redirect voor Android, teksten die nog
+> "iOS-app" zeiden, de aankondigingsmelding) zit in de website-repo op branch
+> `play-store-launch`, met `APP_LINK_PLAN.md` §8 als verslag daarvan.
+
 Bijgewerkt **wo 16 sep 2026**. Dit is het werk dat Claude doet, zodat Alex alleen de stappen uit [play-store-release-guide.md](play-store-release-guide.md) hoeft te doen. Stapnummers als **A6**, **C2** verwijzen naar die gids.
 
 **Regels die voor elke taak gelden**

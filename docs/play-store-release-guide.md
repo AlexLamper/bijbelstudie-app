@@ -1,5 +1,13 @@
 # Google Play-release BijbelStudie: wat JIJ moet doen
 
+> **De app is live in Google Play sinds 17 oktober 2026:**
+> <https://play.google.com/store/apps/details?id=com.bijbelstudie.app>. Deze
+> gids is daarmee geschiedenis, geen openstaand werk. Hij blijft staan voor de
+> volgende keer dat er iets in Play Console moet gebeuren (een nieuwe release,
+> een nieuw abonnement, een gewijzigd Gegevensveiligheid-formulier). Wat nog
+> wel open is, staat in `OWNER_SETUP_TODO.md` §7: het Google-service-account
+> waarmee de website Play-beoordelingen ophaalt.
+
 Bijgewerkt **wo 16 sep 2026**. Hier staan **alleen de stappen die jij zelf moet doen**: dingen in Play Console, Google Cloud, RevenueCat, App Store Connect, en met je eigen telefoon en contacten. Alles wat Claude doet (code, builds, deploys, teksten, afbeeldingen, controles) staat in **[play-store-claude-plan.md](play-store-claude-plan.md)**.
 
 **Wat Claude al gedaan heeft of nu doet**
