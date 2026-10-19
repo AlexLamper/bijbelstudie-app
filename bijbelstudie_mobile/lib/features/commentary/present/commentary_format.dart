@@ -120,6 +120,57 @@ final _mySwordEscape = RegExp(r'([A-Za-z0-9])\\\.');
 final _blockBreak = RegExp(r'\n{2,}');
 final _whitespace = RegExp(r'\s+');
 
+/// One commentary entry as a single line of plain, unstyled prose.
+///
+/// For the two places a block cannot go: the excerpt the note editor shows
+/// above the text field, and the same excerpt as the note's `verseText`, which
+/// the Notities list paints as a flat [Text] as well. Both used to get the raw
+/// entry, so a KingComments note opened with `<p><i><a href=...>` in its head.
+///
+/// Built on [parseCommentary] rather than on a second tag stripper, so the tag
+/// set, the entities and the whitespace stay defined in exactly one place and
+/// all three shapes of entry come out of here the same way. Block structure is
+/// what gets lost: markers, headings and footnote numbers all flatten into the
+/// prose, separated by a space.
+String commentaryPlainText(String input) {
+  final out = StringBuffer();
+  var tail = '';
+
+  void append(String text, {required bool newBlock}) {
+    if (text.isEmpty) return;
+    if (tail.isNotEmpty && (newBlock || _runsOn(tail, text))) out.write(' ');
+    out.write(text);
+    tail = text.substring(text.length - 1);
+  }
+
+  final blocks = parseCommentary(input);
+  for (var i = 0; i < blocks.length; i++) {
+    final spans = blocks[i].spans;
+    for (var j = 0; j < spans.length; j++) {
+      append(spans[j].text, newBlock: i > 0 && j == 0);
+    }
+  }
+
+  return out.toString().replaceAll(_whitespace, ' ').trim();
+}
+
+/// True when two neighbouring spans would read as one word.
+///
+/// `.</i>Je` in `<i><a href="#b...">Rm 5:2</a>.</i>Je hebt ook...`, a real
+/// KingComments entry, ends the citation without a space after it: the browser
+/// shows that as a change of style, plain text would show it as "5:2.Je". A
+/// space only goes in after punctuation that closes a thought, so emphasis
+/// that sits inside a word keeps the word whole.
+bool _runsOn(String left, String right) {
+  if (_whitespace.hasMatch(left) || _whitespace.hasMatch(right[0])) {
+    return false;
+  }
+  return _thoughtEnd.hasMatch(left) && _wordStart.hasMatch(right[0]);
+}
+
+final _thoughtEnd = RegExp(r'[.!?:;,)\]]');
+final _wordStart = RegExp(r'[0-9A-Za-zÀ-ɏ]');
+
 // --- Plain prose, Matthew Henry ------------------------------------------
 //
 // Mirrors `formatPlainText`. The outline markers are the only structure the

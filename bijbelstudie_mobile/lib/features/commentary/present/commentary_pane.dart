@@ -18,6 +18,7 @@ import '../data/commentary_entries.dart';
 import '../domain/commentary_copy_policy.dart';
 import '../domain/commentary_note_anchor.dart';
 import 'commentary_body.dart';
+import 'commentary_format.dart';
 import 'commentary_jump.dart';
 import 'commentary_note_target.dart';
 import 'verse_jump_sheet.dart';
@@ -381,7 +382,10 @@ class _CommentaryPaneState extends ConsumerState<CommentaryPane> {
       // off the chapter, so its reference reads "Genesis 1" rather than the
       // nonsense "Genesis 1:0"; the section still travels in the tags.
       verse: entry.number == 0 ? null : entry.number,
-      verseText: commentaryExcerpt(excerpt ?? entry.text),
+      // A selection and a long-pressed block arrive as text already; the whole
+      // entry arrives as the source the parser is given, markup and all, so it
+      // goes through the parser before it is cut.
+      verseText: commentaryExcerpt(excerpt ?? commentaryPlainText(entry.text)),
       translation: commentaryId,
       tags: anchor.toTags(),
       headerLabel:
