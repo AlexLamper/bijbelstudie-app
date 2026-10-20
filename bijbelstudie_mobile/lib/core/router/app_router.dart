@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/preview_config.dart';
 import '../notifications/notification_service.dart';
+import 'deep_link_routes.dart';
 import '../theme/app_theme.dart';
 import '../ui/app_widgets.dart';
 import '../ui/lucide_icon.dart';
@@ -304,6 +305,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     // Design-preview mode skips splash/onboarding/login and lands on the
     // dashboard so the styling can be reviewed straight away.
     initialLocation: PreviewConfig.enabled ? '/dashboard' : '/',
+    // A tap on a bijbelstudie.io link arrives here as a location, not as a
+    // launcher start. Translate the website path to the app route, and on a
+    // cold start park it until the splash has resolved the session - landing
+    // straight on a chapter with no account is how a deep link reads broken.
+    redirect: (context, state) {
+      final target = DeepLinkRoutes.appRouteFor(state.uri);
+      if (target == null) return null;
+      if (!DeepLinkRoutes.splashDone) {
+        DeepLinkRoutes.hold(target);
+        return '/';
+      }
+      return target == state.uri.toString() ? null : target;
+    },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(

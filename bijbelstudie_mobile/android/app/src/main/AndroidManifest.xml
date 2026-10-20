@@ -38,6 +38,28 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Android App Links: bijbelstudie.io links open in the app.
+                 autoVerify makes Android fetch /.well-known/assetlinks.json
+                 from both hosts at install time; without that file the links
+                 keep opening in the browser, silently. See
+                 docs/android-app-links.md.
+
+                 Only the sections the app can actually show are claimed. A
+                 host-wide filter would also swallow /prijzen, /contact and
+                 the password-reset mails, which belong in the browser. The
+                 prefixes here mirror `_handledPrefixes` in
+                 lib/core/router/deep_link_routes.dart - change both. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="bijbelstudie.io" />
+                <data android:scheme="https" android:host="www.bijbelstudie.io" />
+                <data android:pathPrefix="/studie" />
+                <data android:pathPrefix="/studies" />
+                <data android:pathPrefix="/bronnen" />
+                <data android:pathPrefix="/bijbel" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

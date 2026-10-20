@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/notifications/notification_service.dart';
+import '../../../core/router/deep_link_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../onboarding/data/onboarding_gate.dart';
@@ -97,8 +98,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // A cold start from a notification tap lands on the tapped route, but only
     // once the session is known good and setup is done ('/dashboard'); a
     // reader heading to login or the setup wizard goes there instead.
+    // Both are taken, not just the one that wins, so neither stays pending
+    // and both switch to navigating directly from here on. A followed link
+    // beats a notification tap: it is the more recent intent of the two.
     final launch = NotificationService.takeLaunchRoute();
-    final target = route == '/dashboard' && launch != null ? launch : route;
+    final link = DeepLinkRoutes.take();
+    final pending = link ?? launch;
+    final target = route == '/dashboard' && pending != null ? pending : route;
     if (mounted) context.go(target);
   }
 
