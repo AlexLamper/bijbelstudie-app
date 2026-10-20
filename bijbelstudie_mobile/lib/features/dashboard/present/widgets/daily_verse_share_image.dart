@@ -332,7 +332,7 @@ class _Wordmark extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           Text(
-            'bijbelstudie.io',
+            'bijbelstudie.io/app',
             style: AppTheme.bodyStrong.copyWith(
               fontSize: 13,
               letterSpacing: 0.4,

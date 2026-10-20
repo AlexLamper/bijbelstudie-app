@@ -380,7 +380,9 @@ class _DailyVerseCardState extends ConsumerState<DailyVerseCard>
       );
       await Share.shareXFiles(
         [XFile(path, mimeType: 'image/png')],
-        text: '$source - ${AppConfig.baseUrl}',
+        // The download link, not the bare site: whoever sees the status
+        // lands in the right store (see AppConfig.appLinkUrl).
+        text: '$source - ${AppConfig.appLinkUrl}',
         subject: 'Tekst van de dag - $reference',
         sharePositionOrigin: origin,
       );
