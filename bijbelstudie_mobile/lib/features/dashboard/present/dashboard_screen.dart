@@ -13,6 +13,7 @@ import '../../onboarding/present/tour_controller.dart';
 import '../../study/present/study_pane_controller.dart';
 import '../data/daily_verse_store.dart';
 import '../data/dashboard_models.dart';
+import 'bible_progress_card.dart';
 import 'daily_verse_card.dart';
 import 'dashboard_providers.dart';
 import 'friends_section.dart';
@@ -201,6 +202,10 @@ class _DashboardBody extends ConsumerWidget {
                   ],
                 ),
               ),
+
+              // "Je Bijbel": share of the Bible read, under the verse.
+              const SizedBox(height: 12),
+              BibleProgressCard(readChapters: data.readChapters),
 
               // Below the fold on purpose: the reader scrolls to their
               // vriendenkring, never past the verse to reach it.
