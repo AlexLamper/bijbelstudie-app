@@ -122,7 +122,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: AppSegmentedControl(
-                      labels: const ['Feed', 'Je vrienden'],
+                      labels: const ['Overzicht', 'Je vrienden'],
                       selectedIndex: tab,
                       onChanged: (index) => setState(() => _tab = index),
                     ),
