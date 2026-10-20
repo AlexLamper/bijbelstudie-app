@@ -40,8 +40,10 @@
             </intent-filter>
             <!-- Android App Links: bijbelstudie.io links open in the app.
                  autoVerify makes Android fetch /.well-known/assetlinks.json
-                 from both hosts at install time; without that file the links
-                 keep opening in the browser, silently. See
+                 at install time; without that file the links keep opening in
+                 the browser, silently. Only www: Vercel redirects the apex,
+                 verification does not follow redirects, and before Android 12
+                 one failing host fails them all. See
                  docs/android-app-links.md.
 
                  Only the sections the app can actually show are claimed. A
@@ -53,7 +55,6 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="bijbelstudie.io" />
                 <data android:scheme="https" android:host="www.bijbelstudie.io" />
                 <data android:pathPrefix="/studie" />
                 <data android:pathPrefix="/studies" />
