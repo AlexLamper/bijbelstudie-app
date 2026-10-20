@@ -6,6 +6,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../friends/data/friend_models.dart';
+import '../../friends/present/friends_entry_providers.dart';
 import '../../friends/present/friends_error_card.dart';
 import '../../friends/present/friends_providers.dart';
 import '../../friends/present/friends_screen.dart';
@@ -16,6 +17,10 @@ import '../../friends/present/friends_screen.dart';
 ///
 /// Deliberately below the fold: the verse card has to be fully in view, so
 /// this is what the reader scrolls to.
+///
+/// Left out altogether while the contacts are not connected and there is no
+/// kring yet ([friendsContactsGateProvider]): the header button's red dot is
+/// the way in then, and Vriendenkring itself opens on "Verbind Contacten".
 class FriendsSection extends ConsumerWidget {
   const FriendsSection({super.key, this.maxPosts = 2});
 
@@ -23,6 +28,7 @@ class FriendsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(friendsContactsGateProvider)) return const SizedBox.shrink();
     final async = ref.watch(friendsFeedProvider);
     final feed = async.value;
     final posts = feed == null

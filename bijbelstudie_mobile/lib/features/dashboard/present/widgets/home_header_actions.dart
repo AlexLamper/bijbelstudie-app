@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../friends/present/friends_entry_providers.dart';
 import '../../../friends/present/friends_providers.dart';
 
 /// The two round buttons on the right of the Start tab's header.
@@ -33,8 +34,11 @@ class HomeHeaderActions extends StatelessWidget {
   }
 }
 
-/// The vriendenkring button: a circle with a "two people" icon and a small
-/// teal badge for new activity. No badge at 0.
+/// The vriendenkring button: a circle with a "two people" icon, a small red
+/// badge with the number of new posts, or - with no number to show - a plain
+/// red dot when there is a reason to go there anyway
+/// ([friendsEntryDotProvider]: contacts not connected, a verzoek waiting, or
+/// someone new under "Mensen die je misschien kent").
 class FriendsCircleButton extends ConsumerWidget {
   const FriendsCircleButton({super.key, this.size = 44});
 
@@ -45,13 +49,14 @@ class FriendsCircleButton extends ConsumerWidget {
     AppTheme.dependOn(context);
     final scheme = Theme.of(context).colorScheme;
     final badge = ref.watch(friendsBadgeProvider);
+    final dot = badge == 0 && ref.watch(friendsEntryDotProvider);
 
     return Tooltip(
       message: 'Vriendenkring',
       child: Semantics(
         button: true,
         label: badge == 0
-            ? 'Vriendenkring'
+            ? (dot ? 'Vriendenkring, er is iets nieuws' : 'Vriendenkring')
             : 'Vriendenkring, $badge nieuw${badge == 1 ? '' : 'e'} '
                   '${badge == 1 ? 'bericht' : 'berichten'}',
         child: SizedBox.square(
@@ -86,7 +91,7 @@ class FriendsCircleButton extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 5),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppTheme.teal,
+                      color: AppTheme.destructive,
                       borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                       border: Border.all(color: scheme.surface, width: 2),
                     ),
@@ -98,6 +103,21 @@ class FriendsCircleButton extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
+                    ),
+                  ),
+                ),
+              if (dot)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    key: const ValueKey('friends-entry-dot'),
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: AppTheme.destructive,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: scheme.surface, width: 2),
                     ),
                   ),
                 ),

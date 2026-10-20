@@ -7,8 +7,9 @@ import '../../../core/ui/app_widgets.dart';
 import '../../referral/data/referral_repository.dart';
 import '../data/friend_models.dart';
 import '../data/friends_repository.dart';
+import 'contacts/connect_contacts_button.dart';
 import 'contacts/contact_discovery_providers.dart';
-import 'contacts/contacts_entry_card.dart';
+import 'contacts/contacts_disclosure_screen.dart';
 import 'friend_block_action.dart';
 import 'friend_comments_sheet.dart';
 import 'friend_post_card.dart';
@@ -16,11 +17,18 @@ import 'friend_profile_screen.dart';
 import 'friend_report_sheet.dart';
 import 'friend_rows.dart';
 import 'friend_suggestions_section.dart';
+import 'friends_entry_providers.dart';
 import 'friends_error_card.dart';
 import 'friends_providers.dart';
 
-/// `/vriendenkring` - Feed | Vrienden | Verzoeken, the same three sections the
-/// website's `/vriendenkring` has, so the kring is in the same place on both.
+/// `/vriendenkring` - one scrolling page, modelled on YouVersion: "Mensen die
+/// je misschien kent" at the top with "Verbind Contacten" in it, then any
+/// verzoeken waiting for an answer, then the feed. The kring itself (and the
+/// blocked list) is one tap away under "Je vrienden".
+///
+/// While the contacts are not connected and there is no kring yet
+/// ([friendsContactsGateProvider]), the page is only the invitation to connect
+/// them, with the code-or-link route under it for whoever would rather not.
 ///
 /// Reached from the Start tab's header button and from "Alles bekijken" under
 /// "Bij je vrienden"; it has no tab of its own.
@@ -32,16 +40,31 @@ class FriendsScreen extends ConsumerStatefulWidget {
 }
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
-  int _tab = 0;
+  AppLifecycleListener? _lifecycle;
 
   @override
   void initState() {
     super.initState();
-    // Opening the screen is what "gezien" means, so the badge on Start clears
-    // here rather than on any tap that happens to land in the feed.
+    // Opening the screen is what "gezien" means, so the badge and the dot on
+    // Start clear here rather than on any tap that happens to land in the feed.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(friendsFeedProvider.notifier).markSeen();
+      if (!mounted) return;
+      ref.read(friendsFeedProvider.notifier).markSeen();
+      final people = ref.read(friendSuggestionsProvider).value?.suggestions ?? const [];
+      ref
+          .read(friendsEntrySeenProvider.notifier)
+          .markOpened(suggestionIds: people.map((person) => person.userId));
     });
+    // Access granted or taken away in the Settings app shows up on return.
+    _lifecycle = AppLifecycleListener(
+      onResume: () => ref.invalidate(contactsConnectedProvider),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -50,105 +73,303 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     ref.invalidate(friendsRequestsProvider);
     ref.invalidate(friendsSettingsProvider);
     ref.invalidate(friendSuggestionsProvider);
+    ref.invalidate(contactsConnectedProvider);
   }
 
-  /// A retry has to wait for the answer, otherwise the button stops spinning
-  /// before anything happened. The failure is already on screen, so swallowing
-  /// it here only keeps it from becoming an unhandled future.
-  Future<void> _retryKring() async {
-    ref.invalidate(friendsKringProvider);
-    try {
-      await ref.read(friendsKringProvider.future);
-    } catch (_) {}
-  }
-
-  Future<void> _retryRequests() async {
-    ref.invalidate(friendsRequestsProvider);
-    try {
-      await ref.read(friendsRequestsProvider.future);
-    } catch (_) {}
+  /// "Verbind Contacten": the disclosure first, which is the only route to the
+  /// OS prompt; it then shows what the match found.
+  Future<void> _connectContacts() async {
+    await showContactsDisclosure(context);
+    if (!mounted) return;
+    ref.invalidate(contactsConnectedProvider);
   }
 
   @override
   Widget build(BuildContext context) {
-    final feedAsync = ref.watch(friendsFeedProvider);
-    final kringAsync = ref.watch(friendsKringProvider);
+    // Suggestions that arrive while the screen is open count as seen.
+    ref.listen(friendSuggestionsProvider, (_, next) {
+      final people = next.value?.suggestions;
+      if (people == null || people.isEmpty) return;
+      ref
+          .read(friendsEntrySeenProvider.notifier)
+          .markSuggestionsSeen(people.map((person) => person.userId));
+    });
+    // A finished match can change who is suggested and who is in the kring.
+    ref.listen(contactDiscoveryProvider.select((state) => state.stage), (previous, next) {
+      if (next != ContactDiscoveryStage.matched || previous == next) return;
+      ref.invalidate(friendSuggestionsProvider);
+      ref.invalidate(friendsKringProvider);
+      ref.invalidate(friendsRequestsProvider);
+    });
+
+    final gated = ref.watch(friendsContactsGateProvider);
     final requestsAsync = ref.watch(friendsRequestsProvider);
-    final kring = kringAsync.value;
-    final requests = requestsAsync.value;
-    final pending = requests?.incoming.length ?? kring?.pendingIncoming ?? 0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vriendenkring'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AppSegmentedControl(
-                labels: [
-                  'Feed',
-                  'Vrienden',
-                  pending > 0 ? 'Verzoeken ($pending)' : 'Verzoeken',
-                ],
-                selectedIndex: _tab,
-                onChanged: (index) => setState(() => _tab = index),
-              ),
-            ),
-          ),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Vriendenkring')),
       body: RefreshIndicator(
         color: AppTheme.teal,
         onRefresh: _refresh,
-        child: switch (_tab) {
-          1 => _KringTab(async: kringAsync, onRetry: _retryKring),
-          2 => _RequestsTab(async: requestsAsync, onRetry: _retryRequests),
-          _ => _FeedTab(
-            async: feedAsync,
-            hasKring: (kring?.friends.length ?? 0) > 0,
-            onRetry: () => ref.read(friendsFeedProvider.notifier).refresh(),
-            onLoadMore: () => ref.read(friendsFeedProvider.notifier).loadMore(),
-          ),
-        },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            _PeopleYouMayKnow(onConnect: _connectContacts),
+            _IncomingRequests(async: requestsAsync),
+            if (gated) ...[
+              Text(
+                'Liever zonder je contacten? Nodig iemand uit met je link of code.',
+                style: AppTheme.caption.copyWith(fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              const InviteFriendsCard(),
+            ] else ...[
+              const _KringEntry(),
+              const SectionHeader(title: 'Feed'),
+              const SizedBox(height: 12),
+              const _Feed(),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// The scroll view every tab uses, so pull-to-refresh works on a short tab too.
-class _TabList extends StatelessWidget {
-  const _TabList({required this.children});
+/// "Mensen die je misschien kent", the top of the page.
+///
+/// With contact matching on and the contacts not connected, "Verbind
+/// Contacten" sits right under the title, so it is in view the moment the
+/// screen opens. Once they are connected the rows take its place, with a quiet
+/// way to look through the address book again.
+class _PeopleYouMayKnow extends ConsumerWidget {
+  const _PeopleYouMayKnow({required this.onConnect});
 
-  final List<Widget> children;
+  final VoidCallback onConnect;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: children,
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final offered = ref.watch(contactDiscoveryOfferedProvider).value == true;
+    final connected = ref.watch(contactsConnectedProvider).value;
+
+    // Contact matching off (the build or the server), or not known yet: the
+    // friends-of-friends list as it always was, which draws nothing when empty.
+    if (!offered || connected == null) {
+      final people = ref.watch(friendSuggestionsProvider).value?.suggestions;
+      if (people == null || people.isEmpty) return const SizedBox.shrink();
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionHeader(
+              title: 'Mensen die je misschien kent',
+              description: 'Vrienden van de mensen in je kring.',
+            ),
+            FriendSuggestionsSection(showHeader: false),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(
+            title: 'Mensen die je misschien kent',
+            description: connected
+                ? 'Uit je contacten en uit de kring van je vrienden.'
+                : 'Verbind je contacten en zie wie van je vrienden BijbelStudie al '
+                      'gebruikt. Je kiest zelf wie je uitnodigt.',
+          ),
+          const SizedBox(height: 12),
+          if (!connected) ConnectContactsButton(onPressed: onConnect),
+          const FriendSuggestionsSection(showHeader: false),
+          if (connected)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onConnect,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Contacten opnieuw doorzoeken'),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _FeedTab extends StatelessWidget {
-  const _FeedTab({
-    required this.async,
-    required this.hasKring,
-    required this.onRetry,
-    required this.onLoadMore,
-  });
+/// Verzoeken waiting for an answer. Nothing at all when there are none, and
+/// nothing on a failure either: the feed below already reports the connection.
+class _IncomingRequests extends StatelessWidget {
+  const _IncomingRequests({required this.async});
 
-  final AsyncValue<FriendsFeed> async;
-  final bool hasKring;
-  final Future<void> Function() onRetry;
-  final Future<void> Function() onLoadMore;
+  final AsyncValue<FriendRequestsResponse> async;
 
   @override
   Widget build(BuildContext context) {
+    final incoming = async.value?.incoming ?? const <FriendRequestView>[];
+    if (incoming.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(title: 'Verzoeken (${incoming.length})'),
+          const SizedBox(height: 10),
+          _RequestGroup(rows: incoming, incoming: true),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestGroup extends StatelessWidget {
+  const _RequestGroup({required this.rows, required this.incoming});
+
+  final List<FriendRequestView> rows;
+  final bool incoming;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
+            FriendRequestRow(request: rows[i], incoming: incoming),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// "Je vrienden": one row that opens the kring, the verzoeken sent and the
+/// blocked list. Only there when one of those holds anything.
+class _KringEntry extends ConsumerWidget {
+  const _KringEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final scheme = Theme.of(context).colorScheme;
+    final friends = ref.watch(friendsKringProvider).value?.friends.length ?? 0;
+    final outgoing = ref.watch(friendsRequestsProvider).value?.outgoing.length ?? 0;
+    final blocked = ref.watch(friendsSettingsProvider).value?.blocked.length ?? 0;
+    if (friends == 0 && outgoing == 0 && blocked == 0) return const SizedBox.shrink();
+
+    final detail = [
+      if (friends > 0) friends == 1 ? '1 vriend' : '$friends vrienden',
+      if (outgoing > 0) '$outgoing verstuurd',
+    ].join(' - ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const _KringPage()),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.people_outline, size: 22, color: AppTheme.teal),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Je vrienden',
+                    style: AppTheme.bodyStrong.copyWith(fontSize: 15, color: scheme.onSurface),
+                  ),
+                  if (detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(detail, style: AppTheme.caption.copyWith(fontSize: 12.5)),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: AppTheme.inkMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The kring, the verzoeken sent and the blocked list: what used to be the
+/// Vrienden tab, now one tap under "Je vrienden".
+class _KringPage extends ConsumerWidget {
+  const _KringPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(friendsKringProvider);
+    final kring = async.value;
+    final failed = kring == null && async.hasError;
+    final outgoing =
+        ref.watch(friendsRequestsProvider).value?.outgoing ?? const <FriendRequestView>[];
+    final friends = kring?.friends ?? const <FriendSummary>[];
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Je vrienden')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        children: [
+          if (failed && !FriendsErrorCard.isQuiet(async.error))
+            FriendsErrorCard(
+              failure: async.error!,
+              onRetry: () async {
+                ref.invalidate(friendsKringProvider);
+                try {
+                  await ref.read(friendsKringProvider.future);
+                } catch (_) {}
+              },
+            )
+          else if (kring == null && !failed && async.isLoading)
+            const Padding(padding: EdgeInsets.all(32), child: AppLoader())
+          else if (friends.isNotEmpty)
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < friends.length; i++) ...[
+                    if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
+                    FriendRow(friend: friends[i]),
+                  ],
+                ],
+              ),
+            ),
+          if (outgoing.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const SectionHeader(title: 'Verstuurd'),
+            const SizedBox(height: 10),
+            _RequestGroup(rows: outgoing, incoming: false),
+          ],
+          const SizedBox(height: 24),
+          const InviteFriendsCard(),
+          const _BlockedSection(),
+        ],
+      ),
+    );
+  }
+}
+
+/// The feed: the posts, or what to say when there are none.
+class _Feed extends ConsumerWidget {
+  const _Feed();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(friendsFeedProvider);
+    final hasKring = (ref.watch(friendsKringProvider).value?.friends.length ?? 0) > 0;
     final feed = async.value;
     // The error is checked before the loading flag on purpose: an `AsyncError`
     // still reports `isLoading`, and a failure that renders as a spinner is a
@@ -159,36 +380,42 @@ class _FeedTab extends StatelessWidget {
     // failure is the exception - it falls through to the ordinary states.
     final failed = feed == null && async.hasError;
     if (failed && !FriendsErrorCard.isQuiet(async.error)) {
-      return _TabList(
-        children: [FriendsErrorCard(failure: async.error!, onRetry: onRetry)],
+      return FriendsErrorCard(
+        failure: async.error!,
+        onRetry: () => ref.read(friendsFeedProvider.notifier).refresh(),
       );
     }
     if (feed == null && !failed && async.isLoading) {
-      return const Center(child: AppLoader());
+      return const Padding(padding: EdgeInsets.all(32), child: AppLoader());
     }
     final posts = feed?.posts ?? const <FriendPost>[];
-    return _TabList(
-      children: [
-        if (posts.isNotEmpty) ...[
+    if (posts.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           FriendPostList(posts: posts),
           if (feed != null && feed.hasMore) ...[
             const SizedBox(height: 14),
-            _LoadMoreButton(feed: feed, onLoadMore: onLoadMore),
-          ],
-        ] else if (hasKring || (feed?.hasFriends ?? false))
-          AppCard(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Nog niets te zien in je kring. Zodra iemand een studie afrondt of '
-              'een tekst bewaart, staat het hier.',
-              textAlign: TextAlign.center,
-              style: AppTheme.caption.copyWith(fontSize: 13.5),
+            _LoadMoreButton(
+              feed: feed,
+              onLoadMore: () => ref.read(friendsFeedProvider.notifier).loadMore(),
             ),
-          )
-        else
-          const InviteFriendsCard(),
-      ],
-    );
+          ],
+        ],
+      );
+    }
+    if (hasKring || (feed?.hasFriends ?? false)) {
+      return AppCard(
+        padding: const EdgeInsets.all(20),
+        child: Text(
+          'Nog niets te zien in je kring. Zodra iemand een studie afrondt of '
+          'een tekst bewaart, staat het hier.',
+          textAlign: TextAlign.center,
+          style: AppTheme.caption.copyWith(fontSize: 13.5),
+        ),
+      );
+    }
+    return const InviteFriendsCard();
   }
 }
 
@@ -231,82 +458,6 @@ class _LoadMoreButton extends StatelessWidget {
   }
 }
 
-class _KringTab extends StatelessWidget {
-  const _KringTab({required this.async, required this.onRetry});
-
-  final AsyncValue<FriendsKring> async;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final kring = async.value;
-    final failed = kring == null && async.hasError;
-    if (failed && !FriendsErrorCard.isQuiet(async.error)) {
-      return _TabList(
-        children: [FriendsErrorCard(failure: async.error!, onRetry: onRetry)],
-      );
-    }
-    if (kring == null && !failed && async.isLoading) {
-      return const Center(child: AppLoader());
-    }
-    final friends = kring?.friends ?? const <FriendSummary>[];
-    if (friends.isEmpty) {
-      return const _TabList(
-        children: [
-          _ContactsEntry(),
-          InviteFriendsCard(),
-          // Structurally empty for a reader with no friends - a friend of a
-          // friend needs a friend - so it draws nothing here and says nothing
-          // about why.
-          FriendSuggestionsSection(),
-          _BlockedSection(),
-        ],
-      );
-    }
-    return _TabList(
-      children: [
-        const _ContactsEntry(),
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (var i = 0; i < friends.length; i++) ...[
-                if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
-                FriendRow(friend: friends[i]),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const InviteFriendsCard(),
-        const FriendSuggestionsSection(),
-        const _BlockedSection(),
-      ],
-    );
-  }
-}
-
-/// [ContactsEntryCard] with the gap under it.
-///
-/// The card itself renders nothing unless both the `CONTACT_MATCHING`
-/// dart-define and the server's pepper are on, so it needs no guard - but the
-/// spacing under it does, otherwise a feature that is off leaves a hole at the
-/// top of the tab.
-class _ContactsEntry extends ConsumerWidget {
-  const _ContactsEntry();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(contactDiscoveryOfferedProvider).value != true) {
-      return const SizedBox.shrink();
-    }
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 12),
-      child: ContactsEntryCard(),
-    );
-  }
-}
-
 /// "Geblokkeerd", under the kring, and only when there is something in it.
 ///
 /// The list rides along on `GET /friends/settings`. It is silent on a failure
@@ -345,66 +496,6 @@ class _BlockedSection extends ConsumerWidget {
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _RequestsTab extends StatelessWidget {
-  const _RequestsTab({required this.async, required this.onRetry});
-
-  final AsyncValue<FriendRequestsResponse> async;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final requests = async.value;
-    final failed = requests == null && async.hasError;
-    if (failed && !FriendsErrorCard.isQuiet(async.error)) {
-      return _TabList(
-        children: [FriendsErrorCard(failure: async.error!, onRetry: onRetry)],
-      );
-    }
-    if (requests == null && !failed && async.isLoading) {
-      return const Center(child: AppLoader());
-    }
-    final value = requests ?? FriendRequestsResponse.empty;
-    if (value.isEmpty) {
-      return _TabList(
-        children: [
-          AppCard(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Geen open verzoeken.',
-              textAlign: TextAlign.center,
-              style: AppTheme.caption.copyWith(fontSize: 13.5),
-            ),
-          ),
-        ],
-      );
-    }
-
-    Widget group(List<FriendRequestView> rows, {required bool incoming}) => AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
-            FriendRequestRow(request: rows[i], incoming: incoming),
-          ],
-        ],
-      ),
-    );
-
-    return _TabList(
-      children: [
-        if (value.incoming.isNotEmpty) group(value.incoming, incoming: true),
-        if (value.outgoing.isNotEmpty) ...[
-          if (value.incoming.isNotEmpty) const SizedBox(height: 20),
-          const SectionHeader(title: 'Verstuurd'),
-          const SizedBox(height: 10),
-          group(value.outgoing, incoming: false),
-        ],
       ],
     );
   }

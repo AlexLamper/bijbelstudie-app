@@ -20,7 +20,12 @@ import 'friends_providers.dart';
 /// nothing at all on a failure - no skeleton, no "kon niet laden". A section
 /// that was never promised cannot disappoint.
 class FriendSuggestionsSection extends ConsumerWidget {
-  const FriendSuggestionsSection({super.key});
+  const FriendSuggestionsSection({super.key, this.showHeader = true});
+
+  /// False when the caller already put "Mensen die je misschien kent" above
+  /// it (the top of Vriendenkring, with "Verbind Contacten" under the title):
+  /// then only the rows are drawn.
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,18 +38,21 @@ class FriendSuggestionsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 24),
-        const SectionHeader(title: 'Mensen die je misschien kent'),
-        const SizedBox(height: 4),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text(
-            response!.hasContactMatches
-                ? 'Uit je contacten en de kring van je vrienden.'
-                : 'Vrienden van de mensen in je kring.',
-            style: AppTheme.caption.copyWith(fontSize: 12.5),
+        if (showHeader) ...[
+          const SizedBox(height: 24),
+          const SectionHeader(title: 'Mensen die je misschien kent'),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              response!.hasContactMatches
+                  ? 'Uit je contacten en de kring van je vrienden.'
+                  : 'Vrienden van de mensen in je kring.',
+              style: AppTheme.caption.copyWith(fontSize: 12.5),
+            ),
           ),
-        ),
+        ] else
+          const SizedBox(height: 12),
         AppCard(
           padding: EdgeInsets.zero,
           child: Column(
