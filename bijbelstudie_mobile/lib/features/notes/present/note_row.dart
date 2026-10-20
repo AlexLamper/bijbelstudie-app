@@ -77,11 +77,7 @@ class NoteRow extends ConsumerWidget {
             const SizedBox(height: 10),
             Text(
               note.noteText,
-              style: AppTheme.bodyMuted.copyWith(
-                fontSize: 16,
-                height: 1.55,
-                color: AppTheme.ink,
-              ),
+              style: AppTheme.bodyMuted.copyWith(color: AppTheme.ink),
             ),
           ],
           if (!note.isStudyReflection && note.verseText.trim().isNotEmpty) ...[
@@ -97,11 +93,7 @@ class NoteRow extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
                         note.verseText,
-                        style: AppTheme.verseFragment.copyWith(
-                          fontSize: 16,
-                          height: 1.65,
-                          color: AppTheme.inkMuted,
-                        ),
+                        style: AppTheme.verseFragment,
                       ),
                     ),
                   ),
@@ -491,11 +483,7 @@ class NoteMetaLine extends StatelessWidget {
         Flexible(
           child: Text(
             reference,
-            style: AppTheme.pillLabel.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.teal,
-            ),
+            style: AppTheme.bodyStrong.copyWith(color: AppTheme.teal),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -515,10 +503,7 @@ class NoteMetaLine extends StatelessWidget {
         Expanded(
           child: Text(
             date,
-            style: AppTheme.caption.copyWith(
-              fontSize: 14,
-              color: AppTheme.inkFaint,
-            ),
+            style: AppTheme.caption.copyWith(color: AppTheme.inkFaint),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

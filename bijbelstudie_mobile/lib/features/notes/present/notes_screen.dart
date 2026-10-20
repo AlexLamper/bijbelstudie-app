@@ -171,7 +171,6 @@ class _Header extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 gap: 26,
                 bottomGap: 13,
-                labelSize: 15.5,
                 underlineWidth: 2.5,
                 underlineRadius: 2,
                 // Onto the container's own border rather than above it.
