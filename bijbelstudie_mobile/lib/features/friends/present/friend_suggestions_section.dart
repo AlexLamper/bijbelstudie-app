@@ -26,7 +26,8 @@ class FriendSuggestionsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
     // `.value` on purpose: loading and error both read as "nothing to show".
-    final people = ref.watch(friendSuggestionsProvider).value?.suggestions;
+    final response = ref.watch(friendSuggestionsProvider).value;
+    final people = response?.suggestions;
     if (people == null || people.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -38,7 +39,9 @@ class FriendSuggestionsSection extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(
-            'Vrienden van de mensen in je kring.',
+            response!.hasContactMatches
+                ? 'Uit je contacten en de kring van je vrienden.'
+                : 'Vrienden van de mensen in je kring.',
             style: AppTheme.caption.copyWith(fontSize: 12.5),
           ),
         ),
@@ -81,7 +84,10 @@ class _FriendSuggestionRowState extends ConsumerState<FriendSuggestionRow> {
     setState(() => _busy = true);
     final result = await ref
         .read(friendsRepositoryProvider)
-        .invite(userId: widget.person.userId, source: 'suggestion');
+        .invite(
+          userId: widget.person.userId,
+          source: widget.person.inContacts ? 'contacts' : 'suggestion',
+        );
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -101,7 +107,8 @@ class _FriendSuggestionRowState extends ConsumerState<FriendSuggestionRow> {
     final person = widget.person;
     // Never formatted here: `mutualLabel` is null for an unknown count and for
     // zero alike, so "0 gezamenlijke vrienden" cannot be said.
-    final mutual = person.mutualLabel;
+    // "In je contacten" stands in for a contact match with nobody in common.
+    final mutual = person.suggestionLabel;
 
     return FriendTapTarget(
       onTap: () => openFriendProfile(context, person.userId),

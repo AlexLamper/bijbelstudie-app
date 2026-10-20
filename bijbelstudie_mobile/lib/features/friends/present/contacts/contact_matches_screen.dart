@@ -6,6 +6,7 @@ import '../../../../core/ui/app_widgets.dart';
 import '../../data/friend_models.dart';
 import '../friend_post_card.dart' show FriendAvatar;
 import 'contact_discovery_providers.dart';
+import 'own_number_card.dart';
 
 /// "Vrienden gevonden" - the result of one matching run, one row per account,
 /// each with its own "Uitnodigen".
@@ -124,12 +125,23 @@ class _Body extends ConsumerWidget {
 
       case ContactDiscoveryStage.matched:
         if (state.found.isEmpty) {
-          return const AppEmptyState(
-            title: 'Nog niemand gevonden',
-            description:
-                'Niemand uit je contacten gebruikt BijbelStudie al, of ze willen niet '
-                'gevonden worden. Je kunt iemand uitnodigen met een link of code.',
-            icon: Icons.person_search_outlined,
+          // The own-number card matters most here: an empty result is usually
+          // "they have not connected yet", and the way to be found when they
+          // do is to have a number registered now.
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            children: const [
+              OwnNumberCard(),
+              AppEmptyState(
+                title: 'Nog niemand gevonden',
+                description:
+                    'Niemand uit je contacten gebruikt BijbelStudie al, of ze willen niet '
+                    'gevonden worden. Zodra iemand erbij komt, zie je diegene bij '
+                    '"Mensen die je misschien kent". Je kunt ook iemand uitnodigen met '
+                    'een link of code.',
+                icon: Icons.person_search_outlined,
+              ),
+            ],
           );
         }
         return _MatchList(found: state.found, invited: state.invited);
@@ -168,6 +180,8 @@ class _MatchList extends StatelessWidget {
                   'Nodig uit wie je wilt. Er is nog niets verstuurd.',
                   style: AppTheme.caption,
                 ),
+                const SizedBox(height: 12),
+                const OwnNumberCard(),
               ],
             ),
           );

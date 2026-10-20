@@ -24,6 +24,8 @@ class ContactDiscoveryStore {
   static const _matchedIdsKey = 'friends.contacts.matchedUserIds';
   static const _consentedAtKey = 'friends.contacts.disclosureAcceptedAt';
   static const _discoverableKey = 'friends.contacts.discoverable';
+  static const _ownPhoneKey = 'friends.contacts.ownPhoneSaved';
+  static const _lastMatchKey = 'friends.contacts.lastMatchAt';
 
   /// User ids a match returned, newest run first. Never names, never pictures:
   /// those are re-fetched, so nothing identifying sits in the preferences file.
@@ -64,6 +66,29 @@ class ContactDiscoveryStore {
     await _prefs.setBool(_discoverableKey, value);
   }
 
+  /// Whether the reader's own phone number went up with their findability.
+  ///
+  /// Only a flag - never the number. It matters because people keep each
+  /// other in their contacts by number far more often than by e-mail, so a
+  /// reader who is findable by e-mail alone is, in practice, findable by
+  /// nobody. The flow asks for the number again until this is true.
+  bool get hasOwnPhone => _prefs.getBool(_ownPhoneKey) ?? false;
+
+  Future<void> setHasOwnPhone(bool value) async {
+    await _prefs.setBool(_ownPhoneKey, value);
+  }
+
+  /// When an address book was last matched, by hand or in the background.
+  /// Spaces the background re-check out under the route's 5-an-hour limit.
+  DateTime? get lastMatchAt {
+    final millis = _prefs.getInt(_lastMatchKey);
+    return millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  Future<void> markMatched([DateTime? at]) async {
+    await _prefs.setInt(_lastMatchKey, (at ?? DateTime.now()).millisecondsSinceEpoch);
+  }
+
   /// Forget everything contact matching ever stored.
   ///
   /// Called when the reader revokes access, alongside
@@ -74,5 +99,7 @@ class ContactDiscoveryStore {
     await _prefs.remove(_matchedIdsKey);
     await _prefs.remove(_consentedAtKey);
     await _prefs.remove(_discoverableKey);
+    await _prefs.remove(_ownPhoneKey);
+    await _prefs.remove(_lastMatchKey);
   }
 }

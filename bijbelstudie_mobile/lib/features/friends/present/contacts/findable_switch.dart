@@ -108,9 +108,13 @@ class _FindableSwitchTileState extends ConsumerState<FindableSwitchTile> {
                   controller: controller,
                   keyboardType: TextInputType.phone,
                   autofillHints: const [AutofillHints.telephoneNumber],
+                  // Optional, but the one that matters: people keep each other
+                  // in their contacts by number far more often than by e-mail.
                   decoration: const InputDecoration(
-                    labelText: 'Telefoonnummer (niet verplicht)',
+                    labelText: 'Telefoonnummer',
                     hintText: '06 12345678',
+                    helperText: 'Zonder nummer vinden vrienden je alleen via je e-mailadres.',
+                    helperMaxLines: 2,
                   ),
                 ),
                 const SizedBox(height: 18),

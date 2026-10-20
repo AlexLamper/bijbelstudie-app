@@ -48,6 +48,11 @@ abstract class ContactsSource {
   /// first, and `ContactDiscoveryController` enforces the ordering.
   Future<ContactsAccess> requestAccess();
 
+  /// Whether access is already granted, **without** ever showing a dialog.
+  /// What the background re-check asks: it may only read a book the reader
+  /// already opened through the disclosure and the OS prompt.
+  Future<bool> hasAccess();
+
   /// Phone numbers and e-mail addresses, nothing else.
   Future<AddressBook> read();
 
@@ -77,6 +82,16 @@ class DeviceContactsSource implements ContactsSource {
       // A concurrent request, or no plugin on this platform. Either way there
       // is no permission to work with and nothing worth an error card.
       return ContactsAccess.denied;
+    }
+  }
+
+  @override
+  Future<bool> hasAccess() async {
+    try {
+      final status = await fc.FlutterContacts.permissions.check(fc.PermissionType.read);
+      return status == fc.PermissionStatus.granted || status == fc.PermissionStatus.limited;
+    } catch (_) {
+      return false;
     }
   }
 

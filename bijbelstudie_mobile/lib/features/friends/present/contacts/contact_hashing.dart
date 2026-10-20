@@ -27,6 +27,12 @@ import '../../data/friend_models.dart';
 /// web page brings with it.
 final RegExp _phoneNoise = RegExp(r'[\s\-(). ‑-―]');
 
+/// The bracketed trunk zero of `+31 (0)6 12345678`, the way Dutch business
+/// cards and e-mail signatures write a number. It has to go before the
+/// brackets do, or the zero survives as a digit and `+310612345678` never
+/// matches `+31612345678`.
+final RegExp _bracketedTrunkZero = RegExp(r'\(\s*0\s*\)');
+
 final RegExp _nonDigit = RegExp(r'\D');
 
 /// Deliberately not a full address validator: a thing with an `@` and a dot
@@ -57,7 +63,7 @@ const String defaultContactCountry = 'NL';
 /// not match.
 String? normaliseContactPhone(String raw, {String country = defaultContactCountry}) {
   if (raw.isEmpty) return null;
-  var value = raw.trim().replaceAll(_phoneNoise, '');
+  var value = raw.trim().replaceAll(_bracketedTrunkZero, '').replaceAll(_phoneNoise, '');
   if (value.isEmpty) return null;
 
   // 00 31 ... is the same as +31 ...
@@ -71,9 +77,13 @@ String? normaliseContactPhone(String raw, {String country = defaultContactCountr
   final digits = value.replaceAll(_nonDigit, '');
   if (digits.isEmpty) return null;
 
+  // The US has no trunk zero, so a national number that starts with one cannot
+  // be American: it is a Dutch number on a phone whose locale says en_US,
+  // which is common. Read it as NL rather than minting +1 6... .
+  final upper = country.toUpperCase();
+  final effective = upper == 'US' && digits.startsWith('0') ? defaultContactCountry : upper;
   final prefix =
-      contactCountryPrefixes[country.toUpperCase()] ??
-      contactCountryPrefixes[defaultContactCountry]!;
+      contactCountryPrefixes[effective] ?? contactCountryPrefixes[defaultContactCountry]!;
   // A national number written with its trunk zero: 0612345678 -> +31612345678.
   final national = digits.startsWith('0') ? digits.substring(1) : digits;
   if (national.length < 8) return null;
@@ -138,10 +148,17 @@ ContactDiscoveryHashes hashAddressBook({
   required String pepper,
   String country = defaultContactCountry,
 }) {
+  // The device locale is only a guess at the country (a Dutch reader with an
+  // en_GB phone is not rare), so a national number is also read as Dutch -
+  // NL being where nearly every account is. A number already in international
+  // form comes out the same both ways and the set folds it to one hash.
+  final readings = {country.toUpperCase(), defaultContactCountry};
   final phoneHashes = <String>{};
   for (final number in phoneNumbers) {
-    final hash = hashContactPhone(number, pepper, country: country);
-    if (hash != null) phoneHashes.add(hash);
+    for (final reading in readings) {
+      final hash = hashContactPhone(number, pepper, country: reading);
+      if (hash != null) phoneHashes.add(hash);
+    }
     if (phoneHashes.length >= maxContactMatchHashes) break;
   }
 

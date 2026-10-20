@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/friend_models.dart';
 import '../data/friends_failure.dart';
 import '../data/friends_repository.dart';
+import 'contacts/contact_discovery_providers.dart' show contactSuggestionsProvider;
 
 /// The vriendenkring feed, shared by the Start tab's "Bij je vrienden" block
 /// and the Vriendenkring screen itself, so both agree on the posts and on the
@@ -147,13 +148,39 @@ final friendProfileProvider =
       return ref.watch(friendsRepositoryProvider).getProfile(userId);
     });
 
-/// "Mensen die je misschien kent" - friends of the people in the kring.
+/// "Mensen die je misschien kent" - people from the reader's contacts who use
+/// the app ([contactSuggestionsProvider]), then friends of the people in the
+/// kring (`GET /friends/suggestions`).
 ///
-/// Structurally empty for a reader with no friends, which is why the section
-/// built on it hides itself rather than explaining itself.
+/// The contacts half is what a new reader has: with no friends yet the server
+/// half is structurally empty. Before it was folded in here, two people who
+/// had each other's number never met in this list at all, because the only
+/// place a contact match ever showed was the one-off result screen.
+///
+/// Empty hides the section built on it rather than explaining itself.
 final friendSuggestionsProvider =
-    FutureProvider.autoDispose<FriendSuggestionsResponse>((ref) {
-      return ref.watch(friendsRepositoryProvider).getSuggestions();
+    FutureProvider.autoDispose<FriendSuggestionsResponse>((ref) async {
+      final contacts = ref.watch(contactSuggestionsProvider).value ?? const <FriendSummary>[];
+      // Each visit lets a stale contact match refresh itself - throttled
+      // inside, and it only rebuilds this when a run actually lands.
+      ref.read(contactSuggestionsProvider.notifier).recheckIfStale();
+
+      FriendSuggestionsResponse server;
+      try {
+        server = await ref.watch(friendsRepositoryProvider).getSuggestions();
+      } catch (_) {
+        if (contacts.isEmpty) rethrow;
+        server = FriendSuggestionsResponse.empty;
+      }
+
+      // Not watched: inviting from this list invalidates the requests, and the
+      // row is meant to stay and say "Verzoek verstuurd" rather than vanish.
+      final requests = ref.read(friendsRequestsProvider).value;
+      final inFlight = <String>{
+        for (final request in [...?requests?.incoming, ...?requests?.outgoing])
+          request.user.userId,
+      };
+      return server.withContactMatches(contacts, exclude: inFlight);
     });
 
 /// The reactions under one post, oldest first.

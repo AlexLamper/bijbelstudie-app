@@ -193,11 +193,16 @@ class FriendSummary {
     this.friendsSince,
     this.mutualCount,
     this.publicProfile,
+    this.inContacts = false,
   });
 
   final String userId;
   final String name;
   final String? image;
+
+  /// Client-side only, never on the wire: this person came back from the
+  /// reader's own contact match, which is why they are suggested.
+  final bool inContacts;
 
   /// Days in a row, for the row's flame. 0 when they have none.
   final int streak;
@@ -243,6 +248,24 @@ class FriendSummary {
     if (count == null || count <= 0) return null;
     return count == 1 ? '1 gezamenlijke vriend' : '$count gezamenlijke vrienden';
   }
+
+  /// Why a suggestion is there: the friends in common when there are any,
+  /// else "In je contacten" for a contact match, else nothing.
+  String? get suggestionLabel => mutualLabel ?? (inContacts ? 'In je contacten' : null);
+
+  /// This person, marked as found in the reader's contacts.
+  FriendSummary asContactMatch() => FriendSummary(
+    userId: userId,
+    name: name,
+    image: image,
+    streak: streak,
+    planDay: planDay,
+    planTotalDays: planTotalDays,
+    friendsSince: friendsSince,
+    mutualCount: mutualCount,
+    publicProfile: publicProfile,
+    inContacts: true,
+  );
 
   /// "Dag 42 van 365", or null for someone who runs no reading plan.
   String? get planLabel =>
@@ -402,6 +425,33 @@ class FriendSuggestionsResponse {
   final List<FriendSummary> suggestions;
 
   bool get isEmpty => suggestions.isEmpty;
+
+  /// Whether any row came from the reader's contacts rather than the kring.
+  bool get hasContactMatches => suggestions.any((person) => person.inContacts);
+
+  /// [contactMatches] folded in front of the friends-of-friends rows: one row
+  /// per person, a contact match keeps the server's mutual count when it has
+  /// one, and anyone in [exclude] (a verzoek already in flight) is left out,
+  /// as the server does for its own rows.
+  FriendSuggestionsResponse withContactMatches(
+    List<FriendSummary> contactMatches, {
+    Set<String> exclude = const {},
+  }) {
+    if (contactMatches.isEmpty) return this;
+    final byId = {for (final person in suggestions) person.userId: person};
+    final merged = <FriendSummary>[];
+    final seen = <String>{};
+    for (final match in contactMatches) {
+      if (match.userId.isEmpty || exclude.contains(match.userId) || !seen.add(match.userId)) {
+        continue;
+      }
+      merged.add((byId[match.userId] ?? match).asContactMatch());
+    }
+    for (final person in suggestions) {
+      if (seen.add(person.userId)) merged.add(person);
+    }
+    return FriendSuggestionsResponse(suggestions: merged);
+  }
 
   factory FriendSuggestionsResponse.fromJson(Map<String, dynamic> json) {
     return FriendSuggestionsResponse(suggestions: FriendSummary.listFrom(json['suggestions']));

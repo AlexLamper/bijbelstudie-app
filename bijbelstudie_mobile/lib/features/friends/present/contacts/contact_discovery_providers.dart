@@ -212,6 +212,10 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
     }
 
     await store.setMatchedUserIds(result.found.map((friend) => friend.userId));
+    await store.markMatched();
+    // The same people also belong under "Mensen die je misschien kent", so
+    // the Vrienden tab does not have to spend a second match call on them.
+    ref.read(contactSuggestionsProvider.notifier).put(result.found);
     state = ContactDiscoveryState(
       stage: ContactDiscoveryStage.matched,
       found: result.found,
@@ -252,6 +256,7 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
     final ok = await ref.read(friendsRepositoryProvider).forgetContactDiscovery();
     final store = await ref.read(contactDiscoveryStoreProvider.future);
     await store.forget();
+    ref.read(contactSuggestionsProvider.notifier).put(const []);
     state = ContactDiscoveryState.idle;
     return ok;
   }
@@ -285,17 +290,29 @@ class FindableController extends Notifier<bool> {
   ///
   /// `discoverable` is always sent explicitly, because it defaults to true
   /// server-side when it is absent.
+  ///
+  /// The number is normalised to E.164 **here**, with the same function the
+  /// address book is hashed with, before it goes up. That way the stored hash
+  /// is of exactly the string a friend's phone will compute for this reader,
+  /// whatever the server's own normaliser makes of the raw input (an older
+  /// deploy did not know `+31 (0)6`, for one). A number that does not
+  /// normalise is sent as typed and the server drops it.
   Future<bool> setFindable(bool value, {String? phone, String? email}) async {
     final repo = ref.read(friendsRepositoryProvider);
     final store = await ref.read(contactDiscoveryStoreProvider.future);
+    final country = ref.read(contactCountryProvider);
+    final typed = phone?.trim();
+    final e164 = typed == null || typed.isEmpty
+        ? null
+        : normaliseContactPhone(typed, country: country);
 
     final bool ok;
     if (value) {
       ok = await repo.saveOwnContactIdentifiers(
         OwnContactIdentifiers(
-          phone: phone,
+          phone: e164 ?? (typed == null || typed.isEmpty ? null : typed),
           email: email,
-          country: ref.read(contactCountryProvider),
+          country: country,
           discoverable: true,
         ),
       );
@@ -306,11 +323,137 @@ class FindableController extends Notifier<bool> {
 
     if (ok) {
       await store.setDiscoverable(value);
+      if (!value) {
+        await store.setHasOwnPhone(false);
+      } else if (e164 != null) {
+        await store.setHasOwnPhone(true);
+      }
       state = value;
     }
     return ok;
   }
+
+  /// The "Laat vrienden jou ook vinden" step of the contacts flow: become
+  /// findable by [phone] (and, server-side, the account's e-mail).
+  ///
+  /// Null when the number does not read as one, so the caller can say so
+  /// before anything is sent; otherwise whether the server took it.
+  Future<bool?> saveOwnPhone(String phone) async {
+    final e164 = normaliseContactPhone(phone.trim(), country: ref.read(contactCountryProvider));
+    if (e164 == null) return null;
+    return setFindable(true, phone: e164);
+  }
 }
+
+/// Whether the contacts flow should still ask for the reader's own number:
+/// true until they are findable **with** a phone number. Findable by e-mail
+/// alone does not count, because people keep each other by number.
+final ownPhoneNeededProvider = FutureProvider.autoDispose<bool>((ref) async {
+  // Rebuilt when findability flips, so the card folds away once it lands.
+  ref.watch(findableProvider);
+  final store = await ref.watch(contactDiscoveryStoreProvider.future);
+  return !(store.isDiscoverable && store.hasOwnPhone);
+});
+
+/// [AppConfig.contactMatchingEnabled], as a provider so a test can switch the
+/// background re-check on without a dart-define.
+final contactMatchingBuildFlagProvider = Provider<bool>(
+  (ref) => AppConfig.contactMatchingEnabled,
+);
+
+/// How long a background re-check waits after the previous match, by hand or
+/// not. The route allows 5 an hour per account; this spends at most two.
+const Duration contactRecheckInterval = Duration(minutes: 30);
+
+/// The first re-check of an app session waits only this long, so a reader
+/// who reopens the app shortly after a match does not spend another call.
+const Duration contactSessionRecheckInterval = Duration(minutes: 2);
+
+/// People from the reader's address book who use BijbelStudie and chose to be
+/// findable - the contacts half of "Mensen die je misschien kent".
+///
+/// Matching both ways needs both people to have run it *after* the other one
+/// became findable, so a single run from the disclosure screen is not enough:
+/// whoever connected first would never see whoever came second. This re-runs
+/// the same match quietly, only when the reader already passed the disclosure
+/// and already granted access (it never shows the OS dialog), at most once per
+/// [contactRecheckInterval]. Every failure reads as "nothing new": it is a
+/// suggestion list, not a screen of its own.
+///
+/// Held for the app session and never written to disk beyond the user ids the
+/// store already keeps (plan §6 step 5).
+class ContactSuggestionsController extends AsyncNotifier<List<FriendSummary>> {
+  bool _running = false;
+
+  /// What [put] last handed in, so a [build] still in flight when it arrives
+  /// does not land afterwards and wipe it.
+  List<FriendSummary>? _handed;
+
+  @override
+  Future<List<FriendSummary>> build() async {
+    return await _match(contactSessionRecheckInterval) ?? _handed ?? const [];
+  }
+
+  /// The result of a run made elsewhere (the disclosure flow), or an empty
+  /// list after the reader forgot their contacts.
+  void put(List<FriendSummary> found) {
+    _handed = List.unmodifiable(found);
+    state = AsyncData(_handed!);
+  }
+
+  /// Re-run the match if the last one is older than [contactRecheckInterval].
+  /// Fire-and-forget: the state only changes when a run actually lands.
+  Future<void> recheckIfStale() async {
+    final found = await _match(contactRecheckInterval);
+    if (found != null) state = AsyncData(found);
+  }
+
+  /// Null when nothing ran (throttled, not consented, off, failed).
+  Future<List<FriendSummary>?> _match(Duration minimumGap) async {
+    if (_running || !ref.read(contactMatchingBuildFlagProvider)) return null;
+    _running = true;
+    try {
+      final store = await ref.read(contactDiscoveryStoreProvider.future);
+      if (store.disclosureAcceptedAt == null) return null;
+      final last = store.lastMatchAt;
+      if (last != null && DateTime.now().difference(last) < minimumGap) return null;
+
+      final source = ref.read(contactsSourceProvider);
+      if (!await source.hasAccess()) return null;
+
+      final repo = ref.read(friendsRepositoryProvider);
+      final pepper = await repo.getContactPepper();
+      if (pepper == null) return null;
+
+      final book = await source.read();
+      if (book.isEmpty) return null;
+      final hashes = hashAddressBook(
+        phoneNumbers: book.phoneNumbers,
+        emailAddresses: book.emailAddresses,
+        pepper: pepper,
+        country: ref.read(contactCountryProvider),
+      );
+      if (hashes.isEmpty) return null;
+
+      // Stamped before the call, so a run that fails still waits its turn
+      // instead of retrying into the rate limit on every rebuild.
+      await store.markMatched();
+      final result = await repo.matchContacts(hashes);
+      if (!result.available || (result.found.isEmpty && result.message != null)) return null;
+      await store.setMatchedUserIds(result.found.map((friend) => friend.userId));
+      return List.unmodifiable(result.found);
+    } catch (_) {
+      return null;
+    } finally {
+      _running = false;
+    }
+  }
+}
+
+final contactSuggestionsProvider =
+    AsyncNotifierProvider<ContactSuggestionsController, List<FriendSummary>>(
+      ContactSuggestionsController.new,
+    );
 
 final findableProvider = NotifierProvider<FindableController, bool>(
   FindableController.new,
