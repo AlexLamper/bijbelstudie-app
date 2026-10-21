@@ -321,14 +321,10 @@ class _CloseButton extends StatelessWidget {
       child: Semantics(
         button: true,
         label: 'Sluiten',
-        child: Container(
+        child: const SizedBox(
           width: 32,
           height: 32,
-          decoration: const BoxDecoration(
-            color: Color(0x2EFFFFFF),
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
+          child: Center(
             child: Icon(Icons.close, size: 20, color: Colors.white),
           ),
         ),
