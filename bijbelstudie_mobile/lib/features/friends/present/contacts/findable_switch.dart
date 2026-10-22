@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
 import '../../../auth/present/auth_controller.dart';
+import '../../../settings/present/findable_default.dart';
 import 'contact_discovery_providers.dart';
 
 /// "Laat vrienden me vinden" - the **second** consent
@@ -43,8 +44,17 @@ class _FindableSwitchTileState extends ConsumerState<FindableSwitchTile> {
   void initState() {
     super.initState();
     // Reads the local mirror so the switch renders in the right position
-    // before anything comes back from the server.
-    Future.microtask(() => ref.read(findableProvider.notifier).load());
+    // before anything comes back from the server, and then lets the one-time
+    // default have its turn: a reader who already connected their contacts
+    // starts findable ([FindableDefault], which is where every guard lives -
+    // it is a default, so it runs at most once and never over a choice the
+    // reader made themselves). It lives under `features/settings` because the
+    // default is Instellingen's decision, not the contacts flow's.
+    Future.microtask(() async {
+      await ref.read(findableProvider.notifier).load();
+      if (!mounted) return;
+      await ref.read(findableDefaultProvider).applyIfDue();
+    });
   }
 
   Future<void> _toggle(bool value) async {
