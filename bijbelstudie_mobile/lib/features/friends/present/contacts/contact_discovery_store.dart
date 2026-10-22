@@ -40,12 +40,13 @@ class ContactDiscoveryStore {
     await _prefs.setStringList(_matchedIdsKey, clean.toList(growable: false));
   }
 
-  /// When the reader last passed the disclosure screen, or null if never.
+  /// When the reader last accepted the disclosure, or null if never.
   ///
   /// Recorded for the audit question "was the disclosure shown before the OS
   /// prompt?", which is exactly what store review asks. It is never used to
-  /// *skip* the screen: [ContactsDisclosureScreen] is the only route to the
-  /// permission request, every time.
+  /// *skip* the disclosure: the three facts are printed on the "Verbind
+  /// Contacten" card itself, so they are on screen every time, and this is
+  /// only the gate `ContactDiscoveryController.startMatch` reads.
   DateTime? get disclosureAcceptedAt {
     final millis = _prefs.getInt(_consentedAtKey);
     return millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis);

@@ -9,7 +9,6 @@ import '../data/friend_models.dart';
 import '../data/friends_repository.dart';
 import 'contacts/connect_contacts_button.dart';
 import 'contacts/contact_discovery_providers.dart';
-import 'contacts/contacts_disclosure_screen.dart';
 import 'friend_block_action.dart';
 import 'friend_comments_sheet.dart';
 import 'friend_post_card.dart';
@@ -77,10 +76,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     ref.invalidate(contactsConnectedProvider);
   }
 
-  /// "Verbind Contacten": the disclosure first, which is the only route to the
-  /// OS prompt; it then shows what the match found.
+  /// "Verbind Contacten": straight to the OS prompt, with the disclosure
+  /// printed on the card the reader just tapped.
+  ///
+  /// There is no page in between any more. The ordering Play asks for still
+  /// holds, because the disclosure is *on* that card and the controller still
+  /// refuses to touch the address book until this call has written down that
+  /// it was accepted.
   Future<void> _connectContacts() async {
-    await showContactsDisclosure(context);
+    await startContactsMatch(context, ref);
     if (!mounted) return;
     ref.invalidate(contactsConnectedProvider);
   }
@@ -204,10 +208,11 @@ class _PeopleYouMayKnow extends ConsumerWidget {
         children: [
           SectionHeader(
             title: 'Mensen die je misschien kent',
+            // Short on purpose now that the card under it carries the
+            // disclosure: two paragraphs of explaining read as a warning.
             description: connected
                 ? 'Uit je contacten en uit de kring van je vrienden.'
-                : 'Verbind je contacten en zie wie van je vrienden BijbelStudie al '
-                      'gebruikt. Je kiest zelf wie je uitnodigt.',
+                : 'Zie wie je al kent. Je kiest zelf wie je uitnodigt.',
           ),
           const SizedBox(height: 12),
           if (!connected) ConnectContactsButton(onPressed: onConnect),

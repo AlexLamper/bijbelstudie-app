@@ -10,7 +10,8 @@ import 'friends_providers.dart';
 /// invitation, and whether the Start tab's header button wears its red dot.
 ///
 /// Everything here reads; nothing asks the OS for anything. The permission
-/// prompt stays behind `ContactsDisclosureScreen`, as before.
+/// prompt stays behind the "Verbind Contacten" card, which carries the
+/// disclosure it is asked after.
 
 /// Whether the reader has connected their contacts: the disclosure was passed
 /// once and the OS permission is still granted, in full or (iOS 18+) limited.
@@ -111,22 +112,21 @@ final friendsEntrySeenProvider =
       FriendsEntrySeenNotifier.new,
     );
 
-/// How long after a visit the "connect your contacts" dot may come back.
-///
-/// The dot is a nudge, not a nag: it shows while the contacts are not
-/// connected, goes out when Vriendenkring is opened, and returns a week later
-/// if they still are not.
-const contactsNudgeInterval = Duration(days: 7);
-
 /// The red dot on the Start tab's Vriendenkring button.
 ///
-/// On when any of these holds, and off once the screen has been opened and
-/// none is left:
+/// On when any of these holds:
 ///
-/// * contact matching is on, the contacts are not connected, and Vriendenkring
-///   was not opened in the last [contactsNudgeInterval];
+/// * contact matching is on and the contacts are **not** connected - and this
+///   one never goes away on its own;
 /// * a verzoek is waiting for an answer (it stays until it is answered);
 /// * "Mensen die je misschien kent" holds someone not shown before.
+///
+/// The not-connected dot used to go out for a week after a visit. It no longer
+/// does, and that is deliberate: connecting the contacts is the way into the
+/// whole feature, the reader has not done it, and a dot that gives up after
+/// one look is a feature nobody ever finds. It goes out the moment the
+/// contacts actually are connected, which is the only thing that should turn
+/// it off.
 ///
 /// The count badge for new posts ([friendsBadgeProvider]) is separate and
 /// wins: a number already says "go there".
@@ -136,16 +136,13 @@ const contactsNudgeInterval = Duration(days: 7);
 /// costs no extra request.
 final friendsEntryDotProvider = Provider<bool>((ref) {
   if (ref.watch(contactDiscoveryOfferedProvider).value != true) return false;
+
+  // Checked before anything that has been "seen": nothing the reader has
+  // already looked at makes this false.
+  if (ref.watch(contactsConnectedProvider).value == false) return true;
+
   final seen = ref.watch(friendsEntrySeenProvider).value;
   if (seen == null) return false;
-
-  final connected = ref.watch(contactsConnectedProvider).value;
-  if (connected == false) {
-    final opened = seen.openedAt;
-    if (opened == null || DateTime.now().difference(opened) >= contactsNudgeInterval) {
-      return true;
-    }
-  }
 
   if ((ref.watch(friendsKringProvider).value?.pendingIncoming ?? 0) > 0) return true;
 

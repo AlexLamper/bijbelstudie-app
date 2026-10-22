@@ -14,6 +14,11 @@ import '../../data/friend_models.dart';
 /// ever matches and there is nothing on screen to tell you why. Change one,
 /// change both.
 ///
+/// One deliberate asymmetry, and only one: this side cleans a phone number
+/// harder than the website does, because it reads an address book rather than a
+/// form (see [_notPhoneCharacter]). It is a strict superset - every input the
+/// website normalises comes out the same here - so the hashes still agree.
+///
 /// No Flutter import here on purpose - the whole module is pure functions, so
 /// `test/contact_hashing_test.dart` can check the three ways a Dutch number is
 /// written without a widget tree.
@@ -21,11 +26,22 @@ import '../../data/friend_models.dart';
 /// The pepper is the server's (`GET /friends/discovery/pepper`), held in memory
 /// for the length of one matching run and never written to disk.
 
-/// Everything a human or an address book sprinkles through a phone number:
-/// whitespace, hyphens, brackets, dots, a non-breaking space, and the typographic
-/// dashes (U+2011 figure dash through U+2015 horizontal bar) that a paste from a
-/// web page brings with it.
-final RegExp _phoneNoise = RegExp(r'[\s\-(). ‑-―]');
+/// Everything that is not a digit and not a plus.
+///
+/// Wider than the website's noise class on purpose, and the one place the two
+/// files are deliberately not identical. The website only ever sees a number a
+/// human typed into a form; an address book hands back whatever the OS stored,
+/// and iOS in particular returns directional marks (U+200E in front of a `+` is
+/// common on an imported vCard), narrow no-break spaces, a true minus sign
+/// (U+2212, outside the U+2011..U+2015 dash range the old class knew) and the
+/// odd stray letter. One invisible character in front of the `+` was enough to
+/// make `+31612345678` read as a *national* number and hash as `+313161234...`,
+/// which matches nobody and says nothing on screen.
+///
+/// Keeping only digits and `+` cannot change the outcome for any input the
+/// website also handles - those come out of both files the same - it only
+/// rescues the ones this side used to get wrong.
+final RegExp _notPhoneCharacter = RegExp(r'[^0-9+]');
 
 /// The bracketed trunk zero of `+31 (0)6 12345678`, the way Dutch business
 /// cards and e-mail signatures write a number. It has to go before the
@@ -34,6 +50,16 @@ final RegExp _phoneNoise = RegExp(r'[\s\-(). ‑-―]');
 final RegExp _bracketedTrunkZero = RegExp(r'\(\s*0\s*\)');
 
 final RegExp _nonDigit = RegExp(r'\D');
+
+/// Zero-width and bidi marks: no meaning in an identifier, but they change its
+/// bytes and so its hash. Stripped from e-mail addresses too, because
+/// [_emailShape] happily accepts one and the address then hashes to something
+/// the server will never compute.
+/// A raw string, so the escapes stay escapes: the characters themselves would
+/// reorder this source line in every editor that renders it.
+final RegExp _invisible = RegExp(
+  r'[\u00ad\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]',
+);
 
 /// Deliberately not a full address validator: a thing with an `@` and a dot
 /// after it is enough to hash, and anything stricter silently drops addresses
@@ -63,19 +89,29 @@ const String defaultContactCountry = 'NL';
 /// not match.
 String? normaliseContactPhone(String raw, {String country = defaultContactCountry}) {
   if (raw.isEmpty) return null;
-  var value = raw.trim().replaceAll(_bracketedTrunkZero, '').replaceAll(_phoneNoise, '');
+  // The bracketed trunk zero first, while its brackets are still there.
+  final value = raw
+      .trim()
+      .replaceAll(_bracketedTrunkZero, '')
+      .replaceAll(_notPhoneCharacter, '');
   if (value.isEmpty) return null;
 
-  // 00 31 ... is the same as +31 ...
-  if (value.startsWith('00')) value = '+${value.substring(2)}';
-
-  if (value.startsWith('+')) {
-    final digits = value.substring(1).replaceAll(_nonDigit, '');
-    return digits.length >= 8 ? '+$digits' : null;
-  }
-
+  // A `+` only means anything in front, and by now nothing can sit in front of
+  // it but a digit, so this test is no longer fooled by an invisible mark.
+  final international = value.startsWith('+');
   final digits = value.replaceAll(_nonDigit, '');
   if (digits.isEmpty) return null;
+
+  // 00 31 ... is the same as +31 ... . Checked on the digits rather than on
+  // the raw string, so `+0031...` cannot be read twice.
+  if (!international && digits.startsWith('00')) {
+    final rest = digits.substring(2);
+    return rest.length >= 8 ? '+$rest' : null;
+  }
+
+  if (international) {
+    return digits.length >= 8 ? '+$digits' : null;
+  }
 
   // The US has no trunk zero, so a national number that starts with one cannot
   // be American: it is a Dutch number on a phone whose locale says en_US,
@@ -94,7 +130,7 @@ String? normaliseContactPhone(String raw, {String country = defaultContactCountr
 /// address at all.
 String? normaliseContactEmail(String raw) {
   if (raw.isEmpty) return null;
-  final value = raw.trim().toLowerCase();
+  final value = raw.replaceAll(_invisible, '').trim().toLowerCase();
   if (value.isEmpty) return null;
   return _emailShape.hasMatch(value) ? value : null;
 }

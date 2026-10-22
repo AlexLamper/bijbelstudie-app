@@ -23,8 +23,8 @@ enum ContactDiscoveryStage {
   /// Nothing has happened yet.
   idle,
 
-  /// The disclosure screen has not been passed. The OS prompt is unreachable
-  /// from here - see [ContactDiscoveryController.startMatch].
+  /// The disclosure was never shown and accepted. The OS prompt is
+  /// unreachable from here - see [ContactDiscoveryController.startMatch].
   needsDisclosure,
 
   /// The OS dialog is up, or the address book is being read and hashed.
@@ -59,6 +59,7 @@ class ContactDiscoveryState {
     this.found = const [],
     this.message,
     this.invited = const {},
+    this.offerSettings = false,
   });
 
   static const idle = ContactDiscoveryState();
@@ -77,6 +78,14 @@ class ContactDiscoveryState {
   /// "Uitnodigen" twice.
   final Set<String> invited;
 
+  /// Whether a failure is one the Settings app can fix, so the screen can
+  /// offer "Open instellingen" beside "Opnieuw proberen".
+  ///
+  /// True for the states where asking the OS again is pointless: iOS turns a
+  /// single refusal into a permanent one, and a platform that cannot answer at
+  /// all will not answer a second time either.
+  final bool offerSettings;
+
   bool get isBusy => stage == ContactDiscoveryStage.working;
 
   ContactDiscoveryState copyWith({
@@ -85,12 +94,14 @@ class ContactDiscoveryState {
     String? message,
     bool clearMessage = false,
     Set<String>? invited,
+    bool? offerSettings,
   }) {
     return ContactDiscoveryState(
       stage: stage ?? this.stage,
       found: found ?? this.found,
       message: clearMessage ? null : (message ?? this.message),
       invited: invited ?? this.invited,
+      offerSettings: offerSettings ?? this.offerSettings,
     );
   }
 }
@@ -131,11 +142,12 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
   /// Read the address book, hash it, match it.
   ///
   /// **The gate.** It refuses to touch [ContactsSource] - so the OS dialog
-  /// cannot appear - until the disclosure screen has recorded that it was
-  /// passed. That makes the ordering Play asks for structural rather than a
-  /// convention somebody can forget: there is no path from a button to the
-  /// permission prompt that does not go through
-  /// `ContactsDisclosureScreen`.
+  /// cannot appear - until something has recorded that the disclosure was
+  /// shown and accepted. That makes the ordering Play asks for structural
+  /// rather than a convention somebody can forget: the only thing that opens
+  /// the gate is [acceptDisclosureAndStart], and the only caller of that is
+  /// the "Verbind Contacten" card, which has the three disclosure lines
+  /// printed under the button the reader taps.
   Future<void> startMatch() async {
     if (state.isBusy) return;
 
@@ -170,16 +182,56 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
     final access = await source.requestAccess();
     switch (access) {
       case ContactsAccess.denied:
-        state = const ContactDiscoveryState(stage: ContactDiscoveryStage.permissionDenied);
+        state = const ContactDiscoveryState(
+          stage: ContactDiscoveryStage.permissionDenied,
+          // Asking again is worth a try on Android, and on iOS it is not: the
+          // screen offers both buttons and lets the reader pick.
+          offerSettings: true,
+        );
         return;
       case ContactsAccess.blocked:
-        state = const ContactDiscoveryState(stage: ContactDiscoveryStage.permissionBlocked);
+        state = const ContactDiscoveryState(
+          stage: ContactDiscoveryStage.permissionBlocked,
+          offerSettings: true,
+        );
+        return;
+      // The platform could not answer. Not a refusal, so it must not read as
+      // one - and never as "niemand gevonden" either.
+      case ContactsAccess.unavailable:
+        state = const ContactDiscoveryState(
+          stage: ContactDiscoveryStage.failed,
+          message:
+              'We konden je contacten niet openen. Kijk in de instellingen van je '
+              'telefoon of BijbelStudie toegang heeft tot je contacten.',
+          offerSettings: true,
+        );
         return;
       case ContactsAccess.granted:
         break;
     }
 
-    final book = await source.read();
+    final AddressBook book;
+    try {
+      book = await source.read();
+    } on ContactsReadException {
+      // Granted and still unreadable: iOS does that, and an empty book here
+      // would tell the reader their address book is empty, which is the one
+      // thing it is not.
+      state = const ContactDiscoveryState(
+        stage: ContactDiscoveryStage.failed,
+        message:
+            'We konden je contacten niet lezen. Controleer de toegang tot contacten '
+            'in de instellingen van je telefoon en probeer het nog eens.',
+        offerSettings: true,
+      );
+      return;
+    } catch (_) {
+      state = const ContactDiscoveryState(
+        stage: ContactDiscoveryStage.failed,
+        message: 'We konden je contacten nu niet controleren. Probeer het zo nog eens.',
+      );
+      return;
+    }
     if (book.isEmpty) {
       state = const ContactDiscoveryState(stage: ContactDiscoveryStage.emptyAddressBook);
       return;
@@ -223,8 +275,14 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
     );
   }
 
-  /// What the disclosure screen's "Doorgaan" calls: record that the disclosure
-  /// was shown and accepted, then run. The only thing that opens the gate.
+  /// What "Verbind Contacten" calls: record that the disclosure was on screen
+  /// and accepted, then run. The only thing that opens the gate.
+  ///
+  /// The three facts Play wants said - what is read, what is sent, what is
+  /// kept - are printed under that button (`ConnectContactsButton`), so they
+  /// are in view at the moment of the tap. The bookkeeping is unchanged: the
+  /// store still records when the disclosure was accepted, which is the
+  /// question store review asks.
   Future<void> acceptDisclosureAndStart() async {
     final store = await ref.read(contactDiscoveryStoreProvider.future);
     await store.markDisclosureAccepted();
