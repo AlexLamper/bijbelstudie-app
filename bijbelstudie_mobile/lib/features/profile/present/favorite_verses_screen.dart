@@ -44,6 +44,23 @@ class FavoriteVersesScreen extends ConsumerWidget {
       // The likes come off disk on launch; until they have, an empty list is
       // indistinguishable from "none yet".
       body = const SkeletonList(rows: 5);
+    } else if (favorites.isEmpty && memory.strandedLikes) {
+      // Hearts are on this device under an account id it cannot place - what
+      // a deleted and recreated account leaves behind. They may be this
+      // reader's, they may be the person who had the phone before them, and
+      // nothing stored here can tell: so they are offered, not handed over.
+      body = AppEmptyState(
+        icon: Icons.favorite_border,
+        title: 'Nog geen favorieten',
+        description:
+            'Op dit toestel staan nog favoriete teksten van een eerdere '
+            'aanmelding. Zet ze terug als ze van jou zijn.',
+        action: SiteOutlineButton(
+          label: 'Favorieten terugzetten',
+          expand: false,
+          onPressed: () => _restoreStranded(context, ref),
+        ),
+      );
     } else if (favorites.isEmpty) {
       body = const AppEmptyState(
         icon: Icons.favorite_border,
@@ -65,6 +82,25 @@ class FavoriteVersesScreen extends ConsumerWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Favoriete teksten')),
       body: body,
+    );
+  }
+
+  /// Takes over the hearts stranded under an id this device cannot place.
+  Future<void> _restoreStranded(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final restored = await ref
+        .read(dailyVerseStoreProvider.notifier)
+        .restoreStrandedLikes();
+    showTimedSnackBar(
+      messenger,
+      SnackBar(
+        content: Text(
+          restored
+              ? 'Favorieten teruggezet'
+              : 'Er was niets meer om terug te zetten',
+        ),
+        duration: kActionSnackBarDuration,
+      ),
     );
   }
 }

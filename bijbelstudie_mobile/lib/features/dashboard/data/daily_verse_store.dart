@@ -152,6 +152,7 @@ class DailyVerseMemory {
     this.history = const [],
     this.likes = const [],
     this.loaded = false,
+    this.strandedLikes = false,
   });
 
   /// Newest first, at most [DailyVerseStore.maxDays] entries.
@@ -167,6 +168,11 @@ class DailyVerseMemory {
   /// skeleton instead of a heart that flips a moment later.
   final bool loaded;
 
+  /// True when hearted verses are sitting on this device under an account id
+  /// it cannot place, and this reader has none of their own. Favoriete teksten
+  /// offers to put them back; see [DailyVerseStore.restoreStrandedLikes].
+  final bool strandedLikes;
+
   bool isLiked(String reference) =>
       likes.any((like) => like.reference == reference);
 
@@ -174,11 +180,13 @@ class DailyVerseMemory {
     List<DailyVerseEntry>? history,
     List<LikedVerse>? likes,
     bool? loaded,
+    bool? strandedLikes,
   }) {
     return DailyVerseMemory(
       history: history ?? this.history,
       likes: likes ?? this.likes,
       loaded: loaded ?? this.loaded,
+      strandedLikes: strandedLikes ?? this.strandedLikes,
     );
   }
 }
@@ -223,8 +231,22 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// for the next.
   late Future<String?> _account;
 
+  /// Bumped on every rebuild, which is every time a different account signs
+  /// in. [build] also resets state to an empty [DailyVerseMemory] and reloads,
+  /// so a mutator that started before the rebuild holds a list computed for
+  /// the reader who has just left - or for that transient empty state. It must
+  /// not be written: see [_readyToMutate] and [_stillCurrent].
+  int _generation = 0;
+
+  /// True when the read off disk threw. What is stored is then *unknown*, not
+  /// empty, even though state says `loaded: true` with no likes - so no write
+  /// may go out, or an empty list lands on top of a good one.
+  bool _loadFailed = false;
+
   @override
   DailyVerseMemory build() {
+    _generation++;
+    _loadFailed = false;
     _account = AccountScope.resolve(ref.watch(sessionAccountProvider));
     _ready = _load();
     return const DailyVerseMemory();
@@ -234,23 +256,162 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
     // This build's ref: after a rebuild (another account) it reads unmounted,
     // so a slow read cannot land the previous reader's likes.
     final buildRef = ref;
+    final generation = _generation;
     try {
       final account = await _account;
       final prefs = await SharedPreferences.getInstance();
+      await _adoptSameReaderLikes(prefs, account);
       // The read outlives the provider when the app (or a test) tears down
       // mid-launch; writing state then throws rather than being ignored.
-      if (!buildRef.mounted) return;
+      if (!buildRef.mounted || _generation != generation) return;
       final history = _decode(prefs.getString(_kHistory));
+      final likes = _decodeLikes(prefs, history, account);
       state = DailyVerseMemory(
         history: history,
-        likes: _decodeLikes(prefs, history, account),
+        likes: likes,
         loaded: true,
+        strandedLikes: likes.isEmpty && _strandedDonor(prefs, account) != null,
       );
     } catch (_) {
-      // No preferences plugin: an empty archive, and likes that live only for
-      // this session. Still "loaded" - nothing more is coming.
-      if (!buildRef.mounted) return;
+      // No preferences plugin, or a stored value that is not the type it
+      // should be: an empty archive, and likes that live only for this
+      // session. Still "loaded" - nothing more is coming - but flagged, so
+      // nothing from this session is written over what is really on disk.
+      if (_generation == generation) _loadFailed = true;
+      if (!buildRef.mounted || _generation != generation) return;
       state = state.copyWith(loaded: true);
+    }
+  }
+
+  /// Waits for this build's read off disk. False when the caller must not go
+  /// on at all: the store rebuilt for another account while waiting, or this
+  /// build was disposed. Its list would be the previous reader's.
+  Future<bool> _readyToMutate() async {
+    final generation = _generation;
+    final buildRef = ref;
+    await _ready;
+    return buildRef.mounted && _stillCurrent(generation);
+  }
+
+  /// Still the build that started the mutation.
+  bool _stillCurrent(int generation) => _generation == generation;
+
+  /// Whether what is in memory may go to disk: still this build's, and the
+  /// read it was built on actually succeeded. A failed read leaves state empty
+  /// while disk holds the real list, so a write would wipe it; the tap still
+  /// shows in the UI for this session, it just is not stored.
+  bool _canPersist(int generation) =>
+      _stillCurrent(generation) && !_loadFailed;
+
+  /// The two keys a reader's hearts live under, newest store first.
+  static const _likeBases = [_kLikes, _kLiked];
+
+  /// Takes over hearts stranded under an id this same reader lost.
+  ///
+  /// An account that is deleted and made again comes back with a new id, and
+  /// `daytext.likes.<new id>` then reads empty while the whole list sits under
+  /// the old one. [AccountScope.sameReaderScope] only names that old id when
+  /// the device recorded the same reader behind it, so this is a recovery of
+  /// the reader's own verses and never a peek at somebody else's.
+  Future<void> _adoptSameReaderLikes(
+    SharedPreferences prefs,
+    String? account,
+  ) async {
+    if (account == null || account.isEmpty) return;
+    final donor = AccountScope.sameReaderScope(prefs, _likeBases, account);
+    if (donor == null) return;
+    await _moveLikes(prefs, donor, account);
+  }
+
+  /// The id holding hearts this device cannot place, for the offer on
+  /// Favoriete teksten. Null unless this reader has nothing of their own.
+  String? _strandedDonor(SharedPreferences prefs, String? account) {
+    if (account == null || account.isEmpty) return null;
+    if (!_isEmptyLikesBlob(prefs.getString(AccountScope.keyFor(_kLikes, account)))) {
+      return null;
+    }
+    return AccountScope.strandedScope(prefs, _likeBases, account);
+  }
+
+  /// Puts back the hearts stranded under an id this device cannot place.
+  ///
+  /// What the "Favorieten terugzetten" button on Favoriete teksten calls. The
+  /// reader asking for it is the one thing the silent path cannot have: data
+  /// from before [AccountScope.kIdentitiesKey] carries no proof of whose it
+  /// is, so it is offered rather than taken. True when something moved.
+  Future<bool> restoreStrandedLikes() async {
+    if (!await _readyToMutate()) return false;
+    final generation = _generation;
+    if (!_canPersist(generation)) return false;
+    try {
+      final account = await _account;
+      final prefs = await SharedPreferences.getInstance();
+      if (!_canPersist(generation)) return false;
+      final donor = account == null || account.isEmpty
+          ? null
+          : _strandedDonor(prefs, account);
+      if (donor == null || account == null) {
+        if (_stillCurrent(generation) && ref.mounted) {
+          state = state.copyWith(strandedLikes: false);
+        }
+        return false;
+      }
+      if (!await _moveLikes(prefs, donor, account)) return false;
+      if (!_stillCurrent(generation) || !ref.mounted) return true;
+      state = DailyVerseMemory(
+        history: state.history,
+        likes: _decodeLikes(prefs, state.history, account),
+        loaded: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Hands the hearts stored under [donor] to [account]. True when something
+  /// moved.
+  ///
+  /// Only ever writes into an empty list, so a reader who genuinely has no
+  /// favourites cannot have theirs overwritten. The donor keys go once the
+  /// copy is on disk: the data has a single home again, and a *further* change
+  /// of id stays recoverable the same way.
+  Future<bool> _moveLikes(
+    SharedPreferences prefs,
+    String donor,
+    String account,
+  ) async {
+    final ownLikes = AccountScope.keyFor(_kLikes, account);
+    final ownLiked = AccountScope.keyFor(_kLiked, account);
+    if (!_isEmptyLikesBlob(prefs.getString(ownLikes))) return false;
+    if ((prefs.getStringList(ownLiked) ?? const <String>[]).isNotEmpty) {
+      return false;
+    }
+
+    final donorLikes = AccountScope.keyFor(_kLikes, donor);
+    final donorLiked = AccountScope.keyFor(_kLiked, donor);
+    final raw = prefs.getString(donorLikes);
+    final legacy = prefs.getStringList(donorLiked) ?? const <String>[];
+    final emptyRaw = _isEmptyLikesBlob(raw);
+    if (emptyRaw && legacy.isEmpty) return false;
+
+    if (!emptyRaw) await prefs.setString(ownLikes, raw!);
+    if (legacy.isNotEmpty) await prefs.setStringList(ownLiked, legacy);
+    await prefs.remove(donorLikes);
+    await prefs.remove(donorLiked);
+    return true;
+  }
+
+  /// Nothing to lose: absent, blank, or valid JSON holding no likes at all.
+  /// A blob that will not parse counts as *not* empty - it may still be a
+  /// reader's list, and is never written over.
+  bool _isEmptyLikesBlob(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return true;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is List && decoded.isEmpty;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -337,7 +498,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// Called from the card whenever `/dashboard` hands over a daily verse, so
   /// the archive fills itself simply by opening the app on consecutive days.
   Future<void> remember(DailyVerse verse, {required String version}) async {
-    await _ready;
+    if (!await _readyToMutate()) return;
     final today = dayKey(DateTime.now());
     final existing = state.history;
     // Same day, same verse, same translation: nothing to write. A switch of
@@ -385,7 +546,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// actually saw, including the translation label they were reading in.
   Future<void> mergeServer(List<DailyVerseEntry> entries) async {
     if (entries.isEmpty) return;
-    await _ready;
+    if (!await _readyToMutate()) return;
 
     final byDate = <String, DailyVerseEntry>{
       for (final entry in entries) entry.date: entry,
@@ -414,7 +575,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// shows as a reference on its own.
   Future<void> toggleLike(String reference) async {
     if (reference.isEmpty) return;
-    await _ready;
+    if (!await _readyToMutate()) return;
 
     final next = [...state.likes];
     final at = next.indexWhere((like) => like.reference == reference);
@@ -448,7 +609,7 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   /// Drops [reference] from the favourites. What the Favoriete teksten screen
   /// calls; a reference that is not hearted is left alone.
   Future<void> removeLike(String reference) async {
-    await _ready;
+    if (!await _readyToMutate()) return;
     if (!state.isLiked(reference)) return;
     await _setLikes(
       state.likes.where((like) => like.reference != reference).toList(),
@@ -457,19 +618,29 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
 
   /// Puts [reference] back where it was, for "Ongedaan maken" after a remove.
   Future<void> restoreLike(LikedVerse like) async {
-    await _ready;
+    if (!await _readyToMutate()) return;
     if (state.isLiked(like.reference)) return;
     final next = [...state.likes, like]
       ..sort((a, b) => b.likedAt.compareTo(a.likedAt));
     await _setLikes(next);
   }
 
+  /// Stores [likes] as this account's whole list.
+  ///
+  /// Callers reach here through [_readyToMutate], so the list was computed from
+  /// what is really on disk rather than from the empty state a rebuild leaves
+  /// behind. The generation is checked once more after the awaits: a sign-in
+  /// that lands in between must not get the previous reader's list written
+  /// under its key.
   Future<void> _setLikes(List<LikedVerse> likes) async {
+    final generation = _generation;
     final capped = List<LikedVerse>.unmodifiable(likes);
     state = state.copyWith(likes: capped, loaded: true);
+    if (!_canPersist(generation)) return;
     try {
       final account = await _account;
       final prefs = await SharedPreferences.getInstance();
+      if (!_canPersist(generation)) return;
       await prefs.setString(
         AccountScope.keyFor(_kLikes, account),
         jsonEncode(capped.map((like) => like.toJson()).toList(growable: false)),
@@ -486,8 +657,11 @@ class DailyVerseStore extends Notifier<DailyVerseMemory> {
   }
 
   Future<void> _persistHistory(List<DailyVerseEntry> history) async {
+    final generation = _generation;
+    if (!_canPersist(generation)) return;
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!_canPersist(generation)) return;
       await prefs.setString(
         _kHistory,
         jsonEncode(history.map((e) => e.toJson()).toList(growable: false)),

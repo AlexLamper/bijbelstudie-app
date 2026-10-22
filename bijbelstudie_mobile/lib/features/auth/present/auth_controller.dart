@@ -61,8 +61,14 @@ class SessionAccount extends Notifier<String?> {
       if (id == null) return;
       state = id;
       // Persist it, and let the first account on this device inherit the
-      // favourites and plans stored before they were per account.
-      AccountScope.claim(id).catchError((_) {});
+      // favourites and plans stored before they were per account. The e-mail
+      // rides along as a fingerprint: it is the only thing that tells a
+      // deleted-and-recreated account apart from a second reader on this
+      // phone, and the favourites lean on that difference.
+      AccountScope.claim(
+        id,
+        email: ref.read(authControllerProvider).value?.email,
+      ).catchError((_) {});
     });
     return ref.read(authControllerProvider).value?.id;
   }
