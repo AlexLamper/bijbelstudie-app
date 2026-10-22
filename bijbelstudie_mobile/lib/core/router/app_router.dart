@@ -370,7 +370,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile/favorieten',
             builder: (context, state) => const FavoriteVersesScreen(),
           ),
-          // "Bijbel gelezen": every book and chapter read, from the
+          // "Bijbelvoortgang": every book and chapter read, from the
           // Bijbelboeken tile on Profiel and the book map on Start.
           GoRoute(
             path: '/profile/bijbel',
