@@ -10,6 +10,7 @@ import '../../friends/present/friends_entry_providers.dart';
 import '../../friends/present/friends_error_card.dart';
 import '../../friends/present/friends_providers.dart';
 import '../../friends/present/friends_screen.dart';
+import 'widgets/missing_friends_card.dart';
 
 /// "Bij je vrienden" on the Start tab, under the tekst van de dag: the two
 /// newest posts in the reader's vriendenkring, in the same card style the
@@ -18,9 +19,10 @@ import '../../friends/present/friends_screen.dart';
 /// Deliberately below the fold: the verse card has to be fully in view, so
 /// this is what the reader scrolls to.
 ///
-/// Left out altogether while the contacts are not connected and there is no
-/// kring yet ([friendsContactsGateProvider]): the header button's red dot is
-/// the way in then, and Vriendenkring itself opens on "Verbind Contacten".
+/// While the contacts are not connected and there is no kring yet
+/// ([friendsContactsGateProvider]) this is [MissingFriendsCard] instead: that
+/// reader has nothing to put under "Bij je vrienden", so the card stands on
+/// its own, without the header and without "Alles bekijken".
 class FriendsSection extends ConsumerWidget {
   const FriendsSection({super.key, this.maxPosts = 2});
 
@@ -28,7 +30,7 @@ class FriendsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(friendsContactsGateProvider)) return const SizedBox.shrink();
+    if (ref.watch(friendsContactsGateProvider)) return const MissingFriendsCard();
     final async = ref.watch(friendsFeedProvider);
     final feed = async.value;
     final posts = feed == null
