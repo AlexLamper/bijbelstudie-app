@@ -16,6 +16,10 @@ abstract final class MusicIcons {
       '<rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="currentColor" stroke="none"/>';
   static const stop =
       '<rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="currentColor" stroke="none"/>';
+  static const skipBack = '<path d="M18 6.5v11l-8.5-5.5z" fill="currentColor" stroke="none"/>'
+      '<path d="M7 6.5v11"/>';
+  static const skipForward = '<path d="M6 6.5v11l8.5-5.5z" fill="currentColor" stroke="none"/>'
+      '<path d="M17 6.5v11"/>';
   static const close = '<path d="M6 6l12 12M18 6 6 18"/>';
   static const chevronDown = '<path d="m6 9 6 6 6-6"/>';
   static const search = '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/>';
@@ -25,12 +29,13 @@ abstract final class MusicIcons {
       '<path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/>';
 }
 
-/// Natuur sounds sit on teal, music on grey - in the picker's tiles, the
+/// Lofi sits on teal, piano and organ on grey - in the picker's tiles, the
 /// menu's big circle and nowhere else.
-Color musicTileFill(MusicTrack track) =>
-    track.isNature ? AppTheme.tealTint : AppTheme.paperSunken;
+Color musicTileFill(MusicCategory category) =>
+    category == MusicCategory.lofi ? AppTheme.tealTint : AppTheme.paperSunken;
 
-Color musicTileInk(MusicTrack track) => track.isNature ? AppTheme.teal : AppTheme.inkSoft;
+Color musicTileInk(MusicCategory category) =>
+    category == MusicCategory.lofi ? AppTheme.teal : AppTheme.inkSoft;
 
 /// The small outlined "PRO" capsule in both sheet headers.
 class MusicProBadge extends StatelessWidget {

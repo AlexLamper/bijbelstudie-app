@@ -264,8 +264,9 @@ class _MusicCreditsSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
           child: Text(
-            'De achtergrondmuziek komt van Wikimedia Commons en is vrij van '
-            'auteursrecht. Met dank aan de musici en opnemers.',
+            'De achtergrondmuziek komt van Wikimedia Commons, het Internet Archive '
+            'en het Free Music Archive, en is vrij te gebruiken. Met dank aan de '
+            'musici en opnemers.',
             style: AppTheme.caption,
           ),
         ),
@@ -273,8 +274,9 @@ class _MusicCreditsSection extends StatelessWidget {
       children: [
         for (final track in kMusicTracks)
           SettingsRow(
-            label: track.credit.work,
-            subtitle: '${track.name} · ${track.credit.performer} · ${track.credit.licence}',
+            label: '${track.artist} - ${track.title}',
+            subtitle: '${track.category.label} · ${track.credit.performer} · '
+                '${track.credit.licence}',
             trailing: Icon(Icons.open_in_new, size: 18, color: AppTheme.teal),
             onTap: () {
               final uri = Uri.tryParse(track.credit.sourceUrl);

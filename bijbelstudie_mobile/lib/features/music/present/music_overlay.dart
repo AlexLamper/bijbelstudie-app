@@ -58,7 +58,7 @@ class MusicOverlay extends ConsumerStatefulWidget {
 class _MusicOverlayState extends ConsumerState<MusicOverlay>
     with SingleTickerProviderStateMixin {
   static const _morph = Cubic(0.2, 0.8, 0.2, 1);
-  static const _pillWidth = 236.0;
+  static const _pillWidth = 264.0;
   static const _pillHeight = 46.0;
   static const _bubbleSize = 44.0;
 
@@ -241,8 +241,8 @@ class _MusicOverlayState extends ConsumerState<MusicOverlay>
           child: Semantics(
             button: true,
             label: mini
-                ? 'Achtergrondmuziek: ${track.name}. Vergroten'
-                : 'Achtergrondmuziek: ${track.name}. Muziekmenu openen',
+                ? 'Achtergrondmuziek: ${track.title}. Vergroten'
+                : 'Achtergrondmuziek: ${track.title}. Muziekmenu openen',
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
@@ -299,6 +299,10 @@ class _MusicOverlayState extends ConsumerState<MusicOverlay>
                                     AppHaptics.light();
                                     _controller.togglePause();
                                   },
+                                  onNext: () {
+                                    AppHaptics.light();
+                                    _controller.next();
+                                  },
                                   onStop: () {
                                     AppHaptics.light();
                                     _controller.stop();
@@ -326,12 +330,14 @@ class _PillControls extends StatelessWidget {
     required this.track,
     required this.paused,
     required this.onTogglePause,
+    required this.onNext,
     required this.onStop,
   });
 
   final MusicTrack track;
   final bool paused;
   final VoidCallback onTogglePause;
+  final VoidCallback onNext;
   final VoidCallback onStop;
 
   @override
@@ -341,7 +347,7 @@ class _PillControls extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            track.name,
+            track.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -363,6 +369,11 @@ class _PillControls extends StatelessWidget {
             size: 15,
             color: AppTheme.ink,
           ),
+        ),
+        _PillButton(
+          semantics: 'Volgende',
+          onTap: onNext,
+          child: LucideIcon(MusicIcons.skipForward, size: 15, color: AppTheme.ink, strokeWidth: 2.2),
         ),
         _PillButton(
           semantics: 'Muziek stoppen',

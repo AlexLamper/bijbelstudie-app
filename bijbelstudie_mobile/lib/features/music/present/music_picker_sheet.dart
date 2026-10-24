@@ -13,7 +13,8 @@ import '../domain/music_models.dart';
 import 'music_player_controller.dart';
 import 'music_widgets.dart';
 
-/// "Kies muziek": every sound, searchable and filtered by kind.
+/// "Kies muziek": every track, searchable and filtered by playlist. A track
+/// chosen here plays on into the rest of its playlist.
 ///
 /// Open to everyone - a reader without Pro sees exactly what Pro offers. Only
 /// pressing play is gated: the sheet closes and the paywall opens on the
@@ -21,8 +22,6 @@ import 'music_widgets.dart';
 Future<void> showMusicPickerSheet(BuildContext context) {
   return showMusicSheet<void>(context, (_) => const _MusicPickerSheet());
 }
-
-enum _Filter { all, music, nature }
 
 class _MusicPickerSheet extends ConsumerStatefulWidget {
   const _MusicPickerSheet();
@@ -33,7 +32,8 @@ class _MusicPickerSheet extends ConsumerStatefulWidget {
 
 class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
   final _search = TextEditingController();
-  _Filter _filter = _Filter.all;
+  /// Null is "Alles".
+  MusicCategory? _filter;
 
   @override
   void dispose() {
@@ -50,14 +50,9 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
   }
 
   bool _matches(MusicTrack track, String query) {
-    final kind = switch (_filter) {
-      _Filter.all => true,
-      _Filter.music => track.category == MusicCategory.music,
-      _Filter.nature => track.category == MusicCategory.nature,
-    };
-    if (!kind) return false;
+    if (_filter != null && track.category != _filter) return false;
     if (query.isEmpty) return true;
-    return track.name.toLowerCase().contains(query) ||
+    return track.title.toLowerCase().contains(query) ||
         track.subtitle.toLowerCase().contains(query);
   }
 
@@ -142,8 +137,8 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                   const SizedBox(height: 6),
                   Text(
                     hasPro
-                        ? 'Rustige muziek zonder tekst. Speelt door als je verder leest.'
-                        : 'Rustige muziek zonder tekst. Speelt door als je verder leest. '
+                        ? 'Piano, lofi en orgel, zonder tekst. Speelt door als je verder leest.'
+                        : 'Piano, lofi en orgel, zonder tekst. Speelt door als je verder leest. '
                               'Achtergrondmuziek hoort bij Pro.',
                     style: TextStyle(
                       fontFamily: AppTheme.sansFontName,
@@ -155,13 +150,14 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                   const SizedBox(height: 12),
                   _SearchField(controller: _search, onChanged: () => setState(() {})),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
-                      for (final (filter, label) in const [
-                        (_Filter.all, 'Alles'),
-                        (_Filter.music, 'Muziek'),
-                        (_Filter.nature, 'Natuur'),
-                      ]) ...[
+                      for (final (filter, label) in [
+                        (null, 'Alles'),
+                        for (final c in MusicCategory.values) (c, c.label),
+                      ])
                         _FilterChip(
                           label: label,
                           selected: _filter == filter,
@@ -171,8 +167,6 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                             setState(() => _filter = filter);
                           },
                         ),
-                        const SizedBox(width: 6),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -202,13 +196,20 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                         34 + MediaQuery.paddingOf(context).bottom,
                       ),
                       children: [
-                        for (final i in visible)
+                        for (final (n, i) in visible.indexed) ...[
+                          // Under "Alles" the playlists get a heading each.
+                          if (_filter == null &&
+                              (n == 0 ||
+                                  kMusicTracks[visible[n - 1]].category !=
+                                      kMusicTracks[i].category))
+                            _PlaylistHeading(kMusicTracks[i].category),
                           _TrackRow(
                             track: kMusicTracks[i],
                             isLast: last == i,
                             locked: !hasPro,
                             onTap: () => _pick(i),
                           ),
+                        ],
                       ],
                     ),
             ),
@@ -309,6 +310,30 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+class _PlaylistHeading extends StatelessWidget {
+  const _PlaylistHeading(this.category);
+
+  final MusicCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 6),
+      child: Text(
+        category.label.toUpperCase(),
+        style: TextStyle(
+          fontFamily: AppTheme.sansFontName,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+          color: AppTheme.inkMuted,
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackRow extends StatelessWidget {
   const _TrackRow({
     required this.track,
@@ -329,7 +354,7 @@ class _TrackRow extends StatelessWidget {
     AppTheme.dependOn(context);
     return Semantics(
       button: true,
-      label: '${track.name}, ${track.subtitle}${isLast ? ', laatst gespeeld' : ''}. '
+      label: '${track.title}, ${track.subtitle}${isLast ? ', laatst gespeeld' : ''}. '
           '${locked ? 'Hoort bij Pro' : 'Afspelen'}',
       excludeSemantics: true,
       child: InkWell(
@@ -346,13 +371,13 @@ class _TrackRow extends StatelessWidget {
                 height: 42,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: musicTileFill(track),
+                  color: musicTileFill(track.category),
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                 ),
                 child: LucideIcon(
-                  track.iconPaths,
+                  track.category.iconPaths,
                   size: 20,
-                  color: musicTileInk(track),
+                  color: musicTileInk(track.category),
                   strokeWidth: 1.8,
                 ),
               ),
@@ -365,7 +390,7 @@ class _TrackRow extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            track.name,
+                            track.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

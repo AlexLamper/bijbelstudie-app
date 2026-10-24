@@ -5,9 +5,6 @@
          the app asks for it only when the user turns the reminder on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Background music keeps the CPU awake while it plays with the screen
-         off (audioplayers' stayAwake). A normal permission, no prompt. -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Vriendenkring contact matching (VRIENDENKRING_PLAN.md §6). Optional:
          the kring works entirely without it, through an invite link or code.
          The in-app disclosure screen in features/friends/present/contacts/

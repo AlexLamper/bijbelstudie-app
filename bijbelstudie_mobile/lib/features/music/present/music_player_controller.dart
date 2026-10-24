@@ -27,6 +27,15 @@ class MusicPlayerController extends Notifier<MusicState> {
   Timer? _fadeTimer;
   Completer<void>? _fadeDone;
   AppLifecycleListener? _lifecycle;
+  StreamSubscription<void>? _completions;
+
+  /// The app went out of sight while playing, so the music was paused with it
+  /// and comes back when the app does.
+  bool _pausedForHide = false;
+
+  /// [_onShow] just resumed the player, so the stall check that follows on
+  /// resume has nothing to find out.
+  bool _resumedOnShow = false;
 
   /// Platform calls run one after the other, so a fast double tap cannot
   /// interleave a crossfade with a pause.
@@ -41,19 +50,29 @@ class MusicPlayerController extends Notifier<MusicState> {
   static const stoppedMessageDuration = Duration(seconds: 4);
   static const sleepFadeDuration = Duration(seconds: 3);
 
-  /// Each half of the 400 ms crossfade when switching sounds.
+  /// Each half of the 400 ms crossfade when switching tracks.
   static const switchFadeHalf = Duration(milliseconds: 200);
+
+  /// "Vorige" this far into a track starts it over instead.
+  static const restartThreshold = Duration(seconds: 3);
 
   @override
   MusicState build() {
     _audio = ref.watch(musicAudioProvider);
-    _lifecycle = AppLifecycleListener(onResume: () => unawaited(_syncAfterResume()));
+    _lifecycle = AppLifecycleListener(
+      onHide: _onHide,
+      onShow: _onShow,
+      onResume: () => unawaited(_syncAfterResume()),
+      onDetach: () => stop(silent: true),
+    );
+    _completions = _audio.completions.listen((_) => _onTrackEnd());
     ref.onDispose(() {
       _sleepTimer?.cancel();
       _stoppedTimer?.cancel();
       _volumeSaveTimer?.cancel();
       _cancelFade();
       _lifecycle?.dispose();
+      unawaited(_completions?.cancel());
     });
     unawaited(_loadPrefs());
     return const MusicState();
@@ -79,7 +98,25 @@ class MusicPlayerController extends Notifier<MusicState> {
     _queue = _queue.then((_) => op()).catchError((Object _) {});
   }
 
-  /// Starts [index] from the top, with the pill expanded.
+  /// Loads [index] through [load]. A streamed track that will not load (no
+  /// connection) gives way to its playlist's bundled track, so there is still
+  /// music; the menu says why.
+  Future<void> _load(int index, Future<void> Function(String source) load) async {
+    final track = kMusicTracks[index];
+    try {
+      await load(musicSourceOf(track));
+      if (state.offline && !track.bundled) state = state.copyWith(offline: false);
+    } catch (_) {
+      // Already moved on (a fast skip queued behind this): that load follows.
+      if (track.bundled || !state.isPlaying || state.trackIndex != index) return;
+      final fallback = musicBundledIn(track.category);
+      state = state.copyWith(trackIndex: fallback, offline: true);
+      await load(musicSourceOf(kMusicTracks[fallback]));
+    }
+  }
+
+  /// Starts [index] from the top, with the pill expanded. The rest of its
+  /// playlist follows.
   void play(int index) {
     if (index < 0 || index >= kMusicTracks.length) return;
     _clearStopped();
@@ -97,27 +134,74 @@ class MusicPlayerController extends Notifier<MusicState> {
       showStoppedMessage: false,
     );
     unawaited(MusicPrefs.saveLastTrack(kMusicTracks[index].id).catchError((Object _) {}));
-    final asset = kMusicTracks[index].asset;
     final volume = state.volume;
-    _run(() => _audio.start(asset, volume: volume));
+    _run(() => _load(index, (source) => _audio.start(source, volume: volume)));
   }
 
-  /// Switches sound while playing, with a short crossfade. Choosing a sound
+  /// Switches track while playing, with a short crossfade. Choosing a track
   /// means wanting to hear it, so a paused player starts again.
   void select(int index) {
     if (!state.isPlaying) return play(index);
     if (index == state.trackIndex || index < 0 || index >= kMusicTracks.length) return;
-    final wasPaused = state.paused;
+    _switch(index, fade: !state.paused);
+  }
+
+  void _switch(int index, {required bool fade}) {
     state = state.copyWith(trackIndex: index, lastTrackIndex: index, paused: false);
     unawaited(MusicPrefs.saveLastTrack(kMusicTracks[index].id).catchError((Object _) {}));
-    final asset = kMusicTracks[index].asset;
     _run(() async {
-      final volume = state.volume;
-      if (!wasPaused) await _ramp(volume, 0, switchFadeHalf);
+      if (fade) await _ramp(state.volume, 0, switchFadeHalf);
       await _audio.setVolume(0);
-      await _audio.switchTo(asset);
+      await _load(index, _audio.switchTo);
       await _ramp(0, state.volume, switchFadeHalf);
     });
+  }
+
+  /// "Volgende": the next track in the playlist, round to the first.
+  void next() {
+    if (!state.isPlaying) return;
+    _switch(musicStep(state.trackIndex, 1), fade: !state.paused);
+  }
+
+  /// "Vorige": the start of this track when it is under way, like every music
+  /// player, else the track before it.
+  void previous() {
+    if (!state.isPlaying) return;
+    final index = state.trackIndex;
+    _run(() async {
+      final at = await _audio.position();
+      if (!state.isPlaying || state.trackIndex != index) return;
+      if (at != null && at > restartThreshold) {
+        if (state.paused) state = state.copyWith(paused: false);
+        await _audio.restart();
+        await _audio.resume();
+      } else {
+        _switch(musicStep(index, -1), fade: !state.paused);
+      }
+    });
+  }
+
+  /// A track played to its end: on to the next, without a fade - the track
+  /// faded itself out.
+  void _onTrackEnd() {
+    if (!state.isPlaying || state.paused || _fadingOut) return;
+    _switch(musicStep(state.trackIndex, 1), fade: false);
+  }
+
+  /// Music belongs to the open app: it pauses when the app goes out of sight
+  /// (home, app switcher, locked screen) and carries on when it is back.
+  void _onHide() {
+    if (!state.isPlaying || state.paused) return;
+    _pausedForHide = true;
+    _run(_audio.pause);
+  }
+
+  void _onShow() {
+    if (!_pausedForHide) return;
+    _pausedForHide = false;
+    if (!state.isPlaying || state.paused) return;
+    _resumedOnShow = true;
+    _run(_audio.resume);
   }
 
   void togglePause() {
@@ -241,6 +325,10 @@ class MusicPlayerController extends Notifier<MusicState> {
   /// play button tells the truth - rather than forcing playback back on and
   /// taking the audio away from whatever paused us.
   Future<void> _syncAfterResume() async {
+    if (_resumedOnShow) {
+      _resumedOnShow = false;
+      return;
+    }
     if (!state.isPlaying || state.paused) return;
     try {
       final first = await _audio.position();
