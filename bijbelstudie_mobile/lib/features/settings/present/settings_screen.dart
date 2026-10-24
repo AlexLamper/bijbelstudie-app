@@ -16,6 +16,7 @@ import '../../bible/present/offline_library_sheet.dart';
 import '../../friends/present/contacts/contact_discovery_providers.dart'
     show contactDiscoveryOfferedProvider;
 import '../../friends/present/contacts/findable_switch.dart';
+import '../../music/data/music_tracks.dart';
 import '../../progress_tree/present/progress_tree_providers.dart';
 import '../../progress_tree/present/studio/progress_tree_studio_screen.dart' show publicProfileUrl;
 import '../../notes/data/notes_repository.dart';
@@ -167,6 +168,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
 
+          const _MusicCreditsSection(),
+
           const _SocialsSection(),
         ],
       ),
@@ -239,6 +242,43 @@ class _SocialsSection extends StatelessWidget {
               if (uri != null) {
                 launchUrl(uri, mode: LaunchMode.externalApplication);
               }
+            },
+          ),
+      ],
+    );
+  }
+}
+
+/// Who made the background music. Every recording is public domain or CC0, so
+/// naming them is a courtesy rather than a licence term - and the source page
+/// is one tap away for anyone who wants to check.
+class _MusicCreditsSection extends StatelessWidget {
+  const _MusicCreditsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return _SettingsGroup(
+      title: 'Muziek',
+      footer: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
+          child: Text(
+            'De achtergrondmuziek komt van Wikimedia Commons en is vrij van '
+            'auteursrecht. Met dank aan de musici en opnemers.',
+            style: AppTheme.caption,
+          ),
+        ),
+      ],
+      children: [
+        for (final track in kMusicTracks)
+          SettingsRow(
+            label: track.credit.work,
+            subtitle: '${track.name} · ${track.credit.performer} · ${track.credit.licence}',
+            trailing: Icon(Icons.open_in_new, size: 18, color: AppTheme.teal),
+            onTap: () {
+              final uri = Uri.tryParse(track.credit.sourceUrl);
+              if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
             },
           ),
       ],

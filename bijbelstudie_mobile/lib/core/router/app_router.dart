@@ -35,6 +35,7 @@ import '../../features/bronnen/present/section_reader_screen.dart';
 import '../../features/bronnen/present/work_screen.dart';
 import '../../features/commentary/present/commentary_screen.dart';
 import '../../features/dashboard/present/dashboard_screen.dart';
+import '../../features/music/present/music_overlay.dart';
 import '../../features/progress_tree/present/progress_tree_tab_icon.dart';
 import '../../features/progress_tree/present/studio/progress_tree_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
@@ -91,7 +92,14 @@ class MainScaffold extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: ProPromoTrigger(child: child),
+      // Background music's pill and bubble float above every tab.
+      body: ProPromoTrigger(
+        child: MusicOverlay(
+          inReader: inReader,
+          readerChromeVisible: chromeVisible,
+          child: child,
+        ),
+      ),
       bottomNavigationBar: ReaderChromeReveal(
         visible: chromeVisible,
         axisAlignment: 1,

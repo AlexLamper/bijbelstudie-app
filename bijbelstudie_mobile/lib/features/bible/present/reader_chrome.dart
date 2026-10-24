@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../onboarding/present/tour_controller.dart';
@@ -39,6 +40,57 @@ class ReaderChromeVisibility extends Notifier<bool> {
 final readerChromeVisibleProvider = NotifierProvider<ReaderChromeVisibility, bool>(
   ReaderChromeVisibility.new,
 );
+
+/// How tall the reader's bottom chapter pager (Vorige / Volgende) is right
+/// now, including the bottom inset it takes over when the tab bar slides away.
+///
+/// The background-music pill floats a fixed distance above the pager, and is
+/// built by `MainScaffold`, which cannot see the reader's layout - so the
+/// reader measures it ([ReaderPagerMeasure]) and publishes it here.
+class ReaderPagerHeight extends Notifier<double> {
+  @override
+  double build() => 58;
+
+  void set(double height) {
+    if (state != height) state = height;
+  }
+}
+
+final readerPagerHeightProvider = NotifierProvider<ReaderPagerHeight, double>(
+  ReaderPagerHeight.new,
+);
+
+/// Reports [child]'s height after every layout that changes it, one frame
+/// late (a provider cannot change during layout).
+class ReaderPagerMeasure extends SingleChildRenderObjectWidget {
+  const ReaderPagerMeasure({super.key, required this.onHeight, super.child});
+
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderReaderPagerMeasure(onHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderReaderPagerMeasure renderObject) {
+    renderObject.onHeight = onHeight;
+  }
+}
+
+class RenderReaderPagerMeasure extends RenderProxyBox {
+  RenderReaderPagerMeasure(this.onHeight);
+
+  ValueChanged<double> onHeight;
+  double? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final height = size.height;
+    if (height == _reported) return;
+    _reported = height;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onHeight(height));
+  }
+}
 
 /// Slides a bar out along its own axis and collapses the space it held, in one
 /// motion, so the content next to it moves in step instead of jumping.

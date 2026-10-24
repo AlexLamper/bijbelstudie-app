@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../music/data/music_audio.dart';
 import '../domain/catalog.dart';
 import '../domain/chime.dart';
 import '../domain/growth.dart';
@@ -93,10 +94,16 @@ int _fromLevel(int level, int? lastSeenLevel) {
 Future<void> _playChime() async {
   try {
     final player = AudioPlayer();
-    await player.setAudioContext(
-      AudioContextConfig(respectSilence: true, focus: AudioContextConfigFocus.mixWithOthers)
-          .build(),
-    );
+    // Background music owns the (process-wide) iOS audio session while it
+    // plays; switching it to ambient here would mute the music on the silent
+    // switch and stop it behind a locked screen. The chime rides along on the
+    // music's session instead.
+    if (!MusicAudioSession.inUse) {
+      await player.setAudioContext(
+        AudioContextConfig(respectSilence: true, focus: AudioContextConfigFocus.mixWithOthers)
+            .build(),
+      );
+    }
     await player.play(BytesSource(levelUpChimeWav()), volume: 0.9);
     // Nothing else holds a reference, so release the platform player when the
     // sound ends rather than leaking one per level-up.

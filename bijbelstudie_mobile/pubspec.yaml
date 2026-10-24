@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.5+17
+version: 1.1.6+18
 
 environment:
   sdk: ^3.8.0
@@ -97,6 +97,9 @@ flutter:
   assets:
     - assets/images/
     - assets/images/daytext/
+    # Background music (Pro): six public-domain / CC0 loops, ~9 MB. Sources
+    # and licences in lib/features/music/data/music_tracks.dart.
+    - assets/music/
   fonts:
     # Body / UI face used on www.bijbelstudie.io (--font-sans).
     - family: Inter

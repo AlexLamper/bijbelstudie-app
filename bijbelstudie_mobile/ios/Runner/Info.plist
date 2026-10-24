@@ -84,5 +84,9 @@
 	     without them (App Store Review 5.1.1(i) and 5.1.2). -->
 	<key>NSContactsUsageDescription</key>
 	<string>Zo kunnen we zien welke van je contacten BijbelStudie al gebruiken. We sturen alleen versleutelde codes.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	</dict>
 	</plist>

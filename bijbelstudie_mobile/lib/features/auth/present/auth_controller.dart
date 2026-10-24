@@ -22,6 +22,7 @@ import '../data/auth_local_storage.dart';
 import '../domain/user.dart';
 import '../../progress_tree/data/progress_tree_repository.dart';
 import '../../progress_tree/present/progress_tree_providers.dart';
+import '../../music/present/music_player_controller.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../premium/present/premium_controller.dart';
 import '../../profile/data/profile_repository.dart';
@@ -511,6 +512,9 @@ class AuthController extends AsyncNotifier<User?> {
   }
 
   Future<void> logout() async {
+    // The sign-in screens sit outside the shell, so nothing there could stop
+    // music that kept playing into them.
+    ref.read(musicPlayerProvider.notifier).stop(silent: true);
     state = const AsyncValue.loading();
     // Push offline writes while this account's token is still valid. The
     // queue is tagged per account, so what is left waits for this reader to

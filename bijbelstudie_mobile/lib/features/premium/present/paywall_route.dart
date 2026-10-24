@@ -72,6 +72,14 @@ enum PaywallGate {
     source: 'app_notes',
     reason: 'Je hebt je gratis notities gebruikt.',
     benefit: 'Onbeperkt notities',
+  ),
+  // Pressing play in "Kies muziek" without Pro. The reader is in the reader,
+  // so the analytics source is the reader's own.
+  music(
+    id: 'muziek',
+    source: 'app_study',
+    reason: 'Achtergrondmuziek hoort bij Pro.',
+    benefit: 'Achtergrondmuziek',
   );
 
   const PaywallGate({

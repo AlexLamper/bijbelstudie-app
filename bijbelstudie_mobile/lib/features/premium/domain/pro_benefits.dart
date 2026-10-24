@@ -19,4 +19,6 @@ const List<(String, String)> kProBenefits = [
   // count, and existing notes above the limit stay readable and editable - so
   // the body says notes and nothing wider.
   ('Onbeperkt notities', 'Schrijf er zoveel als je wilt, in plaats van 10.'),
+  // App-only: the website has no music. Six sounds, bundled with the app.
+  ('Achtergrondmuziek', 'Rustige muziek en natuurgeluiden terwijl je leest.'),
 ];

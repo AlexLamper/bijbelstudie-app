@@ -14,9 +14,13 @@ import '../../../core/notifications/retention_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/lazy_scroll.dart';
+import '../../../core/ui/lucide_icon.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../commentary/present/commentary_jump.dart';
 import '../../dashboard/data/dashboard_repository.dart';
+import '../../music/present/music_entry.dart';
+import '../../music/present/music_player_controller.dart';
+import '../../music/present/music_widgets.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_models.dart';
 import '../../notes/present/notes_providers.dart';
@@ -487,14 +491,25 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                 ),
               ),
             ),
-            const RuleLine(),
-            AnimatedPadding(
-              duration: chromeDuration,
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(bottom: chromeVisible ? 0 : bottomInset),
-              child: _ChapterNav(
-                chapters: chaptersAsync.value ?? const [],
-                current: location.chapter,
+            // Measured so the background-music pill can float above it.
+            ReaderPagerMeasure(
+              onHeight: (height) {
+                if (mounted) ref.read(readerPagerHeightProvider.notifier).set(height);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const RuleLine(),
+                  AnimatedPadding(
+                    duration: chromeDuration,
+                    curve: Curves.easeOutCubic,
+                    padding: EdgeInsets.only(bottom: chromeVisible ? 0 : bottomInset),
+                    child: _ChapterNav(
+                      chapters: chaptersAsync.value ?? const [],
+                      current: location.chapter,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -617,6 +632,7 @@ class _ReaderBar extends ConsumerWidget {
                               '/search?book=${Uri.encodeComponent(location.book)}',
                             ),
                           ),
+                          const _MusicToolButton(),
                           _ToolButton(
                             glyph: 'Aa',
                             tooltip: 'Weergave',
@@ -783,6 +799,51 @@ class _ToolButton extends StatelessWidget {
                     ),
                   )
                 : Icon(icon, size: 19, color: color),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Background music: the note opens the list to choose from, or the music menu
+/// while something plays - and wears a teal tint for as long as it does.
+///
+/// Shown to every reader. Without Pro the list still opens; pressing play is
+/// where the paywall comes in (`showMusicPickerSheet`).
+class _MusicToolButton extends ConsumerWidget {
+  const _MusicToolButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final playing = ref.watch(musicPlayerProvider.select((s) => s.isPlaying));
+
+    return Tooltip(
+      message: 'Achtergrondmuziek',
+      child: Semantics(
+        button: true,
+        label: playing ? 'Achtergrondmuziek, speelt. Muziekmenu openen' : 'Achtergrondmuziek',
+        excludeSemantics: true,
+        child: InkResponse(
+          onTap: () => openMusic(context, ref),
+          radius: 20,
+          child: _ToolSlot(
+            child: Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: playing ? AppTheme.tealTint : null,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: LucideIcon(
+                MusicIcons.note,
+                size: 20,
+                color: playing ? AppTheme.tealStrong : AppTheme.inkSoft,
+                strokeWidth: 1.9,
+              ),
+            ),
           ),
         ),
       ),

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0;background:#E6E8EB;font-family:Inter,sans-serif}a{color:#0F766E}a:hover{color:#134E4A}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="padding:40px 48px 56px;display:flex;gap:48px;align-items:flex-start;flex-wrap:wrap">
+  <div data-screen-label="Muziek prototype" style="width:390px;height:844px;background:#F3F4F6;border-radius:34px;border:1px solid #D1D5DB;overflow:hidden;display:flex;flex-direction:column;color:#111827;position:relative;flex:none;box-shadow:0 20px 50px rgba(17,24,39,.12);user-select:none">
+    <div style="height:50px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0 32px;box-sizing:border-box;font:600 16px Inter,sans-serif;background:#fff"><span>16:25</span><span style="display:flex;gap:6px;align-items:center"><span style="width:17px;height:10px;border-radius:2px;background:#111827;opacity:.85"></span><span style="width:24px;height:12px;border-radius:3.5px;border:1.5px solid #111827;box-sizing:border-box;opacity:.85"></span></span></div>
+    <div style="flex:none;background:#fff;border-bottom:1px solid #E5E7EB">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 16px 10px">
+        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px"><div style="font:700 20px Inter,sans-serif;letter-spacing:-.3px;white-space:nowrap">Deuteronomium 1</div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+        <div style="display:flex;background:#F3F4F6;border-radius:12px;padding:3px;flex:none"><div style="padding:8px 15px;font:600 13.5px Inter,sans-serif;color:#fff;background:#0F766E;border-radius:9px">Bijbel</div><div style="padding:8px 15px;font:500 13.5px Inter,sans-serif;color:#6B7280">Studie</div></div>
+      </div>
+      <sc-if value="{{ showToolbar }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;padding:0 16px 11px">
+          <div style="display:flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 13px;border:1.5px solid #E5E7EB;border-radius:99px"><span style="font:700 13px Inter,sans-serif;letter-spacing:.6px;color:#0F766E">SV</span><span style="font:400 13px Inter,sans-serif;color:#6B7280">Statenvertaling</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="width:40px;height:36px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m20 20-4.8-4.8"></path></svg></div>
+            <div onClick="{{ onNote }}" style="{{ noteBtnStyle }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ noteColor }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg></div>
+            <div style="width:40px;height:36px;display:flex;align-items:center;justify-content:center;font:600 17px Inter,sans-serif;letter-spacing:-.3px">Aa</div>
+            <div style="width:40px;height:36px;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="#111827"></circle><circle cx="12" cy="12" r="1.7" fill="#111827"></circle><circle cx="19" cy="12" r="1.7" fill="#111827"></circle></svg></div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="flex:1;min-height:0;position:relative">
+      <div onScroll="{{ onScroll }}" style="position:absolute;inset:0;overflow-y:auto;padding:22px 24px 80px;box-sizing:border-box;font:400 17.5px/1.68 Inter,sans-serif;color:#1F2937">
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">1</span>Dit zijn de woorden, die Mozes tot gans Israel gesproken heeft, aan deze zijde van de Jordaan, in de woestijn, op het vlakke veld tegenover Suf, tussen Paran en tussen Tofel, en Laban, en Hazeroth, en Dizahab.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">2</span>Elf dag reizen zijn het van Horeb, door den weg van het gebergte Seir, tot aan Kades-Barnea.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">3</span>En het is geschied in het veertigste jaar, in de elfde maand, op den eersten der maand, dat Mozes sprak tot de kinderen Israels, naar alles wat hem de HEERE aan hen bevolen had;</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">4</span>Nadat hij geslagen had Sihon, den koning der Amorieten, die te Hesbon woonde, en Og, den koning van Bazan, welke woonde in Astharoth, te Edrei.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">5</span>Aan deze zijde van de Jordaan, in het land van Moab, hief Mozes aan, deze wet uit te leggen, zeggende:</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">6</span>De HEERE, onze God, sprak tot ons aan Horeb, zeggende: Gij zijt lang genoeg bij dezen berg gebleven.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">7</span>Wendt u, en reist heen, en gaat in het gebergte der Amorieten, en tot al zijn naburen, in het vlakke veld, op het gebergte, en in de laagte, en in het zuiden, en aan de haven der zee.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">8</span>Ziet, Ik heb het land voor uw aangezicht gegeven; gaat in, en bezit het land, dat de HEERE uw vaderen, Abraham, Izak en Jakob, gezworen heeft.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">9</span>Toen sprak ik tot u op denzelven tijd, zeggende: Ik alleen kan u niet dragen.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">10</span>De HEERE, uw God, heeft u vermenigvuldigd; en ziet, gij zijt heden als de sterren des hemels in menigte.</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">11</span>De HEERE, de God uwer vaderen, doe tot u, zo als gij nu zijt, duizendmaal meer, en zegene u, gelijk als Hij tot u gesproken heeft!</p>
+        <p style="margin:0 0 20px"><span style="font-size:11px;color:#6B7280;margin-right:4px">12</span>Hoe zou ik alleen dragen uw last, en uw pak, en uw twisting?</p>
+      </div>
+      <div style="{{ hintStyle }}">Veeg omlaag om te verkleinen</div>
+      <div onPointerDown="{{ onDown }}" onPointerMove="{{ onMove }}" onPointerUp="{{ onUp }}" onClick="{{ onPillClick }}" style="{{ pillStyle }}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{ pillNote }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:stroke .25s"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg>
+        <div style="{{ pillInnerStyle }}">
+          <div onClick="{{ onName }}" style="flex:1;min-width:0;font:600 13.5px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:12px 0">{{ moodName }}</div>
+          <div style="width:1px;height:20px;background:#E5E7EB;flex:none"></div>
+          <div onClick="{{ onPause }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex:none">
+            <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#111827"></path></svg></sc-if>
+            <sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="7" y="5.5" width="3.2" height="13" rx="1" fill="#111827"></rect><rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="#111827"></rect></svg></sc-if>
+          </div>
+          <div onClick="{{ onStop }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></div>
+        </div>
+      </div>
+      <div style="{{ toastStyle }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg><span style="flex:1">Muziek gestopt</span><span onClick="{{ onUndo }}" style="font-weight:600;color:#0D9488;cursor:pointer">Ongedaan maken</span></div>
+    </div>
+    <div style="{{ pagerStyle }}">
+      <div style="height:56px;display:flex;align-items:center;padding:0 18px;gap:8px"><div style="flex:1;display:flex;align-items:center;gap:10px;font:400 15px Inter,sans-serif;color:#D1D5DB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"></path></svg>Vorige</div><span style="font:400 12.5px Inter,sans-serif;color:#9CA3AF">1 / 34</span><div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:10px;font:400 15px Inter,sans-serif;color:#0D9488">Volgende<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div></div>
+    </div>
+    <sc-if value="{{ showToolbar }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;height:86px;background:#fff;border-top:1px solid #E5E7EB;display:grid;grid-template-columns:repeat(5,1fr);padding-top:12px;box-sizing:border-box;font:500 11px Inter,sans-serif;color:#6B7280">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"></path><path d="M10 20v-5h4v5"></path></svg>Start</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;color:#0D9488"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"></rect><path d="M9 3.5v6l2-1.3 2 1.3v-6M5 16.5h14"></path></svg>Bijbel</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 5 9 4.5-9 4.5-9-4.5z"></path><path d="M7 12v3.5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V12"></path></svg>Studies</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7z"></path><path d="M5 8h3M5 12h3M5 16h3"></path></svg>Notities</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 50% 30%,#CFE9F2,#7FB6A0)"></div>Profiel</div>
+      </div>
+    </sc-if>
+    <div onClick="{{ onDim }}" style="{{ dimStyle }}"></div>
+    <div style="{{ pickerStyle }}">
+<sc-if value="{{ kOrigineel }}" hint-placeholder-val="{{ true }}">
+      <div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:14px 20px 0"><div style="font:700 17px Inter,sans-serif">Kies muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Sluit</div></div>
+      <div style="padding:4px 20px 34px">
+        <div style="font:400 13px/1.5 Inter,sans-serif;color:#6B7280;margin:6px 0 12px">Rustige muziek zonder tekst. Speelt door als je verder leest.</div>
+        <div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:12px;background:#F3F4F6">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2.2" stroke-linecap="round" style="flex:none"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m20 20-4.8-4.8"></path></svg>
+          <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Zoek muziek" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:400 14px Inter,sans-serif;color:#111827">
+        </div>
+        <div style="display:flex;gap:6px;margin:10px 0 6px">
+          <sc-for list="{{ oCats }}" as="c" hint-placeholder-count="3"><div onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</div></sc-for>
+        </div>
+        <div style="min-height:300px">
+        <sc-for list="{{ moodsO }}" as="m" hint-placeholder-count="6">
+          <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #F3F4F6;cursor:pointer">
+            <div style="{{ m.iconBox }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ m.iconStroke }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.d }}"></path></svg></div>
+            <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 14.5px Inter,sans-serif">{{ m.name }}</span><sc-if value="{{ m.last }}" hint-placeholder-val="{{ false }}"><span style="font:600 10.5px Inter,sans-serif;color:#0F766E;background:#CCFBF1;border-radius:99px;padding:2px 7px">Laatst</span></sc-if></div><div style="font:400 12px Inter,sans-serif;color:#9CA3AF;margin-top:1px">{{ m.info }}</div></div>
+            <div style="width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#374151"></path></svg></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}"><div style="padding:28px 0;text-align:center;font:400 13.5px Inter,sans-serif;color:#9CA3AF">Niets gevonden voor “{{ q }}”</div></sc-if>
+        </div>
+      </div>
+</sc-if>
+<sc-if value="{{ kTeal }}" hint-placeholder-val="{{ false }}">
+      <div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:14px 20px 0"><div style="font:700 17px Inter,sans-serif">Kies muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Sluit</div></div>
+      <div style="padding:4px 20px 34px"><div style="font:400 13px/1.5 Inter,sans-serif;color:#6B7280;margin:6px 0 10px">Rustige muziek zonder tekst. Speelt door als je verder leest.</div>
+        <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+          <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid #F3F4F6;cursor:pointer">
+            <div style="width:44px;height:44px;border-radius:50%;background:#F0FDFA;display:flex;align-items:center;justify-content:center;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg></div>
+            <div style="flex:1"><div style="font:600 15px Inter,sans-serif">{{ m.name }}</div><div style="font:400 12.5px Inter,sans-serif;color:#6B7280;margin-top:1px">{{ m.sub }}</div></div>
+            <div style="width:36px;height:36px;border-radius:50%;background:#0D9488;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" style="flex:none"><path d="M8 5.5v13l10-6.5z" fill="#fff"></path></svg></div>
+          </div>
+        </sc-for>
+      </div>
+</sc-if>
+<sc-if value="{{ kKaartjes }}" hint-placeholder-val="{{ false }}">
+      <div style="width:36px;height:4px;border-radius:2px;background:#D1D5DB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:14px 20px 0"><div style="font:700 17px Inter,sans-serif">Kies muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Sluit</div></div>
+      <div style="padding:4px 16px 34px"><div style="padding:0 4px"><div style="font:400 13px/1.5 Inter,sans-serif;color:#6B7280;margin:6px 0 10px">Rustige muziek zonder tekst. Speelt door als je verder leest.</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+          <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#fff;border-radius:14px;cursor:pointer">
+            <div style="width:40px;height:40px;border-radius:11px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg></div>
+            <div style="flex:1"><div style="font:500 14.5px Inter,sans-serif">{{ m.name }}</div><div style="font:400 12px Inter,sans-serif;color:#9CA3AF;margin-top:1px">{{ m.sub }}</div></div>
+            <div style="width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" style="flex:none"><path d="M8 5.5v13l10-6.5z" fill="#374151"></path></svg></div>
+          </div>
+        </sc-for>
+        </div>
+      </div>
+</sc-if>
+<sc-if value="{{ kStrak }}" hint-placeholder-val="{{ false }}">
+      <div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:14px 20px 0"><div style="font:700 17px Inter,sans-serif">Kies muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Sluit</div></div>
+      <div style="padding:4px 20px 34px"><div style="font:400 13px/1.5 Inter,sans-serif;color:#6B7280;margin:6px 0 10px">Rustige muziek zonder tekst. Speelt door als je verder leest.</div>
+        <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+          <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:10px;height:48px;border-top:1px solid #F3F4F6;cursor:pointer">
+            <svg width="12" height="12" viewBox="0 0 24 24" style="flex:none"><path d="M8 5.5v13l10-6.5z" fill="#0D9488"></path></svg>
+            <div style="flex:1;font:500 15px Inter,sans-serif">{{ m.name }}</div>
+            <div style="font:400 12.5px Inter,sans-serif;color:#9CA3AF">{{ m.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+</sc-if>
+<sc-if value="{{ kLaatst }}" hint-placeholder-val="{{ false }}">
+      <div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:14px 20px 0"><div style="font:700 17px Inter,sans-serif">Kies muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Sluit</div></div>
+      <div style="padding:4px 20px 34px"><div style="font:400 13px/1.5 Inter,sans-serif;color:#6B7280;margin:6px 0 10px">Rustige muziek zonder tekst. Speelt door als je verder leest.</div>
+        <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+          <div onClick="{{ m.onPick }}" style="{{ m.lastRow }}">
+            <div style="{{ m.lastIcon }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg></div>
+            <div style="flex:1"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 14.5px Inter,sans-serif">{{ m.name }}</span><sc-if value="{{ m.sel }}" hint-placeholder-val="{{ false }}"><span style="font:600 10.5px Inter,sans-serif;color:#0F766E;background:#CCFBF1;border-radius:99px;padding:2px 7px">Laatst</span></sc-if></div><div style="font:400 12px Inter,sans-serif;color:#9CA3AF;margin-top:1px">{{ m.sub }}</div></div>
+            <div style="width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 1px #E5E7EB;background:#fff;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" style="flex:none"><path d="M8 5.5v13l10-6.5z" fill="#374151"></path></svg></div>
+          </div>
+        </sc-for>
+      </div>
+</sc-if>
+    </div>
+    <div style="{{ panelStyle }}">
+<sc-if value="{{ mKaart }}" hint-placeholder-val="{{ true }}"><div style="padding:14px 16px 16px;display:flex;flex-direction:column;gap:18px"><div style="display:flex;align-items:center;gap:10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg><div style="flex:1;min-width:0"><div style="font:600 15px Inter,sans-serif">{{ moodName }}</div><div style="font:400 12px Inter,sans-serif;color:#6B7280;margin-top:1px">{{ statusText }}</div></div><div onClick="{{ onClose }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div></div><div style="display:flex;align-items:flex-start;justify-content:center;gap:26px"><div onClick="{{ onStop }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer"><div style="width:48px;height:48px;border-radius:14px;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="#374151"></rect></svg></div><span style="font:500 11px Inter,sans-serif;color:#6B7280">Stop</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div onClick="{{ onPause }}" style="width:58px;height:58px;border-radius:50%;background:#0D9488;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;"><sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#fff"></path></svg></sc-if><sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><rect x="7" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect><rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect></svg></sc-if></div><span style="font:500 11px Inter,sans-serif;color:#6B7280">{{ pauseLabel }}</span></div><div onClick="{{ onTimerCycle }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer"><div style="width:48px;height:48px;border-radius:14px;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"></circle><path d="M12 9.5V13l2.5 1.5M10 3h4"></path></svg></div><span style="font:500 11px Inter,sans-serif;color:#6B7280">{{ timerShort }}</span></div></div><div style="display:flex;align-items:center;gap:12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path></svg><input type="range" min="0" max="100" value="{{ vol }}" onChange="{{ onVol }}" style="flex:1;accent-color:#0D9488"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path></svg></div><div style="padding-top:14px;border-top:1px solid #F3F4F6"><div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px"><sc-for list="{{ moods }}" as="m" hint-placeholder-count="6"><div onClick="{{ m.onSelect }}" style="{{ m.chipStyle }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ m.iconColor }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg>{{ m.name }}</div></sc-for></div></div></div></sc-if>
+<sc-if value="{{ mRaster }}" hint-placeholder-val="{{ false }}"><div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:12px 20px 0"><div style="font:700 17px Inter,sans-serif">Achtergrondmuziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box;flex:none">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Klaar</div></div><div style="padding:16px 20px 32px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px;background:#F9FAFB;box-shadow:inset 0 0 0 1px #F3F4F6"><div style="width:44px;height:44px;border-radius:12px;background:#0D9488;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg></div><div style="flex:1;min-width:0"><div style="font:600 15px Inter,sans-serif">{{ moodName }}</div><div style="font:400 12px Inter,sans-serif;color:#6B7280;margin-top:2px">{{ statusText }}</div></div><div onClick="{{ onPause }}" style="width:40px;height:40px;border-radius:50%;background:#111827;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;"><sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#fff"></path></svg></sc-if><sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="7" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect><rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect></svg></sc-if></div><div onClick="{{ onStop }}" style="width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="#374151"></rect></svg></div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><sc-for list="{{ moods }}" as="m" hint-placeholder-count="6"><div onClick="{{ m.onSelect }}" style="{{ m.tileStyle }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ m.iconColor }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg><div style="font:500 12px Inter,sans-serif;text-align:center;line-height:1.25">{{ m.name }}</div></div></sc-for></div><div style="display:flex;align-items:center;gap:12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path></svg><input type="range" min="0" max="100" value="{{ vol }}" onChange="{{ onVol }}" style="flex:1;accent-color:#0D9488"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path></svg></div><div style="display:grid;grid-template-columns:repeat(4,1fr);background:#F3F4F6;border-radius:10px;padding:3px;gap:3px"><sc-for list="{{ timers }}" as="t" hint-placeholder-count="4"><div onClick="{{ t.onSelect }}" style="{{ t.segStyle }}">{{ t.label }}</div></sc-for></div></div></sc-if>
+<sc-if value="{{ mDonker }}" hint-placeholder-val="{{ false }}"><div style="width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:8px auto 0"></div><div style="display:flex;align-items:center;padding:10px 16px 0"><div onClick="{{ onClose }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div><div style="flex:1;text-align:center;font:600 11px Inter,sans-serif;letter-spacing:1.4px;color:#6B7280">ACHTERGRONDMUZIEK</div><div style="width:34px;display:flex;justify-content:center"><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box">PRO</span></div></div><div style="display:flex;flex-direction:column;align-items:center;padding:18px 24px 32px;color:#111827"><div style="{{ bigIconBox }}"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="{{ bigIconStroke }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ moodD }}"></path></svg></div><div style="font:700 22px Inter,sans-serif;margin-top:30px">{{ moodName }}</div><div style="font:400 13px Inter,sans-serif;color:#6B7280;margin-top:5px">{{ moodInfo }} · {{ statusText }}</div><div style="display:flex;align-items:flex-start;gap:28px;margin-top:22px"><div onClick="{{ onStop }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer"><div style="width:48px;height:48px;border-radius:14px;background:#FEF2F2;box-shadow:inset 0 0 0 1px #FECACA;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="#DC2626"></rect></svg></div><span style="font:600 11px Inter,sans-serif;color:#B91C1C">Stop</span></div><div onClick="{{ onPause }}" style="width:60px;height:60px;border-radius:50%;background:#0D9488;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;box-shadow:0 6px 16px rgba(13,148,136,.28)"><sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#fff"></path></svg></sc-if><sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><rect x="7" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect><rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="#fff"></rect></svg></sc-if></div><div onClick="{{ onTimerCycle }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer"><div style="width:48px;height:48px;border-radius:14px;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"></circle><path d="M12 9.5V13l2.5 1.5M10 3h4"></path></svg></div><span style="font:500 11px Inter,sans-serif;color:#6B7280">{{ timerShort }}</span></div></div><div style="width:100%;margin-top:20px"><div style="display:flex;align-items:center;gap:12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path></svg><input type="range" min="0" max="100" value="{{ vol }}" onChange="{{ onVol }}" style="flex:1;accent-color:#0D9488"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path></svg></div></div><div style="width:100%;margin-top:18px"><div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px"><sc-for list="{{ moods }}" as="m" hint-placeholder-count="6"><div onClick="{{ m.onSelect }}" style="{{ m.chipStyle }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ m.iconColor }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.d }}"></path></svg>{{ m.name }}</div></sc-for></div></div></div></sc-if>
+<sc-if value="{{ mLijst }}" hint-placeholder-val="{{ false }}"><div style="width:36px;height:4px;border-radius:2px;background:#D1D5DB;margin:8px auto 0"></div><div style="display:flex;align-items:center;gap:8px;padding:12px 20px 0"><div style="font:700 17px Inter,sans-serif">Muziek</div><span style="height:18px;padding:0 6px;border:1px solid #D1D5DB;border-radius:99px;font:700 9.5px Inter,sans-serif;letter-spacing:.4px;color:#0F766E;display:inline-flex;align-items:center;box-sizing:border-box;flex:none">PRO</span><div style="flex:1"></div><div onClick="{{ onClose }}" style="font:600 13.5px Inter,sans-serif;color:#0D9488;cursor:pointer">Klaar</div></div><div style="padding:14px 16px 32px;display:flex;flex-direction:column;gap:14px"><div style="background:#fff;border-radius:14px;padding:12px 12px 12px 14px;display:flex;align-items:center;gap:12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg><div style="flex:1;min-width:0"><div style="font:600 15px Inter,sans-serif">{{ moodName }}</div><div style="font:400 12px Inter,sans-serif;color:#6B7280;margin-top:1px">{{ statusText }}</div></div><div onClick="{{ onPause }}" style="width:40px;height:40px;border-radius:50%;background:#F0FDFA;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;box-shadow:inset 0 0 0 1px #CCFBF1"><sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="#0F766E"></path></svg></sc-if><sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="7" y="5.5" width="3.2" height="13" rx="1" fill="#0F766E"></rect><rect x="13.8" y="5.5" width="3.2" height="13" rx="1" fill="#0F766E"></rect></svg></sc-if></div></div><div style="display:flex;flex-direction:column;gap:6px"><div style="font:600 10.5px Inter,sans-serif;letter-spacing:1.2px;color:#6B7280;padding-left:14px">SFEER</div><div style="background:#fff;border-radius:14px;padding:0 14px"><sc-for list="{{ moods }}" as="m" hint-placeholder-count="6"><div onClick="{{ m.onSelect }}" style="display:flex;align-items:center;gap:12px;height:44px;border-top:{{ m.divider }};cursor:pointer"><div style="flex:1;font:500 14.5px Inter,sans-serif;color:{{ m.textColor }}">{{ m.name }}</div><sc-if value="{{ m.sel }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></div></sc-for></div></div><div style="background:#fff;border-radius:14px;padding:0 14px"><div style="padding:13px 0"><div style="display:flex;align-items:center;gap:12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path></svg><input type="range" min="0" max="100" value="{{ vol }}" onChange="{{ onVol }}" style="flex:1;accent-color:#0D9488"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path></svg></div></div><div onClick="{{ onTimerCycle }}" style="display:flex;align-items:center;gap:10px;height:46px;border-top:1px solid #F3F4F6;cursor:pointer"><div style="flex:1;font:500 14.5px Inter,sans-serif">Stoppen na</div><div style="font:400 14px Inter,sans-serif;color:#6B7280">{{ timerLabel }}</div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></div></div><div onClick="{{ onStop }}" style="background:#fff;border-radius:14px;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;font:600 14.5px Inter,sans-serif;color:#374151;cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="#374151"></rect></svg>Stop muziek</div></div></sc-if>
+<sc-if value="{{ mCompact }}" hint-placeholder-val="{{ false }}"><div style="padding:6px 14px 14px"><sc-for list="{{ moods }}" as="m" hint-placeholder-count="6"><div onClick="{{ m.onSelect }}" style="display:flex;align-items:center;gap:10px;height:40px;border-top:{{ m.divider }};cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ m.iconColor }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle></svg><div style="flex:1;font:500 14px Inter,sans-serif;color:{{ m.textColor }}">{{ m.name }}</div><sc-if value="{{ m.sel }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></div></sc-for><div style="margin:8px 0 12px"><div style="display:flex;align-items:center;gap:12px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path></svg><input type="range" min="0" max="100" value="{{ vol }}" onChange="{{ onVol }}" style="flex:1;accent-color:#0D9488"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path></svg></div></div><div style="display:flex;gap:8px"><div onClick="{{ onTimerCycle }}" style="flex:1;height:38px;border-radius:10px;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center;gap:6px;font:500 13px Inter,sans-serif;color:#374151;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"></circle><path d="M12 9.5V13l2.5 1.5M10 3h4"></path></svg>{{ timerShort }}</div><div onClick="{{ onStop }}" style="flex:1;height:38px;border-radius:10px;box-shadow:inset 0 0 0 1px #E5E7EB;display:flex;align-items:center;justify-content:center;gap:6px;font:600 13px Inter,sans-serif;color:#374151;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2" fill="#374151"></rect></svg>Stop</div></div></div></sc-if>
+    </div>
+  </div>
+  <div style="flex:1;min-width:260px;max-width:340px;display:flex;flex-direction:column;gap:18px;padding-top:8px">
+    <div>
+      <div style="font:700 18px Inter,sans-serif;color:#111827">Achtergrondmuziek · klikbaar</div>
+      <div style="font:400 13px/1.55 Inter,sans-serif;color:#4B5563;margin-top:6px">De flow van 10a–10g. Tik, veeg de pil omlaag met de muis, of scroll in de tekst.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="7">
+        <div style="{{ s.rowStyle }}">
+          <div style="{{ s.numStyle }}">{{ s.n }}</div>
+          <div style="flex:1;min-width:0"><div style="font:600 13.5px Inter,sans-serif;color:#111827">{{ s.title }}</div><div style="font:400 12px/1.45 Inter,sans-serif;color:#6B7280;margin-top:2px">{{ s.desc }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:#fff;box-shadow:inset 0 0 0 1px #E5E7EB">
+      <div style="font:400 12px/1.45 Inter,sans-serif;color:#6B7280">Het menu-ontwerp zie je bij stap 6, de bubbelstijl bij stap 4. Spring er direct heen:</div>
+      <div style="display:flex;gap:8px">
+        <div onClick="{{ onShowMenu }}" style="height:36px;padding:0 12px;border-radius:10px;background:#0D9488;color:#fff;display:flex;align-items:center;font:600 13px Inter,sans-serif;cursor:pointer">Toon menu</div>
+        <div onClick="{{ onShowBubble }}" style="height:36px;padding:0 12px;border-radius:10px;background:#F0FDFA;color:#0F766E;box-shadow:inset 0 0 0 1px #CCFBF1;display:flex;align-items:center;font:600 13px Inter,sans-serif;cursor:pointer">Toon bubbel</div>
+      </div>
+    </div>
+    <div onClick="{{ onReset }}" style="align-self:flex-start;height:38px;padding:0 14px;border-radius:10px;background:#fff;box-shadow:inset 0 0 0 1px #D1D5DB;display:flex;align-items:center;font:600 13px Inter,sans-serif;color:#374151;cursor:pointer">Opnieuw beginnen</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;menu&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;kaart&quot;,&quot;raster&quot;,&quot;donker&quot;,&quot;lijst&quot;,&quot;compact&quot;],&quot;default&quot;:&quot;kaart&quot;,&quot;tsType&quot;:&quot;'kaart'|'raster'|'donker'|'lijst'|'compact'&quot;,&quot;section&quot;:&quot;Menu&quot;},&quot;kiezer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;origineel&quot;,&quot;teal&quot;,&quot;kaartjes&quot;,&quot;strak&quot;,&quot;laatst&quot;],&quot;default&quot;:&quot;origineel&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Kies muziek&quot;},&quot;bubble&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;wit&quot;,&quot;teal&quot;,&quot;glas&quot;,&quot;rand&quot;],&quot;default&quot;:&quot;wit&quot;,&quot;tsType&quot;:&quot;'wit'|'teal'|'glas'|'rand'&quot;,&quot;section&quot;:&quot;Bubbel&quot;}}">
+class Component extends DCLogic {
+  init = { phase: 'idle', mini: false, scrolled: false, paused: false, mood: 0, timer: 0, vol: 50, toast: false, fromBubble: false, swiped: false, dy: 0, drag: false, cat: 0, q: '', last: 0 };
+  state = { ...this.init };
+  M = [['Stille piano','Piano'],['Regen','Natuur'],['Strijkers','Ensemble'],['Akoestisch','Gitaar'],['Beek in het bos','Natuur'],['Orgel','Zacht orgel']];
+  S = [['Tik op de noot','In de leesbalk, naast zoeken.'],['Kies muziek','Een rij aantikken start de muziek.'],['Muziek speelt','De pil staat boven de bladerrij.'],['Veeg omlaag of scroll','De pil wordt een kleine bubbel met de noot in de hoek.'],['Tik op de bubbel','Hij klapt weer uit en krimpt vanzelf terug tijdens het lezen.'],['Tik op de naam','Het paneel met pauze, sfeer, timer en Stop.'],['Stop','Met het kruisje of Stop muziek. Ongedaan maken kan even.']];
+  D = ['M3 5h18v14H3z M8 5v8 M12 5v14 M16 5v8', 'M7 15a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 7.5a3.75 3.75 0 0 1 .5 7.5z M8 18l-1 2.5 M12 18l-1 2.5 M16 18l-1 2.5', 'M3 12h2 M7 8v8 M11 5v14 M15 8v8 M19 10v4 M21 12h0', 'M12 3v9 M10 3h4 M12 12a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 16.5h.01', 'M3 9c2 0 2.5-2 4.5-2S10 9 12 9s2.5-2 4.5-2S19 9 21 9 M3 15c2 0 2.5-2 4.5-2S10 15 12 15s2.5-2 4.5-2S19 15 21 15', 'M5 20v-8 M9 20V8 M12 20V4 M15 20V8 M19 20v-8 M3 20h18'];
+  INFO = ['Piano · zacht en traag', 'Natuur · zachte regen', 'Ensemble · warme strijkers', 'Gitaar · fingerpicking', 'Natuur · stromend water', 'Orgel · ingetogen'];
+  componentWillUnmount() { clearTimeout(this.tC); clearTimeout(this.tT); }
+  armCollapse() { clearTimeout(this.tC); this.expandedAt = Date.now(); this.lastY = null; this.tC = setTimeout(() => { this.tC = null; if (this.state.phase === 'playing' && this.state.scrolled) this.setState({ mini: true }); }, 3500); }
+  stop = e => { e && e.stopPropagation && e.stopPropagation(); if (this.sup) return; clearTimeout(this.tC); this.setState({ phase: 'idle', mini: false, toast: true, paused: false }); clearTimeout(this.tT); this.tT = setTimeout(() => this.setState({ toast: false }), 4000); };
+  step() {
+    const s = this.state;
+    if (s.toast) return 6;
+    if (s.phase === 'idle') return 0;
+    if (s.phase === 'picker') return 1;
+    if (s.phase === 'panel') return 5;
+    if (s.mini) return 3;
+    return s.fromBubble ? 4 : 2;
+  }
+  renderVals() {
+    const s = this.state, on = s.phase === 'playing' || s.phase === 'panel';
+    const ease = 'cubic-bezier(.2,.8,.2,1)';
+    const tr = s.drag ? 'none' : `left .35s ${ease}, width .35s ${ease}, background .25s, box-shadow .25s, opacity .25s, transform .35s ${ease}, padding .35s ${ease}`;
+    const BS = {
+      wit: { left: 'calc(100% - 60px)', w: 44, h: 44, bottom: 16, pl: 13.5, bg: '#fff', shadow: '0 4px 14px rgba(17,24,39,.12), 0 0 0 1px #E5E7EB', note: '#0D9488' },
+      teal: { left: 'calc(100% - 58px)', w: 42, h: 42, bottom: 16, pl: 12.5, bg: '#0D9488', shadow: '0 6px 16px rgba(13,148,136,.32)', note: '#fff' },
+      glas: { left: 'calc(100% - 60px)', w: 44, h: 44, bottom: 16, pl: 13.5, bg: 'rgba(255,255,255,.78)', blur: true, shadow: '0 4px 14px rgba(17,24,39,.08), 0 0 0 1px rgba(17,24,39,.06)', note: '#0F766E' },
+      rand: { left: 'calc(100% - 38px)', w: 60, h: 44, bottom: 72, pl: 11, bg: '#fff', shadow: '-3px 4px 14px rgba(17,24,39,.12), 0 0 0 1px #E5E7EB', note: '#0D9488' }
+    };
+    const B = BS[this.props.bubble] || BS.wit;
+    const pillStyle = {
+      position: 'absolute', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer', touchAction: 'none', zIndex: 2, transition: tr,
+      left: s.mini ? B.left : 'calc(50% - 118px)', width: s.mini ? B.w : 236, height: s.mini ? B.h : 46, bottom: s.mini ? B.bottom : 14, paddingLeft: s.mini ? B.pl : 16, paddingRight: 4,
+      background: s.mini ? B.bg : '#fff', backdropFilter: s.mini && B.blur ? 'blur(14px) saturate(1.4)' : 'none',
+      boxShadow: s.mini ? B.shadow : '0 6px 20px rgba(17,24,39,.14), 0 0 0 1px #E5E7EB',
+      opacity: on ? 1 : 0, pointerEvents: on ? 'auto' : 'none',
+      transform: on ? `translateY(${Math.max(0, s.dy)}px)` : 'translateY(24px)'
+    };
+    const sheetBase = { position: 'absolute', left: 0, right: 0, bottom: 0, background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -8px 30px rgba(17,24,39,.18)', zIndex: 6, transition: `transform .4s ${ease}` };
+    const chip = sel => ({ flex: 'none', display: 'flex', alignItems: 'center', gap: 7, height: 36, padding: '0 13px 0 10px', borderRadius: 99, fontFamily: 'Inter,sans-serif', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: sel ? 600 : 500, color: sel ? '#0F766E' : '#374151', background: sel ? '#F0FDFA' : '#fff', boxShadow: sel ? 'inset 0 0 0 1.5px #0D9488' : 'inset 0 0 0 1px #E5E7EB' });
+    const cur = this.step();
+    const MV = this.props.menu || 'kaart';
+    const floating = MV === 'kaart' || MV === 'compact';
+    const KV = this.props.kiezer || 'origineel';
+    return {
+      showToolbar: !s.scrolled,
+      noteBtnStyle: { width: 40, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, cursor: 'pointer', background: on ? '#F0FDFA' : 'transparent', boxShadow: s.phase === 'idle' && !s.toast ? '0 0 0 2px rgba(13,148,136,.35)' : 'none', transition: 'box-shadow .3s' },
+      noteColor: on ? '#0F766E' : '#111827',
+      pillNote: s.mini ? B.note : '#0D9488',
+      moodName: this.M[s.mood][0], moodD: this.D[s.mood], moodInfo: this.INFO[s.mood].split(' · ')[1],
+      bigIconBox: { width: 128, height: 128, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: this.M[s.mood][1] === 'Natuur' ? '#F0FDFA' : '#F3F4F6', boxShadow: '0 0 0 12px rgba(13,148,136,.06), 0 0 0 26px rgba(13,148,136,.03)' },
+      bigIconStroke: this.M[s.mood][1] === 'Natuur' ? '#0D9488' : '#374151',
+      statusText: s.paused ? 'Gepauzeerd' : s.timer ? `Stopt na ${['', '15', '30', '60'][s.timer]} min` : 'Speelt door',
+      paused: s.paused, playing: !s.paused, vol: s.vol,
+      pillStyle,
+      pillInnerStyle: { display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, opacity: s.mini ? 0 : 1, pointerEvents: s.mini ? 'none' : 'auto', transition: 'opacity .2s' },
+      hintStyle: { position: 'absolute', left: '50%', bottom: 70, transform: 'translateX(-50%)', height: 26, padding: '0 10px', borderRadius: 99, background: '#0F766E', color: '#fff', font: '600 11.5px Inter,sans-serif', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', pointerEvents: 'none', transition: 'opacity .3s', opacity: s.phase === 'playing' && !s.mini && !s.swiped ? 1 : 0 },
+      toastStyle: { position: 'absolute', left: 16, right: 16, bottom: 14, height: 46, borderRadius: 14, background: '#fff', color: '#111827', boxShadow: '0 6px 20px rgba(17,24,39,.14), 0 0 0 1px #E5E7EB', display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', font: '500 13.5px Inter,sans-serif', zIndex: 3, transition: `opacity .25s, transform .35s ${ease}`, opacity: s.toast ? 1 : 0, transform: s.toast ? 'translateY(0px)' : 'translateY(16px)', pointerEvents: s.toast ? 'auto' : 'none' },
+      pagerStyle: { flex: 'none', background: '#F3F4F6', borderTop: '1px solid #E5E7EB', paddingBottom: s.scrolled ? 30 : 0 },
+      dimStyle: { position: 'absolute', inset: 0, background: (s.phase === 'panel' && floating) || (s.phase === 'picker' && KV === 'balk') ? 'rgba(17,24,39,.08)' : 'rgba(17,24,39,.28)', zIndex: 5, transition: 'opacity .3s', opacity: s.phase === 'picker' || s.phase === 'panel' ? 1 : 0, pointerEvents: s.phase === 'picker' || s.phase === 'panel' ? 'auto' : 'none' },
+      pickerStyle: (() => {
+        const open = s.phase === 'picker';
+        if (KV === 'balk') return { position: 'absolute', zIndex: 6, top: 136, left: 0, right: 0, background: '#fff', borderBottom: '1px solid #E5E7EB', boxShadow: '0 10px 24px rgba(17,24,39,.08)', transition: `opacity .2s, transform .3s ${ease}`, opacity: open ? 1 : 0, transform: open ? 'translateY(0px)' : 'translateY(-16px)', pointerEvents: open ? 'auto' : 'none' };
+        return { ...sheetBase, background: KV === 'kaartjes' ? '#F3F4F6' : '#fff', transform: open ? 'translateY(0px)' : 'translateY(105%)' };
+      })(),
+      kOrigineel: !['teal','kaartjes','strak','laatst'].includes(KV), kTeal: KV === 'teal', kKaartjes: KV === 'kaartjes', kStrak: KV === 'strak', kLaatst: KV === 'laatst',
+      onStart: () => { this.setState({ phase: 'playing', mini: false, paused: false, fromBubble: false, toast: false }); if (this.state.scrolled) this.armCollapse(); },
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      oCats: ['Alles', 'Muziek', 'Natuur'].map((label, i) => ({ label, onClick: () => this.setState({ cat: i }), style: { height: 30, padding: '0 12px', borderRadius: 99, display: 'flex', alignItems: 'center', font: (i === s.cat ? '600' : '500') + ' 12.5px Inter,sans-serif', color: i === s.cat ? '#fff' : '#374151', background: i === s.cat ? '#0D9488' : '#fff', boxShadow: i === s.cat ? 'none' : 'inset 0 0 0 1px #E5E7EB', cursor: 'pointer' } })),
+      ...(() => {
+        const D = this.D, INFO = this.INFO;
+        const q = s.q.trim().toLowerCase();
+        const list = this.M.map(([name, sub], i) => ({ name, sub, i, nat: sub === 'Natuur' }))
+          .filter(m => (s.cat === 0 || (s.cat === 2 ? m.nat : !m.nat)) && (!q || (m.name + ' ' + INFO[m.i]).toLowerCase().includes(q)))
+          .map(m => ({ name: m.name, info: INFO[m.i], d: D[m.i], last: m.i === s.last,
+            iconBox: { width: 42, height: 42, borderRadius: 12, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: m.nat ? '#F0FDFA' : '#F3F4F6' },
+            iconStroke: m.nat ? '#0D9488' : '#374151',
+            onPick: () => { this.setState({ phase: 'playing', mood: m.i, last: m.i, mini: false, paused: false, fromBubble: false, toast: false, q: '' }); if (this.state.scrolled) this.armCollapse(); } }));
+        return { moodsO: list, noResults: list.length === 0 };
+      })(),
+      cats: ['Alles', 'Muziek', 'Natuur'].map((label, i) => ({ label, onClick: () => this.setState({ cat: i }), style: { flex: 1, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', font: (i === s.cat ? '600' : '500') + ' 13px Inter,sans-serif', color: i === s.cat ? '#111827' : '#6B7280', background: i === s.cat ? '#fff' : 'transparent', boxShadow: i === s.cat ? '0 1px 2px rgba(17,24,39,.1)' : 'none', cursor: 'pointer' } })),
+      moodsCat: this.M.map(([name, sub], i) => ({ name, sub, nat: sub === 'Natuur', onPick: () => { this.setState({ phase: 'playing', mood: i, mini: false, paused: false, fromBubble: false, toast: false }); if (this.state.scrolled) this.armCollapse(); } })).filter(m => s.cat === 0 || (s.cat === 2 ? m.nat : !m.nat)),
+      pTimers: ['Uit', '15', '30', '60'].map((label, i) => ({ label: i ? label + ' min' : label, onClick: () => this.setState({ timer: i }), style: { flex: 1, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', font: (i === s.timer ? '600' : '500') + ' 12px Inter,sans-serif', color: i === s.timer ? '#0F766E' : '#6B7280', background: i === s.timer ? '#fff' : 'transparent', boxShadow: i === s.timer ? '0 1px 2px rgba(17,24,39,.1)' : 'none', cursor: 'pointer' } })),
+      panelStyle: (() => {
+        const open = s.phase === 'panel', above = (s.scrolled ? 86 : 142) + 70;
+        if (MV === 'kaart' || MV === 'compact') return { position: 'absolute', zIndex: 6, bottom: above, borderRadius: MV === 'kaart' ? 22 : 16, background: '#fff', boxShadow: '0 14px 40px rgba(17,24,39,.2), 0 0 0 1px #E5E7EB', overflow: 'hidden', ...(MV === 'kaart' ? { left: 12, right: 12 } : { left: 'calc(50% - 150px)', width: 300 }), transformOrigin: '50% 100%', transition: `opacity .22s, transform .35s ${ease}`, opacity: open ? 1 : 0, transform: open ? 'translateY(0px) scale(1)' : 'translateY(24px) scale(.94)', pointerEvents: open ? 'auto' : 'none' };
+        return { ...sheetBase, background: MV === 'lijst' ? '#F3F4F6' : '#fff', transform: open ? 'translateY(0px)' : 'translateY(105%)' };
+      })(),
+      mKaart: MV === 'kaart', mRaster: MV === 'raster', mDonker: MV === 'donker', mLijst: MV === 'lijst', mCompact: MV === 'compact',
+      pauseLabel: s.paused ? 'Speel' : 'Pauze',
+      timerLabel: ['Uit', '15 min', '30 min', '60 min'][s.timer],
+      timerShort: s.timer ? ['', '15 min', '30 min', '60 min'][s.timer] : 'Timer',
+      onShowMenu: () => { clearTimeout(this.tC); this.setState({ phase: 'panel', mini: false, toast: false, swiped: true }); },
+      onShowBubble: () => { clearTimeout(this.tC); this.setState({ phase: 'playing', mini: true, scrolled: true, toast: false, swiped: true }); },
+      onTimerCycle: () => this.setState(st => ({ timer: (st.timer + 1) % 4 })),
+      moods: this.M.map(([name, sub], i) => ({ name, sub, chipStyle: chip(i === s.mood), iconColor: i === s.mood ? '#0D9488' : '#6B7280',
+        sel: i === s.mood, textColor: i === s.mood ? '#0F766E' : '#111827', divider: i ? '1px solid #F3F4F6' : 'none',
+        darkIcon: i === s.mood ? '#111827' : '#9CA3AF',
+        darkChipStyle: { ...chip(false), background: i === s.mood ? '#fff' : 'rgba(255,255,255,.08)', color: i === s.mood ? '#111827' : '#E5E7EB', boxShadow: 'none', fontWeight: i === s.mood ? 600 : 500 },
+        tileStyle: { aspectRatio: '1.15', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 6px', cursor: 'pointer', color: i === s.mood ? '#0F766E' : '#111827', background: i === s.mood ? '#F0FDFA' : '#fff', boxShadow: i === s.mood ? 'inset 0 0 0 1.5px #0D9488' : 'inset 0 0 0 1px #E5E7EB', fontWeight: i === s.mood ? 600 : 500 },
+        onPick: () => { this.setState({ phase: 'playing', mood: i, mini: false, paused: false, fromBubble: false, toast: false }); if (this.state.scrolled) this.armCollapse(); },
+        onSelect: () => this.setState({ mood: i, last: i, paused: false }), d: this.D[i],
+        cardStyle: { flex: 'none', width: 136, height: 168, borderRadius: 18, padding: 14, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', cursor: 'pointer', background: ['#CCFBF1', '#E0F2FE', '#F0FDFA', '#F3F4F6', '#DCFCE7', '#F5F5F4'][i] },
+        lastRow: { display: 'flex', alignItems: 'center', gap: 12, padding: i === s.mood ? '10px 10px' : '10px 0', margin: i === s.mood ? '0 -10px 4px' : 0, borderRadius: 14, background: i === s.mood ? '#F0FDFA' : 'transparent', borderTop: i === s.mood || i === s.mood + 1 ? 'none' : '1px solid #F3F4F6', cursor: 'pointer' },
+        lastIcon: { width: 40, height: 40, borderRadius: 11, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: i === s.mood ? '#0D9488' : '#F3F4F6', color: i === s.mood ? '#fff' : '#374151' },
+        radioStyle: { width: 20, height: 20, borderRadius: '50%', boxSizing: 'border-box', flex: 'none', border: i === s.mood ? '6px solid #0D9488' : '2px solid #D1D5DB', transition: 'border .15s' } })),
+      timers: ['Uit', '15 min', '30 min', '60 min'].map((label, i) => ({ label, chipStyle: { ...chip(i === s.timer), padding: '0 12px', height: 32, fontSize: 12.5 }, segStyle: { height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `${i === s.timer ? 600 : 500} 12.5px Inter,sans-serif`, cursor: 'pointer', background: i === s.timer ? '#fff' : 'transparent', color: i === s.timer ? '#111827' : '#6B7280', boxShadow: i === s.timer ? '0 1px 2px rgba(17,24,39,.08)' : 'none' }, onSelect: () => this.setState({ timer: i }) })),
+      steps: this.S.map(([title, desc], i) => ({ n: i + 1, title, desc,
+        rowStyle: { display: 'flex', gap: 12, padding: '10px 12px', borderRadius: 12, background: i === cur ? '#fff' : 'transparent', boxShadow: i === cur ? '0 1px 3px rgba(17,24,39,.08), 0 0 0 1px #E5E7EB' : 'none', opacity: i <= cur ? 1 : .55, transition: 'all .25s' },
+        numStyle: { width: 24, height: 24, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '600 11.5px Inter,sans-serif', background: i < cur ? '#0D9488' : i === cur ? '#F0FDFA' : '#E5E7EB', color: i < cur ? '#fff' : i === cur ? '#0F766E' : '#6B7280', boxShadow: i === cur ? 'inset 0 0 0 1.5px #0D9488' : 'none' } })),
+      onNote: () => this.setState({ phase: on ? 'panel' : 'picker', toast: false }),
+      onClose: () => { this.setState(st => ({ phase: st.phase === 'panel' ? 'playing' : 'idle' })); if (this.state.scrolled) this.armCollapse(); },
+      onDim: () => this.setState(st => ({ phase: st.phase === 'panel' ? 'playing' : 'idle' })),
+      onScroll: e => {
+        const y = e.currentTarget.scrollTop;
+        if (y > 40 && !this.state.scrolled) this.setState(st => ({ scrolled: true, mini: st.phase === 'playing' ? true : st.mini }));
+        else if (y < 8 && this.state.scrolled) this.setState({ scrolled: false });
+        else if (y > 40 && this.state.phase === 'playing' && !this.state.mini) {
+          const now = Date.now();
+          if (!this.lastY || Math.abs(y - this.lastY) > 60) { this.lastY = y; if (now - (this.expandedAt || 0) > 600) this.setState({ mini: true }); }
+        }
+      },
+      onDown: e => { if (this.state.mini) return; this.y0 = e.clientY; this.sup = false; this.cap = false; },
+      onMove: e => { if (this.y0 == null) return; const dy = e.clientY - this.y0; if (Math.abs(dy) > 4) { if (!this.cap) { this.cap = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} } this.setState({ dy, drag: true }); } },
+      onUp: e => {
+        if (this.y0 == null) return;
+        const dy = e.clientY - this.y0; this.y0 = null;
+        if (dy > 24) { this.sup = true; setTimeout(() => { this.sup = false; }, 50); this.setState({ mini: true, swiped: true, dy: 0, drag: false }); }
+        else this.setState({ dy: 0, drag: false });
+      },
+      onPillClick: () => { if (this.sup) return; if (this.state.mini) { this.setState({ mini: false, fromBubble: true }); if (this.state.scrolled) this.armCollapse(); } else if (this.state.phase === 'playing') { clearTimeout(this.tC); this.setState({ phase: 'panel' }); } },
+      onName: () => { if (this.sup || this.state.mini) return; clearTimeout(this.tC); this.setState({ phase: 'panel' }); },
+      onPause: e => { e && e.stopPropagation && e.stopPropagation(); if (this.sup || this.state.mini) return; this.setState(st => ({ paused: !st.paused })); },
+      onStop: this.stop,
+      onUndo: () => { clearTimeout(this.tT); this.setState({ toast: false, phase: 'playing', mini: false }); if (this.state.scrolled) this.armCollapse(); },
+      onVol: e => this.setState({ vol: +e.target.value }),
+      onReset: () => { clearTimeout(this.tC); clearTimeout(this.tT); this.setState({ ...this.init }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
