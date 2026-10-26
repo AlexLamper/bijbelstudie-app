@@ -181,6 +181,66 @@ class AdminContentStats {
   }
 }
 
+/// The client an account was made on or used on. `unknown` only appears as a
+/// signup platform: an account older than the measurement.
+enum ClientPlatform {
+  ios('iOS'),
+  android('Android'),
+  web('Web');
+
+  const ClientPlatform(this.label);
+
+  final String label;
+
+  static ClientPlatform? parse(dynamic value) => switch (value) {
+        'ios' => ClientPlatform.ios,
+        'android' => ClientPlatform.android,
+        'web' => ClientPlatform.web,
+        _ => null,
+      };
+}
+
+/// The `platforms` block - where accounts were made and which clients they use.
+/// Null maps mean the server could not read them (or is older than the block).
+class AdminPlatformStats {
+  const AdminPlatformStats({
+    this.signups,
+    this.signupsLast30d,
+    this.active30d,
+    this.activeAny,
+    this.activeMulti,
+  });
+
+  /// Accounts per signup platform, plus `unknown`. Adds up to the total.
+  final Map<String, int>? signups;
+  final Map<String, int>? signupsLast30d;
+
+  /// Accounts seen on each client in 30 days. One account on two clients
+  /// counts twice; [activeMulti] is that overlap.
+  final Map<ClientPlatform, int>? active30d;
+  final int? activeAny;
+  final int? activeMulti;
+
+  factory AdminPlatformStats.fromJson(Map<String, dynamic> json) {
+    Map<String, int>? counts(dynamic raw) => raw is Map<String, dynamic>
+        ? {
+            for (final key in const ['ios', 'android', 'web', 'unknown'])
+              key: _int(raw[key]) ?? 0,
+          }
+        : null;
+    final active = json['active30d'];
+    return AdminPlatformStats(
+      signups: counts(json['signups']),
+      signupsLast30d: counts(json['signupsLast30d']),
+      active30d: active is Map<String, dynamic>
+          ? {for (final p in ClientPlatform.values) p: _int(active[p.name]) ?? 0}
+          : null,
+      activeAny: active is Map<String, dynamic> ? _int(active['any']) : null,
+      activeMulti: active is Map<String, dynamic> ? _int(active['multi']) : null,
+    );
+  }
+}
+
 /// `GET /api/v1/admin/stats`.
 class AdminStats {
   const AdminStats({
@@ -188,6 +248,7 @@ class AdminStats {
     required this.billing,
     required this.revenue,
     required this.content,
+    this.platforms = const AdminPlatformStats(),
     this.degraded = const [],
   });
 
@@ -195,6 +256,7 @@ class AdminStats {
   final AdminBillingStats billing;
   final AdminRevenueStats revenue;
   final AdminContentStats content;
+  final AdminPlatformStats platforms;
 
   /// Dutch labels of the figures that could not be read. Empty when healthy.
   final List<String> degraded;
@@ -207,6 +269,7 @@ class AdminStats {
       billing: AdminBillingStats.fromJson(block('billing')),
       revenue: AdminRevenueStats.fromJson(block('revenue')),
       content: AdminContentStats.fromJson(block('content')),
+      platforms: AdminPlatformStats.fromJson(block('platforms')),
       degraded: ((json['degraded'] as List<dynamic>?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),
@@ -456,6 +519,8 @@ class AdminAccount {
     this.createdAt,
     this.lastStreakDate,
     this.compedProUntil,
+    this.signupPlatform,
+    this.platformsSeenAt = const {},
   });
 
   final String id;
@@ -502,6 +567,20 @@ class AdminAccount {
   /// live entitlement check - the account can be Pro a day longer.
   final DateTime? compedProUntil;
 
+  /// Where the account was made. Null on accounts older than the measurement.
+  final ClientPlatform? signupPlatform;
+
+  /// Last use per client. A missing key means never seen there.
+  final Map<ClientPlatform, DateTime> platformsSeenAt;
+
+  /// Made on [platform], or used there since.
+  bool usesPlatform(ClientPlatform platform) =>
+      signupPlatform == platform || platformsSeenAt.containsKey(platform);
+
+  /// [platformsSeenAt] newest first.
+  List<MapEntry<ClientPlatform, DateTime>> get platformsByRecency =>
+      platformsSeenAt.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
   String get displayName => name.trim().isEmpty ? 'Naamloos' : name.trim();
 
   /// First letter, for the avatar circle.
@@ -517,6 +596,7 @@ class AdminAccount {
       !storePremium && (subscriptionStatus == null || subscriptionStatus!.isEmpty);
 
   factory AdminAccount.fromJson(Map<String, dynamic> json) {
+    final seenAt = json['platformsSeenAt'] as Map<String, dynamic>?;
     return AdminAccount(
       id: json['_id'] as String? ?? json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -541,6 +621,11 @@ class AdminAccount {
       createdAt: _date(json['createdAt']),
       lastStreakDate: _date(json['lastStreakDate']),
       compedProUntil: _date(json['compedProUntil']),
+      signupPlatform: ClientPlatform.parse(json['signupPlatform']),
+      platformsSeenAt: {
+        for (final p in ClientPlatform.values)
+          if (_date(seenAt?[p.name]) case final seen?) p: seen,
+      },
     );
   }
 
@@ -583,6 +668,8 @@ class AdminAccount {
       createdAt: createdAt,
       lastStreakDate: lastStreakDate,
       compedProUntil: nextCompedUntil,
+      signupPlatform: signupPlatform,
+      platformsSeenAt: platformsSeenAt,
     );
   }
 }

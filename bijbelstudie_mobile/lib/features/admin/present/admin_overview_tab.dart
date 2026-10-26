@@ -176,6 +176,15 @@ class _Overview extends ConsumerWidget {
 
         const SizedBox(height: 20),
         const SectionHeader(
+          title: 'Platforms',
+          description: 'Waar accounts zijn aangemaakt en wat ze gebruiken',
+          icon: Icons.devices_outlined,
+        ),
+        const SizedBox(height: 12),
+        _PlatformsCard(platforms: stats.platforms, total: users.total),
+
+        const SizedBox(height: 20),
+        const SectionHeader(
           title: 'Abonnementen',
           description: 'Wie betaalt er, en waar hapert het',
           icon: Icons.credit_card_outlined,
@@ -321,6 +330,78 @@ class _Overview extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Two questions kept apart: "aangemaakt op" is one platform per account and
+/// adds up to the total; "actief" counts an account on every client it used in
+/// 30 days, so it does not - the overlap row says by how much.
+class _PlatformsCard extends StatelessWidget {
+  const _PlatformsCard({required this.platforms, required this.total});
+
+  final AdminPlatformStats platforms;
+  final int? total;
+
+  String _withShare(int? value) {
+    if (value == null) return '-';
+    final t = total;
+    if (t == null || t == 0) return adminNumber(value);
+    return '${adminNumber(value)} (${(value * 100 / t).round()}%)';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final signups = platforms.signups;
+    final recent = platforms.signupsLast30d;
+    final active = platforms.active30d;
+    String signupValue(String key) {
+      final base = _withShare(signups?[key]);
+      final added = recent?[key] ?? 0;
+      return added > 0 ? '$base  +${adminNumber(added)}' : base;
+    }
+
+    return AppCard(
+      radius: AppTheme.radiusMd,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Aangemaakt op', style: AppTheme.bodyStrong),
+          const SizedBox(height: 6),
+          AdminStatRow(label: 'iOS-app', value: signupValue('ios')),
+          AdminStatRow(label: 'Android-app', value: signupValue('android')),
+          AdminStatRow(label: 'Website', value: signupValue('web')),
+          AdminStatRow(
+            label: 'Onbekend',
+            value: signupValue('unknown'),
+            showRule: false,
+          ),
+          const SizedBox(height: 14),
+          Text('Actief in 30 dagen', style: AppTheme.bodyStrong),
+          const SizedBox(height: 6),
+          for (final p in ClientPlatform.values)
+            AdminStatRow(
+              label: p == ClientPlatform.web ? 'Website' : '${p.label}-app',
+              value: adminNumber(active?[p]),
+            ),
+          AdminStatRow(
+            label: 'Op meerdere platforms',
+            value: adminNumber(platforms.activeMulti),
+          ),
+          AdminStatRow(
+            label: 'Actieve accounts',
+            value: adminNumber(platforms.activeAny),
+            showRule: false,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '+ is nieuw in 30 dagen. Onbekend zijn accounts van voor deze meting.',
+            style: AppTheme.caption.copyWith(color: AppTheme.inkMuted),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
     );
   }
 }

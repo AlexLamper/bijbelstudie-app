@@ -330,6 +330,23 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                       value: adminDate(account.createdAt),
                     ),
                     AdminStatRow(
+                      label: 'Aangemaakt op',
+                      value: account.signupPlatform?.label ?? 'Onbekend',
+                    ),
+                    // One row per client the account has been used on, the
+                    // most recent first. None at all reads "nog niet gezien".
+                    if (account.platformsSeenAt.isEmpty)
+                      const AdminStatRow(
+                        label: 'Gebruikt op',
+                        value: 'Nog niet gezien',
+                      )
+                    else
+                      for (final seen in account.platformsByRecency)
+                        AdminStatRow(
+                          label: 'Laatst op ${seen.key.label}',
+                          value: adminRelative(seen.value),
+                        ),
+                    AdminStatRow(
                       label: 'Abonnementsstatus',
                       value: account.subscriptionStatus ?? '-',
                     ),

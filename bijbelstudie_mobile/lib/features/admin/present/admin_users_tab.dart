@@ -10,7 +10,7 @@ import 'admin_providers.dart';
 import 'admin_user_sheet.dart';
 
 /// Which slice of the account list is on screen.
-enum _AccountFilter { all, pro, admins, billing }
+enum _AccountFilter { all, pro, admins, billing, ios, android, web }
 
 /// The users tab - the website's `/admin/users` table as a searchable list.
 ///
@@ -43,6 +43,9 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
         _AccountFilter.pro => account.isPro,
         _AccountFilter.admins => account.isAdmin,
         _AccountFilter.billing => account.hasBillingIssue,
+        _AccountFilter.ios => account.usesPlatform(ClientPlatform.ios),
+        _AccountFilter.android => account.usesPlatform(ClientPlatform.android),
+        _AccountFilter.web => account.usesPlatform(ClientPlatform.web),
       };
       if (!matchesFilter) return false;
       if (needle.isEmpty) return true;
@@ -90,6 +93,9 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
                       _AccountFilter.pro: 'Pro',
                       _AccountFilter.admins: 'Beheerders',
                       _AccountFilter.billing: 'Betaalproblemen',
+                      _AccountFilter.ios: 'iOS',
+                      _AccountFilter.android: 'Android',
+                      _AccountFilter.web: 'Web',
                     }.entries) ...[
                       ChoiceChip(
                         label: Text(entry.value),
