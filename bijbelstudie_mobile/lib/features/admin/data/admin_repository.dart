@@ -116,6 +116,21 @@ class AdminRepository {
     }
   }
 
+  /// Gives Pro with no end date - "Pro voor altijd". On the server this is the
+  /// plain `subscribed: true` write, which also clears any running month grant
+  /// (lib/adminUsers.ts), so nothing ever expires it. Named on its own so the
+  /// sheet's intent is not hidden behind a generic toggle call.
+  Future<void> grantPermanentPro(String id) async {
+    try {
+      await _apiClient.dio.patch(
+        '/admin/users/$id',
+        data: {'subscribed': true},
+      );
+    } on DioException catch (e) {
+      throw _describe(e, 'cadeau', fallback: 'Pro voor altijd geven mislukt.');
+    }
+  }
+
   /// Permanently removes the account and its notes.
   Future<void> deleteUser(String id) async {
     try {

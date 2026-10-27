@@ -595,6 +595,12 @@ class AdminAccount {
   bool get canReceiveComp =>
       !storePremium && (subscriptionStatus == null || subscriptionStatus!.isEmpty);
 
+  /// Pro given by an admin with no end date ("Pro voor altijd"): `subscribed`
+  /// set by hand, no paying subscription behind it and no grant date that
+  /// the server's daily sweep would act on.
+  bool get hasPermanentComp =>
+      subscribed && canReceiveComp && compedProUntil == null;
+
   factory AdminAccount.fromJson(Map<String, dynamic> json) {
     final seenAt = json['platformsSeenAt'] as Map<String, dynamic>?;
     return AdminAccount(

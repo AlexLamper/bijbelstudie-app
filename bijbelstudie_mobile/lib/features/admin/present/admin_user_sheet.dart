@@ -203,6 +203,45 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
     );
   }
 
+  /// "Pro voor altijd": Pro with no end date. The server's plain
+  /// `subscribed: true` (lib/adminUsers.ts) does exactly that and also clears
+  /// a running month grant, so a gifted month can be turned into a permanent
+  /// one here. Confirmed first, like the month, because it hands a real person
+  /// paid access with nothing that ever takes it back by itself.
+  Future<void> _confirmForever() async {
+    final fromMonth = _account.compedProUntil != null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pro voor altijd geven?'),
+        content: Text(
+          '${_account.displayName} (${_account.email}) krijgt Pro zonder '
+          'einddatum${fromMonth ? '; het lopende cadeau wordt daarmee vervangen' : ''}. '
+          'Er wordt nooit iets afgeschreven. Het blijft aan tot je Pro-toegang '
+          'hier zelf uitzet.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuleren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Geven'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _run(
+      () => ref
+          .read(adminRepositoryProvider)
+          .grantPermanentPro(_account.id),
+      describe: 'Pro voor altijd gegeven',
+      next: _account.copyWith(subscribed: true, isComped: true),
+    );
+  }
+
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -301,6 +340,8 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                     SiteBadge.neutral(
                       'Cadeau tot ${adminDate(account.compedProUntil)}',
                     )
+                  else if (account.hasPermanentComp)
+                    SiteBadge.neutral('Pro voor altijd')
                   else if (account.isComped)
                     SiteBadge.neutral('Gratis toegekend'),
                   if (account.storePremium)
@@ -366,6 +407,11 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                       AdminStatRow(
                         label: 'Pro cadeau tot',
                         value: adminDate(account.compedProUntil),
+                      )
+                    else if (account.hasPermanentComp)
+                      const AdminStatRow(
+                        label: 'Pro cadeau tot',
+                        value: 'Voor altijd',
                       ),
                     AdminStatRow(
                       label: 'Stripe-klant',
@@ -456,13 +502,31 @@ class _AdminUserSheetState extends ConsumerState<_AdminUserSheet> {
                   style: AppTheme.caption,
                 ),
                 const SizedBox(height: 8),
-                SiteOutlineButton(
-                  label: account.compedProUntil == null
-                      ? '1 maand Pro cadeau'
-                      : '1 maand Pro opnieuw geven',
-                  icon: Icons.card_giftcard_outlined,
-                  onPressed: _busy ? null : _confirmGift,
-                ),
+                // A month on top of a permanent grant would put an end date
+                // on Pro that is meant to last, so it is not offered then.
+                if (!account.hasPermanentComp)
+                  SiteOutlineButton(
+                    label: account.compedProUntil == null
+                        ? '1 maand Pro cadeau'
+                        : '1 maand Pro opnieuw geven',
+                    icon: Icons.card_giftcard_outlined,
+                    onPressed: _busy ? null : _confirmGift,
+                  ),
+                if (!account.hasPermanentComp) ...[
+                  const SizedBox(height: 10),
+                  SiteOutlineButton(
+                    label: account.compedProUntil == null
+                        ? 'Pro voor altijd'
+                        : 'Maak Pro voor altijd',
+                    icon: Icons.all_inclusive,
+                    onPressed: _busy ? null : _confirmForever,
+                  ),
+                ] else
+                  Text(
+                    'Dit account heeft Pro voor altijd. Zet Pro-toegang '
+                    'hierboven uit om het in te trekken.',
+                    style: AppTheme.caption,
+                  ),
               ],
               const SizedBox(height: 14),
               SiteOutlineButton(
