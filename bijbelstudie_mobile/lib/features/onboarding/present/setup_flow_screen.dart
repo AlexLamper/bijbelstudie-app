@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
@@ -18,6 +19,8 @@ import '../../progress_tree/present/tree_view.dart';
 import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
+import '../../premium/data/paywall_goal.dart';
+import '../../premium/present/promo_moments.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/notification_prefs.dart';
@@ -90,6 +93,9 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
   /// app greets by, so it comes before any cosmetic choice.
   List<Widget> get _steps => [
     if (_showNameStep) const _NameStep(),
+    // First real question: it shapes the rest of the reader's first week -
+    // and the paywall at the end of onboarding, which names this goal back.
+    const _GoalStep(),
     const _TranslationStep(),
     const _ReadingPrefsStep(),
     const _ThemeStep(),
@@ -187,6 +193,11 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
         await ref.read(treeStateProvider.notifier).plant(ref.read(plantChoiceProvider));
       } catch (_) {}
     }
+
+    // The tour runs next; when it ends (finished or skipped) the Pro offer
+    // opens once, on Start, through ProPromoTrigger. Asked for here rather
+    // than in the tour so a replay from Profiel never triggers it.
+    ref.read(onboardingPaywallProvider.notifier).arm();
 
     if (mounted) context.go('/tour');
   }
@@ -347,6 +358,52 @@ class _NameStepState extends ConsumerState<_NameStep> {
 /// The list is grouped by language ([VersionCatalog]): Dutch first, then a
 /// rule and a heading before the English ones, so it is obvious at a glance
 /// where the Dutch translations stop.
+/// "Wat wil je uit bijbelstudie halen?" - the same five goals as the Pro
+/// pitch ([StudyGoal]), asked once at the start so the app (and the paywall at
+/// the end of onboarding) can answer it rather than pitch generically.
+/// Optional like every step here: "Volgende" without a choice is fine.
+class _GoalStep extends ConsumerWidget {
+  const _GoalStep();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(studyGoalProvider);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('Jouw doel'),
+          const SizedBox(height: 16),
+          Text('Wat wil je uit bijbelstudie halen?', style: AppTheme.displayLarge),
+          const SizedBox(height: 12),
+          Text(
+            'Dan stemmen we BijbelStudie daarop af. Je kunt dit altijd aanpassen.',
+            style: AppTheme.bodyLead,
+          ),
+          const SizedBox(height: 28),
+          for (final goal in StudyGoal.values) ...[
+            _SelectableRow(
+              title: goal.label,
+              subtitle: '',
+              leading: goal.icon,
+              selected: goal == selected,
+              onTap: () {
+                ref.read(studyGoalProvider.notifier).select(goal);
+                ref.read(analyticsProvider).track(
+                  AnalyticsEvents.onboardingGoalSelected,
+                  {'goal': goal.id},
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _TranslationStep extends ConsumerWidget {
   const _TranslationStep();
 
@@ -856,12 +913,14 @@ class _SelectableRow extends StatelessWidget {
     required this.subtitle,
     required this.selected,
     required this.onTap,
+    this.leading,
   });
 
   final String title;
   final String subtitle;
   final bool selected;
   final VoidCallback onTap;
+  final IconData? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -875,6 +934,10 @@ class _SelectableRow extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
+            if (leading != null) ...[
+              Icon(leading, size: 20, color: selected ? AppTheme.teal : AppTheme.inkMuted),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

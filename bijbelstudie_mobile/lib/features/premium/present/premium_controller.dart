@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+
+import '../domain/trial_offer.dart';
+import '../data/trial_reminder.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/config/revenuecat_config.dart';
 import '../../bible/present/bible_providers.dart';
@@ -37,6 +40,7 @@ class PremiumState {
     this.monthlyProduct,
     this.yearlyProduct,
     this.priceDiagnostics,
+    this.yearlyTrial,
   });
 
   final PurchaseStatus status;
@@ -65,6 +69,12 @@ class PremiumState {
   /// attached to a TestFlight build.
   final String? priceDiagnostics;
 
+  /// The free trial the annual plan will start with for *this* reader, or null:
+  /// no trial configured in the store, or the account already used it. The
+  /// paywall only says "gratis" when this is set. Monthly never has one - the
+  /// trial is what makes annual the obvious default.
+  final TrialOffer? yearlyTrial;
+
   bool get isPro =>
       customerInfo?.entitlements.active.containsKey(kRcProEntitlement) ??
       false;
@@ -85,6 +95,7 @@ class PremiumState {
       monthlyProduct: monthlyProduct,
       yearlyProduct: yearlyProduct,
       priceDiagnostics: priceDiagnostics,
+      yearlyTrial: yearlyTrial,
     );
   }
 
@@ -99,6 +110,7 @@ class PremiumState {
     StoreProduct? yearlyProduct,
     CustomerInfo? customerInfo,
     String? priceDiagnostics,
+    TrialOffer? yearlyTrial,
   }) {
     return PremiumState(
       status: status,
@@ -110,6 +122,7 @@ class PremiumState {
       monthlyProduct: monthlyProduct,
       yearlyProduct: yearlyProduct,
       priceDiagnostics: priceDiagnostics,
+      yearlyTrial: yearlyTrial,
     );
   }
 }
@@ -286,6 +299,8 @@ class PremiumController extends Notifier<PremiumState> {
       rawError: rawError,
     );
 
+    final yearlyTrial = yearly == null ? null : await _svc.trialFor(yearly, info);
+
     if (!ref.mounted) return;
     state = state.withPrices(
       priceStatus: ready ? PriceStatus.ready : PriceStatus.unavailable,
@@ -301,6 +316,7 @@ class PremiumController extends Notifier<PremiumState> {
       yearlyProduct: yearly,
       customerInfo: info,
       priceDiagnostics: diagnostics,
+      yearlyTrial: yearlyTrial,
     );
     _log(
       'Prices: monthly=${monthly?.priceString ?? '(none)'} '
@@ -401,7 +417,10 @@ class PremiumController extends Notifier<PremiumState> {
     _log('Purchase requested for product="$productId"');
     final interval = _intervalOf(productId);
     final analytics = ref.read(analyticsProvider);
-    analytics.track(AnalyticsEvents.checkoutStarted, {'interval': interval});
+    // Only the annual plan carries the trial; see PremiumState.yearlyTrial.
+    final trial = productId == kRcYearlyProductId ? state.yearlyTrial : null;
+    final trialFlag = trial != null ? 'yes' : 'no';
+    analytics.track(AnalyticsEvents.checkoutStarted, {'interval': interval, 'trial': trialFlag});
     final package = productId == kRcMonthlyProductId
         ? _svc.findMonthlyPackage(state.packages)
         : _svc.findYearlyPackage(state.packages);
@@ -417,7 +436,14 @@ class PremiumController extends Notifier<PremiumState> {
       _log(
         'Purchase success. Active entitlements: ${info.entitlements.active.keys.join(', ')}',
       );
-      analytics.track(AnalyticsEvents.checkoutCompleted, {'interval': interval});
+      analytics.track(AnalyticsEvents.checkoutCompleted, {'interval': interval, 'trial': trialFlag});
+      if (trial != null) {
+        analytics.track(AnalyticsEvents.trialStarted, {'interval': interval});
+        // A reminder before the first charge is part of the trial's promise
+        // on the paywall ("Dag 5: we sturen je een herinnering"). Best-effort:
+        // a refused notification permission must not touch the purchase.
+        unawaited(ref.read(trialReminderProvider).schedule(trial).catchError((_) {}));
+      }
       final serverPro = await _syncServerPremium();
       _settleAfterStoreSuccess(info, serverPro);
     } on PlatformException catch (e) {

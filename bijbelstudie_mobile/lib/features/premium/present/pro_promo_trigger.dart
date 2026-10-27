@@ -8,10 +8,13 @@ import '../../../core/config/preview_config.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
+import '../../../core/analytics/analytics.dart';
+import '../data/paywall_goal.dart';
 import '../data/pro_promo_schedule.dart';
 import 'paywall_route.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
+import 'promo_moments.dart';
 
 /// True only when it is *known* that a signed-in reader does not have Pro:
 /// the server profile has loaded and the store has answered. Anything still
@@ -64,6 +67,17 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     if (ProPromoRules.enabled && !PreviewConfig.enabled) {
       _sessionRecorded ??= ProPromoSchedule.recordSession();
     }
+    // A gifted Pro week that just ended asks for its own offer.
+    ref.listenManual(profileProvider, (previous, next) {
+      final profile = next.value;
+      if (profile == null) return;
+      unawaited(trackGiftEnd(
+        ref.read(promoMomentProvider.notifier),
+        isPro: profile.isPro,
+        proSource: profile.proSource,
+        proExpiresAt: profile.proExpiresAt,
+      ));
+    }, fireImmediately: true);
   }
 
   @override
@@ -81,7 +95,14 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
   }
 
   void _sync(bool eligible) {
-    final armed = eligible && !_doneThisProcess && _path() == ProPromoRules.triggerRoute;
+    // A pending moment re-arms the trigger even after this process's session
+    // promo: a streak or the end of onboarding is a new reason to ask.
+    final pending = ref.read(promoMomentProvider) != null;
+    final touring = ref.read(tourControllerProvider).active;
+    final armed = eligible &&
+        !touring &&
+        (pending || !_doneThisProcess) &&
+        _path() == ProPromoRules.triggerRoute;
     if (!armed) {
       _timer?.cancel();
       _timer = null;
@@ -92,7 +113,12 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
 
   Future<void> _fire() async {
     _timer = null;
-    if (!mounted || _doneThisProcess) return;
+    if (!mounted) return;
+    if (ref.read(promoMomentProvider) != null) {
+      await _fireMoment();
+      return;
+    }
+    if (_doneThisProcess) return;
     await _sessionRecorded;
     if (!mounted || _doneThisProcess) return;
     if (!await ProPromoSchedule.isDue()) {
@@ -110,6 +136,7 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
 
     _doneThisProcess = true;
     unawaited(ProPromoSchedule.markShown());
+    ref.read(analyticsProvider).track(AnalyticsEvents.promoShown, {'trigger': 'session'});
     // The pre-sell itself is the interstitial now, in place of the static
     // `ProPromoScreen` (still in the tree, no longer reachable) that used to
     // sit here and then hand off to the price.
@@ -126,9 +153,46 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     openPaywall(context, source: ProPromoRules.paywallSource);
   }
 
+  /// Opens the pitch for the pending [PromoMoment], if the rules allow it now.
+  Future<void> _fireMoment() async {
+    final moment = ref.read(promoMomentProvider);
+    if (moment == null) return;
+    if (!moment.bypassesWindow && !await ProPromoSchedule.isWindowOpen()) {
+      // Too soon after the last offer: the moment is dropped, not queued.
+      // Queuing would just move the interruption to a worse time.
+      ref.read(promoMomentProvider.notifier).consume();
+      return;
+    }
+    if (!mounted) return;
+    if (_path() != ProPromoRules.triggerRoute) return;
+    if (ref.read(tourControllerProvider).active) return;
+    if (!ref.read(proPromoEligibleProvider)) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+
+    ref.read(promoMomentProvider.notifier).consume();
+    // The session promo would be a second offer in the same visit.
+    _doneThisProcess = true;
+    unawaited(ProPromoSchedule.markShown());
+    ref.read(analyticsProvider).track(AnalyticsEvents.promoShown, {'trigger': moment.trigger});
+
+    // The end of onboarding opens on the demo: the goal was the wizard's first
+    // question, a minute ago. Without a stored answer the pitch asks it.
+    final goal = await ref.read(storedStudyGoalProvider.future).catchError((_) => null);
+    if (!mounted) return;
+    if (moment == PromoMoment.onboarding && goal != null) {
+      GoRouter.of(context).push('/pro-intro?source=${moment.source}&skipGoal=1');
+      return;
+    }
+    openPaywall(context, source: moment.source);
+  }
+
   @override
   Widget build(BuildContext context) {
     final eligible = ref.watch(proPromoEligibleProvider);
+    // Both re-arm the timer: a moment being requested, and the tour ending
+    // (the onboarding offer waits for it).
+    ref.watch(promoMomentProvider);
+    ref.watch(tourControllerProvider.select((tour) => tour.active));
     // Route and eligibility both arrive through rebuilds (the shell rebuilds
     // on every navigation); the timer is (re)armed or cancelled after layout.
     WidgetsBinding.instance.addPostFrameCallback((_) {

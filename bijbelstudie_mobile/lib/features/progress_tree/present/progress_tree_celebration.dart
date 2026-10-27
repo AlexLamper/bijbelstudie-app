@@ -4,6 +4,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../premium/present/pro_access_provider.dart';
+import '../../premium/present/promo_moments.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/analytics/analytics.dart';
@@ -51,6 +54,9 @@ Future<void> showProgressTreeCelebration(
     'phase': phaseForStep(copy.step).id,
     'floored': floor != null ? 'true' : 'false',
   });
+  if (!ref.read(hasProProvider)) {
+    ref.read(promoMomentProvider.notifier).request(PromoMoment.treeLevel);
+  }
 
   if (!reducedMotion) {
     // Gentle, once. `mediumImpact` is the heaviest thing this app does, and it

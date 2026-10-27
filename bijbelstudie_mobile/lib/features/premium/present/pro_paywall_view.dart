@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../domain/paywall_copy.dart';
 import '../domain/store_copy.dart';
+import '../domain/trial_offer.dart';
 
 /// The Pro paywall, design 35c.
 ///
@@ -35,7 +37,25 @@ class ProPaywallView extends StatelessWidget {
     this.busy = false,
     this.gateReason,
     this.priceNotice,
+    this.headline = PaywallCopy.defaultHeadline,
+    this.benefits = defaultBenefits,
+    this.trial,
   });
+
+  /// The heading, personalised by the gate or the reader's goal (see
+  /// [PaywallCopy.headline]).
+  final String headline;
+
+  /// The benefit lines, with the one this reader came for first.
+  final List<String> benefits;
+
+  /// The free trial the annual plan starts with for this reader, or null. Only
+  /// set from what the store returned (`PremiumState.yearlyTrial`), so the
+  /// word "gratis" never appears on a paywall that will charge today.
+  final TrialOffer? trial;
+
+  /// A trial is on offer *and* it is the plan selected. Monthly has none.
+  bool get _trialSelected => trial != null && yearlySelected;
 
   /// The billed amounts, localized by the store ("€ 99,99").
   final String yearlyPrice;
@@ -72,12 +92,12 @@ class ProPaywallView extends StatelessWidget {
   /// Shown above the plans when the store had no prices to give.
   final Widget? priceNotice;
 
-  /// The four lines of the design, in its order.
-  static const List<String> benefits = [
-    'Offline lezen, zonder verbinding',
+  /// The lines for a reader nothing is known about.
+  static const List<String> defaultBenefits = [
     'Alle commentaren: Matthew Henry en Dachsel',
+    '200 AI-vragen per dag in plaats van 3',
     'Grondtekst in Hebreeuws en Grieks',
-    '200 AI-vragen per dag',
+    'Onbeperkt notities bij elk vers',
   ];
 
   /// The spacing the design uses between the blocks of the content area.
@@ -104,7 +124,7 @@ class ProPaywallView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Verdiep je studie met Pro',
+                            headline,
                             style: AppTheme.displaySmall.copyWith(
                               fontSize: 26,
                               height: 1.2,
@@ -130,7 +150,17 @@ class ProPaywallView extends StatelessWidget {
                           const SizedBox(height: _block + 14),
                           ProPlanCard(
                             title: 'Jaarlijks',
-                            perWeek: yearlyPerWeek,
+                            // The trial is named on the card it belongs to,
+                            // as a subordinate line: the billed amount stays
+                            // the most prominent figure (3.1.2(c)) and the
+                            // trial is never the loudest thing on the page
+                            // (Play's subscription policy).
+                            perWeek: trial != null
+                                ? [
+                                    '${trial!.label} gratis',
+                                    if (yearlyPerWeek != null) 'daarna $yearlyPerWeek',
+                                  ].join(', ')
+                                : yearlyPerWeek,
                             price: yearlyPrice,
                             period: 'per jaar',
                             selected: yearlySelected,
@@ -146,6 +176,10 @@ class ProPaywallView extends StatelessWidget {
                             selected: !yearlySelected,
                             onTap: onSelectMonthly,
                           ),
+                          if (_trialSelected) ...[
+                            const SizedBox(height: _block + 4),
+                            TrialTimeline(trial: trial!, yearlyPrice: yearlyPrice),
+                          ],
                           const SizedBox(height: 4),
                         ],
                       ),
@@ -156,6 +190,15 @@ class ProPaywallView extends StatelessWidget {
             ),
             _BottomBlock(
               busy: busy,
+              ctaLabel: _trialSelected ? 'Probeer ${trial!.label} gratis' : 'Word Pro',
+              // Directly under the button, legible, so the price after the
+              // trial is never further from the tap than the word "gratis".
+              ctaNote: _trialSelected
+                  ? 'Daarna $yearlyPrice per jaar. Op elk moment op te zeggen.'
+                  : null,
+              renewalNotice: _trialSelected
+                  ? StoreCopy.trialRenewalNotice(trial!.days, yearlyPrice)
+                  : StoreCopy.renewalNotice,
               onContinue: onContinue,
               onTerms: onTerms,
               onPrivacy: onPrivacy,
@@ -542,6 +585,9 @@ class _SaveBadge extends StatelessWidget {
 class _BottomBlock extends StatelessWidget {
   const _BottomBlock({
     required this.busy,
+    required this.ctaLabel,
+    required this.renewalNotice,
+    this.ctaNote,
     required this.onContinue,
     required this.onTerms,
     required this.onPrivacy,
@@ -549,6 +595,9 @@ class _BottomBlock extends StatelessWidget {
   });
 
   final bool busy;
+  final String ctaLabel;
+  final String? ctaNote;
+  final String renewalNotice;
   final VoidCallback? onContinue;
   final VoidCallback onTerms;
   final VoidCallback onPrivacy;
@@ -582,7 +631,7 @@ class _BottomBlock extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        'Doorgaan',
+                        ctaLabel,
                         style: AppTheme.displayTitle.copyWith(
                           fontSize: 16,
                           color: Colors.white,
@@ -590,9 +639,21 @@ class _BottomBlock extends StatelessWidget {
                       ),
               ),
             ),
+            if (ctaNote case final note?) ...[
+              const SizedBox(height: 8),
+              Text(
+                note,
+                textAlign: TextAlign.center,
+                style: AppTheme.bodyStrong.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.ink,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Text(
-              StoreCopy.renewalNotice,
+              renewalNotice,
               textAlign: TextAlign.center,
               style: AppTheme.caption.copyWith(
                 fontSize: 11,
@@ -643,6 +704,108 @@ class _FooterLink extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// What happens when, for the free trial: today, the reminder, the first
+/// charge. Shown instead of a trial toggle (rejected under 3.1.2 since January
+/// 2026) and because a visible charge date is both the most persuasive and the
+/// most honest thing a trial paywall can say.
+class TrialTimeline extends StatelessWidget {
+  const TrialTimeline({super.key, required this.trial, required this.yearlyPrice});
+
+  final TrialOffer trial;
+  final String yearlyPrice;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final steps = <(IconData, String, String)>[
+      (Icons.lock_open_rounded, 'Vandaag', 'Alles van Pro staat open. Je betaalt nu niets.'),
+      (Icons.notifications_none_rounded, 'Dag ${trial.reminderDay}', 'We sturen je een herinnering dat je proefperiode bijna afloopt.'),
+      (Icons.event_available_outlined, 'Dag ${trial.days}', 'Je jaarabonnement van $yearlyPrice gaat in. Eerder opzeggen kan altijd.'),
+    ];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+      decoration: BoxDecoration(
+        color: AppTheme.teal.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.teal.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Zo werkt je gratis proefperiode',
+            style: AppTheme.displayTitle.copyWith(fontSize: 14.5, height: 1.2),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < steps.length; i++)
+            _TimelineRow(
+              icon: steps[i].$1,
+              title: steps[i].$2,
+              body: steps[i].$3,
+              last: i == steps.length - 1,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.last,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(color: AppTheme.teal, shape: BoxShape.circle),
+                child: Icon(icon, size: 15, color: Colors.white),
+              ),
+              if (!last)
+                Expanded(
+                  child: Container(width: 2, color: AppTheme.teal.withValues(alpha: 0.25)),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12, top: 3),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTheme.bodyStrong.copyWith(fontSize: 13.5, color: AppTheme.ink)),
+                  const SizedBox(height: 2),
+                  Text(
+                    body,
+                    style: AppTheme.caption.copyWith(fontSize: 12.5, height: 1.4, color: AppTheme.inkMuted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

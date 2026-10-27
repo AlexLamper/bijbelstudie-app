@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../premium/present/pro_access_provider.dart';
+import '../../premium/present/promo_moments.dart';
+
 import '../../../core/analytics/analytics.dart';
 import '../data/ai_repository.dart';
 
@@ -336,6 +339,11 @@ class AiConversationStore extends Notifier<AiAssistantState> {
             : 'De AI-assistent is momenteel niet beschikbaar.',
         blockedIsAuth: false,
       );
+      // The last free question of the day was just used: the offer appears
+      // next time Start is on screen, before the next question is refused.
+      if (!quota.unlimited && quota.cap > 0 && quota.remaining == 0 && !ref.read(hasProProvider)) {
+        ref.read(promoMomentProvider.notifier).request(PromoMoment.aiLastQuestion);
+      }
     } on AiAuthRequired catch (e) {
       state = AiAssistantState(
         conversations: state.conversations,

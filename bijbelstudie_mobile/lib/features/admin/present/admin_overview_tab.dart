@@ -93,7 +93,10 @@ class _Overview extends ConsumerWidget {
               child: AdminMetricTile(
                 label: 'Betalende abonnees',
                 value: adminNumber(users.paying),
-                delta: '${adminPercent(users.premiumPercent)} conversie',
+                // The all-time ratio, labelled as such: it is everyone
+                // paying today over every account ever made. The cohort card
+                // below has the conversion to steer on.
+                delta: '${adminPercent(users.premiumPercent)} van alle accounts',
                 icon: Icons.verified_outlined,
                 tint: AppTheme.flame,
               ),
@@ -124,6 +127,15 @@ class _Overview extends ConsumerWidget {
             ),
           ],
         ),
+
+        const SizedBox(height: 20),
+        const SectionHeader(
+          title: 'Conversie nieuwe accounts',
+          description: 'Per aanmeldweek · doel: 7 % betaalt binnen 35 dagen',
+          icon: Icons.track_changes_outlined,
+        ),
+        const SizedBox(height: 12),
+        _CohortCard(cohorts: stats.cohorts),
 
         const SizedBox(height: 20),
         const SectionHeader(
@@ -548,6 +560,75 @@ class _DegradedBanner extends StatelessWidget {
             'Deze cijfers staan op een streepje: ${labels.join(', ')}.',
             style: AppTheme.bodyMuted,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Signup-week cohorts: the four headline rates, then the last eight weeks.
+/// Grey D35 figures belong to weeks that are still too young to be final.
+class _CohortCard extends StatelessWidget {
+  const _CohortCard({required this.cohorts});
+
+  final AdminCohortStats cohorts;
+
+  @override
+  Widget build(BuildContext context) {
+    final weeks = cohorts.weeks.reversed.take(8).toList();
+    String pct(double? v) => adminPercent(v == null ? null : (v * 10).round() / 10);
+    return AppCard(
+      radius: AppTheme.radiusMd,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AdminStatRow(label: 'Betaald binnen 35 dagen', value: pct(cohorts.recentD35Percent)),
+          AdminStatRow(label: 'Betaald binnen 7 dagen', value: pct(cohorts.recentD7Percent)),
+          AdminStatRow(label: 'Proefperiode gestart (7 d)', value: pct(cohorts.recentTrialD7Percent)),
+          AdminStatRow(
+            label: 'Omzet per aanmelding (60 d, schatting)',
+            value: adminEuro(cohorts.recentRevenuePerSignupD60Eur),
+            showRule: weeks.isNotEmpty,
+          ),
+          if (weeks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('Nog geen cohortgegevens.', style: AppTheme.bodyMuted),
+            )
+          else ...[
+            const SizedBox(height: 10),
+            for (final week in weeks)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        week.weekStart == null ? '-' : adminDate(week.weekStart),
+                        style: AppTheme.bodyMuted.copyWith(fontSize: 12.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text('${week.signups}', style: AppTheme.bodyMuted.copyWith(fontSize: 12.5)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pct(week.percent(week.paidD35)),
+                        textAlign: TextAlign.right,
+                        style: AppTheme.bodyStrong.copyWith(
+                          fontSize: 12.5,
+                          color: week.matureD35 ? null : AppTheme.inkMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

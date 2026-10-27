@@ -498,7 +498,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               ).toString()
             : null,
         builder: (context, state) =>
-            PaywallFunnelScreen(source: state.uri.queryParameters['source']),
+            PaywallFunnelScreen(
+              source: state.uri.queryParameters['source'],
+              // `?skipGoal=1`: the goal was already asked (the setup wizard),
+              // so the pitch opens on the demo rather than asking it again.
+              skipGoal: state.uri.queryParameters['skipGoal'] == '1',
+            ),
       ),
       GoRoute(
         path: '/premium',
