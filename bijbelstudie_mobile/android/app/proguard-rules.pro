@@ -22,3 +22,12 @@
 }
 -keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
 -keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+
+# Google Sign-In (google_sign_in_android -> androidx.credentials). Credential
+# Manager finds its Play Services provider by reflection, which R8 cannot see,
+# so a minified release build can lose it and fail where a debug build works.
+# Rule from developer.android.com/identity/sign-in/credential-manager.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *;
+}

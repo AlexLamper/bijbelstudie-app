@@ -306,7 +306,24 @@ class AuthController extends AsyncNotifier<User?> {
       await _completeGoogleSignIn(account);
     } on google_auth.GoogleSignInException catch (e, st) {
       if (e.code == google_auth.GoogleSignInExceptionCode.canceled) {
-        return; // User dismissed the Google dialog: not an error.
+        // On iOS and web, canceled really means the reader closed the dialog.
+        // On Android it does not: Credential Manager also reports a rejected
+        // app signature (the Play app signing SHA-1 missing from the Android
+        // OAuth client) or an unpublished consent screen as "canceled", right
+        // after the reader picked an account (see the google_sign_in_android
+        // README, Troubleshooting). Returning silently there made the button
+        // look dead on every Play install, so Android always says something,
+        // worded so it is also true for a genuine cancel.
+        if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+        debugPrint('Google sign-in canceled on Android: ${e.description}');
+        state = AsyncValue.error(
+          Exception(
+            'Inloggen met Google is niet afgerond. Probeer het opnieuw, of '
+            'log in met je e-mailadres en wachtwoord.',
+          ),
+          st,
+        );
+        return;
       }
       if (e.code == google_auth.GoogleSignInExceptionCode.interrupted &&
           await _retryGoogleAfterInterrupt()) {
