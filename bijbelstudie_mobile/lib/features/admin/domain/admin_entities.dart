@@ -250,7 +250,12 @@ class AdminStats {
     required this.content,
     this.platforms = const AdminPlatformStats(),
     this.degraded = const [],
+    this.cohorts = const AdminCohortStats(),
   });
+
+  /// Signup-week conversion (`lib/adminCohorts.ts`, website). Empty on an
+  /// older server.
+  final AdminCohortStats cohorts;
 
   final AdminUserStats users;
   final AdminBillingStats billing;
@@ -270,6 +275,7 @@ class AdminStats {
       revenue: AdminRevenueStats.fromJson(block('revenue')),
       content: AdminContentStats.fromJson(block('content')),
       platforms: AdminPlatformStats.fromJson(block('platforms')),
+      cohorts: AdminCohortStats.fromJson(block('cohorts')),
       degraded: ((json['degraded'] as List<dynamic>?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),
@@ -678,4 +684,69 @@ class AdminAccount {
       platformsSeenAt: platformsSeenAt,
     );
   }
+}
+
+/// One signup week of [AdminCohortStats].
+class AdminCohortWeek {
+  const AdminCohortWeek({
+    required this.weekStart,
+    required this.signups,
+    required this.trialsD7,
+    required this.paidD7,
+    required this.paidD35,
+    required this.matureD35,
+    required this.revenuePerSignupD60Eur,
+  });
+
+  final DateTime? weekStart;
+  final int signups;
+  final int trialsD7;
+  final int paidD7;
+  final int paidD35;
+
+  /// False while the cohort is under 35 days old and [paidD35] still rising.
+  final bool matureD35;
+  final double revenuePerSignupD60Eur;
+
+  double? percent(int n) => signups == 0 ? null : (n / signups) * 100;
+
+  factory AdminCohortWeek.fromJson(Map<String, dynamic> json) => AdminCohortWeek(
+        weekStart: DateTime.tryParse(json['weekStart'] as String? ?? ''),
+        signups: _int(json['signups']) ?? 0,
+        trialsD7: _int(json['trialsD7']) ?? 0,
+        paidD7: _int(json['paidD7']) ?? 0,
+        paidD35: _int(json['paidD35']) ?? 0,
+        matureD35: json['matureD35'] == true,
+        revenuePerSignupD60Eur: _double(json['revenuePerSignupD60Eur']) ?? 0,
+      );
+}
+
+/// Signup-to-paid by signup week. [recentD35Percent] is the conversion figure
+/// to steer on: the all-time `premiumPercent` barely moves when new users
+/// convert better.
+class AdminCohortStats {
+  const AdminCohortStats({
+    this.weeks = const [],
+    this.recentD35Percent,
+    this.recentD7Percent,
+    this.recentTrialD7Percent,
+    this.recentRevenuePerSignupD60Eur,
+  });
+
+  final List<AdminCohortWeek> weeks;
+  final double? recentD35Percent;
+  final double? recentD7Percent;
+  final double? recentTrialD7Percent;
+  final double? recentRevenuePerSignupD60Eur;
+
+  factory AdminCohortStats.fromJson(Map<String, dynamic> json) => AdminCohortStats(
+        weeks: ((json['weeks'] as List<dynamic>?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(AdminCohortWeek.fromJson)
+            .toList(growable: false),
+        recentD35Percent: _double(json['recentD35Percent']),
+        recentD7Percent: _double(json['recentD7Percent']),
+        recentTrialD7Percent: _double(json['recentTrialD7Percent']),
+        recentRevenuePerSignupD60Eur: _double(json['recentRevenuePerSignupD60Eur']),
+      );
 }

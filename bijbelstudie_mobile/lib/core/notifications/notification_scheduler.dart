@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../features/premium/present/pro_access_provider.dart';
+import '../../features/premium/present/promo_moments.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -1159,6 +1162,12 @@ class NotificationScheduler {
         ref
             .read(reviewPromptProvider.notifier)
             .recordSuccess(ReviewSignal.streakMilestone),
+      );      // ...and the moment a reader who is clearly sticking with it is most
+      // open to what Pro adds (3, 7 and 30 days; see kPromoStreakMilestones).
+      requestStreakMomentFor(
+        id,
+        isPro: ref.read(hasProProvider),
+        moments: ref.read(promoMomentProvider.notifier),
       );
     }
 

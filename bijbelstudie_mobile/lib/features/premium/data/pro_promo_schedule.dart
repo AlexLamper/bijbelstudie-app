@@ -33,6 +33,7 @@ class ProPromoRules {
 
 const _kLastShownAt = 'proPromo.lastShownAt';
 const _kSessions = 'proPromo.sessions';
+const _kShownCount = 'proPromo.shownCount';
 
 /// The persisted half of the show logic: session count and last-shown time.
 class ProPromoSchedule {
@@ -54,12 +55,33 @@ class ProPromoSchedule {
       final prefs = await SharedPreferences.getInstance();
       final sessions = prefs.getInt(_kSessions) ?? 0;
       if (sessions < ProPromoRules.minSessions) return false;
+      return await isWindowOpen(now: now);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The window between offers, widening as offers go unanswered: 24h for
+  /// the first three, then three days, then a week. A reader who has said no
+  /// six times is not persuaded by a seventh daily interruption, and the
+  /// review prompt and the reading streak deserve the space more.
+  static Duration intervalAfter(int shown) {
+    if (shown >= 6) return const Duration(days: 7);
+    if (shown >= 3) return const Duration(days: 3);
+    return ProPromoRules.minInterval;
+  }
+
+  /// Only the time window, not the session count - for the value moments
+  /// (`PromoMoment`), which may come in the very first session.
+  static Future<bool> isWindowOpen({DateTime? now}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
       final last = prefs.getInt(_kLastShownAt);
       if (last == null) return true;
       final at = now ?? DateTime.now();
       final elapsed = at.difference(DateTime.fromMillisecondsSinceEpoch(last));
       // A clock set backwards reads as negative; treat it as "just shown".
-      return elapsed >= ProPromoRules.minInterval;
+      return elapsed >= intervalAfter(prefs.getInt(_kShownCount) ?? 0);
     } catch (_) {
       return false;
     }
@@ -69,6 +91,7 @@ class ProPromoSchedule {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_kLastShownAt, (now ?? DateTime.now()).millisecondsSinceEpoch);
+      await prefs.setInt(_kShownCount, (prefs.getInt(_kShownCount) ?? 0) + 1);
     } catch (_) {}
   }
 }

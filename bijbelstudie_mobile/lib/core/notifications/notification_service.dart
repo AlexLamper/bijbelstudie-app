@@ -264,6 +264,13 @@ const String kActionOpen = 'OPEN';
 /// finished study day still clear it.
 const int kSnoozeNotificationId = 1400;
 
+/// The free-trial reminder ("je proefperiode eindigt over 2 dagen"). Outside
+/// every [NotifType] range on purpose: the scheduler's recompute cancels those
+/// ranges, and this one-shot is a promise made on the paywall that must survive
+/// every recompute until it fires. It is not an engagement nudge, so it has no
+/// "Later vandaag" and does not count towards the daily cap.
+const int kTrialReminderNotificationId = 1410;
+
 /// What a notification carries to its tap handler.
 ///
 /// Written as JSON so "Later vandaag" can re-post the same words from a
@@ -322,6 +329,9 @@ final _allowedRoutes = <RegExp>[
   RegExp(r'^/read$'),
   RegExp(r'^/studies/bijbel-in-een-jaar$'),
   RegExp(r'^/profile/boom$'),
+  // The trial reminder: a subscriber sees their status and "Abonnement
+  // beheren" here, never prices.
+  RegExp(r'^/premium$'),
   // A lesson, optionally on a step (the keys are frozen, see StudyStep).
   RegExp(r'^/studie/[A-Za-z0-9%._~-]+/\d+(\?stap=(intro|context|word|depth|quiz|reflection))?$'),
   // Vriendenkring: the feed, one of its tabs, one post's thread, and one
@@ -858,6 +868,29 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       payload: _payload(type, variant, deepLink),
+    );
+  }
+
+  /// Schedules the free-trial reminder at [when]. See
+  /// [kTrialReminderNotificationId] for why it lives outside the typed ranges.
+  Future<void> scheduleTrialReminder(
+    DateTime when, {
+    required String title,
+    required String body,
+  }) async {
+    await initialise();
+    if (kIsWeb) return;
+    await _plugin.zonedSchedule(
+      kTrialReminderNotificationId,
+      title,
+      body,
+      tz.TZDateTime.from(when, tz.local),
+      detailsFor(NotifType.milestone, withActions: false),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: NotificationPayload(route: '/premium', title: title, body: body, typeId: 'trialReminder')
+          .encode(),
     );
   }
 

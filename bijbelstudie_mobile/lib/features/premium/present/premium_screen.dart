@@ -10,6 +10,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../profile/present/profile_provider.dart';
+import '../data/paywall_goal.dart';
+import '../domain/paywall_copy.dart';
 import '../domain/price_framing.dart';
 import '../domain/pro_benefits.dart';
 import 'paywall_route.dart';
@@ -153,7 +155,11 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         : yearlyProduct == null;
 
     if (!showActive) {
+      final goal = ref.watch(storedStudyGoalProvider).value;
       return ProPaywallView(
+        headline: PaywallCopy.headline(gateId: widget.gate?.id, goal: goal, source: widget.source),
+        benefits: PaywallCopy.benefits(gateBenefit: widget.gate?.benefit, goal: goal),
+        trial: premiumState.yearlyTrial,
         yearlyPrice: yearlyPrice,
         monthlyPrice: monthlyPrice,
         yearlyPerWeek: yearlyProduct != null
@@ -231,6 +237,13 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   /// The paywall is a modal: its close button pops back to whatever opened it,
   /// and falls back to Start when it was opened as the first route.
   void _close() {
+    // The other half of `pricing_viewed`: without it the dismiss rate per
+    // entry point - the number an onboarding paywall is judged on - was
+    // unknowable.
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallDismissed, {
+      'source': widget.source ?? 'direct',
+      'trial': ref.read(premiumControllerProvider).yearlyTrial != null ? 'yes' : 'no',
+    });
     if (context.canPop()) {
       context.pop();
     } else {

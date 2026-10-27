@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+
+import '../../premium/present/promo_moments.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -186,6 +189,9 @@ Future<void> showAddNoteDialog({
     );
     container.invalidate(notesListProvider);
     await HapticFeedback.lightImpact();
+    // Two notes left of the free ten: the moment to mention unlimited notes,
+    // before the limit refuses one rather than after.
+    unawaited(requestNoteMomentIfNear(container));
   } on SyncRejectedException catch (e) {
     // Shared with the offline-queue flush, which refuses the same note for the
     // same reason - just later, and with nobody awaiting it.

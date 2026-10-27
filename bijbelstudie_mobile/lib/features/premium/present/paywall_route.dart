@@ -28,19 +28,19 @@ enum PaywallGate {
   ),
   commentary(
     id: 'commentary',
-    source: 'app_study',
+    source: 'app_commentary',
     reason: 'Dit commentaar hoort bij Pro.',
     benefit: 'Alle commentaren',
   ),
   originalText(
     id: 'grondtekst',
-    source: 'app_study',
+    source: 'app_grondtekst',
     reason: 'De grondtekst hoort bij Pro.',
     benefit: 'Grondtekst',
   ),
   offline(
     id: 'offline',
-    source: 'app_study',
+    source: 'app_offline',
     reason: 'Offline lezen hoort bij Pro.',
     benefit: 'Offline lezen',
   ),
@@ -73,11 +73,12 @@ enum PaywallGate {
     reason: 'Je hebt je gratis notities gebruikt.',
     benefit: 'Onbeperkt notities',
   ),
-  // Pressing play in "Kies muziek" without Pro. The reader is in the reader,
-  // so the analytics source is the reader's own.
+  // Pressing play in "Kies muziek" without Pro. Its own source since the
+  // allowlist grew per-gate values; it used to share the reader's
+  // `app_study` with commentary, grondtekst and offline.
   music(
     id: 'muziek',
-    source: 'app_study',
+    source: 'app_music',
     reason: 'Achtergrondmuziek hoort bij Pro.',
     benefit: 'Achtergrondmuziek',
   );

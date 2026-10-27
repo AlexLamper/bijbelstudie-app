@@ -31,4 +31,17 @@ class StoreCopy {
       : 'Het abonnement wordt automatisch verlengd tenzij je het minstens 24 uur '
           'voor het einde van de periode opzegt. Beheren en opzeggen doe je in je '
           'Apple ID-instellingen.';
+
+  /// The disclosure when the annual plan starts with a free trial: the trial
+  /// length, what is charged after it and when, and how to stop it - the
+  /// three things 3.1.2(a) and Play's policy require next to a trial offer.
+  static String trialRenewalNotice(int days, String yearlyPrice) => isPlay
+      ? 'Na de gratis proefperiode van $days dagen wordt $yearlyPrice per jaar in rekening '
+          'gebracht en wordt het abonnement automatisch verlengd tot je het opzegt. Opzeggen '
+          'kan altijd vóór het einde van de proefperiode, in de Play Store onder Betalingen '
+          'en abonnementen.'
+      : 'Na de gratis proefperiode van $days dagen wordt $yearlyPrice per jaar in rekening '
+          'gebracht, tenzij je minstens 24 uur voor het einde van de proefperiode opzegt. Het '
+          'abonnement wordt daarna automatisch verlengd. Beheren en opzeggen doe je in je '
+          'Apple ID-instellingen.';
 }

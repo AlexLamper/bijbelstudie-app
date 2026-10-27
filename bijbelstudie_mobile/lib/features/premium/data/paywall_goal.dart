@@ -115,3 +115,19 @@ class StudyGoalController extends Notifier<StudyGoal?> {
     await prefs.setString(_kGoalKey, goal.id);
   }
 }
+
+/// The goal saved by the last answer (setup wizard or pitch), for surfaces
+/// that personalise without asking again - the paywall's headline and benefit
+/// order. [studyGoalProvider] deliberately starts empty each time; this is the
+/// remembered answer behind it.
+final storedStudyGoalProvider = FutureProvider<StudyGoal?>((ref) async {
+  // Re-read whenever a fresh answer is given in this run.
+  final fresh = ref.watch(studyGoalProvider);
+  if (fresh != null) return fresh;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return StudyGoal.fromId(prefs.getString(_kGoalKey));
+  } catch (_) {
+    return null;
+  }
+});

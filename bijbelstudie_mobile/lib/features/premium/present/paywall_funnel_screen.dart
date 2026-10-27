@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../data/paywall_goal.dart';
@@ -24,10 +25,14 @@ import '../domain/store_copy.dart';
 /// The X is always there. A paywall with no way out converts worse and is a
 /// review rejection besides.
 class PaywallFunnelScreen extends ConsumerStatefulWidget {
-  const PaywallFunnelScreen({super.key, this.source});
+  const PaywallFunnelScreen({super.key, this.source, this.skipGoal = false});
 
   /// Where the reader came from, passed through to the paywall for analytics.
   final String? source;
+
+  /// Open on the demo: the reader answered the goal question moments ago (the
+  /// setup wizard), and asking it twice reads as not having listened.
+  final bool skipGoal;
 
   @override
   ConsumerState<PaywallFunnelScreen> createState() => _PaywallFunnelScreenState();
@@ -35,12 +40,30 @@ class PaywallFunnelScreen extends ConsumerStatefulWidget {
 
 class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
   static const _steps = 3;
-  int _step = 0;
+  static const _stepIds = ['goal', 'demo', 'benefits'];
+  late int _step = widget.skipGoal ? 1 : 0;
   bool _leaving = false;
+
+  /// `presell_step_viewed`, once per step per visit: which screen of the
+  /// pitch readers leave on was unmeasured, so it could not be improved.
+  final Set<int> _tracked = {};
+
+  void _trackStep() {
+    if (!_tracked.add(_step)) return;
+    const allowed = {'app_funnel', 'app_profile', 'app_promo', 'app_onboarding', 'app_streak', 'app_referral_end'};
+    final source = widget.source ?? 'app_funnel';
+    ref.read(analyticsProvider).track(AnalyticsEvents.presellStepViewed, {
+      'step': _stepIds[_step],
+      'source': allowed.contains(source) ? source : 'app_funnel',
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _trackStep();
+    });
     // Second half of the paywall guard; the `/pro-intro` redirect is the
     // first. The redirect can only see Pro that is already known, so if it
     // becomes known while the pitch is open - the profile finishing loading -
@@ -56,6 +79,7 @@ class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
   void _next() {
     if (_step < _steps - 1) {
       setState(() => _step += 1);
+      _trackStep();
       return;
     }
     _toPaywall();
@@ -94,6 +118,10 @@ class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
                   selected: goal,
                   onSelect: (value) {
                     ref.read(studyGoalProvider.notifier).select(value);
+                    ref.read(analyticsProvider).track(
+                      AnalyticsEvents.onboardingGoalSelected,
+                      {'goal': value.id},
+                    );
                     // Advance on tap. Choosing is the answer; making the reader
                     // then press "verder" is a second tap for nothing.
                     Future.delayed(const Duration(milliseconds: 180), () {
@@ -102,7 +130,8 @@ class _PaywallFunnelScreenState extends ConsumerState<PaywallFunnelScreen> {
                   },
                 ),
                 1 => const _DemoStep(),
-                _ => _BenefitsStep(goal: goal),
+                // After a skipped goal step, the answer from setup.
+                _ => _BenefitsStep(goal: goal ?? ref.watch(storedStudyGoalProvider).value),
               },
             ),
             // The goal step advances on selection, so it needs no button of

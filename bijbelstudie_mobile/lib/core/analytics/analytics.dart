@@ -23,6 +23,22 @@ class AnalyticsEvents {
   static const paywallHit = 'paywall_hit';
   static const paywallCtaClicked = 'paywall_cta_clicked';
 
+  /// The paywall was closed without buying. `source` (the entry point) and
+  /// `trial` ('yes'/'no': was a free trial on offer).
+  static const paywallDismissed = 'paywall_dismissed';
+
+  /// The Pro promo was put on screen. `trigger` says what earned it the slot.
+  static const promoShown = 'promo_shown';
+
+  /// One screen of the three-screen pitch. `step` (goal/demo/benefits), `source`.
+  static const presellStepViewed = 'presell_step_viewed';
+
+  /// The study goal picked in setup or the pitch. `goal` is a [StudyGoal] id.
+  static const onboardingGoalSelected = 'onboarding_goal_selected';
+
+  /// A store purchase that started a free trial. `interval`.
+  static const trialStarted = 'trial_started';
+
   /// Cross-references. `surface` says where the list was opened, `action`
   /// what was done with it and `testament` which direction the reader moved
   /// in. Book, chapter and verse are deliberately absent: the server allowlist

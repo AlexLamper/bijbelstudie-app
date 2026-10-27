@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../domain/trial_offer.dart';
+
 // ─── RevenueCat identifiers ──────────────────────────────────────────────────
 // Product IDs must match App Store Connect / Play exactly.
 const kRcMonthlyProductId = 'bijbelstudie_pro_monthly';
@@ -191,6 +193,40 @@ class PurchaseService {
     return annual
         ? normalised == 'P1Y' || normalised == 'P12M'
         : normalised == 'P1M';
+  }
+
+  /// The free trial [product] will start with for this account, or null.
+  ///
+  /// Android needs no extra call: Play only lists offers the account can
+  /// still redeem, so a free phase on the default option is a real trial.
+  /// iOS lists the introductory offer whether or not the Apple ID already
+  /// used it, so eligibility is asked separately. "Unknown" (no receipt yet,
+  /// a sandbox account) is only trusted for an account that has never bought
+  /// anything: a returning subscriber must never be promised a free week
+  /// StoreKit will then not give them.
+  Future<TrialOffer?> trialFor(StoreProduct product, CustomerInfo? info) async {
+    if (kIsWeb) return null;
+    final offer = TrialOffer.fromProduct(product);
+    if (offer == null) return null;
+    if (defaultTargetPlatform == TargetPlatform.android) return offer;
+    try {
+      final id = subscriptionIdOf(product.identifier);
+      final result = await Purchases.checkTrialOrIntroductoryPriceEligibility([id]);
+      final status = result[id]?.status ?? result[product.identifier]?.status;
+      switch (status) {
+        case IntroEligibilityStatus.introEligibilityStatusEligible:
+          return offer;
+        case IntroEligibilityStatus.introEligibilityStatusUnknown:
+        case null:
+          final boughtBefore = (info?.allPurchasedProductIdentifiers.isNotEmpty ?? true);
+          return boughtBefore ? null : offer;
+        default:
+          return null;
+      }
+    } catch (e) {
+      _log('Trial eligibility check failed; not offering a trial: $e');
+      return null;
+    }
   }
 
   /// Purchase a RevenueCat package from the current offering.
