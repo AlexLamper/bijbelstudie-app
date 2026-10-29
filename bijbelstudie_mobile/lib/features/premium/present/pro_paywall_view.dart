@@ -212,11 +212,9 @@ class ProPaywallView extends StatelessWidget {
             _BottomBlock(
               busy: busy,
               ctaLabel: _trialSelected ? 'Probeer ${trial!.label} gratis' : ctaLabelNoTrial,
-              // Directly under the button, legible, so the price after the
-              // trial is never further from the tap than the word "gratis".
-              ctaNote: _trialSelected
-                  ? 'Daarna $yearlyPrice per jaar. Op elk moment op te zeggen.'
-                  : null,
+              // No bold "Daarna ... per jaar" line under the button (Alex, 29 Oct:
+              // keep it simple). The price after the trial is still on the yearly
+              // card and in the renewal notice right under the button.
               renewalNotice: _trialSelected
                   ? StoreCopy.trialRenewalNotice(trial!.days, yearlyPrice)
                   : StoreCopy.renewalNotice,
@@ -679,7 +677,6 @@ class _BottomBlock extends StatelessWidget {
     required this.busy,
     required this.ctaLabel,
     required this.renewalNotice,
-    this.ctaNote,
     required this.onContinue,
     required this.onTerms,
     required this.onPrivacy,
@@ -694,7 +691,6 @@ class _BottomBlock extends StatelessWidget {
   final Duration skipDelay;
   final bool busy;
   final String ctaLabel;
-  final String? ctaNote;
   final String renewalNotice;
   final VoidCallback? onContinue;
   final VoidCallback onTerms;
@@ -737,18 +733,6 @@ class _BottomBlock extends StatelessWidget {
                       ),
               ),
             ),
-            if (ctaNote case final note?) ...[
-              const SizedBox(height: 8),
-              Text(
-                note,
-                textAlign: TextAlign.center,
-                style: AppTheme.bodyStrong.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.ink,
-                ),
-              ),
-            ],
             const SizedBox(height: 14),
             Text(
               renewalNotice,
@@ -784,7 +768,11 @@ class _BottomBlock extends StatelessWidget {
                       child: Text(
                         label,
                         textAlign: TextAlign.center,
-                        style: AppTheme.caption.copyWith(fontSize: 12, color: AppTheme.inkMuted),
+                        // Lighter than the footer links (Alex, 29 Oct): there, but quiet.
+                        style: AppTheme.caption.copyWith(
+                          fontSize: 12,
+                          color: AppTheme.inkMuted.withValues(alpha: 0.55),
+                        ),
                       ),
                     ),
                   ),
