@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -40,7 +42,22 @@ class ProPaywallView extends StatelessWidget {
     this.headline = PaywallCopy.defaultHeadline,
     this.benefits = defaultBenefits,
     this.trial,
+    this.skipLabel,
+    this.ctaLabelNoTrial = 'Word Pro',
+    this.closeDelay = kPaywallCloseDelay,
   });
+
+  /// Set on the onboarding paywall: there is no X then, and this quiet link
+  /// under the button is the way on to the free version ([onClose]).
+  final String? skipLabel;
+
+  /// The button when no trial is selected ("Word Pro", "Begin direct").
+  final String ctaLabelNoTrial;
+
+  /// How long the way out (the X, or [skipLabel]) waits before it fades in.
+  /// The price gets a moment to be read first (Alex, 29 Oct: "TOO easy for the
+  /// user to just click away"); it is never hidden, only not first.
+  final Duration closeDelay;
 
   /// The heading, personalised by the gate or the reader's goal (see
   /// [PaywallCopy.headline]).
@@ -117,7 +134,7 @@ class ProPaywallView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _VerseHeader(onClose: onClose),
+                    _VerseHeader(onClose: skipLabel == null ? onClose : null, closeDelay: closeDelay),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
                       child: Column(
@@ -165,6 +182,10 @@ class ProPaywallView extends StatelessWidget {
                             period: 'per jaar',
                             selected: yearlySelected,
                             badge: discountPercent != null ? 'BESPAAR $discountPercent%' : null,
+                            // The weekly price is what makes the year an easy
+                            // yes (Alex, 29 Oct), so it is coloured and bold -
+                            // still smaller than the billed amount (3.1.2(c)).
+                            highlightPerWeek: true,
                             onTap: onSelectYearly,
                           ),
                           const SizedBox(height: 10),
@@ -190,12 +211,10 @@ class ProPaywallView extends StatelessWidget {
             ),
             _BottomBlock(
               busy: busy,
-              ctaLabel: _trialSelected ? 'Probeer ${trial!.label} gratis' : 'Word Pro',
-              // Directly under the button, legible, so the price after the
-              // trial is never further from the tap than the word "gratis".
-              ctaNote: _trialSelected
-                  ? 'Daarna $yearlyPrice per jaar. Op elk moment op te zeggen.'
-                  : null,
+              ctaLabel: _trialSelected ? 'Probeer ${trial!.label} gratis' : ctaLabelNoTrial,
+              // No bold "Daarna ... per jaar" line under the button (Alex, 29 Oct:
+              // keep it simple). The price after the trial is still on the yearly
+              // card and in the renewal notice right under the button.
               renewalNotice: _trialSelected
                   ? StoreCopy.trialRenewalNotice(trial!.days, yearlyPrice)
                   : StoreCopy.renewalNotice,
@@ -203,8 +222,61 @@ class ProPaywallView extends StatelessWidget {
               onTerms: onTerms,
               onPrivacy: onPrivacy,
               onRestore: onRestore,
+              skipLabel: skipLabel,
+              onSkip: onClose,
+              skipDelay: closeDelay,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// How long the paywall's way out waits before it appears.
+const Duration kPaywallCloseDelay = Duration(seconds: 3);
+
+/// Shows [child] only after [delay], fading it in; until then it takes its
+/// space but cannot be tapped or reached by a screen reader. With reduced
+/// motion it simply appears.
+class _DelayedReveal extends StatefulWidget {
+  const _DelayedReveal({required this.delay, required this.child});
+
+  final Duration delay;
+  final Widget child;
+
+  @override
+  State<_DelayedReveal> createState() => _DelayedRevealState();
+}
+
+class _DelayedRevealState extends State<_DelayedReveal> {
+  Timer? _timer;
+  late bool _shown = widget.delay <= Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_shown) _timer = Timer(widget.delay, () => mounted ? setState(() => _shown = true) : null);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return IgnorePointer(
+      ignoring: !_shown,
+      child: ExcludeSemantics(
+        excluding: !_shown,
+        child: AnimatedOpacity(
+          opacity: _shown ? 1 : 0,
+          duration: still ? Duration.zero : const Duration(milliseconds: 450),
+          curve: Curves.easeOut,
+          child: widget.child,
         ),
       ),
     );
@@ -216,9 +288,11 @@ class ProPaywallView extends StatelessWidget {
 /// Drawn rather than shipped as a photograph, so it weighs nothing, needs no
 /// decoding before first paint and carries no licence.
 class _VerseHeader extends StatelessWidget {
-  const _VerseHeader({required this.onClose});
+  const _VerseHeader({required this.onClose, required this.closeDelay});
 
-  final VoidCallback onClose;
+  /// Null: no X (the onboarding paywall has its own quiet way on).
+  final VoidCallback? onClose;
+  final Duration closeDelay;
 
   /// Silhouettes as fractions of their own band, from the design.
   static const List<Offset> _backRidge = [
@@ -298,11 +372,12 @@ class _VerseHeader extends StatelessWidget {
             // The status bar sits over the top of the hero, so the verse box is
             // shifted down to read as centred in the part of it that shows.
             const Positioned(left: 24, right: 64, top: 60, bottom: 40, child: _VerseText()),
-            Positioned(
-              top: 52,
-              right: 16,
-              child: _CloseButton(onTap: onClose),
-            ),
+            if (onClose case final close?)
+              Positioned(
+                top: 52,
+                right: 16,
+                child: _DelayedReveal(delay: closeDelay, child: _CloseButton(onTap: close)),
+              ),
           ],
         ),
       ),
@@ -364,11 +439,13 @@ class _CloseButton extends StatelessWidget {
       child: Semantics(
         button: true,
         label: 'Sluiten',
+        // Quiet on purpose: small and half transparent over the hero, so the
+        // price is what the eye lands on. The tap target stays 32pt.
         child: const SizedBox(
           width: 32,
           height: 32,
           child: Center(
-            child: Icon(Icons.close, size: 20, color: Colors.white),
+            child: Icon(Icons.close, size: 16, color: Color(0x99FFFFFF)),
           ),
         ),
       ),
@@ -447,6 +524,7 @@ class ProPlanCard extends StatelessWidget {
     required this.onTap,
     this.perWeek,
     this.badge,
+    this.highlightPerWeek = false,
   });
 
   final String title;
@@ -458,6 +536,10 @@ class ProPlanCard extends StatelessWidget {
 
   /// "BESPAAR 24%", straddling the top edge. Annual only.
   final String? badge;
+
+  /// The per-week figure in the accent colour and bold (the annual card), so
+  /// it is the thing a reader compares; otherwise plain but readable.
+  final bool highlightPerWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -489,10 +571,17 @@ class ProPlanCard extends StatelessWidget {
                     style: AppTheme.displayTitle.copyWith(fontSize: 15.5, height: 1.2),
                   ),
                   if (perWeek case final week?) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       week,
-                      style: AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.inkMuted),
+                      style: highlightPerWeek
+                          ? AppTheme.caption.copyWith(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                              color: AppTheme.tealStrong,
+                            )
+                          : AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.inkSoft),
                     ),
                   ],
                 ],
@@ -502,7 +591,8 @@ class ProPlanCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(price, style: AppTheme.displayTitle.copyWith(fontSize: 16, height: 1.2)),
+                // The billed amount: the largest price on the card (3.1.2(c)).
+                Text(price, style: AppTheme.displayTitle.copyWith(fontSize: 18, height: 1.2)),
                 const SizedBox(height: 2),
                 Text(
                   period,
@@ -587,16 +677,20 @@ class _BottomBlock extends StatelessWidget {
     required this.busy,
     required this.ctaLabel,
     required this.renewalNotice,
-    this.ctaNote,
     required this.onContinue,
     required this.onTerms,
     required this.onPrivacy,
     required this.onRestore,
+    this.skipLabel,
+    this.onSkip,
+    this.skipDelay = kPaywallCloseDelay,
   });
 
+  final String? skipLabel;
+  final VoidCallback? onSkip;
+  final Duration skipDelay;
   final bool busy;
   final String ctaLabel;
-  final String? ctaNote;
   final String renewalNotice;
   final VoidCallback? onContinue;
   final VoidCallback onTerms;
@@ -639,18 +733,6 @@ class _BottomBlock extends StatelessWidget {
                       ),
               ),
             ),
-            if (ctaNote case final note?) ...[
-              const SizedBox(height: 8),
-              Text(
-                note,
-                textAlign: TextAlign.center,
-                style: AppTheme.bodyStrong.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.ink,
-                ),
-              ),
-            ],
             const SizedBox(height: 14),
             Text(
               renewalNotice,
@@ -673,6 +755,29 @@ class _BottomBlock extends StatelessWidget {
                 _FooterLink(label: 'Herstellen', onTap: onRestore),
               ],
             ),
+            if (skipLabel case final label?)
+              _DelayedReveal(
+                delay: skipDelay,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: busy ? null : onSkip,
+                  child: Semantics(
+                    button: true,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 2),
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        // Lighter than the footer links (Alex, 29 Oct): there, but quiet.
+                        style: AppTheme.caption.copyWith(
+                          fontSize: 12,
+                          color: AppTheme.inkMuted.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

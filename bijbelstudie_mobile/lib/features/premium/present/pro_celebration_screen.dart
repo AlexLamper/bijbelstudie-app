@@ -21,7 +21,11 @@ import '../domain/pro_benefits.dart';
 /// and the unlocked benefits settle in one after another. With reduced motion
 /// on, everything is simply there - the confetti is skipped entirely.
 class ProCelebrationScreen extends StatefulWidget {
-  const ProCelebrationScreen({super.key});
+  const ProCelebrationScreen({super.key, this.next});
+
+  /// Where "Aan de slag" goes instead of back: the tour, for a reader who
+  /// bought Pro on the onboarding paywall (nothing sits underneath then).
+  final String? next;
 
   @override
   State<ProCelebrationScreen> createState() => _ProCelebrationScreenState();
@@ -96,6 +100,10 @@ class _ProCelebrationScreenState extends State<ProCelebrationScreen>
   }
 
   void _done() {
+    if (widget.next case final next?) {
+      context.go(next);
+      return;
+    }
     if (context.canPop()) {
       context.pop();
     } else {
