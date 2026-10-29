@@ -20,7 +20,7 @@ import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
 import '../../premium/data/paywall_goal.dart';
-import '../../premium/present/promo_moments.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/notification_prefs.dart';
@@ -194,12 +194,19 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
       } catch (_) {}
     }
 
-    // The tour runs next; when it ends (finished or skipped) the Pro offer
-    // opens once, on Start, through ProPromoTrigger. Asked for here rather
-    // than in the tour so a replay from Profiel never triggers it.
-    ref.read(onboardingPaywallProvider.notifier).arm();
-
-    if (mounted) context.go('/tour');
+    if (!mounted) return;
+    // The paywall comes straight after setup, before the tour (Alex, 29 Oct:
+    // "they pay after creating the account immediately"). It used to open
+    // once on Start after the tour, behind three pitch screens; the goal is
+    // known by now, so it goes straight to the price. Leaving it - its quiet
+    // "Ga verder met de gratis versie" link - or buying both continue to the
+    // tour (`PremiumScreen.onboarding`). An account that already has Pro, a
+    // web subscriber signing in here for the first time, goes on to the tour.
+    if (ref.read(hasProProvider)) {
+      context.go('/tour');
+      return;
+    }
+    context.go('/premium?source=app_onboarding&onboarding=1');
   }
 
   @override

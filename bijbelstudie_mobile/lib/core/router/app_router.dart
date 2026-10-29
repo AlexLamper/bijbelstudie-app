@@ -512,9 +512,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         // was sent straight here, skipping the pitch (see `openPaywall`); the
         // paywall then names that reason above the price. Unknown or absent
         // leaves the screen exactly as a browsing reader sees it.
+        // ?onboarding=1: the paywall step at the end of the setup wizard;
+        // leaving it or buying goes on to the tour instead of back.
         builder: (context, state) => PremiumScreen(
           source: state.uri.queryParameters['source'],
           gate: PaywallGate.fromId(state.uri.queryParameters['gate']),
+          onboarding: state.uri.queryParameters['onboarding'] == '1',
         ),
       ),
       // The post-purchase celebration. Reached only by `pushReplacement` from
@@ -523,7 +526,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/pro-welkom',
         pageBuilder: (context, state) => CustomTransitionPage<void>(
           key: state.pageKey,
-          child: const ProCelebrationScreen(),
+          // ?then=tour: bought during onboarding, so "Aan de slag" goes on to
+          // the tour. Only this one value is honoured - never a free path.
+          child: ProCelebrationScreen(
+            next: state.uri.queryParameters['then'] == 'tour' ? '/tour' : null,
+          ),
           transitionDuration: const Duration(milliseconds: 380),
           transitionsBuilder: (context, animation, secondaryAnimation, child) =>
               FadeTransition(

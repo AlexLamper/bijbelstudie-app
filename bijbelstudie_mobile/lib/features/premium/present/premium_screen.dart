@@ -30,7 +30,7 @@ enum _ProPlan { monthly, yearly }
 /// who already pay on the web keep Pro through `/api/v1/me` and are shown a
 /// status card instead of a purchase button.
 class PremiumScreen extends ConsumerStatefulWidget {
-  const PremiumScreen({super.key, this.source, this.gate});
+  const PremiumScreen({super.key, this.source, this.gate, this.onboarding = false});
 
   /// Which surface sent the user here, so the contextual paywalls can be ranked
   /// against each other. Validated against the server allowlist before it is
@@ -44,6 +44,15 @@ class PremiumScreen extends ConsumerStatefulWidget {
   /// list. Null for a reader who arrived through the pitch or from Profiel,
   /// and the screen is exactly as it was.
   final PaywallGate? gate;
+
+  /// The paywall step at the end of the setup wizard (`?onboarding=1`). It
+  /// opens with "Begin direct met je BijbelStudie", has no X - the way on is a
+  /// quiet "Ga verder met de gratis versie" link that appears after a few
+  /// seconds - and leaving or buying goes on to the tour rather than back.
+  final bool onboarding;
+
+  /// The onboarding headline (Alex, 29 Oct).
+  static const onboardingHeadline = 'Begin direct met je BijbelStudie';
 
   @override
   ConsumerState<PremiumScreen> createState() => _PremiumScreenState();
@@ -105,7 +114,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   void _celebrate() {
     if (_celebrating) return;
     setState(() => _celebrating = true);
-    context.pushReplacement('/pro-welkom');
+    context.pushReplacement(widget.onboarding ? '/pro-welkom?then=tour' : '/pro-welkom');
   }
 
   @override
@@ -157,8 +166,17 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     if (!showActive) {
       final goal = ref.watch(storedStudyGoalProvider).value;
       return ProPaywallView(
-        headline: PaywallCopy.headline(gateId: widget.gate?.id, goal: goal, source: widget.source),
-        benefits: PaywallCopy.benefits(gateBenefit: widget.gate?.benefit, goal: goal),
+        headline: widget.onboarding
+            ? PremiumScreen.onboardingHeadline
+            : PaywallCopy.headline(gateId: widget.gate?.id, goal: goal, source: widget.source),
+        // Onboarding: no X, the free road is a quiet link under the button.
+        skipLabel: widget.onboarding ? 'Ga verder met de gratis versie' : null,
+        ctaLabelNoTrial: widget.onboarding ? 'Begin direct' : 'Word Pro',
+        // Onboarding: three lines, so both plans - and the weekly prices side by
+        // side - fit above the button with the two-line headline.
+        benefits: PaywallCopy.benefits(gateBenefit: widget.gate?.benefit, goal: goal)
+            .take(widget.onboarding ? 3 : PaywallCopy.shown)
+            .toList(),
         trial: premiumState.yearlyTrial,
         yearlyPrice: yearlyPrice,
         monthlyPrice: monthlyPrice,
@@ -244,6 +262,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       'source': widget.source ?? 'direct',
       'trial': ref.read(premiumControllerProvider).yearlyTrial != null ? 'yes' : 'no',
     });
+    if (widget.onboarding) {
+      context.go('/tour');
+      return;
+    }
     if (context.canPop()) {
       context.pop();
     } else {
