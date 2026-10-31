@@ -218,7 +218,12 @@ class PurchaseService {
           return offer;
         case IntroEligibilityStatus.introEligibilityStatusUnknown:
         case null:
-          final boughtBefore = (info?.allPurchasedProductIdentifiers.isNotEmpty ?? true);
+          // No CustomerInfo at all means RevenueCat could not be reached; an
+          // account with an earlier purchase is then also "unknown" to StoreKit
+          // only without a receipt on this device, i.e. effectively new here.
+          // StoreKit itself still refuses the free period to an ineligible
+          // Apple ID at purchase, so the risk is a wrong label, not a free year.
+          final boughtBefore = info?.allPurchasedProductIdentifiers.isNotEmpty ?? false;
           return boughtBefore ? null : offer;
         default:
           return null;

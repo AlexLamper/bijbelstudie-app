@@ -299,7 +299,10 @@ class PremiumController extends Notifier<PremiumState> {
       rawError: rawError,
     );
 
-    final yearlyTrial = yearly == null ? null : await _svc.trialFor(yearly, info);
+    // The CustomerInfo from this load, else the one already known: with
+    // neither, an iOS "unknown" eligibility (a fresh install has no receipt
+    // yet) counted as "bought before" and the 7-day trial never showed.
+    final yearlyTrial = yearly == null ? null : await _svc.trialFor(yearly, info ?? state.customerInfo);
 
     if (!ref.mounted) return;
     state = state.withPrices(
