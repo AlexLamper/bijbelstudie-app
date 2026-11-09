@@ -8,7 +8,7 @@ import '../../friends/data/friends_repository.dart';
 /// One enum rather than four methods, because every switch does the same two
 /// things - flip one named path, adopt the whole answer - and the mapping to
 /// [FriendSettingsUpdate] is the only part that differs.
-enum VriendenkringSwitch { discoverable, milestones, verses, notes }
+enum VriendenkringSwitch { discoverable, contactJoinAlerts, milestones, verses, notes }
 
 /// The reader's own vriendenkring settings, and the writes back.
 ///
@@ -67,6 +67,11 @@ class VriendenkringSettingsNotifier extends AsyncNotifier<FriendSettings> {
     final share = from.autoShare;
     return switch (which) {
       VriendenkringSwitch.discoverable => from.copyWith(discoverable: value),
+      // Off deletes the stored codes server-side, so the count goes with it.
+      VriendenkringSwitch.contactJoinAlerts => from.copyWith(
+        contactJoinAlerts: value,
+        contactBookSize: value ? from.contactBookSize : 0,
+      ),
       VriendenkringSwitch.milestones => from.copyWith(
         autoShare: FriendAutoShare(
           milestones: value,
@@ -97,6 +102,8 @@ class VriendenkringSettingsNotifier extends AsyncNotifier<FriendSettings> {
     return switch (which) {
       VriendenkringSwitch.discoverable =>
         FriendSettingsUpdate(discoverable: value),
+      VriendenkringSwitch.contactJoinAlerts =>
+        FriendSettingsUpdate(contactJoinAlerts: value),
       VriendenkringSwitch.milestones =>
         FriendSettingsUpdate(autoShareMilestones: value),
       VriendenkringSwitch.verses => FriendSettingsUpdate(autoShareVerses: value),

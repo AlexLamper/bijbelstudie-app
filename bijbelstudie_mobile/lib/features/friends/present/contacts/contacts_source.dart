@@ -1,6 +1,10 @@
 import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'address_book.dart';
+
+export 'address_book.dart';
+
 /// The device address book, behind an interface two functions wide.
 ///
 /// `flutter_contacts` asks for the contacts permission itself - it ships its
@@ -56,21 +60,6 @@ class ContactsReadException implements Exception {
   String toString() => 'ContactsReadException: $detail';
 }
 
-/// Raw identifiers read off the device, held for the length of one matching
-/// run and then dropped. Names are deliberately not read: the matches come
-/// back from the server with their own names, so the address book's names
-/// serve no purpose and the app does not ask for them.
-class AddressBook {
-  const AddressBook({this.phoneNumbers = const [], this.emailAddresses = const []});
-
-  static const empty = AddressBook();
-
-  final List<String> phoneNumbers;
-  final List<String> emailAddresses;
-
-  bool get isEmpty => phoneNumbers.isEmpty && emailAddresses.isEmpty;
-}
-
 abstract class ContactsSource {
   /// Shows the OS permission dialog, unless it has already been answered.
   ///
@@ -84,7 +73,8 @@ abstract class ContactsSource {
   /// already opened through the disclosure and the OS prompt.
   Future<bool> hasAccess();
 
-  /// Phone numbers and e-mail addresses, nothing else.
+  /// Every contact with a phone number or an e-mail address: its name, numbers,
+  /// addresses and (Android) whether it is starred.
   ///
   /// Throws [ContactsReadException] when the platform refused to hand them
   /// over. An empty [AddressBook] means the book really is empty.
@@ -163,25 +153,54 @@ class DeviceContactsSource implements ContactsSource {
     try {
       // `properties` has to name phone *and* email explicitly: without it the
       // plugin fetches neither, and on iOS the keys that were not asked for
-      // are not merely empty but unreadable.
+      // are not merely empty but unreadable. The display name always comes
+      // along. `favorite` is Android-only and ignored on iOS.
       contacts = await fc.FlutterContacts.getAll(
-        properties: const {fc.ContactProperty.phone, fc.ContactProperty.email},
+        properties: const {
+          fc.ContactProperty.phone,
+          fc.ContactProperty.email,
+          fc.ContactProperty.favorite,
+        },
       );
     } catch (error) {
       throw ContactsReadException(error.toString());
     }
 
-    final phoneNumbers = <String>[];
-    final emailAddresses = <String>[];
+    final entries = <AddressBookEntry>[];
     for (final contact in contacts) {
-      for (final phone in contact.phones) {
-        if (phone.number.trim().isNotEmpty) phoneNumbers.add(phone.number);
-      }
-      for (final email in contact.emails) {
-        if (email.address.trim().isNotEmpty) emailAddresses.add(email.address);
-      }
+      final phones = <AddressBookPhone>[
+        for (final phone in contact.phones)
+          if (phone.number.trim().isNotEmpty)
+            AddressBookPhone(phone.number, mobileLabel: _isMobileLabel(phone.label.label)),
+      ];
+      final emails = <String>[
+        for (final email in contact.emails)
+          if (email.address.trim().isNotEmpty) email.address,
+      ];
+      if (phones.isEmpty && emails.isEmpty) continue;
+      entries.add(
+        AddressBookEntry(
+          id: contact.id ?? '${entries.length}',
+          name: (contact.displayName ?? '').trim(),
+          phones: phones,
+          emails: emails,
+          starred: contact.android?.isFavorite ?? false,
+        ),
+      );
     }
-    return AddressBook(phoneNumbers: phoneNumbers, emailAddresses: emailAddresses);
+    return AddressBook(entries: entries);
+  }
+
+  static bool _isMobileLabel(fc.PhoneLabel label) {
+    switch (label) {
+      case fc.PhoneLabel.mobile:
+      case fc.PhoneLabel.iPhone:
+      case fc.PhoneLabel.workMobile:
+      case fc.PhoneLabel.mms:
+        return true;
+      default:
+        return false;
+    }
   }
 
   @override

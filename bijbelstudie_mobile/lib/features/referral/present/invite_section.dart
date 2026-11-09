@@ -120,12 +120,19 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Both weeks land the moment the friend's account is linked
+          // (`claimReferral` on the server). `youEarn` is false for a paying
+          // member and for an inviter at the monthly cap, and then only the
+          // friend's week is promised.
           Text(
-            '${isPro ? 'Geef een vriend een week Pro cadeau. Maakt die via jouw '
-                'link een account, dan gaat de week meteen in.' : 'Maakt een vriend '
-                'via jouw link een account, dan krijgt die meteen een week Pro.'}'
-            '${overview.youEarn ? ' Gaat je vriend echt aan de slag, dan krijg '
-                'jij er ook een week bij.' : ''}',
+            overview.youEarn
+                ? 'Maakt een vriend via jouw link een account, dan krijgen jullie '
+                      'allebei een week Pro.'
+                : isPro
+                ? 'Geef een vriend een week Pro cadeau. Maakt die via jouw link een '
+                      'account, dan gaat de week meteen in.'
+                : 'Maakt een vriend via jouw link een account, dan krijgt die meteen '
+                      'een week Pro.',
             style: AppTheme.bodyMuted.copyWith(
               fontSize: 14.5,
               height: 1.5,
@@ -173,8 +180,9 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
             const SizedBox(height: 12),
             if (overview.joined > 0)
               Text(
-                '${overview.joined} ${overview.joined == 1 ? 'vriend' : 'vrienden'} via jouw link'
-                '${overview.active > 0 ? ' · ${overview.active} al aan de slag' : ''}',
+                // No "al aan de slag" count any more: the inviter's week now
+                // lands at signup, so `active` no longer means activity.
+                '${overview.joined} ${overview.joined == 1 ? 'vriend' : 'vrienden'} via jouw link',
                 style: AppTheme.caption,
               ),
             if (overview.youEarn && overview.proUntil != null)

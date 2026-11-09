@@ -162,7 +162,9 @@ class _FriendSuggestionRowState extends ConsumerState<FriendSuggestionRow> {
               )
             else
               SiteButton(
-                label: _busy ? 'Versturen...' : 'Uitnodigen',
+                // "Toevoegen", not "Uitnodigen": this person already uses the
+                // app, and "Uitnodigen" is what the contacts without it get.
+                label: _busy ? 'Versturen...' : 'Toevoegen',
                 expand: false,
                 height: 40,
                 onPressed: _busy ? null : _invite,

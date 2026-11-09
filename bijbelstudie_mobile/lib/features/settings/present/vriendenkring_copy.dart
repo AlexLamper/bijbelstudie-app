@@ -27,6 +27,14 @@ const discoverableHint =
     'vinden en je een vriendschapsverzoek sturen. Staat dit uit, dan vindt niemand je zo; '
     'via een uitnodigingslink of een code kun je altijd vrienden worden.';
 
+/// "Melding als een contact lid wordt" - `CONTACT_ALERTS_COPY` on the website.
+const contactAlertsLabel = 'Melding als een contact lid wordt';
+const contactAlertsHint =
+    'De app bewaart dan versleutelde codes van de nummers en e-mailadressen in je contacten, '
+    'nooit de namen of nummers zelf. Wordt iemand uit je contacten lid en is diegene vindbaar, '
+    'dan krijg je een melding, hooguit één per dag. Zet je dit uit, dan gooien we die codes '
+    'meteen weg.';
+
 const autoShareMilestonesLabel = 'Mijlpalen';
 const autoShareMilestonesHint =
     'Maak je een studie af, haal je een badge of lees je 7, 30 of 100 dagen op rij? Dan '
@@ -52,14 +60,14 @@ const autoShareFootnote =
 const forgetContactsLabel = 'Vergeet mijn contactgegevens';
 const forgetContactsHint =
     'De app bewaart een versleutelde afdruk van je telefoonnummer en e-mailadres, zodat '
-    'mensen die je al kennen je kunnen vinden. Hiermee gooi je die weg. Je vriendschappen '
-    'blijven; alleen vinden via contacten werkt daarna niet meer tot je het in de app '
-    'opnieuw aanzet.';
+    'mensen die je al kennen je kunnen vinden, en versleutelde codes uit je contacten voor '
+    'meldingen als iemand lid wordt. Hiermee gooi je alles weg. Je vriendschappen blijven; '
+    'vinden via contacten werkt daarna niet meer tot je het in de app opnieuw aanzet.';
 const forgetContactsAction = 'Vergeten';
 const forgetContactsConfirmTitle = 'Je contactgegevens vergeten?';
 const forgetContactsConfirmBody =
-    'We verwijderen de versleutelde afdruk van je telefoonnummer en e-mailadres. Je '
-    'vrienden en je berichten blijven staan. Mensen die je nummer hebben, vinden je '
-    'hierna niet meer in BijbelStudie.';
+    'We verwijderen de versleutelde afdruk van je telefoonnummer en e-mailadres en de codes '
+    'uit je contacten. Je vrienden en je berichten blijven staan. Mensen die je nummer hebben, '
+    'vinden je hierna niet meer in BijbelStudie.';
 const forgetContactsConfirmAction = 'Ja, vergeet ze';
 const forgetContactsDone = 'Je contactgegevens zijn verwijderd.';

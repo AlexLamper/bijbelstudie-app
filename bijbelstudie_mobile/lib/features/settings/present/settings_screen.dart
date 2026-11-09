@@ -704,10 +704,20 @@ class _VriendenkringSection extends ConsumerWidget {
             onSwitchChanged: flip(VriendenkringSwitch.discoverable),
           ),
         if (contactsOffered) const _FindableRow(),
+        // Only where contacts can be connected at all: the codes it is about
+        // are sent by the contacts flow and nothing else.
+        if (contactsOffered)
+          SettingsRow(
+            label: kring.contactAlertsLabel,
+            subtitle: kring.contactAlertsHint,
+            switchValue: settings?.contactJoinAlerts ?? true,
+            onSwitchChanged: flip(VriendenkringSwitch.contactJoinAlerts),
+          ),
         // Only when there is something to forget: offering it to a reader who
         // never made themselves findable is a row that does nothing and a
         // sentence that worries them for no reason.
-        if (contactsOffered && (settings?.hasContactHashes ?? false))
+        if (contactsOffered &&
+            ((settings?.hasContactHashes ?? false) || (settings?.contactBookSize ?? 0) > 0))
           const _ForgetContactsRow(),
 
         SettingsRow(
@@ -736,7 +746,9 @@ class _VriendenkringSection extends ConsumerWidget {
         // is then the one way out, and it clears the app's own local traces
         // (the matched ids, the recorded disclosure, the findability mirror)
         // as well as the hashes on the server, which this row cannot.
-        if (!contactsOffered && settings != null && settings.hasContactHashes)
+        if (!contactsOffered &&
+            settings != null &&
+            (settings.hasContactHashes || settings.contactBookSize > 0))
           SettingsRow(
             label: kring.forgetContactsLabel,
             subtitle: kring.forgetContactsHint,

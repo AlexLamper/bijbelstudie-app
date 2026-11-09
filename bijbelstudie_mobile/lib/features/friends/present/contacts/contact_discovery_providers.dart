@@ -3,10 +3,12 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../settings/present/findable_default.dart' show findableDefaultProvider;
 import '../../data/friend_models.dart';
 import '../../data/friends_repository.dart';
 import 'contact_discovery_store.dart';
 import 'contact_hashing.dart';
+import 'contact_invites.dart' show contactInvitesProvider;
 import 'contacts_source.dart';
 
 /// State and providers for contact matching (`VRIENDENKRING_PLAN.md` §6).
@@ -16,6 +18,13 @@ import 'contacts_source.dart';
 /// /friends/discovery/match` -> a list with an "Uitnodigen" per row. Nothing is
 /// sent on the reader's behalf at any point (plan principle 3), and nothing but
 /// the matched user ids is written to disk.
+
+/// Which wording of the contacts disclosure this build shows
+/// (`contactsDisclosureLines`). 2 is the one that says the hashes are kept for
+/// contact alerts and that connecting makes the reader findable by e-mail;
+/// only an acceptance of at least this version lets the app ask the server to
+/// keep hashes (`retain`) or apply the findability default from the flow.
+const int contactsDisclosureVersion = 2;
 
 /// Where the flow has got to. One enum rather than a handful of booleans so
 /// the screen is a `switch` and no two states can be true at once.
@@ -109,6 +118,16 @@ class ContactDiscoveryState {
 /// The preferences-backed store, opened once.
 final contactDiscoveryStoreProvider = FutureProvider<ContactDiscoveryStore>((ref) {
   return ContactDiscoveryStore.open();
+});
+
+/// Whether the reader accepted the disclosure as this build words it
+/// ([contactsDisclosureVersion]). False for someone who connected under the
+/// older wording: a "look again" button then has to show the current lines
+/// beside it, because tapping it accepts them.
+final contactsDisclosureCurrentProvider = FutureProvider<bool>((ref) async {
+  ref.watch(contactDiscoveryProvider.select((state) => state.stage));
+  final store = await ref.watch(contactDiscoveryStoreProvider.future);
+  return store.disclosureVersion >= contactsDisclosureVersion;
 });
 
 /// The ISO country used to read a national phone number, from the device
@@ -232,30 +251,34 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
       );
       return;
     }
+    // Held in memory for "Nodig uit", whatever the match says next.
+    ref.read(contactInvitesProvider.notifier).putBook(book);
     if (book.isEmpty) {
       state = const ContactDiscoveryState(stage: ContactDiscoveryStage.emptyAddressBook);
       return;
     }
 
-    final hashes = hashAddressBook(
-      phoneNumbers: book.phoneNumbers,
-      emailAddresses: book.emailAddresses,
+    final indexed = hashAddressBookIndexed(
+      book: book,
       pepper: pepper,
       country: ref.read(contactCountryProvider),
     );
-    if (hashes.isEmpty) {
+    if (indexed.hashes.isEmpty) {
       state = const ContactDiscoveryState(stage: ContactDiscoveryStage.emptyAddressBook);
       return;
     }
 
-    final result = await repo.matchContacts(hashes);
+    final retain = store.disclosureVersion >= contactsDisclosureVersion;
+    await store.markMatched();
+    final result = await repo.matchContacts(indexed.hashes.withRetain(retain));
     if (!result.available) {
       state = const ContactDiscoveryState(stage: ContactDiscoveryStage.unavailable);
       return;
     }
     if (result.found.isEmpty && result.message != null) {
       // A rate limit, or a server that said no. Its own Dutch line is better
-      // than anything written here.
+      // than anything written here - and the matched screen below still has
+      // the address book to offer "Nodig uit" from, so it is not a dead end.
       state = ContactDiscoveryState(
         stage: ContactDiscoveryStage.failed,
         message: result.message,
@@ -263,16 +286,31 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
       return;
     }
 
-    await store.setMatchedUserIds(result.found.map((friend) => friend.userId));
-    await store.markMatched();
-    // The same people also belong under "Mensen die je misschien kent", so
-    // the Vrienden tab does not have to spend a second match call on them.
-    ref.read(contactSuggestionsProvider.notifier).put(result.found);
+    await _landMatch(store, result, indexed);
+    // Connecting the contacts is, by the disclosure the reader just accepted,
+    // also becoming findable by e-mail: the one-time default, with every guard
+    // it already has (never over an explicit choice, never twice).
+    if (retain) await ref.read(findableDefaultProvider).applyIfDue();
     state = ContactDiscoveryState(
       stage: ContactDiscoveryStage.matched,
       found: result.found,
       message: result.message,
     );
+  }
+
+  /// Everything a successful match leaves behind: the matched user ids, which
+  /// address-book rows those were (so "Nodig uit" skips them), and the people
+  /// themselves under "Mensen die je misschien kent".
+  Future<void> _landMatch(
+    ContactDiscoveryStore store,
+    ContactMatchResult result,
+    ContactHashIndex indexed,
+  ) async {
+    await store.setMatchedUserIds(result.found.map((friend) => friend.userId));
+    await ref
+        .read(contactInvitesProvider.notifier)
+        .putMatchedEntries(indexed.entryIdsFor(result.onAppHashes));
+    ref.read(contactSuggestionsProvider.notifier).put(result.found);
   }
 
   /// What "Verbind Contacten" calls: record that the disclosure was on screen
@@ -285,7 +323,7 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
   /// question store review asks.
   Future<void> acceptDisclosureAndStart() async {
     final store = await ref.read(contactDiscoveryStoreProvider.future);
-    await store.markDisclosureAccepted();
+    await store.markDisclosureAccepted(version: contactsDisclosureVersion);
     await startMatch();
   }
 
@@ -315,6 +353,7 @@ class ContactDiscoveryController extends Notifier<ContactDiscoveryState> {
     final store = await ref.read(contactDiscoveryStoreProvider.future);
     await store.forget();
     ref.read(contactSuggestionsProvider.notifier).put(const []);
+    ref.read(contactInvitesProvider.notifier).clear();
     state = ContactDiscoveryState.idle;
     return ok;
   }
@@ -375,8 +414,10 @@ class FindableController extends Notifier<bool> {
         ),
       );
     } else {
-      // Off is a deletion, not a flag: the stored hashes go with it.
-      ok = await repo.forgetContactDiscovery();
+      // Off is a deletion, not a flag: the reader's own hashes go with it.
+      // Only those - the hashed address book kept for contact alerts has its
+      // own switch, and being findable has nothing to do with it.
+      ok = await repo.forgetContactDiscovery(scope: 'own');
     }
 
     if (ok) {
@@ -484,21 +525,25 @@ class ContactSuggestionsController extends AsyncNotifier<List<FriendSummary>> {
       if (pepper == null) return null;
 
       final book = await source.read();
+      ref.read(contactInvitesProvider.notifier).putBook(book);
       if (book.isEmpty) return null;
-      final hashes = hashAddressBook(
-        phoneNumbers: book.phoneNumbers,
-        emailAddresses: book.emailAddresses,
+      final indexed = hashAddressBookIndexed(
+        book: book,
         pepper: pepper,
         country: ref.read(contactCountryProvider),
       );
-      if (hashes.isEmpty) return null;
+      if (indexed.hashes.isEmpty) return null;
 
       // Stamped before the call, so a run that fails still waits its turn
       // instead of retrying into the rate limit on every rebuild.
       await store.markMatched();
-      final result = await repo.matchContacts(hashes);
+      final retain = store.disclosureVersion >= contactsDisclosureVersion;
+      final result = await repo.matchContacts(indexed.hashes.withRetain(retain));
       if (!result.available || (result.found.isEmpty && result.message != null)) return null;
       await store.setMatchedUserIds(result.found.map((friend) => friend.userId));
+      await ref
+          .read(contactInvitesProvider.notifier)
+          .putMatchedEntries(indexed.entryIdsFor(result.onAppHashes));
       return List.unmodifiable(result.found);
     } catch (_) {
       return null;

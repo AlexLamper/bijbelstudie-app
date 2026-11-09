@@ -235,10 +235,24 @@ leaving the website looking broken.
 
 **On the server**
 
-- Never store an uploaded hash from a match call: match and drop.
+- ~~Never store an uploaded hash from a match call: match and drop.~~
+  Changed 2026-11-09 (owner's decision, "contact joined" alerts): a match
+  call from a build whose disclosure says so sends `retain: true`, and unless
+  the reader switched "Melding als een contact lid wordt" off the hashes are
+  kept in `FriendContactBook` - hashes only, linked to the uploader only, never
+  a name or a number. When somebody becomes findable, every reader with one of
+  their hashes gets "<Naam> uit je contacten zit nu op BijbelStudie", at most
+  one grouped alert a day (`lib/friends/contactAlerts.ts`). The off switch,
+  "contacten vergeten", account deletion and 180 days without a refresh all
+  delete the book; the account archive keeps it without the hashes.
 - `FriendProfile.phoneHashes` / `emailHashes` hold only the reader's own
   identifiers.
-- `DELETE /friends/discovery` and account deletion remove them.
+- `DELETE /friends/discovery` and account deletion remove them
+  (`?scope=own` only the own hashes, `?scope=contacts` only the book).
+- The match answer carries `matchedHashes` per account (the caller's own
+  hashes only), so the app can leave those rows out of "Nodig uit": contacts
+  without the app, listed and searched on the phone - names never leave it -
+  and invited through WhatsApp, SMS or the share sheet.
 
 **Why hashes and not raw contacts:** it keeps the address book out of
 `scriptura` entirely, which is both the policy requirement and the thing that
@@ -247,7 +261,9 @@ by their nature; the server-held pepper, the rate limit and not retaining
 uploaded hashes are what keep that expensive. That is the same trade every
 contact-matching app makes.
 
-**Permission copy (Dutch)**
+**Permission copy (Dutch)** - superseded by `contactsDisclosureLines` in
+`connect_contacts_button.dart` (version 2, 2026-11-09), which is what the app
+shows; the block below is the original draft.
 
 > **Vind je vrienden**
 > BijbelStudie kan in je contacten kijken om te zien wie de app al gebruikt.

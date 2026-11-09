@@ -569,12 +569,20 @@ class FriendsRepository {
     }
   }
 
-  /// `DELETE /friends/discovery` - forget my hashes and stop being findable.
-  /// The counterpart to the consent, and it really deletes.
-  Future<bool> forgetContactDiscovery() async {
+  /// `DELETE /friends/discovery` - the counterpart to the consents, and it
+  /// really deletes.
+  ///
+  /// [scope] `own` forgets only the reader's own hashes (findability off),
+  /// `contacts` only the hashed address book kept for contact alerts, and no
+  /// scope both - what "contacten vergeten" means. A server that predates the
+  /// scope ignores it and forgets both, which is the safe direction.
+  Future<bool> forgetContactDiscovery({String? scope}) async {
     if (PreviewConfig.enabled) return false;
     try {
-      await _apiClient.dio.delete('/friends/discovery');
+      await _apiClient.dio.delete(
+        '/friends/discovery',
+        queryParameters: scope == null ? null : {'scope': scope},
+      );
       return true;
     } catch (_) {
       return false;

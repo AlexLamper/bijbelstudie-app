@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../../data/friend_models.dart';
+import 'address_book.dart';
 
 /// On-device normalisation and hashing for contact matching
 /// (`VRIENDENKRING_PLAN.md` §6).
@@ -77,6 +78,19 @@ const Map<String, String> contactCountryPrefixes = {
   'ZA': '27',
 };
 
+/// Country codes whose numbers drop a national trunk 0 when written
+/// internationally: `+31 06 12345678` is a common way to store a Dutch mobile,
+/// and it has to hash as `+31612345678`. `TRUNK_ZERO_COUNTRY_CODES` in
+/// `lib/friends/discovery.ts` - the same list, or nobody matches.
+const List<String> _trunkZeroCountryCodes = ['31', '32', '49', '44', '27'];
+
+String _dropTrunkZero(String digits) {
+  for (final code in _trunkZeroCountryCodes) {
+    if (digits.startsWith('${code}0')) return '$code${digits.substring(code.length + 1)}';
+  }
+  return digits;
+}
+
 /// The fallback country for a national number without a dialling prefix.
 const String defaultContactCountry = 'NL';
 
@@ -105,12 +119,13 @@ String? normaliseContactPhone(String raw, {String country = defaultContactCountr
   // 00 31 ... is the same as +31 ... . Checked on the digits rather than on
   // the raw string, so `+0031...` cannot be read twice.
   if (!international && digits.startsWith('00')) {
-    final rest = digits.substring(2);
+    final rest = _dropTrunkZero(digits.substring(2));
     return rest.length >= 8 ? '+$rest' : null;
   }
 
   if (international) {
-    return digits.length >= 8 ? '+$digits' : null;
+    final fixed = _dropTrunkZero(digits);
+    return fixed.length >= 8 ? '+$fixed' : null;
   }
 
   // The US has no trunk zero, so a national number that starts with one cannot
@@ -209,4 +224,70 @@ ContactDiscoveryHashes hashAddressBook({
   // rules the match route applies - which costs nothing and means a future
   // change to either side cannot quietly send malformed hex.
   return ContactDiscoveryHashes(phoneHashes: phoneHashes, emailHashes: emailHashes);
+}
+
+/// An address book hashed for `POST /friends/discovery/match`, plus which
+/// entries each hash came from.
+///
+/// The index never leaves the phone. It is how a match answer
+/// (`matchedHashes` per account) turns back into "these rows already use
+/// BijbelStudie", so "Nodig uit" does not offer to invite them.
+class ContactHashIndex {
+  const ContactHashIndex({required this.hashes, required this.entryIdsByHash});
+
+  final ContactDiscoveryHashes hashes;
+  final Map<String, Set<String>> entryIdsByHash;
+
+  /// The entries behind [matched], a set of hashes the server sent back.
+  Set<String> entryIdsFor(Iterable<String> matched) => {
+    for (final hash in matched) ...?entryIdsByHash[hash.toLowerCase()],
+  };
+}
+
+/// [hashAddressBook] for a book read with its entries, keeping the way back
+/// from each hash to the entry it came from.
+ContactHashIndex hashAddressBookIndexed({
+  required AddressBook book,
+  required String pepper,
+  String country = defaultContactCountry,
+}) {
+  final readings = {country.toUpperCase(), defaultContactCountry};
+  final index = <String, Set<String>>{};
+  final phoneHashes = <String>{};
+  final emailHashes = <String>{};
+
+  for (final entry in book.entries) {
+    for (final phone in entry.phones) {
+      if (phoneHashes.length >= maxContactMatchHashes) break;
+      for (final reading in readings) {
+        final hash = hashContactPhone(phone.number, pepper, country: reading);
+        if (hash == null) continue;
+        phoneHashes.add(hash);
+        (index[hash] ??= <String>{}).add(entry.id);
+      }
+    }
+    for (final address in entry.emails) {
+      if (emailHashes.length >= maxContactMatchHashes) break;
+      final hash = hashContactEmail(address, pepper);
+      if (hash == null) continue;
+      emailHashes.add(hash);
+      (index[hash] ??= <String>{}).add(entry.id);
+    }
+  }
+
+  // A book built from flat lists (no entries) still hashes the same way.
+  if (book.entries.isEmpty) {
+    final flat = hashAddressBook(
+      phoneNumbers: book.phoneNumbers,
+      emailAddresses: book.emailAddresses,
+      pepper: pepper,
+      country: country,
+    );
+    return ContactHashIndex(hashes: flat, entryIdsByHash: const {});
+  }
+
+  return ContactHashIndex(
+    hashes: ContactDiscoveryHashes(phoneHashes: phoneHashes, emailHashes: emailHashes),
+    entryIdsByHash: index,
+  );
 }

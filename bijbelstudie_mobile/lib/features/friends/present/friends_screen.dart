@@ -9,6 +9,7 @@ import '../data/friend_models.dart';
 import '../data/friends_repository.dart';
 import 'contacts/connect_contacts_button.dart';
 import 'contacts/contact_discovery_providers.dart';
+import 'contacts/contact_invite_section.dart';
 import 'friend_block_action.dart';
 import 'friend_comments_sheet.dart';
 import 'friend_post_card.dart';
@@ -201,6 +202,14 @@ class _PeopleYouMayKnow extends ConsumerWidget {
       );
     }
 
+    // Connected and still nobody in the kring: the whole point of connecting
+    // is to see people, so they come first and in full - who in the address
+    // book is here, who is one step away, and who to invite.
+    final kring = ref.watch(friendsKringProvider).value;
+    if (connected && kring != null && kring.friends.isEmpty) {
+      return _FirstFriends(onRescan: onConnect);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -217,15 +226,93 @@ class _PeopleYouMayKnow extends ConsumerWidget {
           const SizedBox(height: 12),
           if (!connected) ConnectContactsButton(onPressed: onConnect),
           const FriendSuggestionsSection(showHeader: false),
-          if (connected)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onConnect,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Contacten opnieuw doorzoeken'),
+          if (connected) _RescanButton(onPressed: onConnect),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Contacten opnieuw doorzoeken". Tapping it accepts the disclosure as this
+/// build words it, so for a reader who connected under older wording the
+/// current lines are printed right under it.
+class _RescanButton extends ConsumerWidget {
+  const _RescanButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(contactsDisclosureCurrentProvider).value ?? true;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: const Text('Contacten opnieuw doorzoeken'),
+        ),
+        if (!current)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(8, 0, 8, 6),
+            child: ContactsDisclosureLines(),
+          ),
+      ],
+    );
+  }
+}
+
+/// The top of Vriendenkring for a reader who connected their contacts and has
+/// no friends yet: "In je contacten", "Mensen die je misschien kent" and
+/// "Nodig uit", the same three sections the contacts screen ends on.
+class _FirstFriends extends ConsumerWidget {
+  const _FirstFriends({required this.onRescan});
+
+  final VoidCallback onRescan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    AppTheme.dependOn(context);
+    final contacts = ref.watch(contactSuggestionsProvider).value ?? const <FriendSummary>[];
+    final alertsOn = ref.watch(friendsSettingsProvider).value?.contactJoinAlerts ?? true;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SectionHeader(
+            title: 'In je contacten',
+            description: 'Wie je kent en BijbelStudie al gebruikt.',
+          ),
+          const SizedBox(height: 10),
+          if (contacts.isEmpty)
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Text(
+                alertsOn
+                    ? 'Nog niemand uit je contacten gevonden. Komt er iemand bij die vindbaar '
+                          'is, dan krijg je een melding.'
+                    : 'Nog niemand uit je contacten gevonden.',
+                style: AppTheme.caption.copyWith(fontSize: 13, height: 1.45),
+              ),
+            )
+          else
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < contacts.length; i++) ...[
+                    if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
+                    FriendSuggestionRow(person: contacts[i].asContactMatch()),
+                  ],
+                ],
               ),
             ),
+          _RescanButton(onPressed: onRescan),
+          SecondCircleSection(exclude: {for (final person in contacts) person.userId}),
+          const SizedBox(height: 24),
+          const ContactInviteSection(),
         ],
       ),
     );

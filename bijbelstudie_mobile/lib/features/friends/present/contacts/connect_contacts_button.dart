@@ -15,23 +15,31 @@ import 'contact_matches_screen.dart';
 /// dialog instead. The disclosure did not go away: Play's "Personal and
 /// sensitive data" policy requires a prominent in-app disclosure **before** the
 /// runtime permission is requested, and App Store Review 5.1.1(i) and 5.1.2
-/// require that contacts stay optional. So the three facts that have to be
-/// said - what is read, what is sent, what is kept - are printed inside this
-/// card, under the button, where they are on screen at the moment of the tap
-/// rather than one page behind it.
+/// require that contacts stay optional. So the facts that have to be said -
+/// what is read, what is sent, what is kept - are printed inside this card,
+/// under the button, where they are on screen at the moment of the tap rather
+/// than one page behind it.
 ///
 /// The card also nags a little on purpose ([_AttentionIcon]): it is the way
 /// into the whole feature and a reader who never notices it never finds
 /// anybody. A slow teal breath, nothing that moves across the screen, and the
 /// static tinted state when the reader asked for less motion.
 
-/// The three disclosure lines, short enough for a card and complete enough for
-/// review. `VRIENDENKRING_PLAN.md` §6 says the same at length; these are the
-/// same three facts in one line each, and all three have to stay.
+/// The disclosure lines, short enough for a card and complete enough for
+/// review: what is read, what is sent, what is kept and why, and what
+/// connecting changes for the reader themselves. Every line has to stay, and
+/// any change to what they promise bumps `contactsDisclosureVersion`, because
+/// the server may only keep hashes for a reader who saw the wording that says
+/// so.
+///
+/// Version 2 (contact alerts and "Nodig uit"): names are now read - for the
+/// invite list, on the phone only - and the hashes are kept to say when a
+/// contact joins. The website's /privacybeleid says the same at length.
 const contactsDisclosureLines = [
-  'We lezen alleen de nummers en e-mailadressen in je contacten, geen namen.',
-  'Er gaat alleen een versleutelde code naar onze server, nooit een nummer zelf.',
-  'We bewaren niets: de codes worden vergeleken en daarna weggegooid.',
+  'We lezen namen, nummers en e-mailadressen uit je contacten. Namen blijven altijd op je telefoon.',
+  'Naar onze server gaan alleen versleutelde codes van nummers en e-mailadressen, nooit de nummers zelf.',
+  'We bewaren die codes om je te laten weten als iemand uit je contacten lid wordt. Uitzetten of wissen kan in Instellingen.',
+  'Wie jouw e-mailadres in zijn contacten heeft, kan jou dan ook vinden. Ook dat zet je uit in Instellingen.',
 ];
 
 /// [contactsDisclosureLines] as the quiet text under a "verbind contacten"

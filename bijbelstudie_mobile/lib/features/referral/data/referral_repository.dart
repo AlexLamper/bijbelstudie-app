@@ -88,9 +88,15 @@ class ReferralRepository {
     try {
       final response = await _apiClient.dio.post('/referral/claim', data: {'code': code});
       final data = response.data as Map<String, dynamic>? ?? const {};
+      // `granted: false` is a new account that already pays: linked to the
+      // friend who invited it, with no comp week on top. The server words it.
+      final granted = data['granted'] != false;
+      final message = data['message'];
       return ClaimOutcome(
         ok: true,
-        message: 'Je week Pro is gestart.',
+        message: !granted && message is String && message.isNotEmpty
+            ? message
+            : 'Je week Pro is gestart.',
         proUntil: DateTime.tryParse(data['proUntil'] as String? ?? '')?.toLocal(),
       );
     } on DioException catch (e) {

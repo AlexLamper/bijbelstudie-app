@@ -3,27 +3,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_widgets.dart';
+import '../../../settings/present/vriendenkring_settings_provider.dart';
 import '../../data/friend_models.dart';
 import '../friend_post_card.dart' show FriendAvatar;
-import '../friend_suggestions_section.dart' show FriendSuggestionRow;
-import '../friends_providers.dart';
+import '../friends_screen.dart' show InviteFriendsCard;
+import 'connect_contacts_button.dart';
 import 'contact_discovery_providers.dart';
+import 'contact_invite_section.dart';
+import 'contact_invites.dart';
 import 'own_number_card.dart';
 
-/// "Vrienden gevonden" - the result of one matching run, one row per account,
-/// each with its own "Uitnodigen", and under it the people who are one step
-/// further away: contacten van contacten.
+/// "Vind je vrienden" - what connecting the contacts turns up, in three
+/// sections, the way the owner chose it ("alleen voorgestelde mensen", not the
+/// whole address book):
 ///
-/// Nothing is sent on arriving here (`VRIENDENKRING_PLAN.md` principle 3): a
-/// verzoek goes out on a tap, one row at a time, and the row says so
-/// afterwards. The names and pictures come from the server's answer, never
-/// from the address book - the address book's names are not even read.
+/// 1. **In je contacten** - contacts who use BijbelStudie and are findable,
+///    each with "Toevoegen" (a vriendschapsverzoek, on a tap).
+/// 2. **Mensen die je misschien kent** - friends of friends, with how many
+///    friends are shared (`GET /friends/suggestions`).
+/// 3. **Nodig uit** - about ten contacts without the app, plus a search field,
+///    each with "Uitnodigen" through WhatsApp, SMS or the share sheet.
 ///
-/// Reached straight from "Verbind Contacten", which carries the disclosure; it
-/// renders whatever `contactDiscoveryProvider` holds and starts nothing itself.
-/// Every way a run can fail has its own words here, and the ones only the
-/// Settings app can fix offer that route - an empty list for a refused
-/// permission is how this looked broken on iPhone and said nothing.
+/// Nothing is sent on arriving here (`VRIENDENKRING_PLAN.md` principle 3). The
+/// names in "Nodig uit" come from the address book on this phone and are never
+/// uploaded; the names in the first two sections come from the server.
+///
+/// **It is never blank.** That is the bug this screen used to have on iPhone:
+/// matching only ever finds people who made themselves findable, which almost
+/// nobody had, so a perfectly working run ended on "niemand gevonden" and
+/// nothing else. Now every stage - including the refusals and failures, which
+/// each still say what happened - ends with a way to reach people: the invite
+/// list when the address book could be read, the link and code otherwise.
 class ContactMatchesScreen extends ConsumerWidget {
   const ContactMatchesScreen({super.key});
 
@@ -36,7 +46,7 @@ class ContactMatchesScreen extends ConsumerWidget {
     final state = ref.watch(contactDiscoveryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Vrienden gevonden')),
+      appBar: AppBar(title: const Text('Vind je vrienden')),
       body: SafeArea(child: _Body(state: state)),
     );
   }
@@ -52,94 +62,162 @@ class _Body extends ConsumerWidget {
     final controller = ref.read(contactDiscoveryProvider.notifier);
 
     switch (state.stage) {
-      case ContactDiscoveryStage.idle:
       case ContactDiscoveryStage.working:
-        return const Padding(
-          padding: EdgeInsets.all(40),
-          child: AppLoader(),
-        );
+        return const _Working();
 
-      // The disclosure has not been passed, so nothing was asked and nothing
-      // read. Reaching this means a caller skipped the screen; the gate held.
+      // Nothing ran yet, or a caller skipped the disclosure (the gate held).
+      // Either way: the card that carries the disclosure, then the link.
+      case ContactDiscoveryStage.idle:
       case ContactDiscoveryStage.needsDisclosure:
-        return const AppEmptyState(
-          title: 'Eerst even uitleggen',
-          description:
-              'We vertellen je eerst wat we lezen en versturen, voordat we iets vragen. '
-              'Ga terug en begin opnieuw.',
-          icon: Icons.info_outline,
+        return _WithFallback(
+          children: [
+            ConnectContactsButton(onPressed: controller.acceptDisclosureAndStart),
+          ],
         );
 
       // Switched off server-side. Not a fault, so not an error card.
       case ContactDiscoveryStage.unavailable:
-        return const AppEmptyState(
-          title: 'Dit kan nu niet',
-          description:
-              'Zoeken via contacten is op dit moment niet beschikbaar. Je kunt wel '
-              'iemand uitnodigen met een link of code.',
-          icon: Icons.contacts_outlined,
+        return const _WithFallback(
+          children: [
+            AppEmptyState(
+              title: 'Dit kan nu niet',
+              description:
+                  'Zoeken via contacten is op dit moment niet beschikbaar. Je kunt wel '
+                  'iemand uitnodigen met een link of code.',
+              icon: Icons.contacts_outlined,
+            ),
+          ],
         );
 
       // Refused, and askable again - which is what Android means by it. On
       // iPhone a single "Sta niet toe" is already permanent, so Settings is
       // offered beside the retry rather than instead of it.
       case ContactDiscoveryStage.permissionDenied:
-        return AppEmptyState(
-          title: 'Geen toegang tot contacten',
-          description:
-              'Zonder toegang kunnen we niet zien wie de app al gebruikt. Op een '
-              'iPhone kun je dit alleen weer aanzetten in de instellingen. De '
-              'Vriendenkring werkt ook met een uitnodigingslink of code.',
-          icon: Icons.lock_outline,
-          action: _TwoWaysOut(
-            retry: controller.startMatch,
-            settings: controller.openSystemSettings,
-          ),
+        return _WithFallback(
+          children: [
+            AppEmptyState(
+              title: 'Geen toegang tot contacten',
+              description:
+                  'Zonder toegang kunnen we niet zien wie de app al gebruikt. Op een '
+                  'iPhone kun je dit alleen weer aanzetten in de instellingen. De '
+                  'Vriendenkring werkt ook met een uitnodigingslink of code.',
+              icon: Icons.lock_outline,
+              action: _TwoWaysOut(
+                retry: controller.startMatch,
+                settings: controller.openSystemSettings,
+              ),
+            ),
+          ],
         );
 
       case ContactDiscoveryStage.permissionBlocked:
-        return AppEmptyState(
-          title: 'Toegang staat uit',
-          description:
-              'Contacten staat voor BijbelStudie uit in de instellingen van je '
-              'telefoon. Je kunt het daar weer aanzetten.',
-          icon: Icons.settings_outlined,
-          action: SiteButton(
-            label: 'Open instellingen',
-            expand: false,
-            onPressed: controller.openSystemSettings,
-          ),
+        return _WithFallback(
+          children: [
+            AppEmptyState(
+              title: 'Toegang staat uit',
+              description:
+                  'Contacten staat voor BijbelStudie uit in de instellingen van je '
+                  'telefoon. Je kunt het daar weer aanzetten.',
+              icon: Icons.settings_outlined,
+              action: SiteButton(
+                label: 'Open instellingen',
+                expand: false,
+                onPressed: controller.openSystemSettings,
+              ),
+            ),
+          ],
         );
 
       case ContactDiscoveryStage.emptyAddressBook:
-        return const AppEmptyState(
-          title: 'Niets om te vergelijken',
-          description:
-              'In je contacten staan geen telefoonnummers of e-mailadressen die we '
-              'kunnen vergelijken.',
-          icon: Icons.contact_page_outlined,
+        return const _WithFallback(
+          children: [
+            AppEmptyState(
+              title: 'Niets om te vergelijken',
+              description:
+                  'In je contacten staan geen telefoonnummers of e-mailadressen die we '
+                  'kunnen vergelijken.',
+              icon: Icons.contact_page_outlined,
+            ),
+          ],
         );
 
+      // The book may well have been read before the run failed (a rate limit,
+      // a server hiccup), and then "Nodig uit" still works - it never needed
+      // the server.
       case ContactDiscoveryStage.failed:
-        return AppEmptyState(
-          title: 'Dat lukte niet',
-          description: state.message ?? 'Probeer het zo nog eens.',
-          icon: Icons.error_outline,
-          action: state.offerSettings
-              ? _TwoWaysOut(
-                  retry: controller.startMatch,
-                  settings: controller.openSystemSettings,
-                )
-              : SiteButton(
-                  label: 'Opnieuw proberen',
-                  expand: false,
-                  onPressed: controller.startMatch,
-                ),
+        final haveBook = ref.watch(inviteCandidatesProvider).isNotEmpty;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: [
+            AppEmptyState(
+              title: 'Dat lukte niet',
+              description: state.message ?? 'Probeer het zo nog eens.',
+              icon: Icons.error_outline,
+              action: state.offerSettings
+                  ? _TwoWaysOut(
+                      retry: controller.startMatch,
+                      settings: controller.openSystemSettings,
+                    )
+                  : SiteButton(
+                      label: 'Opnieuw proberen',
+                      expand: false,
+                      onPressed: controller.startMatch,
+                    ),
+            ),
+            const SizedBox(height: 20),
+            if (haveBook) const ContactInviteSection() else const InviteFriendsCard(),
+          ],
         );
 
       case ContactDiscoveryStage.matched:
         return _MatchList(found: state.found, invited: state.invited);
     }
+  }
+}
+
+/// A stage's own message, then the link-and-code card, so no stage is a dead
+/// end.
+class _WithFallback extends StatelessWidget {
+  const _WithFallback({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: [
+        ...children,
+        const SizedBox(height: 20),
+        Text(
+          'Of nodig iemand uit met je link of code.',
+          style: AppTheme.caption.copyWith(fontSize: 13),
+        ),
+        const SizedBox(height: 10),
+        const InviteFriendsCard(),
+      ],
+    );
+  }
+}
+
+class _Working extends StatelessWidget {
+  const _Working();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppLoader(),
+          const SizedBox(height: 14),
+          Text('We kijken wie je kent...', style: AppTheme.caption.copyWith(fontSize: 13)),
+        ],
+      ),
+    );
   }
 }
 
@@ -167,13 +245,7 @@ class _TwoWaysOut extends StatelessWidget {
   }
 }
 
-/// The direct matches, then the second circle under them.
-///
-/// Two sections rather than one list, because the two answers to "how do I
-/// know this person?" are different and a row that cannot say which is a row
-/// nobody taps. The first is "in je contacten" and comes from the match run;
-/// the second is friends-of-friends and comes from `GET /friends/suggestions`,
-/// which already carries `mutualCount` per row - no graph is built here.
+/// The three sections, in order.
 class _MatchList extends ConsumerWidget {
   const _MatchList({required this.found, required this.invited});
 
@@ -184,83 +256,59 @@ class _MatchList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     AppTheme.dependOn(context);
     final count = found.length;
-    final lead = count == 0
-        ? 'Nog niemand uit je contacten gevonden.'
-        : (count == 1
-              ? 'Eén van je contacten gebruikt BijbelStudie al.'
-              : '$count van je contacten gebruiken BijbelStudie al.');
-
-    // `.value` on purpose: loading and a failure both read as "no second
-    // circle yet". This screen is about the contacts; the suggestions are a
-    // bonus and must not be able to turn it into an error.
-    final suggestions =
-        ref.watch(friendSuggestionsProvider).value?.suggestions ?? const <FriendSummary>[];
-    final directIds = {for (final person in found) person.userId};
-    // Only the ones that are there *through somebody*: a row with no friends
-    // in common has nothing to put under its name, and a contact match
-    // already had its turn above.
-    final secondDegree = [
-      for (final person in suggestions)
-        if (!directIds.contains(person.userId) && person.mutualLabel != null) person,
-    ];
+    final alertsOn = ref.watch(vriendenkringSettingsProvider).value?.contactJoinAlerts ?? true;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
-        Text(lead, style: AppTheme.bodyLead),
-        const SizedBox(height: 4),
         Text(
           count == 0
-              ? 'Zodra iemand uit je contacten erbij komt, zie je diegene hier.'
-              : 'Nodig uit wie je wilt. Er is nog niets verstuurd.',
-          style: AppTheme.caption,
+              ? 'Er is nog niets verstuurd. Kies zelf wie je toevoegt of uitnodigt.'
+              : 'Er is nog niets verstuurd. Voeg toe wie je wilt.',
+          style: AppTheme.caption.copyWith(fontSize: 13),
         ),
-        const SizedBox(height: 12),
-        // Matters most when nothing was found: an empty result usually means
-        // "zij hebben nog niet verbonden", and the way to be found when they
-        // do is to have a number registered now.
-        const OwnNumberCard(),
-        const SizedBox(height: 8),
-        for (final match in found) ...[
-          ContactMatchRow(
-            match: match,
-            alreadyInvited: invited.contains(match.userId),
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (count == 0 && secondDegree.isEmpty)
-          const AppEmptyState(
-            title: 'Nog niemand gevonden',
-            description:
-                'Niemand uit je contacten gebruikt BijbelStudie al, of ze willen niet '
-                'gevonden worden. Je kunt ook iemand uitnodigen met een link of code.',
-            icon: Icons.person_search_outlined,
-          ),
-        if (secondDegree.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const SectionHeader(
-            title: 'Contacten van contacten',
-            description: 'Via de mensen in je kring.',
-          ),
-          const SizedBox(height: 10),
+        const SizedBox(height: 16),
+        SectionHeader(
+          title: 'In je contacten',
+          description: count == 0
+              ? null
+              : (count == 1
+                    ? 'Eén van je contacten gebruikt BijbelStudie al.'
+                    : '$count van je contacten gebruiken BijbelStudie al.'),
+        ),
+        const SizedBox(height: 10),
+        if (count == 0)
           AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (var i = 0; i < secondDegree.length; i++) ...[
-                  if (i > 0) Divider(height: 1, thickness: 1, color: AppTheme.rule),
-                  FriendSuggestionRow(person: secondDegree[i]),
-                ],
-              ],
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Text(
+              alertsOn
+                  ? 'Nog niemand uit je contacten gevonden. Komt er iemand bij die vindbaar '
+                        'is, dan krijg je een melding.'
+                  : 'Nog niemand uit je contacten gevonden. Alleen mensen die vindbaar zijn, '
+                        'zie je hier.',
+              style: AppTheme.caption.copyWith(fontSize: 13, height: 1.45),
             ),
-          ),
-        ],
+          )
+        else
+          for (final match in found) ...[
+            ContactMatchRow(match: match, alreadyInvited: invited.contains(match.userId)),
+            const SizedBox(height: 8),
+          ],
+        const SizedBox(height: 12),
+        // Matters most when nothing was found: the people in this address
+        // book can only find this reader back once a number is registered.
+        const OwnNumberCard(),
+        SecondCircleSection(exclude: {for (final person in found) person.userId}),
+        const SizedBox(height: 28),
+        const ContactInviteSection(),
       ],
     );
   }
 }
 
-/// One found account, with the one action it offers.
+/// One found account, with the one action it offers: "Toevoegen", which sends
+/// a vriendschapsverzoek. Never called "Uitnodigen" - that word belongs to the
+/// contacts without the app, further down.
 class ContactMatchRow extends ConsumerStatefulWidget {
   const ContactMatchRow({super.key, required this.match, this.alreadyInvited = false});
 
@@ -326,14 +374,14 @@ class _ContactMatchRowState extends ConsumerState<ContactMatchRow> {
                 Icon(Icons.check, size: 16, color: AppTheme.teal),
                 const SizedBox(width: 4),
                 Text(
-                  'Uitgenodigd',
+                  'Verzoek verstuurd',
                   style: AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.teal),
                 ),
               ],
             )
           else
             SiteButton(
-              label: 'Uitnodigen',
+              label: 'Toevoegen',
               expand: false,
               height: 38,
               loading: _busy,

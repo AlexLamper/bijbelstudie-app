@@ -14,7 +14,7 @@ import 'notification_service.dart' show NotifType, isAllowedNotificationRoute;
 /// [other] is any kind a newer server sends that this build does not know: it
 /// still updates the badge and is still shown with the server's own words, on
 /// the social channel, deep-linking to the kring.
-enum SocialEventKind { friendRequest, friendAccepted, postLike, postComment, other }
+enum SocialEventKind { friendRequest, friendAccepted, postLike, postComment, contactJoined, other }
 
 SocialEventKind socialEventKindFrom(Object? raw) {
   final s = raw is String ? raw.trim() : '';
@@ -25,6 +25,7 @@ SocialEventKind socialEventKindFrom(Object? raw) {
       SocialEventKind.friendAccepted,
     'postLike' || 'post_like' || 'like' => SocialEventKind.postLike,
     'postComment' || 'post_comment' || 'comment' => SocialEventKind.postComment,
+    'contactJoined' || 'contact_joined' => SocialEventKind.contactJoined,
     _ => SocialEventKind.other,
   };
 }
@@ -37,6 +38,11 @@ NotifType notifTypeForSocial(SocialEventKind kind) => switch (kind) {
   SocialEventKind.friendAccepted => NotifType.friendAccepted,
   SocialEventKind.postLike => NotifType.postLike,
   SocialEventKind.postComment => NotifType.postComment,
+  // "Iemand uit je contacten zit nu op BijbelStudie" is an invitation to add
+  // somebody, so it rides the verzoek's channel and switch - the same place
+  // builds that do not know the kind already put it (as [other]). At most one
+  // a day, grouped, by the server's own rule.
+  SocialEventKind.contactJoined => NotifType.friendRequest,
   SocialEventKind.other => NotifType.friendRequest,
 };
 
@@ -70,6 +76,10 @@ NotifType notifTypeForSocial(SocialEventKind kind) => switch (kind) {
       title: 'Een reactie',
       body: '$who reageerde op je bericht.',
     ),
+    SocialEventKind.contactJoined => (
+      title: 'Nieuw uit je contacten',
+      body: '$who uit je contacten zit nu op BijbelStudie.',
+    ),
     SocialEventKind.other => (
       title: 'Vriendenkring',
       body: 'Er is iets nieuws in je vriendenkring.',
@@ -95,7 +105,7 @@ String socialFallbackRoute(
       (actorId == null || actorId.isEmpty) ? null : '/vriendenkring/$actorId',
     SocialEventKind.postLike || SocialEventKind.postComment =>
       (postId == null || postId.isEmpty) ? null : '/vriendenkring?post=$postId',
-    SocialEventKind.other => null,
+    SocialEventKind.contactJoined || SocialEventKind.other => null,
   };
   if (candidate == null || !isAllowedNotificationRoute(candidate)) {
     candidate = '/vriendenkring';

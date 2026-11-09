@@ -21,7 +21,8 @@ import 'contact_discovery_providers.dart';
 /// account's e-mail, so hashing one's own two identifiers on the phone would
 /// buy nothing, while somebody *else's* address book never leaves the phone
 /// unhashed. Turning it off is a deletion - `DELETE /friends/discovery` - not
-/// a flag.
+/// a flag - of the reader's own hashes only (`?scope=own`); the hashed address
+/// book kept for contact alerts has its own switch.
 ///
 /// Deliberately a standalone widget and not a screen: where this belongs is
 /// Instellingen's call, and the settings screen can drop it into whichever
@@ -214,9 +215,9 @@ class _ForgetContactsTileState extends ConsumerState<ForgetContactsTile> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Contacten vergeten?'),
         content: const Text(
-          'We verwijderen de versleutelde codes van je nummer en e-mailadres, en je '
-          'bent niet meer te vinden via contacten. Je vrienden blijven gewoon in je '
-          'kring.',
+          'We verwijderen de versleutelde codes van je nummer en e-mailadres en de codes '
+          'uit je contacten, en je bent niet meer te vinden via contacten. Je vrienden '
+          'blijven gewoon in je kring.',
         ),
         actions: [
           TextButton(

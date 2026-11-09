@@ -83,6 +83,6 @@
 	     this dialog ever appears; contacts are optional and the app works
 	     without them (App Store Review 5.1.1(i) and 5.1.2). -->
 	<key>NSContactsUsageDescription</key>
-	<string>Zo kunnen we zien welke van je contacten BijbelStudie al gebruiken. We sturen alleen versleutelde codes.</string>
+	<string>Zo zie je wie van je contacten BijbelStudie al gebruikt en kun je anderen uitnodigen. Namen blijven op je telefoon; naar onze server gaan alleen versleutelde codes.</string>
 	</dict>
 	</plist>

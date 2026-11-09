@@ -552,6 +552,8 @@ class FriendSettings {
     this.discoverable = false,
     this.autoShare = const FriendAutoShare(),
     this.hasContactHashes = false,
+    this.contactJoinAlerts = true,
+    this.contactBookSize = 0,
     this.blocked = const [],
   });
 
@@ -562,6 +564,13 @@ class FriendSettings {
 
   /// Whether contact hashes are on file, so a client can offer "vergeten".
   final bool hasContactHashes;
+
+  /// "Melding als een contact lid wordt". Absent reads as on, like the
+  /// server's default.
+  final bool contactJoinAlerts;
+
+  /// How many hashed contacts the server keeps for those alerts. A count only.
+  final int contactBookSize;
 
   final List<BlockedUser> blocked;
 
@@ -574,6 +583,8 @@ class FriendSettings {
           ? FriendAutoShare.fromJson(share)
           : const FriendAutoShare(),
       hasContactHashes: json['hasContactHashes'] == true,
+      contactJoinAlerts: json['contactJoinAlerts'] != false,
+      contactBookSize: (json['contactBookSize'] as num?)?.toInt() ?? 0,
       blocked: raw is List
           ? [
               for (final item in raw)
@@ -587,12 +598,16 @@ class FriendSettings {
     bool? discoverable,
     FriendAutoShare? autoShare,
     bool? hasContactHashes,
+    bool? contactJoinAlerts,
+    int? contactBookSize,
     List<BlockedUser>? blocked,
   }) {
     return FriendSettings(
       discoverable: discoverable ?? this.discoverable,
       autoShare: autoShare ?? this.autoShare,
       hasContactHashes: hasContactHashes ?? this.hasContactHashes,
+      contactJoinAlerts: contactJoinAlerts ?? this.contactJoinAlerts,
+      contactBookSize: contactBookSize ?? this.contactBookSize,
       blocked: blocked ?? this.blocked,
     );
   }
@@ -610,6 +625,7 @@ class FriendSettings {
 class FriendSettingsUpdate {
   const FriendSettingsUpdate({
     this.discoverable,
+    this.contactJoinAlerts,
     this.autoShareMilestones,
     this.autoShareVerses,
     this.autoShareNotes,
@@ -619,6 +635,9 @@ class FriendSettingsUpdate {
   const FriendSettingsUpdate.discoverability(bool value) : this(discoverable: value);
 
   final bool? discoverable;
+
+  /// Off deletes the hashed address book server-side.
+  final bool? contactJoinAlerts;
   final bool? autoShareMilestones;
   final bool? autoShareVerses;
   final bool? autoShareNotes;
@@ -626,6 +645,7 @@ class FriendSettingsUpdate {
   /// Nothing to send - the repository answers without a round trip.
   bool get isEmpty =>
       discoverable == null &&
+      contactJoinAlerts == null &&
       autoShareMilestones == null &&
       autoShareVerses == null &&
       autoShareNotes == null;
@@ -638,6 +658,7 @@ class FriendSettingsUpdate {
     };
     return {
       if (discoverable != null) 'discoverable': discoverable,
+      if (contactJoinAlerts != null) 'contactJoinAlerts': contactJoinAlerts,
       // Left out entirely when empty, rather than sent as `{}`.
       if (share.isNotEmpty) 'autoShare': share,
     };
@@ -773,21 +794,39 @@ class ContactDiscoveryHashes {
   ContactDiscoveryHashes({
     Iterable<String> phoneHashes = const [],
     Iterable<String> emailHashes = const [],
+    this.retain = false,
   }) : phoneHashes = sanitiseContactHashes(phoneHashes),
        emailHashes = sanitiseContactHashes(emailHashes);
 
   /// Already-validated lists, for a caller that did its own sanitising.
-  const ContactDiscoveryHashes.raw({this.phoneHashes = const [], this.emailHashes = const []});
+  const ContactDiscoveryHashes.raw({
+    this.phoneHashes = const [],
+    this.emailHashes = const [],
+    this.retain = false,
+  });
 
   final List<String> phoneHashes;
   final List<String> emailHashes;
+
+  /// Ask the server to keep these hashes, linked to the reader only, so it can
+  /// say when one of these contacts joins (`lib/friends/contactAlerts.ts`).
+  /// Only sent after the reader saw the disclosure that says so; the server
+  /// still refuses when they switched contact alerts off.
+  final bool retain;
 
   /// Nothing worth a round trip: the server answers `{found: []}` for this.
   bool get isEmpty => phoneHashes.isEmpty && emailHashes.isEmpty;
 
   int get length => phoneHashes.length + emailHashes.length;
 
-  Map<String, Object?> toJson() => {'phoneHashes': phoneHashes, 'emailHashes': emailHashes};
+  ContactDiscoveryHashes withRetain(bool value) =>
+      ContactDiscoveryHashes.raw(phoneHashes: phoneHashes, emailHashes: emailHashes, retain: value);
+
+  Map<String, Object?> toJson() => {
+    'phoneHashes': phoneHashes,
+    'emailHashes': emailHashes,
+    if (retain) 'retain': true,
+  };
 }
 
 /// Lower-cases, drops anything that is not [contactHashLength] hex characters,
@@ -816,7 +855,13 @@ final RegExp _hexOnly = RegExp(r'^[0-9a-f]+$');
 /// error and must not be shown as one: the screen simply offers no contact
 /// matching.
 class ContactMatchResult {
-  const ContactMatchResult({this.found = const [], this.available = true, this.message});
+  const ContactMatchResult({
+    this.found = const [],
+    this.available = true,
+    this.message,
+    this.matchedHashes = const {},
+    this.knownHashes = const [],
+  });
 
   /// Contact matching is switched off server-side. Nothing is wrong.
   static const unavailable = ContactMatchResult(available: false);
@@ -835,11 +880,52 @@ class ContactMatchResult {
   /// "Je hebt je contacten net al gecontroleerd." in particular.
   final String? message;
 
+  /// Per found user id, which of the reader's own uploaded hashes belong to
+  /// that account (`matchedHashes` on each row, `ContactMatch` in
+  /// `lib/friends/types.ts`). Empty for a server that predates the field,
+  /// which the invite list reads as "we do not know who already has it".
+  final Map<String, List<String>> matchedHashes;
+
+  /// The reader's own hashes that belong to anyone findable they may see,
+  /// existing friends and pending verzoeken included (`knownHashes`). Those
+  /// rows already use the app, so "Nodig uit" leaves them out too.
+  final List<String> knownHashes;
+
+  /// Every hash that says "this contact already uses BijbelStudie".
+  Iterable<String> get onAppHashes => {
+    ...matchedHashes.values.expand((hashes) => hashes),
+    ...knownHashes,
+  };
+
   bool get isEmpty => found.isEmpty;
 
   factory ContactMatchResult.fromJson(Map<String, dynamic> json) {
     // `matchContacts` answers `{ found: [...] }`, not `{ matches: ... }`.
-    return ContactMatchResult(found: FriendSummary.listFrom(json['found']));
+    final raw = json['found'];
+    final matched = <String, List<String>>{};
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final id = '${item['userId'] ?? ''}';
+        final hashes = item['matchedHashes'];
+        if (id.isEmpty || hashes is! List) continue;
+        matched[id] = [
+          for (final hash in hashes)
+            if (hash is String && hash.isNotEmpty) hash.toLowerCase(),
+        ];
+      }
+    }
+    final known = json['knownHashes'];
+    return ContactMatchResult(
+      found: FriendSummary.listFrom(raw),
+      matchedHashes: matched,
+      knownHashes: known is List
+          ? [
+              for (final hash in known)
+                if (hash is String && hash.isNotEmpty) hash.toLowerCase(),
+            ]
+          : const [],
+    );
   }
 }
 
