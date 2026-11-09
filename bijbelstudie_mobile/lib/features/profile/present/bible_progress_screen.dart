@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,16 +9,20 @@ import 'package:go_router/go_router.dart';
 import '../../../core/data/bible_books.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
+import '../../../core/ui/lucide_icon.dart';
 import '../../../core/ui/skeleton.dart';
+import '../../auth/present/auth_controller.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../dashboard/data/dashboard_models.dart';
 import '../../dashboard/data/resume_link.dart';
 import '../../dashboard/domain/bible_milestones.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../study/present/study_pane_controller.dart';
+import '../data/finished_books_store.dart';
 import '../domain/bible_progress.dart';
-import 'bible_book_groups.dart';
-import 'bible_milestone_bar.dart';
+import '../domain/bookcase.dart';
+import 'bookcase_books.dart';
+import 'bookcase_view.dart';
 
 /// Every book with the reader's progress, derived from `/dashboard`.
 final bibleProgressProvider = Provider.autoDispose<AsyncValue<BibleProgress>>((ref) {
@@ -25,8 +31,8 @@ final bibleProgressProvider = Provider.autoDispose<AsyncValue<BibleProgress>>((r
       .whenData((data) => BibleProgress.fromReadChapters(data.readChapters));
 });
 
-/// What the "Verder lezen" card offers. Null while `/dashboard` is still in
-/// flight, and once every chapter of the Bible is read.
+/// Where the leeslint lies: the chapter the reading-ribbon card offers. Null
+/// while `/dashboard` is still in flight, and once every chapter is read.
 final nextChapterProvider = Provider.autoDispose<NextChapter?>((ref) {
   final data = ref.watch(dashboardProvider).value;
   final progress = ref.watch(bibleProgressProvider).value;
@@ -40,7 +46,7 @@ final nextChapterProvider = Provider.autoDispose<NextChapter?>((ref) {
   );
 });
 
-/// One chapter to open, the way the "Verder lezen" card and a book row hand it
+/// One chapter to open, the way the leeslint card and a book's sheet hand it
 /// to the reader.
 class NextChapter {
   const NextChapter({required this.book, required this.chapter, this.version});
@@ -112,10 +118,18 @@ NextChapter? nextUnreadChapter({
 }
 
 /// "Bijbelvoortgang" at `/profile/bijbel`, reached from the "Je Bijbel" card on
-/// Start and the Bijbelboeken tile on Profiel. Read-only: every number comes
-/// from the `readChapters` map `/api/v1/dashboard` already returns. Inside the
-/// tab shell, so the bottom bar stays put. Mirrors `/profiel/bijbel` on the
-/// website.
+/// Start and the Bijbelboeken tile on Profiel: "Je boekenkast".
+///
+/// A deep-teal case holds the 66 books as spines. A spine's width follows its
+/// chapter count, its colour rises from the bottom as chapters are read, and a
+/// finished book wears gold lettering. Each shelf's brass plaque counts its
+/// group. A library ladder leaning on the case is the overall bar, with the
+/// reader's marker climbing to the share read. Below: where the leeslint lies,
+/// the books on the reading table and the next rung on three tracks.
+///
+/// Read-only: every number comes from `/api/v1/dashboard`. Inside the tab
+/// shell, so the bottom bar stays put. Mirrors `/profiel/bijbel` on the
+/// website (`components/profile/BibleProgressView.tsx`).
 class BibleProgressScreen extends ConsumerStatefulWidget {
   const BibleProgressScreen({super.key});
 
@@ -124,39 +138,95 @@ class BibleProgressScreen extends ConsumerStatefulWidget {
 }
 
 class _BibleProgressScreenState extends ConsumerState<BibleProgressScreen>
-    with SingleTickerProviderStateMixin {
-  /// Short on purpose: the page is a reference, not a reward screen.
+    with TickerProviderStateMixin {
+  /// Spines filling in a wave, the count running up, the marker climbing.
   late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 1700),
   );
+
+  /// The sparks over a book finished since the last visit.
+  late final AnimationController _celebrate = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+
+  /// A tapped spine sliding out of the shelf while its sheet is open.
+  late final AnimationController _pull = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+    reverseDuration: const Duration(milliseconds: 200),
+  );
+
   bool _introStarted = false;
+  bool _celebrated = false;
 
-  /// 0 = Alles, 1 = Oude T., 2 = Nieuwe T.
-  int _filter = 0;
+  /// Books finished since the case was last seen on this device.
+  List<String> _fresh = const [];
+  String? _pulled;
+  bool _scrolled = false;
 
-  /// Group labels currently expanded.
-  final Set<String> _open = {};
+  BookcaseLayout? _layout;
+  BibleProgress? _layoutFor;
+
+  @override
+  void initState() {
+    super.initState();
+    _intro.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _maybeCelebrate();
+    });
+  }
 
   @override
   void dispose() {
     _intro.dispose();
+    _celebrate.dispose();
+    _pull.dispose();
     super.dispose();
   }
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
 
   /// Runs once, as soon as the progress is first on screen - the page may paint
   /// its skeleton before `/dashboard` answers. Reduce-motion lands on the
   /// finished state without ever ticking.
-  void _startIntro() {
+  void _startIntro(BibleProgress progress) {
     if (_introStarted) return;
     _introStarted = true;
-    if (MediaQuery.disableAnimationsOf(context)) {
+    unawaited(_checkFinished(progress));
+    if (_reduceMotion) {
       _intro.value = 1;
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _intro.forward(from: 0);
     });
+  }
+
+  /// Compares the finished books with the ones the case last showed and
+  /// remembers the new set.
+  Future<void> _checkFinished(BibleProgress progress) async {
+    final userId = ref.read(authControllerProvider).value?.id;
+    final before = await FinishedBooksStore.read(userId);
+    if (!mounted) return;
+    final now = {for (final b in progress.books) if (b.completed) b.name};
+    if (before == null || !setEquals(before, now)) {
+      unawaited(FinishedBooksStore.write(userId, now));
+    }
+    final fresh = newlyFinishedBooks(before: before, now: progress);
+    if (fresh.isEmpty) return;
+    setState(() => _fresh = fresh);
+    _maybeCelebrate();
+  }
+
+  /// The sparks go off once the intro has settled, so they do not compete
+  /// with the spines filling.
+  void _maybeCelebrate() {
+    if (!mounted || _fresh.isEmpty || _celebrated || !_intro.isCompleted) return;
+    _celebrated = true;
+    if (_reduceMotion) return;
+    AppHaptics.light();
+    unawaited(_celebrate.forward(from: 0));
   }
 
   void _openChapter(NextChapter target) {
@@ -171,48 +241,183 @@ class _BibleProgressScreenState extends ConsumerState<BibleProgressScreen>
     context.go('/study');
   }
 
-  /// A book row opens where the reader would want to carry on inside that book:
-  /// its first unread chapter, or chapter 1 once it is finished.
-  void _openBook(BookProgress book) {
-    final next = (() {
-      for (var n = 1; n <= book.chapters; n++) {
-        if (!book.isRead(n)) return n;
-      }
-      return 1;
-    })();
-    _openChapter(NextChapter(book: book.name, chapter: next));
+  /// A tapped spine slides out of the shelf and its sheet opens; the spine
+  /// slides back when the sheet closes.
+  Future<void> _showBook(BookProgress book, NextChapter? next) async {
+    AppHaptics.selection();
+    final isCurrent = next != null && next.book == book.name;
+    setState(() => _pulled = book.name);
+    if (_reduceMotion) {
+      _pull.value = 1;
+    } else {
+      unawaited(_pull.forward(from: 0));
+    }
+    await showShelfBookSheet(
+      context,
+      book: book,
+      leeslint: isCurrent ? next.chapter : null,
+      onRead: (chapter) => _openChapter(
+        NextChapter(book: book.name, chapter: chapter, version: isCurrent ? next.version : null),
+      ),
+    );
+    if (!mounted) return;
+    if (_reduceMotion) {
+      _pull.value = 0;
+    } else {
+      await _pull.reverse();
+    }
+    if (mounted) setState(() => _pulled = null);
   }
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final progress = ref.watch(bibleProgressProvider);
-    if (progress.hasValue) _startIntro();
+    if (progress.hasValue) _startIntro(progress.requireValue);
+    final palette = BookcasePalette.current;
 
     return Scaffold(
-      backgroundColor: AppTheme.canvas,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            const _Header(),
-            Expanded(
-              child: progress.when(
-                loading: () => const _Skeleton(),
-                error: (_, __) => Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: AppEmptyState(
-                    icon: Icons.wifi_off_outlined,
-                    title: 'Leesvoortgang niet geladen',
-                    description: 'Controleer je verbinding en probeer het opnieuw.',
-                    action: SiteOutlineButton(
-                      label: 'Opnieuw proberen',
-                      expand: false,
-                      onPressed: () => ref.invalidate(dashboardProvider),
-                    ),
+      backgroundColor: _pageColor,
+      body: Column(
+        children: [
+          _Header(color: palette.wallTop, scrolled: _scrolled),
+          Expanded(
+            child: progress.when(
+              loading: () => const _Skeleton(),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.all(20),
+                child: AppEmptyState(
+                  icon: Icons.wifi_off_outlined,
+                  title: 'Leesvoortgang niet geladen',
+                  description: 'Controleer je verbinding en probeer het opnieuw.',
+                  action: SiteOutlineButton(
+                    label: 'Opnieuw proberen',
+                    expand: false,
+                    onPressed: () => ref.invalidate(dashboardProvider),
                   ),
                 ),
-                data: _content,
+              ),
+              data: _content,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(BibleProgress p) {
+    final palette = BookcasePalette.current;
+    final data = ref.watch(dashboardProvider).value;
+    final next = ref.watch(nextChapterProvider);
+    if (!identical(_layoutFor, p)) {
+      _layout = BookcaseLayout.of(p);
+      _layoutFor = p;
+    }
+    final layout = _layout!;
+    final byName = {for (final b in p.books) b.name: b};
+    final current = next == null ? null : byName[next.book];
+    final table = readingTable(p, current: next?.book);
+    final steps = ladderSteps(
+      chaptersRead: p.chaptersRead,
+      chaptersTotal: p.chaptersTotal,
+      booksStarted: p.booksStarted,
+      streak: data?.streak ?? 0,
+    );
+    final page = _pageColor;
+    final allRead = next == null && p.chaptersRead >= p.chaptersTotal;
+    final restart = NextChapter(book: BibleBooks.oldTestament.first, chapter: 1);
+
+    return NotificationListener<ScrollUpdateNotification>(
+      onNotification: (n) {
+        final scrolled = n.metrics.pixels > 2;
+        if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+        return false;
+      },
+      child: DecoratedBox(
+        // Overscroll at the top shows wall, at the bottom shows page.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [palette.wallTop, palette.wallTop, page, page],
+            stops: const [0, 0.5, 0.5, 1],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 32),
+          children: [
+            AnimatedBuilder(
+              animation: Listenable.merge([_intro, _celebrate, _pull]),
+              builder: (context, _) => _Room(
+                progress: p,
+                layout: layout,
+                palette: palette,
+                intro: _intro.value,
+                current: next?.book,
+                fresh: _fresh,
+                celebrate: _celebrate.value,
+                pulled: _pulled,
+                pull: _pull.value,
+                onTapBook: (book) => _showBook(book, next),
+              ),
+            ),
+            ColoredBox(
+              color: page,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Transform.translate(
+                    offset: const Offset(0, -8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: AnimatedBuilder(
+                        animation: _intro,
+                        builder: (context, _) => allRead || current == null
+                            ? const _AllReadCard()
+                            : _RibbonCard(
+                                book: current,
+                                chapter: next!.chapter,
+                                fresh: p.chaptersRead == 0,
+                                intro: _intro.value,
+                                palette: palette,
+                                onTap: () => _showBook(current, next),
+                              ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: SiteButton(
+                      label: allRead || next == null
+                          ? 'Begin opnieuw bij ${restart.reference}'
+                          : 'Lees ${next.reference}',
+                      height: 46,
+                      onPressed: () => _openChapter(allRead || next == null ? restart : next),
+                    ),
+                  ),
+                  _Section(
+                    title: 'Op je leestafel',
+                    lede: 'Boeken die je begonnen bent',
+                    child: AnimatedBuilder(
+                      animation: _intro,
+                      builder: (context, _) => _ReadingTable(
+                        books: table,
+                        current: next?.book,
+                        intro: _intro.value,
+                        onTap: (book) => _showBook(book, next),
+                      ),
+                    ),
+                  ),
+                  if (steps.isNotEmpty)
+                    _Section(
+                      title: 'De ladder op',
+                      lede: 'Elke sport is een stuk van de Bijbel',
+                      child: AnimatedBuilder(
+                        animation: _intro,
+                        builder: (context, _) => _LadderSteps(steps: steps, intro: _intro.value),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -220,521 +425,273 @@ class _BibleProgressScreenState extends ConsumerState<BibleProgressScreen>
       ),
     );
   }
+}
 
-  Widget _content(BibleProgress p) {
-    final byName = {for (final b in p.books) b.name: b};
-    final groups = switch (_filter) {
-      1 => BibleBookGroup.forTestament(newTestament: false),
-      2 => BibleBookGroup.forTestament(newTestament: true),
-      _ => BibleBookGroup.all,
-    };
+/// White below the room in light mode, as in the design; the dark canvas in
+/// dark mode, so the raised cards still lift off it.
+Color get _pageColor => AppTheme.isDark ? AppTheme.paper : AppTheme.paperRaised;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      children: [
-        AnimatedBuilder(
-          animation: _intro,
-          builder: (context, _) => _SummaryCard(progress: p, intro: _intro.value),
-        ),
-        const SizedBox(height: 12),
-        _ResumeCard(onOpen: _openChapter),
-        const SizedBox(height: 18),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: AppSegmentedControl(
-            labels: const ['Alles', 'Oude T.', 'Nieuwe T.'],
-            selectedIndex: _filter,
-            onChanged: (index) => setState(() => _filter = index),
-          ),
-        ),
-        const SizedBox(height: 14),
-        const _Legend(),
-        const SizedBox(height: 14),
-        for (final group in groups) ...[
-          AnimatedBuilder(
-            animation: _intro,
-            builder: (context, _) => _GroupCard(
-              group: group,
-              books: [
-                for (final name in group.books)
-                  byName[name] ??
-                      BookProgress(
-                        name: name,
-                        isNewTestament: BibleBooks.newTestament.contains(name),
-                        chapters: BibleBooks.chaptersIn(name),
-                        readChapters: const [],
-                      ),
-              ],
-              intro: _intro.value,
-              expanded: _open.contains(group.label),
-              onToggle: () => setState(() {
-                if (!_open.remove(group.label)) _open.add(group.label);
-              }),
-              onOpenBook: _openBook,
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ],
+TextStyle _serif(double size, {Color? color, double letterSpacing = 0, double height = 1.15}) => TextStyle(
+      fontFamily: AppTheme.serifFontName,
+      fontVariations: const [FontVariation.weight(600)],
+      fontWeight: FontWeight.w600,
+      fontSize: size,
+      letterSpacing: letterSpacing,
+      height: height,
+      color: color ?? AppTheme.ink,
     );
-  }
+
+/// [text] with every number in it weighted and in full ink.
+TextSpan _boldNumbers(String text, TextStyle base) {
+  final spans = <TextSpan>[];
+  text.splitMapJoin(
+    RegExp(r'\d[\d.]*'),
+    onMatch: (m) {
+      spans.add(TextSpan(text: m[0], style: base.copyWith(fontWeight: FontWeight.w700, color: AppTheme.ink)));
+      return '';
+    },
+    onNonMatch: (s) {
+      if (s.isNotEmpty) spans.add(TextSpan(text: s));
+      return '';
+    },
+  );
+  return TextSpan(style: base, children: spans);
 }
 
-/// A whole number with the Dutch thousands separator: 1189 -> "1.189". Hand
-/// rolled like `adminNumber` and `formatCount` elsewhere; the app does not
-/// depend on `intl`.
-String _count(int n) {
-  final digits = (n < 0 ? 0 : n).toString();
-  final out = StringBuffer();
-  for (var i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 == 0) out.write('.');
-    out.write(digits[i]);
-  }
-  return out.toString();
-}
-
-/// The three colours a book can wear, here and in the squares on Start.
-enum _Status {
-  read('Gelezen'),
-  busy('Bezig'),
-  none('Nog niet');
-
-  const _Status(this.label);
-
-  final String label;
-
-  static _Status of(BookProgress book) => book.completed
-      ? _Status.read
-      : book.started
-      ? _Status.busy
-      : _Status.none;
-
-  Color get color => switch (this) {
-    // The same trio the "Je Bijbel" book grid paints with.
-    _Status.read => AppTheme.teal,
-    _Status.busy => AppTheme.teal.withValues(alpha: 0.35),
-    _Status.none => AppTheme.paperSunkenStrong,
-  };
-}
-
-/// Canonical position of every book, 0-65. [BibleBooks.all] builds a fresh
-/// list on every read, so the square wave looks the position up here instead of
-/// scanning that list once per square per frame.
-final Map<String, int> _canonIndex = () {
-  final order = BibleBooks.all;
-  return {for (var i = 0; i < order.length; i++) order[i]: i};
-}();
-
-/// How far along the reveal the square for the book at [index] of 66 is: one
-/// short wave from Genesis to Openbaring.
-double _squareReveal(double intro, int index) {
-  const start = 0.10;
-  const span = 0.45;
-  const pop = 0.16;
-  final at = start + span * index / (_canonIndex.length - 1);
-  return ((intro - at) / pop).clamp(0.0, 1.0);
-}
-
-/// White bar with the back arrow and the page title, matching the one on
-/// Bronnen and Alle studies.
+/// Back arrow and page title on the wall colour, so the room runs up to the
+/// status bar. A hairline appears once the page scrolls under it.
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.color, required this.scrolled});
+
+  final Color color;
+  final bool scrolled;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-
-    return Container(
-      height: 56,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(bottom: BorderSide(color: AppTheme.rule)),
+        color: color,
+        border: Border(
+          bottom: BorderSide(color: scrolled ? AppTheme.rule : color.withValues(alpha: 0)),
+        ),
       ),
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: IconButton(
-              tooltip: 'Terug',
-              onPressed: () => context.canPop() ? context.pop() : context.go('/dashboard'),
-              icon: Icon(Icons.arrow_back_ios_new, size: 20, color: AppTheme.inkSoft),
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(
-                'Bijbelvoortgang',
-                style: AppTheme.displayTitle.copyWith(fontWeight: FontWeight.w600),
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 52,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: IconButton(
+                  tooltip: 'Terug',
+                  onPressed: () => context.canPop() ? context.pop() : context.go('/dashboard'),
+                  icon: Icon(Icons.arrow_back, size: 22, color: AppTheme.ink),
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                ),
               ),
-            ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    'Bijbelvoortgang',
+                    style: AppTheme.displayTitle.copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+            ],
           ),
-          const SizedBox(width: 16),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// The share read, the two counts, the milestone bar and what is left to the
-/// next milestone.
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.progress, required this.intro});
+/// The wall with the title, the two counts and the bookcase standing on the
+/// floor.
+class _Room extends StatelessWidget {
+  const _Room({
+    required this.progress,
+    required this.layout,
+    required this.palette,
+    required this.intro,
+    required this.current,
+    required this.fresh,
+    required this.celebrate,
+    required this.pulled,
+    required this.pull,
+    required this.onTapBook,
+  });
 
   final BibleProgress progress;
+  final BookcaseLayout layout;
+  final BookcasePalette palette;
   final double intro;
+  final String? current;
+  final List<String> fresh;
+  final double celebrate;
+  final String? pulled;
+  final double pull;
+  final void Function(BookProgress book) onTapBook;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
     final p = progress;
-    final surface = Theme.of(context).colorScheme.surface;
+    final count = intro >= 1
+        ? p.chaptersRead
+        : (p.chaptersRead * Curves.easeOutCubic.transform(const Interval(0, 0.6).transform(intro))).round();
+    final climbed = intro >= 1 ? p.percent : p.percent * BookcaseMotion.ladder(intro);
+    final marker = climbed < 0.1 && climbed < p.percent ? '0%' : formatBiblePercent(climbed);
+    final freshIn = Curves.easeOut.transform(const Interval(0.8, 1).transform(intro));
 
-    // The number counts up over the first stretch of the intro, then sits on
-    // the real value - never a rounded-up share the reader has not reached.
-    final counted =
-        p.percent * Curves.easeOutCubic.transform(const Interval(0, 0.6).transform(intro));
-    final shown = intro >= 1 ? p.percent : counted;
-    final percentText =
-        shown < 0.1 && shown < p.percent ? '0%' : formatBiblePercent(shown);
-    final footer = bibleMilestoneFooter(p.chaptersRead, p.chaptersTotal);
-
-    return AppCard(
-      padding: EdgeInsets.zero,
-      clip: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final caseWidth = math.min(constraints.maxWidth - 20, Bookcase.maxWidth);
+        final s = caseWidth / BookcaseLayout.width;
+        return CustomPaint(
+          painter: BookcaseRoomPainter(palette: palette, floorHeight: 46 * s),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 6, 22, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            percentText,
-                            style: AppTheme.statNumber.copyWith(
-                              fontSize: 40,
-                              height: 1.05,
-                              letterSpacing: -1,
-                              color: AppTheme.teal,
+                          Semantics(
+                            header: true,
+                            child: Text('Je boekenkast', style: _serif(27, letterSpacing: -0.4, height: 1.1)),
+                          ),
+                          const SizedBox(height: 5),
+                          Text.rich(
+                            _boldNumbers(
+                              shelfSummary(p),
+                              AppTheme.bodyMuted.copyWith(fontSize: 14, height: 1.3, color: AppTheme.inkSoft),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text('van de Bijbel gelezen', style: AppTheme.caption),
                         ],
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                    Semantics(
+                      excludeSemantics: true,
+                      label: '${p.chaptersRead} van ${p.chaptersTotal} hoofdstukken gelezen, '
+                          '${formatBiblePercent(p.percent)} van de Bijbel',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _Count(
-                            '${_count(p.chaptersRead)} / ${_count(p.chaptersTotal)}',
-                            'hoofdstukken',
-                          ),
-                          const SizedBox(height: 6),
-                          _Count(
-                            '${_count(p.booksCompleted)} / ${_count(p.booksTotal)}',
-                            'boeken',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                BibleMilestoneBar(fraction: p.percent / 100, intro: intro, cut: surface),
-              ],
-            ),
-          ),
-          Container(
-            color: AppTheme.tealTint,
-            padding: const EdgeInsets.fromLTRB(18, 11, 16, 11),
-            child: Row(
-              children: [
-                Icon(Icons.flag_outlined, size: 16, color: AppTheme.teal),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    footer,
-                    maxLines: 2,
-                    style: AppTheme.caption.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.inkSoft,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "694 / 1.189 hoofdstukken" on one line, the number weighted.
-class _Count extends StatelessWidget {
-  const _Count(this.value, this.unit);
-
-  final String value;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: value,
-            style: AppTheme.caption.copyWith(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.ink,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          TextSpan(text: ' $unit', style: AppTheme.caption.copyWith(fontSize: 13)),
-        ],
-      ),
-      textAlign: TextAlign.right,
-    );
-  }
-}
-
-/// "Verder lezen" with the next chapter and a teal button that opens it.
-class _ResumeCard extends ConsumerWidget {
-  const _ResumeCard({required this.onOpen});
-
-  final void Function(NextChapter target) onOpen;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    AppTheme.dependOn(context);
-    final next = ref.watch(nextChapterProvider);
-    if (next == null) return const SizedBox.shrink();
-
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Verder lezen',
-                  style: AppTheme.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  next.reference,
-                  style: AppTheme.bodyStrong.copyWith(fontSize: 17),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          SiteButton(
-            label: 'Lezen',
-            expand: false,
-            height: 40,
-            onPressed: () => onOpen(next),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// What the three colours mean. Without it the squares are decorative.
-class _Legend extends StatelessWidget {
-  const _Legend();
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-
-    return Row(
-      children: [
-        for (final status in _Status.values) ...[
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: status.color,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            status.label,
-            style: AppTheme.caption.copyWith(fontSize: 12, color: AppTheme.inkMuted),
-          ),
-          if (status != _Status.values.last) const SizedBox(width: 16),
-        ],
-      ],
-    );
-  }
-}
-
-/// One canon group: its name, how many of its books are read, a square per
-/// book, and - once tapped - the books themselves.
-class _GroupCard extends StatelessWidget {
-  const _GroupCard({
-    required this.group,
-    required this.books,
-    required this.intro,
-    required this.expanded,
-    required this.onToggle,
-    required this.onOpenBook,
-  });
-
-  final BibleBookGroup group;
-  final List<BookProgress> books;
-  final double intro;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final void Function(BookProgress book) onOpenBook;
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    final done = books.where((b) => b.completed).length;
-    final finished = done == books.length && books.isNotEmpty;
-
-    return AppCard(
-      padding: EdgeInsets.zero,
-      clip: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            button: true,
-            expanded: expanded,
-            label: '${group.label}, $done van ${books.length} boeken gelezen',
-            excludeSemantics: true,
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            group.label,
-                            style: AppTheme.bodyStrong,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        if (finished)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.tealTint,
-                              borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                            ),
-                            child: Text(
-                              'Klaar',
-                              style: AppTheme.caption.copyWith(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.teal,
-                              ),
-                            ),
-                          )
-                        else
                           Text(
-                            '$done van ${books.length}',
-                            style: AppTheme.caption.copyWith(
-                              fontSize: 12.5,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                            formatShelfCount(count),
+                            style: AppTheme.statNumber.copyWith(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                              height: 1,
+                              color: AppTheme.tealStrong,
                             ),
                           ),
-                        AnimatedRotation(
-                          turns: expanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 180),
-                          child: Icon(Icons.expand_more, color: AppTheme.inkFaint),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: [
-                          for (final book in books)
-                            _Square(
-                              status: _Status.of(book),
-                              reveal: _squareReveal(intro, _canonIndex[book.name] ?? 0),
-                            ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'van ${formatShelfCount(p.chaptersTotal)} hoofdstukken',
+                            style: AppTheme.caption.copyWith(color: AppTheme.inkMuted),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          if (expanded)
-            for (final book in books) ...[
-              Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-              _BookRow(book: book, onTap: () => onOpenBook(book)),
+              if (fresh.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Opacity(
+                      opacity: freshIn,
+                      child: Transform.translate(
+                        offset: Offset(0, 6 * (1 - freshIn)),
+                        child: _FreshChip(names: fresh),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Center(
+                child: SizedBox(
+                  width: caseWidth,
+                  child: Bookcase(
+                    layout: layout,
+                    fraction: p.chaptersRead / math.max(1, p.chaptersTotal),
+                    markerLabel: marker,
+                    intro: intro,
+                    current: current,
+                    celebrating: fresh.toSet(),
+                    celebrate: celebrate,
+                    pulled: pulled,
+                    pull: pull,
+                    onTapBook: onTapBook,
+                  ),
+                ),
+              ),
             ],
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
-/// One book as a small square in its status colour, popping into place during
-/// the intro.
-class _Square extends StatelessWidget {
-  const _Square({required this.status, required this.reveal});
+/// "Nieuw uit: Exodus" on a brass plate, for books finished since last time.
+class _FreshChip extends StatelessWidget {
+  const _FreshChip({required this.names});
 
-  final _Status status;
-  final double reveal;
+  final List<String> names;
 
   @override
   Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    final empty = _Status.none.color;
-    final t = Curves.easeOut.transform(reveal);
-    // A finished square is the only one worth announcing; grey needs no reveal.
-    final color = status == _Status.none ? empty : Color.lerp(empty, status.color, t)!;
-    final scale = status == _Status.none ? 1.0 : 1 + 0.22 * math.sin(math.pi * reveal);
-
-    return SizedBox(
-      width: 11,
-      height: 11,
-      child: Center(
-        child: Container(
-          width: 11 * scale,
-          height: 11 * scale,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3 * scale),
+    final label = names.length > 3
+        ? '${joinBookNames(names)} nieuw uit'
+        : 'Nieuw uit: ${joinBookNames(names)}';
+    return Semantics(
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFB98A2E), Color(0xFFF5D98B), Color(0xFFC49533)],
+            stops: [0, 0.45, 1],
+          ),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [BoxShadow(color: Color(0x33A47C2C), blurRadius: 8, offset: Offset(0, 3))],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(9, 5, 12, 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF5B4314)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.caption.copyWith(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF5B4314),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -742,66 +699,516 @@ class _Square extends StatelessWidget {
   }
 }
 
-/// One book inside an expanded group: status dot, name, bar, chapters read.
-class _BookRow extends StatelessWidget {
-  const _BookRow({required this.book, required this.onTap});
+/// "Je leeslint ligt in Exodus 10": the book's cover with the ribbon, and a
+/// strip with a cell per chapter. Tapping it opens the book's sheet.
+class _RibbonCard extends StatelessWidget {
+  const _RibbonCard({
+    required this.book,
+    required this.chapter,
+    required this.fresh,
+    required this.intro,
+    required this.palette,
+    required this.onTap,
+  });
 
   final BookProgress book;
+  final int chapter;
+
+  /// No chapter read yet: the card invites a start instead.
+  final bool fresh;
+  final double intro;
+  final BookcasePalette palette;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     AppTheme.dependOn(context);
-    final status = _Status.of(book);
-
+    final color = shelfColorFor(book.name);
+    final kicker = fresh ? 'Hier begin je' : 'Je leeslint ligt in';
     return Semantics(
       button: true,
-      label: '${book.name}, ${book.readCount} van ${book.chapters} hoofdstukken '
-          'gelezen${book.completed ? ', voltooid' : ''}',
       excludeSemantics: true,
-      child: InkWell(
+      label: '$kicker ${book.name} $chapter. ${book.readCount} van ${book.chapters} hoofdstukken gelezen.',
+      onTap: onTap,
+      child: _RaisedCard(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-          child: Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(color: status.color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 5,
-                child: Text(
-                  book.name,
-                  style: AppTheme.caption.copyWith(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.ink,
+        child: Row(
+          children: [
+            BookCover(
+              title: book.name,
+              color: color,
+              width: 58,
+              height: 80,
+              titleSize: book.name.length > 9 ? 9 : 11,
+              ruleTop: 30,
+              ribbon: const Color(0xFFC2410C),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(kicker, style: AppTheme.caption.copyWith(fontSize: 12.5)),
+                  const SizedBox(height: 1),
+                  Text(
+                    '${book.name} $chapter',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.displaySmall.copyWith(letterSpacing: -0.3, height: 1.25),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 8),
+                  _ChapterStrip(
+                    book: book,
+                    next: chapter,
+                    color: color,
+                    empty: palette.chapterEmpty,
+                    nextColor: palette.chapterNext,
+                    reveal: intro,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown once every chapter is read: the whole case is gold.
+class _AllReadCard extends StatelessWidget {
+  const _AllReadCard();
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return _RaisedCard(
+      child: Row(
+        children: [
+          const BookCover(title: 'Bijbel', color: Color(0xFF134E4A), width: 58, height: 80, titleSize: 11, ruleTop: 30),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Je boekenkast is vol', style: AppTheme.caption.copyWith(fontSize: 12.5)),
+                const SizedBox(height: 1),
+                Text(
+                  'Je hebt de hele Bijbel gelezen',
+                  style: AppTheme.displaySmall.copyWith(fontSize: 18, letterSpacing: -0.3, height: 1.25),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 3,
-                child: SiteProgressBar(value: book.percent / 100, height: 4),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '${book.readCount}/${book.chapters}',
-                style: AppTheme.caption.copyWith(
-                  fontSize: 12,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The floating white card of the design: rounded 20, a long soft shadow.
+class _RaisedCard extends StatelessWidget {
+  const _RaisedCard({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final radius = BorderRadius.circular(20);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.isDark ? const Color(0x99000000) : const Color(0x590F172A),
+            blurRadius: 30,
+            offset: const Offset(0, 14),
+            spreadRadius: -14,
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppTheme.paperRaised,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: AppTheme.isDark ? AppTheme.rule : const Color(0x0A0F172A)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap == null ? null : AppHaptics.tap(onTap),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: child,
           ),
         ),
       ),
     );
   }
+}
+
+/// A cell per chapter: read in the book's colour, the leeslint's chapter in
+/// ribbon orange, the rest empty. Read cells fill in left to right during the
+/// intro.
+class _ChapterStrip extends StatelessWidget {
+  const _ChapterStrip({
+    required this.book,
+    required this.next,
+    required this.color,
+    required this.empty,
+    required this.nextColor,
+    required this.reveal,
+  });
+
+  final BookProgress book;
+  final int next;
+  final Color color;
+  final Color empty;
+  final Color nextColor;
+  final double reveal;
+
+  static const _gap = 2.0;
+  static const _cell = 8.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final cols = book.chapters > 100 ? 25 : 20;
+    final rows = (book.chapters / cols).ceil();
+    return SizedBox(
+      height: rows * (_cell + _gap) - _gap,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _ChapterStripPainter(
+          book: book,
+          next: next,
+          cols: cols,
+          color: color,
+          empty: empty,
+          nextColor: nextColor,
+          reveal: reveal,
+        ),
+      ),
+    );
+  }
+}
+
+class _ChapterStripPainter extends CustomPainter {
+  _ChapterStripPainter({
+    required this.book,
+    required this.next,
+    required this.cols,
+    required this.color,
+    required this.empty,
+    required this.nextColor,
+    required this.reveal,
+  });
+
+  final BookProgress book;
+  final int next;
+  final int cols;
+  final Color color;
+  final Color empty;
+  final Color nextColor;
+  final double reveal;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const gap = _ChapterStrip._gap;
+    const cell = _ChapterStrip._cell;
+    final w = (size.width - gap * (cols - 1)) / cols;
+    final n = book.chapters;
+    final sweep = ((reveal - 0.3) / 0.55).clamp(0.0, 1.0) * (n + 2);
+    for (var i = 0; i < n; i++) {
+      final chapter = i + 1;
+      final rect = Rect.fromLTWH((i % cols) * (w + gap), (i ~/ cols) * (cell + gap), w, cell);
+      final t = (sweep - i).clamp(0.0, 1.0);
+      final target = book.isRead(chapter) ? color : (chapter == next ? nextColor : empty);
+      final fill = target == empty ? empty : Color.lerp(empty, target, t)!;
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(2)), Paint()..color = fill);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChapterStripPainter old) =>
+      old.reveal != reveal ||
+      !identical(old.book, book) ||
+      old.next != next ||
+      old.color != color ||
+      old.empty != empty ||
+      old.nextColor != nextColor;
+}
+
+/// A titled block below the case: Lora heading, a muted line, content.
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.lede, required this.child});
+
+  final String title;
+  final String lede;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(header: true, child: Text(title, style: _serif(20, letterSpacing: -0.2))),
+          const SizedBox(height: 3),
+          Text(lede, style: AppTheme.bodyMuted.copyWith(fontSize: 13.5, height: 1.35)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// "Op je leestafel": the books started but not finished, lying slightly
+/// askew, each with its ribbon. Four fit across; more scroll sideways.
+class _ReadingTable extends StatelessWidget {
+  const _ReadingTable({
+    required this.books,
+    required this.current,
+    required this.intro,
+    required this.onTap,
+  });
+
+  final List<BookProgress> books;
+  final String? current;
+  final double intro;
+  final void Function(BookProgress book) onTap;
+
+  static const _tilts = [-3.0, 2.0, -1.5, 3.0];
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    if (books.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.paperSunken,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          'Nog niets op tafel. Open een hoofdstuk in de lezer en het boek ligt hier klaar.',
+          style: AppTheme.bodyMuted.copyWith(fontSize: 13.5),
+        ),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 10.0;
+        final perRow = books.length > 4 ? 4.35 : 4.0;
+        final itemWidth = (constraints.maxWidth - gap * 3) / perRow;
+        final coverWidth = math.min(70.0, itemWidth - 6);
+        final items = [
+          for (var i = 0; i < books.length; i++)
+            _TableBook(
+              book: books[i],
+              width: itemWidth,
+              coverWidth: coverWidth,
+              tilt: _tilts[i % _tilts.length],
+              reveal: Curves.easeOutCubic.transform(
+                ((intro - 0.35 - 0.07 * math.min(i, 6)) / 0.35).clamp(0.0, 1.0),
+              ),
+              onTap: () => onTap(books[i]),
+            ),
+        ];
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          physics: books.length > 4 ? null : const NeverScrollableScrollPhysics(),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0) const SizedBox(width: gap),
+                items[i],
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TableBook extends StatelessWidget {
+  const _TableBook({
+    required this.book,
+    required this.width,
+    required this.coverWidth,
+    required this.tilt,
+    required this.reveal,
+    required this.onTap,
+  });
+
+  final BookProgress book;
+  final double width;
+  final double coverWidth;
+  final double tilt;
+  final double reveal;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final share = book.readCount / math.max(1, book.chapters);
+    return Semantics(
+      button: true,
+      excludeSemantics: true,
+      label: '${book.name}, ${book.readCount} van ${book.chapters} hoofdstukken gelezen',
+      onTap: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: AppHaptics.tap(onTap),
+        child: Opacity(
+          opacity: reveal,
+          child: Transform.translate(
+            offset: Offset(0, 14 * (1 - reveal)),
+            child: SizedBox(
+              width: width,
+              child: Column(
+                children: [
+                  const SizedBox(height: 6),
+                  Transform.rotate(
+                    angle: tilt * math.pi / 180 * (0.4 + 0.6 * reveal),
+                    child: BookCover(
+                      title: book.name,
+                      color: shelfColorFor(book.name),
+                      width: coverWidth,
+                      height: coverWidth * 90 / 70,
+                      ribbon: ribbonRed,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    book.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.bodyStrong.copyWith(fontSize: 13, height: 1.3),
+                  ),
+                  Text(
+                    '${book.readCount} van ${book.chapters}',
+                    style: AppTheme.caption.copyWith(
+                      fontSize: 11.5,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  ShelfBar(value: share, color: AppTheme.teal, height: 4, width: math.min(56, width - 8)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "De ladder op": the next rung on each track, with a brass bar.
+class _LadderSteps extends StatelessWidget {
+  const _LadderSteps({required this.steps, required this.intro});
+
+  final List<LadderStep> steps;
+  final double intro;
+
+  // Lucide `flag`, `book-open` and `flame`, as the website draws them.
+  static const _flag =
+      '<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/>';
+  static const _book = '<path d="M12 7v14"/>'
+      '<path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>';
+  static const _flame =
+      '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>';
+
+  @override
+  Widget build(BuildContext context) {
+    AppTheme.dependOn(context);
+    final grow = Curves.easeOutCubic.transform(const Interval(0.5, 1).transform(intro.clamp(0.0, 1.0)));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.paperRaised,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.rule),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < steps.length; i++) ...[
+            if (i > 0) CustomPaint(size: const Size(double.infinity, 1), painter: _DashPainter(AppTheme.rule)),
+            _rung(steps[i], grow),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _rung(LadderStep step, double grow) {
+    final (icon, bg, fg) = switch (step.track) {
+      LadderTrack.bible => (
+          _flag,
+          AppTheme.isDark ? const Color(0xFF3A2E12) : const Color(0xFFFEF3C7),
+          AppTheme.isDark ? const Color(0xFFE9C46A) : const Color(0xFFA47C2C),
+        ),
+      LadderTrack.books => (_book, AppTheme.tealSoft, AppTheme.isDark ? AppTheme.teal : AppTheme.tealStrong),
+      LadderTrack.streak => (_flame, AppTheme.flameTint, AppTheme.isDark ? AppTheme.flame : AppTheme.vermilionStrong),
+    };
+    return Semantics(
+      excludeSemantics: true,
+      label: '${step.title}, ${step.subtitle}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+              alignment: Alignment.center,
+              child: LucideIcon(icon, size: 19, color: fg),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(step.title, style: AppTheme.bodyStrong.copyWith(fontSize: 14.5, height: 1.3)),
+                  Text(step.subtitle, style: AppTheme.caption.copyWith(fontSize: 12.5)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ShelfBar(value: step.fraction * grow, color: brass, height: 6, width: 64),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashPainter extends CustomPainter {
+  _DashPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 7) {
+      canvas.drawLine(Offset(x, 0.5), Offset(math.min(x + 3.5, size.width), 0.5), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashPainter old) => old.color != color;
 }
 
 class _Skeleton extends StatelessWidget {
@@ -810,15 +1217,15 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: const [
-        Skeleton(height: 168),
-        SizedBox(height: 12),
-        Skeleton(height: 72),
-        SizedBox(height: 18),
-        Skeleton(height: 34),
+        Skeleton(height: 54),
         SizedBox(height: 14),
-        Skeleton(height: 320),
+        Skeleton(height: 420, radius: 10),
+        SizedBox(height: 14),
+        Skeleton(height: 112, radius: 20),
+        SizedBox(height: 12),
+        Skeleton(height: 46, radius: 12),
       ],
     );
   }

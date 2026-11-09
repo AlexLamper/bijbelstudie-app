@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,16 +9,17 @@ import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/auth_controller.dart';
 import '../../profile/domain/bible_progress.dart';
 import '../../profile/present/bible_milestone_bar.dart';
+import '../../profile/present/bookcase_view.dart';
 import '../data/bible_progress_seen_store.dart';
 import '../domain/bible_milestones.dart';
 
 /// "Je Bijbel" on Start, under the tekst van de dag: the share of all 1189
-/// chapters read, a 66-square map of the books, a milestone bar and what is
-/// left to the next milestone. Built from the `readChapters` map `/dashboard`
-/// already returns; a tap opens the full list at `/profile/bijbel`.
+/// chapters read, the bookcase of `/profile/bijbel` in miniature, a milestone
+/// bar and what is left to the next milestone. Built from the `readChapters`
+/// map `/dashboard` already returns; a tap opens the bookcase itself.
 ///
-/// The first time it shows in a session the number counts up, the squares fill
-/// in reading order and the bar grows, all in about 1.4 s. A milestone crossed
+/// The first time it shows in a session the number counts up, the little
+/// spines fill in reading order and the bar grows, all in about 1.4 s. A milestone crossed
 /// since the card last showed (remembered per account on the device) makes its
 /// tick glow and turns the footer into a short celebration.
 class BibleProgressCard extends ConsumerStatefulWidget {
@@ -182,13 +182,11 @@ class _BibleProgressCardState extends ConsumerState<BibleProgressCard>
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: CustomPaint(
-                      size: _BookGridPainter.size,
-                      painter: _BookGridPainter(
+                      size: MiniBookcasePainter.size,
+                      painter: MiniBookcasePainter(
                         books: p.books,
                         intro: v,
-                        done: AppTheme.teal,
-                        partial: AppTheme.teal.withValues(alpha: 0.35),
-                        empty: AppTheme.paperSunkenStrong,
+                        palette: BookcasePalette.current,
                       ),
                     ),
                   ),
@@ -241,73 +239,4 @@ class _BibleProgressCardState extends ConsumerState<BibleProgressCard>
       ],
     );
   }
-}
-
-/// 11 x 6 squares, one per book in canonical order: teal when finished, light
-/// teal when started, grey when not. During the intro each started square pops
-/// into its colour in turn, a quick wave from Genesis to Openbaring.
-class _BookGridPainter extends CustomPainter {
-  _BookGridPainter({
-    required this.books,
-    required this.intro,
-    required this.done,
-    required this.partial,
-    required this.empty,
-  });
-
-  static const _cols = 11;
-  static const _rows = 6;
-  static const _cell = 9.0;
-  static const _gap = 3.0;
-  static const size = Size(
-    _cols * _cell + (_cols - 1) * _gap,
-    _rows * _cell + (_rows - 1) * _gap,
-  );
-
-  /// Where in the intro the wave starts and ends, and how long one square takes.
-  static const _waveStart = 0.08;
-  static const _waveSpan = 0.45;
-  static const _pop = 0.14;
-
-  final List<BookProgress> books;
-  final double intro;
-  final Color done;
-  final Color partial;
-  final Color empty;
-
-  @override
-  void paint(Canvas canvas, Size _) {
-    final n = math.min(books.length, _cols * _rows);
-    for (var i = 0; i < n; i++) {
-      final book = books[i];
-      final center = Offset(
-        (i % _cols) * (_cell + _gap) + _cell / 2,
-        (i ~/ _cols) * (_cell + _gap) + _cell / 2,
-      );
-      var color = empty;
-      var scale = 1.0;
-      if (book.started) {
-        final start = _waveStart + _waveSpan * i / math.max(1, n - 1);
-        final t = ((intro - start) / _pop).clamp(0.0, 1.0);
-        color = Color.lerp(empty, book.completed ? done : partial, Curves.easeOut.transform(t))!;
-        scale = 1 + 0.28 * math.sin(math.pi * t);
-      }
-      final side = _cell * scale;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: center, width: side, height: side),
-          Radius.circular(2.5 * scale),
-        ),
-        Paint()..color = color,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BookGridPainter old) =>
-      old.intro != intro ||
-      !identical(old.books, books) ||
-      old.done != done ||
-      old.partial != partial ||
-      old.empty != empty;
 }
