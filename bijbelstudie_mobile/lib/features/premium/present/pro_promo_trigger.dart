@@ -14,6 +14,8 @@ import 'paywall_route.dart';
 import 'premium_controller.dart';
 import 'pro_access_provider.dart';
 import 'promo_moments.dart';
+import 'trial_announcement_sheet.dart';
+import '../data/reverse_trial_repository.dart';
 
 /// True only when it is *known* that a signed-in reader does not have Pro:
 /// the server profile has loaded and the store has answered. Anything still
@@ -62,6 +64,9 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
   /// marks it seen as well, so the next profile load no longer asks for it.
   static bool _recapShown = false;
 
+  /// "Je hebt 3 dagen Pro gekregen" was put on screen this process.
+  static bool _announced = false;
+
   Timer? _timer;
 
   @override
@@ -105,10 +110,11 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     // promo: a streak or the end of onboarding is a new reason to ask.
     final pending = ref.read(promoMomentProvider) != null || _recapDue();
     final touring = ref.read(tourControllerProvider).active;
-    final armed = eligible &&
-        !touring &&
-        (pending || !_doneThisProcess) &&
-        _path() == ProPromoRules.triggerRoute;
+    // The announcement is for a reader who HAS Pro (their trial just began),
+    // so it does not wait for the promo's "not Pro" eligibility.
+    final armed = !touring &&
+        _path() == ProPromoRules.triggerRoute &&
+        (_announceDue() || (eligible && (pending || !_doneThisProcess)));
     if (!armed) {
       _timer?.cancel();
       _timer = null;
@@ -122,9 +128,17 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
   /// happens once per account.
   bool _recapDue() => !_recapShown && (ref.read(reverseTrialProvider)?.recapPending ?? false);
 
+  /// An older account was just given the reverse trial (website
+  /// `isExistingFreeAccount`) and has not been told yet.
+  bool _announceDue() => !_announced && (ref.read(reverseTrialProvider)?.announce ?? false);
+
   Future<void> _fire() async {
     _timer = null;
     if (!mounted) return;
+    if (_announceDue()) {
+      await _fireAnnouncement();
+      return;
+    }
     if (_recapDue()) {
       _fireRecap();
       return;
@@ -166,6 +180,17 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     // five screens to a reader who did not ask for any of them. One pitch, and
     // it ends by replacing itself with `/premium`.
     openPaywall(context, source: ProPromoRules.paywallSource);
+  }
+
+  Future<void> _fireAnnouncement() async {
+    if (_path() != ProPromoRules.triggerRoute) return;
+    if (ref.read(tourControllerProvider).active) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    final trial = ref.read(reverseTrialProvider);
+    if (trial == null) return;
+    _announced = true;
+    unawaited(ref.read(reverseTrialRepositoryProvider).markAnnounceSeen(Analytics.platform));
+    await showTrialAnnouncementSheet(context, daysTotal: trial.daysTotal, daysUsed: trial.daysUsed);
   }
 
   void _fireRecap() {
@@ -213,6 +238,7 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     // (the onboarding offer waits for it).
     ref.watch(promoMomentProvider);
     ref.watch(reverseTrialProvider.select((trial) => trial?.recapPending ?? false));
+    ref.watch(reverseTrialProvider.select((trial) => trial?.announce ?? false));
     ref.watch(tourControllerProvider.select((tour) => tour.active));
     // Route and eligibility both arrive through rebuilds (the shell rebuilds
     // on every navigation); the timer is (re)armed or cancelled after layout.

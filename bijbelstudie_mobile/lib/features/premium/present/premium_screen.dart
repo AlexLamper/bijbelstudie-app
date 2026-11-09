@@ -194,10 +194,9 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         ctaLabelNoTrial: widget.onboarding ? 'Begin direct' : 'Word Pro',
         // Onboarding: three lines, so both plans - and the weekly prices side by
         // side - fit above the button with the two-line headline.
-        benefits: PaywallCopy.benefits(
-          gateBenefit: pitch != null ? PaywallCopy.featureBenefit(pitch.feature) : widget.gate?.benefit,
-          goal: goal,
-        )
+        benefits: (pitch != null
+                ? PaywallCopy.benefitsFor(pitch.feature, goal: goal)
+                : PaywallCopy.benefits(gateBenefit: widget.gate?.benefit, goal: goal))
             .take(widget.onboarding ? 3 : PaywallCopy.shown)
             .toList(),
         trial: premiumState.yearlyTrial,

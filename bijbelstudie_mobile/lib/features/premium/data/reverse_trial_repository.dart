@@ -59,6 +59,13 @@ class ReverseTrialRepository {
     } catch (_) {}
   }
 
+  /// "Je hebt 3 dagen Pro gekregen" was shown: the website will not show it again.
+  Future<void> markAnnounceSeen(String platform) async {
+    try {
+      await _apiClient.dio.post('/reverse-trial', data: {'action': 'announce_seen', 'platform': platform});
+    } catch (_) {}
+  }
+
   /// "I am about to open [kind]" (`music`, `offline`). Null when the server
   /// could not be asked - the caller then keeps to what it already knew.
   Future<AllowanceAnswer?> claim(String kind, {String? key}) async {

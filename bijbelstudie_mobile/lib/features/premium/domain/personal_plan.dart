@@ -10,8 +10,12 @@
 /// the same sentences the website uses, so the two clients never disagree.
 library;
 
-/// The four features the trial weighs. `id` is the server's string.
+/// The five features the trial weighs. `id` is the server's string.
 enum ProFeature {
+  /// The guided lessons. Free and unlimited for everyone but the reader whose
+  /// personal limit they are: one NEW lesson a day, a begun one always
+  /// finished.
+  studies('studies', 'de lessen'),
   ai('ai', 'AI-vragen'),
   notes('notes', 'notities'),
   study('study', 'studiemateriaal'),
@@ -47,6 +51,8 @@ class TrialUsage {
     this.highlights = 0,
     this.study = 0,
     this.audio = 0,
+    this.lessons = 0,
+    this.lessonSteps = 0,
     this.chapters = 0,
   });
 
@@ -55,6 +61,10 @@ class TrialUsage {
   final int highlights;
   final int study;
   final int audio;
+
+  /// Lessons finished, and lesson steps worked through for the first time.
+  final int lessons;
+  final int lessonSteps;
   final int chapters;
 
   factory TrialUsage.fromJson(Map<String, dynamic>? json) {
@@ -65,6 +75,8 @@ class TrialUsage {
       highlights: _count(j['highlights']),
       study: _count(j['study']),
       audio: _count(j['audio']),
+      lessons: _count(j['lessons']),
+      lessonSteps: _count(j['lessonSteps']),
       chapters: _count(j['chapters']),
     );
   }
@@ -80,6 +92,8 @@ class ReverseTrial {
     this.topFeature,
     this.usage = const TrialUsage(),
     this.recapPending = false,
+    this.existingAccount = false,
+    this.announce = false,
   });
 
   /// True while the Pro days run; false once they ended.
@@ -97,6 +111,13 @@ class ReverseTrial {
   /// "Je Pro-dagen zitten erop" is due: once, on either client.
   final bool recapPending;
 
+  /// The one-time trial of an account from before the reverse trial.
+  final bool existingAccount;
+
+  /// "Je hebt 3 dagen Pro gekregen" is due: once, on either client, while the
+  /// trial of an older account runs.
+  final bool announce;
+
   bool get ended => !active;
   int get daysLeft => (daysTotal - daysUsed).clamp(0, daysTotal);
 
@@ -113,6 +134,8 @@ class ReverseTrial {
       topFeature: ProFeature.fromId(json['topFeature']),
       usage: TrialUsage.fromJson(json['usage'] as Map<String, dynamic>?),
       recapPending: json['recapPending'] == true,
+      existingAccount: json['origin'] == 'existing',
+      announce: json['announce'] == true,
     );
   }
 }
@@ -128,6 +151,7 @@ class AccountLimits {
     required this.studyChaptersPerDay,
     required this.audioPerDay,
     required this.offline,
+    this.lessonsPerDay,
     this.limitedFeature,
   });
 
@@ -146,6 +170,9 @@ class AccountLimits {
   /// Music tracks per day; null = unlimited, 0 = Pro only.
   final int? audioPerDay;
   final bool offline;
+
+  /// New lessons a day; null = as many as you like (everyone but one reader).
+  final int? lessonsPerDay;
 
   /// The feature with a personal limit, or null.
   final ProFeature? limitedFeature;
@@ -179,6 +206,7 @@ class AccountLimits {
       studyChaptersPerDay: _optionalInt(json['studyChaptersPerDay']),
       audioPerDay: _optionalInt(json['audioPerDay']),
       offline: json['offline'] == true,
+      lessonsPerDay: _optionalInt(json['lessonsPerDay']),
       limitedFeature: ProFeature.fromId(json['limitedFeature']),
     );
   }
@@ -194,6 +222,7 @@ class PersonalPlanCopy {
   static const tinyStudyChapters = 1;
   static const tinyCrossRefs = 1;
   static const tinyAudioDaily = 1;
+  static const tinyLessonsDaily = 1;
 
   static String _plural(int n, String one, String many) => '$n ${n == 1 ? one : many}';
 
@@ -215,6 +244,11 @@ class PersonalPlanCopy {
             : null;
       case ProFeature.audio:
         return usage.audio > 0 ? 'Je luisterde ${usage.audio} keer naar muziek of voorlezen${_inDays(days)}' : null;
+      case ProFeature.studies:
+        if (usage.lessons > 0) return 'Je deed ${_plural(usage.lessons, 'les', 'lessen')}${_inDays(days)}';
+        return usage.lessonSteps > 0
+            ? 'Je zette ${_plural(usage.lessonSteps, 'stap', 'stappen')} in je lessen${_inDays(days)}'
+            : null;
     }
   }
 
@@ -226,6 +260,8 @@ class PersonalPlanCopy {
       'elke dag ${_plural(tinyStudyChapters, 'hoofdstuk', 'hoofdstukken')} met al het commentaar en de grondtekst, '
           'en ${_plural(tinyCrossRefs, 'kruisverwijzing', 'kruisverwijzingen')} per vers',
     ProFeature.audio => '$tinyAudioDaily muzieknummer of voorgelezen hoofdstuk per dag',
+    ProFeature.studies =>
+      '${_plural(tinyLessonsDaily, 'nieuwe les', 'nieuwe lessen')} per dag; een les waar je al aan begonnen bent, maak je altijd af',
   };
 
   /// The refusal at the personal limit.
@@ -237,6 +273,8 @@ class PersonalPlanCopy {
       'Je gratis hoofdstuk met al het studiemateriaal is voor vandaag gebruikt. Morgen opent er weer $tinyStudyChapters.',
     ProFeature.audio =>
       'Je gratis muzieknummer of voorgelezen hoofdstuk is voor vandaag gebruikt. Morgen kun je er weer $tinyAudioDaily kiezen.',
+    ProFeature.studies =>
+      'Je nieuwe les voor vandaag ben je al begonnen. Morgen kun je weer $tinyLessonsDaily nieuwe les beginnen; een les waar je al in zit, maak je gewoon af.',
   };
 
   /// What Pro gives back, said under the refusal on the paywall.
@@ -245,13 +283,17 @@ class PersonalPlanCopy {
     ProFeature.notes => 'Met Pro schrijf je weer onbeperkt notities.',
     ProFeature.study => 'Met Pro open je alle commentaren en de grondtekst bij elk hoofdstuk.',
     ProFeature.audio => 'Met Pro speelt alle muziek door en lees je ook offline.',
+    ProFeature.studies => 'Met Pro begin je elke dag zoveel lessen als je wilt.',
   };
 
   /// What stays free for an account with [limited] as its personal limit.
   static List<String> freeIncludes(ProFeature? limited, AccountLimits free) {
     return [
       'de Bijbel lezen in alle vertalingen',
-      'alle begeleide studies',
+      if (limited == ProFeature.studies)
+        '${_plural(tinyLessonsDaily, 'nieuwe les', 'nieuwe lessen')} per dag in de begeleide studies'
+      else
+        'alle begeleide studies',
       'het KingComments-commentaar',
       if (limited != ProFeature.ai) '${free.aiDaily} AI-vragen per dag',
       if (limited != ProFeature.notes)

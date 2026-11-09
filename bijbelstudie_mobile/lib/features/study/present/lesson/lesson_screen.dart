@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/analytics/analytics.dart';
 import '../../../../core/notifications/notification_scheduler.dart';
 import '../../../../core/notifications/permission_moment.dart';
 import '../../../../core/notifications/retention_store.dart';
@@ -14,6 +15,7 @@ import '../../../ai/present/ai_assistant_pane.dart';
 import '../../../dashboard/data/dashboard_repository.dart';
 import '../../../dashboard/present/dashboard_providers.dart';
 import '../../../feedback/data/review_prompt.dart';
+import '../../../premium/present/paywall_route.dart';
 import '../../../progress_tree/present/progress_tree_celebration.dart';
 import '../../../progress_tree/present/progress_tree_providers.dart';
 import '../../../settings/data/reading_settings.dart';
@@ -431,6 +433,21 @@ class _LessonScreenState extends ConsumerState<LessonScreen> {
 
   Widget _error(Object error) {
     final needsEnrollment = error is LessonException && error.needsEnrollment;
+    if (error is LessonException && error.personalLimit) {
+      return Column(
+        children: [
+          _TopBar(
+            title: 'Les',
+            subtitle: null,
+            onClose: () => _close(null),
+            onTapTitle: null,
+            onOpenAssistant: null,
+            onOpenSettings: null,
+          ),
+          Expanded(child: LessonLimitState(message: error.message)),
+        ],
+      );
+    }
     return Column(
       children: [
         _TopBar(
@@ -1114,6 +1131,7 @@ class ChapterLessonScreen extends ConsumerWidget {
             ? error.message
             : 'Controleer je verbinding en probeer het opnieuw.',
         onRetry: () => ref.invalidate(chapterStudyProvider(key)),
+        personalLimit: error is LessonException && error.personalLimit,
       ),
       data: (chapter) => LessonScreen(
         key: ValueKey('chapter:${chapter.studyId}:${chapter.lessonDay}'),
@@ -1127,10 +1145,13 @@ class ChapterLessonScreen extends ConsumerWidget {
 }
 
 class _ChapterError extends StatelessWidget {
-  const _ChapterError({required this.message, required this.onRetry});
+  const _ChapterError({required this.message, required this.onRetry, this.personalLimit = false});
 
   final String message;
   final VoidCallback? onRetry;
+
+  /// A new lesson refused by the personal studies limit: the paywall, not a retry.
+  final bool personalLimit;
 
   @override
   Widget build(BuildContext context) {
@@ -1155,7 +1176,10 @@ class _ChapterError extends StatelessWidget {
             onOpenAssistant: null,
             onOpenSettings: null,
           ),
-          Expanded(
+          if (personalLimit)
+            Expanded(child: LessonLimitState(message: message))
+          else
+            Expanded(
             child: AppEmptyState(
               icon: Icons.wifi_off_outlined,
               title: 'Hoofdstuk niet geladen',
@@ -1168,6 +1192,45 @@ class _ChapterError extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// In place of a lesson the reader may not START today: their personal limit
+/// after the reverse trial is studies - one new lesson a day, decided by the
+/// server (`lib/lessonAllowance.ts`). A lesson already begun always opens, so
+/// this only ever stands in for a new one. The way on is the paywall, which
+/// leads with the reader's own numbers ("Je deed 6 lessen in 3 dagen").
+class LessonLimitState extends ConsumerStatefulWidget {
+  const LessonLimitState({super.key, required this.message});
+
+  final String message;
+
+  @override
+  ConsumerState<LessonLimitState> createState() => _LessonLimitStateState();
+}
+
+class _LessonLimitStateState extends ConsumerState<LessonLimitState> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(analyticsProvider).track(AnalyticsEvents.paywallHit, {'surface': 'lessons'});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppEmptyState(
+      icon: Icons.lock_outline,
+      title: 'Je nieuwe les voor vandaag',
+      description: widget.message,
+      action: SiteButton(
+        label: 'Meer lessen met Pro',
+        expand: false,
+        onPressed: () {
+          ref.read(analyticsProvider).track(AnalyticsEvents.paywallCtaClicked, {'surface': 'lessons'});
+          openPaywall(context, gate: PaywallGate.lessons);
+        },
       ),
     );
   }

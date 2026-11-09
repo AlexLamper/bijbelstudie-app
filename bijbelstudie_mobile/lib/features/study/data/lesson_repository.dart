@@ -19,7 +19,12 @@ final lessonRepositoryProvider = Provider((ref) {
 
 /// A lesson could not be read or written.
 class LessonException implements Exception {
-  const LessonException(this.message, {this.needsEnrollment = false, this.isUnauthorized = false});
+  const LessonException(
+    this.message, {
+    this.needsEnrollment = false,
+    this.isUnauthorized = false,
+    this.personalLimit = false,
+  });
 
   final String message;
 
@@ -29,8 +34,27 @@ class LessonException implements Exception {
 
   final bool isUnauthorized;
 
+  /// A NEW lesson refused by the reader's personal studies limit after the
+  /// reverse trial (one a day; a lesson already begun always opens). The
+  /// message is the server's; the way on is the paywall, not a retry.
+  final bool personalLimit;
+
   @override
   String toString() => message;
+}
+
+/// The server's `PERSONAL_LIMIT` refusal of a lesson, or null for any other
+/// answer. Shared by the lesson and the single-chapter study repositories.
+LessonException? personalLimitRefusal(DioException e) {
+  final data = e.response?.data;
+  if (e.response?.statusCode != 403 || data is! Map || data['error'] != 'PERSONAL_LIMIT') return null;
+  final message = data['message'];
+  return LessonException(
+    message is String && message.isNotEmpty
+        ? message
+        : 'Je nieuwe les voor vandaag ben je al begonnen. Morgen kun je weer een nieuwe les beginnen.',
+    personalLimit: true,
+  );
 }
 
 /// Reads lesson content and owns every write to the lesson cursor.
@@ -289,6 +313,8 @@ class LessonRepository {
   }
 
   LessonException _translate(DioException e, String fallback) {
+    final refusal = personalLimitRefusal(e);
+    if (refusal != null) return refusal;
     final status = e.response?.statusCode;
     if (status == 401) {
       return const LessonException(

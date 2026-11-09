@@ -43,6 +43,7 @@ class PaywallCopy {
     'muziek': 'Lees met rustige muziek met Pro',
     'crossrefs': 'Zie alle verwante teksten met Pro',
     'levensboom': 'Laat je boom groeien in elke stijl',
+    'lessen': 'Doe elke dag zoveel lessen als je wilt',
   };
 
   /// The benefit a stated goal makes most relevant, lifted to the top.
@@ -56,7 +57,11 @@ class PaywallCopy {
 
   /// The benefit line for a reverse-trial feature, lifted to the top when it
   /// was the reader's most used one.
-  static String featureBenefit(ProFeature feature) => switch (feature) {
+  static String? featureBenefit(ProFeature feature) => switch (feature) {
+    // Lessons are free for everyone but one reader, so they are no
+    // `kProBenefits` entry (the welcome screen would promise every buyer
+    // something they already had); [studiesLine] leads for that reader.
+    ProFeature.studies => null,
     ProFeature.ai => 'Meer AI-vragen',
     ProFeature.notes => 'Onbeperkt notities',
     ProFeature.study => 'Alle commentaren',
@@ -88,6 +93,17 @@ class PaywallCopy {
     if (forSource != null) return forSource;
     if (goal != null) return goalHeadline(goal);
     return defaultHeadline;
+  }
+
+  /// The first line for a reader whose personal limit is studies.
+  static const studiesLine = 'Zoveel nieuwe lessen per dag als je wilt';
+
+  /// The lines for a reader after the reverse trial: their feature first.
+  static List<String> benefitsFor(ProFeature feature, {StudyGoal? goal}) {
+    if (feature == ProFeature.studies) {
+      return [studiesLine, ...benefits(goal: goal).take(shown - 1)];
+    }
+    return benefits(gateBenefit: featureBenefit(feature), goal: goal);
   }
 
   /// The [shown] lines, with the gate's benefit first, then the goal's, then

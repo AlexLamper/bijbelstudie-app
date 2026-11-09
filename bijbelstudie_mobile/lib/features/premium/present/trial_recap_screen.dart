@@ -82,7 +82,10 @@ class _TrialRecapScreenState extends ConsumerState<TrialRecapScreen> {
 
     final stats = [
       (Icons.menu_book_outlined, trial.usage.chapters, trial.usage.chapters == 1 ? 'hoofdstuk gelezen' : 'hoofdstukken gelezen'),
-      (Icons.edit_note_outlined, trial.usage.notes, trial.usage.notes == 1 ? 'notitie' : 'notities'),
+      // Lessons take the notes tile when they were the reader's thing.
+      feature == ProFeature.studies
+          ? (Icons.school_outlined, trial.usage.lessons, trial.usage.lessons == 1 ? 'les gedaan' : 'lessen gedaan')
+          : (Icons.edit_note_outlined, trial.usage.notes, trial.usage.notes == 1 ? 'notitie' : 'notities'),
       (Icons.auto_awesome_outlined, trial.usage.ai, trial.usage.ai == 1 ? 'AI-vraag' : 'AI-vragen'),
       (Icons.local_fire_department_outlined, streak, streak == 1 ? 'dag op rij' : 'dagen op rij'),
     ];

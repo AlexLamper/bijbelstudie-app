@@ -85,6 +85,14 @@ enum PaywallGate {
     source: 'app_music',
     reason: 'Achtergrondmuziek hoort bij Pro.',
     benefit: 'Achtergrondmuziek',
+  ),
+  // A NEW lesson refused by the personal studies limit after the reverse
+  // trial (one a day; a begun lesson always opens). Only that reader ever
+  // meets this gate - lessons are free for everyone else.
+  lessons(
+    id: 'lessen',
+    source: 'app_lessons',
+    reason: 'Je nieuwe les voor vandaag ben je al begonnen.',
   );
 
   const PaywallGate({
@@ -122,6 +130,7 @@ enum PaywallGate {
     PaywallGate.notes => ProFeature.notes,
     PaywallGate.commentary || PaywallGate.originalText || PaywallGate.crossrefs => ProFeature.study,
     PaywallGate.music || PaywallGate.offline => ProFeature.audio,
+    PaywallGate.lessons => ProFeature.studies,
     PaywallGate.groups || PaywallGate.progressTree => null,
   };
 

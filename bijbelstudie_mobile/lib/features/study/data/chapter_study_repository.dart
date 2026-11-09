@@ -38,6 +38,8 @@ class ChapterStudyRepository {
       }
       return study;
     } on DioException catch (e) {
+      final refusal = personalLimitRefusal(e);
+      if (refusal != null) throw refusal;
       if (e.response?.statusCode == 404) {
         throw const LessonException('Dit hoofdstuk bestaat niet.');
       }
