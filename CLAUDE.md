@@ -15,8 +15,13 @@ Feature-first clean architecture under `bijbelstudie_mobile/lib/`:
   chapter cache), `data/bible_books.dart`, `notifications/`, `preview/`.
 - `features/<name>/` — each with `data/` (repositories, models, local storage),
   `domain/` (entities), `present/` (screens + Riverpod providers).
-  Features: `ai auth bible commentary dashboard feedback groups levensboom notes
+  Features: `ai auth bible commentary daily_goal dashboard feedback groups levensboom notes
   onboarding premium profile resources search settings studies study`.
+- `features/daily_goal/` is the Duolingo-style daily goal (5/10/15/20 minutes, stored
+  server-side at `/api/v1/daily-goal`), the reading clock that counts foreground time
+  on reading screens, and Start's progress strip (goal ring + level + XP bar).
+  Reminder frequency is decided by `core/notifications/reminder_policy.dart`
+  (cap 2/day, 1 for readers who ignore them; at most 5 armed per open, 3 for them).
 - `features/progress_tree/` is the tree avatar - "Voortgang" to the reader, "je
   boom" for the object, `progressTree`/`ProgressTree` in code. `domain/tree_generator.dart`,
   `species.dart`, `catalog.dart`, `stages.dart` mirror `lib/progressTree/*.ts` in the

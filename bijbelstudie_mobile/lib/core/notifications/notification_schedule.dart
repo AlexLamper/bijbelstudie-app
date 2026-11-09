@@ -131,7 +131,15 @@ class NotificationSchedule {
     this.fetchedAt,
     this.requestedTimeZone = '',
     this.exclude = '',
+    this.habitMinutes,
   });
+
+  /// When this reader usually reads, learned by the server from their
+  /// sittings (`habit.minutes`, website `lib/notificationSchedule.ts`
+  /// `habitFromSittings`): minutes past local midnight for the reminder, a
+  /// little before the usual time. Null while there is no habit yet, or from a
+  /// server older than the field.
+  final int? habitMinutes;
 
   /// The zone the server says it built the days in.
   final String timeZone;
@@ -162,6 +170,7 @@ class NotificationSchedule {
         fetchedAt: fetchedAt ?? this.fetchedAt,
         requestedTimeZone: timeZone,
         exclude: exclude,
+        habitMinutes: habitMinutes,
       );
 
   ScheduleDay? dayFor(String dateKey) {
@@ -186,6 +195,11 @@ class NotificationSchedule {
     }
     if (days.isEmpty) return null;
     final fetched = fetchedAt ?? DateTime.tryParse(_str(raw['fetchedAt']));
+    final habit = raw['habit'];
+    final habitRaw = habit is Map ? habit['minutes'] : null;
+    final habitMinutes = habitRaw is num && habitRaw >= 0 && habitRaw < 24 * 60
+        ? habitRaw.toInt()
+        : null;
     return NotificationSchedule(
       timeZone: _str(raw['timeZone']),
       days: days,
@@ -193,6 +207,7 @@ class NotificationSchedule {
       fetchedAt: fetched,
       requestedTimeZone: _str(raw['requestedTz']),
       exclude: _str(raw['exclude']),
+      habitMinutes: habitMinutes,
     );
   }
 
@@ -202,6 +217,7 @@ class NotificationSchedule {
         'fetchedAt': fetchedAt?.toIso8601String(),
         'requestedTz': requestedTimeZone,
         'exclude': exclude,
+        'habit': {'minutes': habitMinutes},
         'days': [for (final d in days) d.toJson()],
       };
 }

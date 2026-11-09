@@ -430,7 +430,7 @@ TreeScene generateTree({
     k = structuralStep(lvl, fl);
   }
   final size = sizeAt(form, e);
-  final droopT = (1 - h) * 0.25;
+  final droopT = (1 - h) * 0.45;
 
   /// The step a level-gated feature arrived at, never later than now.
   int stepOfLevel(int l) => math.min(k, at != null ? l : structuralStep(l, fl));
@@ -921,7 +921,7 @@ TreeScene generateTree({
   // Wilt sheds a scatter rather than a block, and the same leaves return on
   // recovery because `hardiness` is seeded. Older leaves open first. The
   // order is total (paths are unique), so an unstable sort gives the same ranks.
-  final visibleCut = 0.55 + 0.45 * h;
+  final visibleCut = 0.3 + 0.7 * h;
   final order = List<int>.generate(leaves.length, (i) => i);
   order.sort((a, b) {
     final la = leaves[a];

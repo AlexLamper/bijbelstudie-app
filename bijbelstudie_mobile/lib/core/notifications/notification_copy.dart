@@ -217,6 +217,8 @@ const Map<NotifType, List<VariantTemplate>> notificationCopy = {
   // has to threaten. The server pool in `lib/notificationCopy.ts` overrides
   // these when `GET /notifications/copy?type=tree_wilting` has been fetched.
   NotifType.treeWilting: [
+    VariantTemplate('tw6', 'Je boom heeft dorst',
+        'Hij laat zijn blaadjes wat hangen. Even lezen en hij staat weer recht.'),
     // The name is spent only here, on milestones and on the win-back nudges
     // (D12): on a daily reminder it would wear out in a week.
     VariantTemplate('tw5', '{name}, je boom mist wat licht',

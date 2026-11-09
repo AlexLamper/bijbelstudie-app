@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File;
 import 'dart:ui' show Color, DartPluginRegistrant;
@@ -14,6 +15,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../features/progress_tree/data/tree_image.dart';
 import 'daily_slots.dart' show kMaxNotificationsPerDay;
+import 'reminder_engagement.dart';
 import 'retention_store.dart' show parseSentTag, retentionDayKey;
 
 /// OS-truth state of the local reminders, for the settings master row.
@@ -462,6 +464,8 @@ Future<void> notificationBackgroundTap(NotificationResponse response) async {
   if (response.actionId != kActionLater) return;
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
+  // "Later vandaag" is an answer too: the reader saw it and chose a time.
+  await ReminderEngagement.recordTap(NotificationPayload.parse(response.payload).typeId);
   await snoozeFromResponse(FlutterLocalNotificationsPlugin(), response, reloadPrefs: true);
 }
 
@@ -575,6 +579,9 @@ class NotificationService {
     final launch = await _plugin.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp ?? false) {
       final response = launch!.notificationResponse;
+      // A reminder that brought the reader in was answered (reminder_policy.dart).
+      await ReminderEngagement.recordTap(
+          NotificationPayload.parse(response?.payload).typeId);
       if (response?.actionId == kActionLater) {
         await snoozeFromResponse(_plugin, response!);
       } else {
@@ -601,6 +608,7 @@ class NotificationService {
   }
 
   void _onForegroundTap(NotificationResponse response) {
+    unawaited(ReminderEngagement.recordTap(NotificationPayload.parse(response.payload).typeId));
     if (response.actionId == kActionLater) {
       snoozeFromResponse(_plugin, response);
       return;

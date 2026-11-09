@@ -12,6 +12,7 @@ import '../../auth/present/splash_screen.dart' show BijbelStudieWordmark;
 import '../../auth/present/auth_controller.dart';
 import '../../auth/domain/display_name.dart';
 import '../../dashboard/present/dashboard_providers.dart';
+import '../../daily_goal/present/daily_goal_setup_step.dart';
 import '../../progress_tree/domain/catalog.dart';
 import '../../progress_tree/domain/species.dart';
 import '../../progress_tree/present/progress_tree_providers.dart';
@@ -96,6 +97,8 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
     // First real question: it shapes the rest of the reader's first week -
     // and the paywall at the end of onboarding, which names this goal back.
     const _GoalStep(),
+    // Minutes a day (lib/features/daily_goal). Self-contained on purpose.
+    const DailyGoalSetupStep(),
     const _TranslationStep(),
     const _ReadingPrefsStep(),
     const _ThemeStep(),

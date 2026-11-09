@@ -6,11 +6,14 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/config/apple_sign_in_config.dart';
 import '../../../core/config/google_sign_in_config.dart';
+import '../../daily_goal/data/daily_goal_repository.dart';
+import '../../daily_goal/present/daily_goal_providers.dart';
 import '../data/auth_repository.dart';
 import '../../../core/data/account_scope.dart';
 import '../../../core/data/payload_cache.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/notifications/notification_schedule.dart';
+import '../../../core/notifications/reminder_engagement.dart';
 import '../../../core/notifications/notification_scheduler.dart'
     show notificationReschedulerProvider;
 import '../../../core/notifications/notification_service.dart';
@@ -219,6 +222,13 @@ class AuthController extends AsyncNotifier<User?> {
     // kring; the next reader must not inherit either.
     await SocialNotificationStore.clearForSignOut();
     await NotificationScheduleRepository.clearCache();
+    // The reminder record (taps, opens, outcomes) and the daily goal's
+    // cached minutes were this reader's.
+    await ReminderEngagement.clear();
+    await DailyGoalRepository.clearLocal();
+    try {
+      ref.invalidate(dailyGoalProvider);
+    } catch (_) {}
     try {
       await ref
           .read(retentionStoreProvider.notifier)

@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../daily_goal/present/start_progress_strip.dart';
 import '../../friends/present/friends_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../study/present/study_pane_controller.dart';
@@ -169,6 +170,12 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Today's goal ring and the level with its XP bar. One compact
+              // row, so the verse below stays in view
+              // (lib/features/daily_goal/present/start_progress_strip.dart).
+              const StartProgressStrip(),
+              const SizedBox(height: 12),
+
               // One main card: "Waar je gebleven was", else nothing.
               // Together with the verse card it is "je startpunt",
               // which is what the tour's first step points at.

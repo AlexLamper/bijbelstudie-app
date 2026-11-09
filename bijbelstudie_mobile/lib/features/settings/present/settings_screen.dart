@@ -13,6 +13,7 @@ import '../../../core/ui/app_widgets.dart';
 import '../../auth/present/auth_controller.dart' show sessionAccountProvider;
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/offline_library_sheet.dart';
+import '../../daily_goal/present/daily_goal_settings_section.dart';
 import '../../friends/present/contacts/contact_discovery_providers.dart'
     show contactDiscoveryOfferedProvider;
 import '../../friends/present/contacts/findable_switch.dart';
@@ -117,6 +118,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               controller: controller,
             ),
           ),
+
+          // Dagdoel and the win-back mail switch (lib/features/daily_goal).
+          const DailyGoalSettingsSection(),
 
           const _NotificationsSection(),
 
@@ -341,7 +345,7 @@ class _NotificationsSection extends ConsumerWidget {
             SettingsRow(
               label: 'Herinneringen',
               subtitle: status.permitted
-                  ? 'Hooguit twee per dag.'
+                  ? 'Hooguit twee per dag, minder als je ze laat liggen.'
                   : 'Zet meldingen aan in de systeeminstellingen.',
               switchValue: master,
               onSwitchChanged: (on) async {
@@ -392,6 +396,17 @@ class _NotificationsSection extends ConsumerWidget {
                 },
                 onPickTime: (m) async {
                   await prefsCtl.setEvening(minutes: m, enabled: true);
+                  bump();
+                },
+              ),
+              SettingsRow(
+                label: 'Op je eigen leestijd',
+                subtitle: prefs.smartTiming
+                    ? 'Schuift mee naar wanneer je meestal leest, zodra we dat weten.'
+                    : 'Altijd op de tijden hierboven.',
+                switchValue: prefs.smartTiming,
+                onSwitchChanged: (v) async {
+                  await prefsCtl.setSmartTiming(v);
                   bump();
                 },
               ),

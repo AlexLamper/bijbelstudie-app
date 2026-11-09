@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/daily_goal/data/reading_clock.dart';
+import '../features/daily_goal/present/daily_goal_providers.dart';
 import '../features/progress_tree/present/progress_tree_providers.dart';
 import 'notifications/notification_scheduler.dart';
 import 'notifications/retention_store.dart';
@@ -65,6 +67,10 @@ final appLifecycleProvider = Provider<void>((ref) {
   binding.addObserver(observer);
   ref.onDispose(() => binding.removeObserver(observer));
 
+  // The daily goal's reading clock: counts foreground time on a reading screen
+  // (lib/features/daily_goal/data/reading_clock.dart).
+  ref.read(readingClockProvider).attach();
+
   if (isForegroundState(binding.lifecycleState)) _onForeground(ref);
 });
 
@@ -81,6 +87,11 @@ void _onForeground(Ref ref) {
   ref
       .read(notificationReschedulerProvider)
       .requestReschedule(contentChanged: false);
+  // A new day may have started while the app slept: the ring re-reads today.
+  if (ref.exists(dailyGoalProvider)) {
+    Future(() => ref.read(dailyGoalProvider.notifier).refresh()).catchError(
+        (Object e) => debugPrint('[Lifecycle] goal refresh failed: $e'));
+  }
   // The vriendenkring pull. Foreground-triggered only: there is no timer and no
   // polling loop behind this, and it throttles itself to one request a minute.
   // On Android it is the whole of the social notifications (no push exists

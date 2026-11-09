@@ -76,6 +76,19 @@ class AnalyticsEvents {
 
   /// Walked to the end. `done`, `skipped`: step counts.
   static const guideFinished = 'guide_finished';
+
+  /// Retention (Nov 2026). `type` is a reminder's [NotifType.id]: tapped, or
+  /// fired and left lying (no tap, no open within three hours). Sent by the
+  /// scheduler on the next open (reminder_engagement.dart).
+  static const pushOpened = 'push_opened';
+  static const pushIgnored = 'push_ignored';
+
+  /// The reader came back after `ignored` reminders in a row went unanswered.
+  static const remindersPaused = 'reminders_paused';
+
+  // daily_goal_set, daily_goal_reached and level_up are written by the
+  // server itself (lib/dailyGoal.ts, lib/gamification.ts), so a closed app or
+  // a lost request cannot drop them.
 }
 
 /// Fire-and-forget funnel tracking for the mobile app.

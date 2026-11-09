@@ -21,6 +21,7 @@ import '../domain/palette.dart';
 import '../domain/stages.dart';
 import '../domain/traits.dart';
 import '../domain/tree_state.dart';
+import 'progress_tree_avatar.dart' show kGoldLevelBadge;
 import 'progress_tree_providers.dart';
 import 'tree_analytics.dart';
 import 'tree_view.dart';
@@ -43,6 +44,29 @@ Future<void> showProgressTreeCelebration(
   required int level,
   required bool reducedMotion,
   AvatarChoice avatar = AvatarChoice.defaults,
+  TreeState? tree,
+}) async {
+  // Start and Profiel both watch for an owed level-up; whichever gets there
+  // first shows it, and the other must not stack a second dialog on top.
+  if (_celebrationShowing) return;
+  _celebrationShowing = true;
+  try {
+    await _showCelebration(context, ref,
+        seed: seed, level: level, reducedMotion: reducedMotion, avatar: avatar, tree: tree);
+  } finally {
+    _celebrationShowing = false;
+  }
+}
+
+bool _celebrationShowing = false;
+
+Future<void> _showCelebration(
+  BuildContext context,
+  WidgetRef ref, {
+  required String seed,
+  required int level,
+  required bool reducedMotion,
+  required AvatarChoice avatar,
   TreeState? tree,
 }) async {
   final floor = tree?.floor;
@@ -209,6 +233,24 @@ class _CelebrationDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
               child: Column(
                 children: [
+                  // XP and levels are on screen now (Start's strip): the
+                  // moment names the level it reached, in the badge's gold.
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: kGoldLevelBadge,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    ),
+                    child: Text(
+                      'Niveau $level bereikt',
+                      style: AppTheme.bodyStrong.copyWith(
+                        color: const Color(0xFF2B1E02),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Text(
                     copy.title,
                     textAlign: TextAlign.center,

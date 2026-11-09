@@ -193,7 +193,7 @@ TreePalette buildPalette(
   final night = tod == DayPhase.night;
 
   Color desaturate(Color c) => night ? _mix(c, _nightMix, 0.25) : c;
-  Color wilt(Color c) => _mix(c, _wiltMix, (1 - health) * 0.4);
+  Color wilt(Color c) => _mix(c, _wiltMix, (1 - health) * 0.6);
 
   // A species with its own green keeps it in spring and summer. Deciduous ones
   // turn with the season like the eik; evergreens only dull a little in winter.

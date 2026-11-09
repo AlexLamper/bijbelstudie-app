@@ -41,9 +41,16 @@ class NotificationPrefs {
     this.quietEndMinutes = 7 * 60 + 30,
     this.snoozedUntilEpochMs,
     this.pendingPermissionRequest = false,
+    this.smartTiming = true,
   });
 
   final bool loaded;
+
+  /// "Op je eigen leestijd": the slot nearest to when this reader usually
+  /// reads moves to that time, as learned by the server (`habitMinutes` on the
+  /// schedule). On by default; the morning and evening times still apply
+  /// until there is a habit to go on, and always when this is off.
+  final bool smartTiming;
 
   /// On by default: nothing is scheduled without OS permission anyway, so the
   /// default only decides what happens the moment permission is granted. A
@@ -132,6 +139,7 @@ class NotificationPrefs {
     int? snoozedUntilEpochMs,
     bool clearSnooze = false,
     bool? pendingPermissionRequest,
+    bool? smartTiming,
   }) {
     return NotificationPrefs(
       loaded: loaded ?? this.loaded,
@@ -152,6 +160,7 @@ class NotificationPrefs {
           clearSnooze ? null : (snoozedUntilEpochMs ?? this.snoozedUntilEpochMs),
       pendingPermissionRequest:
           pendingPermissionRequest ?? this.pendingPermissionRequest,
+      smartTiming: smartTiming ?? this.smartTiming,
     );
   }
 }
@@ -247,6 +256,7 @@ class NotificationPrefsController extends Notifier<NotificationPrefs> {
         snoozedUntilEpochMs: prefs.getInt('${_p}snoozedUntilEpochMs'),
         pendingPermissionRequest:
             prefs.getBool('${_p}pendingPermissionRequest') ?? false,
+        smartTiming: prefs.getBool('${_p}smartTiming') ?? true,
       );
     } catch (_) {
       if (ref.mounted) state = const NotificationPrefs(loaded: true);
@@ -369,6 +379,12 @@ class NotificationPrefsController extends Notifier<NotificationPrefs> {
   Future<void> clearSnooze() => _write(
         (p) => p.remove('${_p}snoozedUntilEpochMs'),
         state.copyWith(clearSnooze: true),
+      );
+
+  /// "Op je eigen leestijd".
+  Future<void> setSmartTiming(bool value) => _write(
+        (p) => p.setBool('${_p}smartTiming', value),
+        state.copyWith(smartTiming: value),
       );
 
   Future<void> setPendingPermissionRequest(bool value) => _write(

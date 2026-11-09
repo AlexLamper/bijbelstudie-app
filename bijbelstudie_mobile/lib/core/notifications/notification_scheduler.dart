@@ -21,12 +21,15 @@ import '../../features/studies/data/enrollment_repository.dart';
 import '../../features/studies/data/study_models.dart';
 import '../../features/studies/data/study_plan_store.dart';
 import '../../features/studies/present/studies_providers.dart';
+import '../analytics/analytics.dart';
 import '../config/preview_config.dart';
 import 'daily_slots.dart';
 import 'notification_art.dart';
 import 'notification_copy.dart';
 import 'notification_schedule.dart';
 import 'notification_service.dart';
+import 'reminder_engagement.dart';
+import 'reminder_policy.dart';
 import 'retention_store.dart';
 
 /// The two shapes a "streak" can take, chosen by cadence (`RETENTION_PLAN.md`
@@ -167,6 +170,7 @@ class Candidate {
     this.slot = 0,
     this.immediate = false,
     this.images,
+    this.artType,
   });
 
   final NotifType type;
@@ -181,6 +185,10 @@ class Candidate {
 
   /// `showNow` instead of `zonedSchedule` (weeklyGoal "met").
   final bool immediate;
+
+  /// Draw this type's picture instead of [type]'s: an evening slot that
+  /// carries the thirsty tree shows the tree as the tree nudge draws it.
+  final NotifType? artType;
 }
 
 /// The one place the daily total is enforced (DAILY_HABIT_PLAN.md §1): per
@@ -402,9 +410,7 @@ class NotificationScheduler {
     required tz.TZDateTime now,
   }) {
     if (!prefs.masterEnabled) return const [];
-    final quiet = prefs.quietHours;
-    final morningMin = clampDailyMinutes(prefs.morningMinutes, quiet);
-    final eveningMin = clampDailyMinutes(prefs.eveningMinutes, quiet);
+    final (:morningMin, :eveningMin) = slotMinutes(prefs, schedule?.habitMinutes);
     final snoozedUntil = prefs.snoozedUntilEpochMs;
     bool open(tz.TZDateTime t) =>
         t.isAfter(now) &&
@@ -449,6 +455,109 @@ class NotificationScheduler {
       }
     }
     return out;
+  }
+
+  /// The two slot times, with "Op je eigen leestijd" applied: when the server
+  /// knows when this reader usually reads ([habitMinutes], already a little
+  /// before that time), the slot on that side of noon moves there - the
+  /// morning for a morning reader, the evening (if it is on) for everyone
+  /// else. Without a habit, or with the switch off, the reader's own times.
+  /// Both stay out of quiet hours.
+  @visibleForTesting
+  static ({int morningMin, int eveningMin}) slotMinutes(
+    NotificationPrefs prefs,
+    int? habitMinutes,
+  ) {
+    final quiet = prefs.quietHours;
+    var morningMin = clampDailyMinutes(prefs.morningMinutes, quiet);
+    var eveningMin = clampDailyMinutes(prefs.eveningMinutes, quiet);
+    final habit = prefs.smartTiming ? habitMinutes : null;
+    if (habit != null) {
+      final at = clampDailyMinutes(habit, quiet);
+      if (at < 12 * 60) {
+        morningMin = at;
+      } else if (prefs.eveningEnabled) {
+        eveningMin = at;
+      }
+    }
+    return (morningMin: morningMin, eveningMin: eveningMin);
+  }
+
+  /// The tree in the daily slots (owner's choice: "Je boom heeft dorst" in the
+  /// smart reminder). On every future day the tree will be drooping on - two
+  /// or more days after the last completion, if the reader does not come
+  /// back - that day's evening slot speaks for the tree instead of the task,
+  /// keeps the task's link, and carries the tree's picture. The morning keeps
+  /// the verse. Pure.
+  @visibleForTesting
+  static List<Candidate> withThirstyTree(
+    List<Candidate> candidates, {
+    required String lastCompletionDay,
+    Map<String, String?> tokens = const {},
+  }) {
+    return [
+      for (final c in candidates)
+        if (c.type == NotifType.evening &&
+            retentionDayGap(lastCompletionDay, retentionDayKey(c.when)) >= 2)
+          Candidate(
+            type: c.type,
+            when: c.when,
+            slot: c.slot,
+            deepLink: c.deepLink,
+            artType: NotifType.treeWilting,
+            variant: thirstyTreeVariant(
+              retentionDayGap(lastCompletionDay, retentionDayKey(c.when)),
+              study: tokens['study'],
+            ),
+          )
+        else
+          c,
+    ];
+  }
+
+  /// The tree's words for a day [daysAway] after the last read. Never says
+  /// it could die - it cannot (health floors at 0.3) - and never counts days.
+  @visibleForTesting
+  static RenderedVariant thirstyTreeVariant(int daysAway, {String? study}) {
+    if (daysAway <= 2) {
+      return const RenderedVariant(
+        variantId: 'tt1',
+        title: 'Je boom heeft dorst',
+        body: 'Hij laat zijn blaadjes wat hangen. Even lezen en hij staat weer recht.',
+      );
+    }
+    if (daysAway <= 4) {
+      final s = study?.trim();
+      return RenderedVariant(
+        variantId: 'tt2',
+        title: 'Je boom mist je',
+        body: s != null && s.isNotEmpty
+            ? 'Verder met $s? Een paar minuten en hij knapt meteen op.'
+            : 'Een paar minuten lezen en hij knapt meteen op.',
+      );
+    }
+    return const RenderedVariant(
+      variantId: 'tt3',
+      title: 'Je boom wacht op je',
+      body: 'Hij is er nog. Eén hoofdstuk en hij leeft weer op.',
+    );
+  }
+
+  /// `push_opened`, `push_ignored`, `reminders_paused`. Measurement only.
+  static void _reportEngagement(Ref ref, EngagementUpdate update) {
+    try {
+      final analytics = ref.read(analyticsProvider);
+      for (final type in update.tapped) {
+        analytics.track(AnalyticsEvents.pushOpened, {'type': type});
+      }
+      for (final type in update.ignored) {
+        analytics.track(AnalyticsEvents.pushIgnored, {'type': type});
+      }
+      final paused = update.pausedAfter;
+      if (paused != null) {
+        analytics.track(AnalyticsEvents.remindersPaused, {'ignored': '$paused'});
+      }
+    } catch (_) {}
   }
 
   /// Verses the device holds for a given date (the dashboard's daily-verse
@@ -499,8 +608,9 @@ class NotificationScheduler {
     NotificationService service,
     NotificationPrefs prefs,
     NotificationSchedule schedule,
-    tz.TZDateTime now,
-  ) async {
+    tz.TZDateTime now, {
+    ReminderPolicy policy = ReminderPolicy.normal,
+  }) async {
     final store = ref.read(retentionStoreProvider.notifier);
     final candidates = dailyCandidates(
       prefs: prefs,
@@ -510,8 +620,15 @@ class NotificationScheduler {
       now: now,
     );
     final others = NotifType.values.toSet().difference(_dailyTypes);
-    final kept = applyDailyCap(candidates,
-        used: await _withSnooze(store.usedByDay(now, stillArmed: others)));
+    final kept = applyRunBudget<Candidate>(
+      applyDailyCap(candidates,
+          used: await _withSnooze(store.usedByDay(now, stillArmed: others)),
+          maxPerDay: policy.dailyCap),
+      policy: policy,
+      now: now,
+      when: (c) => c.when,
+      counts: (c) => kReminderTypes.contains(c.type),
+    );
     for (final type in _dailyTypes) {
       await service.cancelType(type);
     }
@@ -634,6 +751,16 @@ class NotificationScheduler {
     // counts as opened: today's evening slot is not armed again.
     await store.markOpened();
 
+    // How the reader answered the reminders that fired since the last run
+    // decides how many the next batch may hold (reminder_policy.dart).
+    await ReminderEngagement.recordOpen();
+    final engagement = await ReminderEngagement.evaluate(
+      sentLog: ref.read(retentionStoreProvider).sentLog,
+      now: DateTime.now(),
+    );
+    _reportEngagement(ref, engagement);
+    final policy = engagement.policy;
+
     final inputs = await loadInputs(ref);
     final schedule = await _loadSchedule(
       ref,
@@ -648,7 +775,8 @@ class NotificationScheduler {
       // settings change made offline, say).
       if (schedule != null) {
         await _rewriteDailyOnly(
-            ref, service, prefs, schedule, tz.TZDateTime.now(tz.local));
+            ref, service, prefs, schedule, tz.TZDateTime.now(tz.local),
+            policy: policy);
       }
       return;
     }
@@ -746,6 +874,27 @@ class NotificationScheduler {
       localVerses: _localVerses(ref),
       now: now,
     ));
+
+    // ── the tree in the evening slot, on days it will be drooping ────────
+    {
+      final tree = ref.exists(treeStateProvider)
+          ? ref.read(treeStateProvider).value
+          : null;
+      final lastDone = ref.read(retentionStoreProvider).lastCompletionDay;
+      if (prefs.enabledFor('treeWilting') &&
+          !(tree?.disabled ?? false) &&
+          lastDone != null &&
+          lastDone.isNotEmpty) {
+        final withTree = withThirstyTree(
+          candidates,
+          lastCompletionDay: lastDone,
+          tokens: tokens,
+        );
+        candidates
+          ..clear()
+          ..addAll(withTree);
+      }
+    }
 
     final todayIsCadence = cadence.isCadenceDay(now);
     final completionsThisWeek = store.completionsThisWeek;
@@ -947,7 +1096,20 @@ class NotificationScheduler {
     // A "Later vandaag" re-post is moot once the day's study is done; one
     // that stays counts towards its day.
     if (store.studiedToday) await service.cancelSnooze();
-    final kept = applyDailyCap(candidates, used: await _withSnooze(store.usedByDay(now)));
+    final capped = applyDailyCap(
+      candidates,
+      used: await _withSnooze(store.usedByDay(now)),
+      maxPerDay: policy.dailyCap,
+    );
+    // At most `runBudget` reminders until the reader opens the app again,
+    // tapering to one a day from the third day: unanswered reminders stop.
+    final kept = applyRunBudget<Candidate>(
+      capped,
+      policy: policy,
+      now: now,
+      when: (c) => c.when,
+      counts: (c) => !c.immediate && kReminderTypes.contains(c.type),
+    );
     if (weekGoalCelebration != null &&
         kept.any((c) => c.type == NotifType.weeklyGoal && c.immediate)) {
       await store.markMilestone(weekGoalCelebration);
@@ -1034,7 +1196,7 @@ class NotificationScheduler {
     TreeImageFiles? images;
     try {
       images = c.images ??
-          await art.forCandidate(c.type, c.when, celebrate: c.immediate);
+          await art.forCandidate(c.artType ?? c.type, c.when, celebrate: c.immediate);
     } catch (e) {
       debugPrint('[Notifications] art for ${c.type.id} failed: $e');
     }
