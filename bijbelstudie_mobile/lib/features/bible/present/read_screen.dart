@@ -925,16 +925,19 @@ class ReaderChapterBody extends StatelessWidget {
           const _OfflineNotice(),
           const SizedBox(height: 16),
         ],
-        for (final verse in chapter.verses)
-          _VerseRow(
-            key: verseKey?.call(verse.number),
-            book: book,
-            chapter: chapterNumber,
-            verse: verse,
-            fontSize: fontSize,
-            settings: settings,
-            onLongPress: () => onVerseLongPress(verse),
-            pulse: verse.number == pulsingVerse,
+        for (final (index, verse) in chapter.verses.indexed)
+          _anchorFirst(
+            index == 0,
+            _VerseRow(
+              key: verseKey?.call(verse.number),
+              book: book,
+              chapter: chapterNumber,
+              verse: verse,
+              fontSize: fontSize,
+              settings: settings,
+              onLongPress: () => onVerseLongPress(verse),
+              pulse: verse.number == pulsingVerse,
+            ),
           ),
         const SizedBox(height: 28),
         // The end of the chapter is the natural moment to go deeper into it.
@@ -971,6 +974,11 @@ class ReaderChapterBody extends StatelessWidget {
     );
   }
 }
+
+/// The onboarding guide's hand presses on the first verse. The anchor adds
+/// nothing to the row itself.
+Widget _anchorFirst(bool first, Widget row) =>
+    first ? TourAnchor(id: TourAnchorIds.firstVerse, child: row) : row;
 
 class _VerseRow extends ConsumerWidget {
   const _VerseRow({

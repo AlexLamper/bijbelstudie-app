@@ -16,6 +16,7 @@ import '../../commentary/present/commentary_jump.dart';
 import '../../commentary/present/original_verse_sheet.dart';
 import '../../crossrefs/present/crossref_providers.dart';
 import '../../crossrefs/present/crossref_sheet.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../../study/present/study_pane_controller.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_models.dart';
@@ -47,6 +48,32 @@ Future<void> showVerseActionSheet({
   /// Called after "Commentaar bij vers N" has pointed the study page at this
   /// verse, for a caller that is not already inside `/studie` and has to
   /// navigate there. Null inside `/studie`, where flipping the pane is enough.
+  VoidCallback? onOpenCommentary,
+}) async {
+  // The onboarding guide watches this sheet: opening it is the long-press it
+  // asks for, and it keeps its card clear of the sheet until the whole
+  // sequence - the note editor or grondtekst it may lead to included - is
+  // over. Captured up front: the notifier outlives this call's context.
+  final guide = ref.read(tourControllerProvider.notifier);
+  guide.signal(GuideSignal.verseSheetOpened, verse: verse.number);
+  try {
+    await _runVerseSheet(
+      context: context,
+      ref: ref,
+      chapter: chapter,
+      verse: verse,
+      onOpenCommentary: onOpenCommentary,
+    );
+  } finally {
+    guide.signal(GuideSignal.verseSheetClosed);
+  }
+}
+
+Future<void> _runVerseSheet({
+  required BuildContext context,
+  required WidgetRef ref,
+  required ChapterContent chapter,
+  required Verse verse,
   VoidCallback? onOpenCommentary,
 }) async {
   final result = await showModalBottomSheet<_VerseSheetResult>(
@@ -153,22 +180,32 @@ Future<void> showAddNoteDialog({
   // after the editor has closed, when this context may be gone.
   final router = GoRouter.maybeOf(context);
 
+  // The onboarding guide moves its card above the keyboard while the editor
+  // is up, and counts a saved note - or one that could not be saved - as done.
+  final guide = container.read(tourControllerProvider.notifier);
+
   final reference = verse == null ? '$book $chapter' : '$book $chapter:$verse';
-  final text = await showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: AppTheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(AppTheme.radiusLg),
+  guide.signal(GuideSignal.noteEditorOpened);
+  final String? text;
+  try {
+    text = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusLg),
+        ),
       ),
-    ),
-    builder: (sheetContext) => _NoteEditorSheet(
-      reference: headerLabel ?? reference,
-      verseText: verseText,
-      excerptNotice: excerptNotice,
-    ),
-  );
+      builder: (sheetContext) => _NoteEditorSheet(
+        reference: headerLabel ?? reference,
+        verseText: verseText,
+        excerptNotice: excerptNotice,
+      ),
+    );
+  } finally {
+    guide.signal(GuideSignal.noteEditorClosed);
+  }
 
   if (text == null || text.isEmpty) return;
 
@@ -188,15 +225,18 @@ Future<void> showAddNoteDialog({
       ),
     );
     container.invalidate(notesListProvider);
+    guide.signal(GuideSignal.noteSaved);
     await HapticFeedback.lightImpact();
     // Two notes left of the free ten: the moment to mention unlimited notes,
     // before the limit refuses one rather than after.
     unawaited(requestNoteMomentIfNear(container));
   } on SyncRejectedException catch (e) {
+    guide.signal(GuideSignal.noteFailed);
     // Shared with the offline-queue flush, which refuses the same note for the
     // same reason - just later, and with nobody awaiting it.
     showSyncRejection(messenger, router, e);
   } catch (e) {
+    guide.signal(GuideSignal.noteFailed);
     // Anything else - a malformed response, a plugin blowing up - is still a
     // note the reader believes they saved. Say so rather than letting it
     // disappear into an unhandled async error, which is exactly how this bug
@@ -427,23 +467,29 @@ class _VerseActionSheet extends ConsumerWidget {
               style: AppTheme.bodyMuted,
             ),
             const SizedBox(height: 20),
-            _ColorRow(
-              selected: existing,
-              onSelected: (color) =>
-                  _toggleHighlight(context, ref, color, existing),
+            TourAnchor(
+              id: TourAnchorIds.sheetColours,
+              child: _ColorRow(
+                selected: existing,
+                onSelected: (color) =>
+                    _toggleHighlight(context, ref, color, existing),
+              ),
             ),
             const SizedBox(height: 20),
             RuleGrid(
               children: [
-                RuleListTile(
-                  onTap: () => _openCommentary(context, ref),
-                  child: _ActionRow(
-                    icon: Icons.menu_book_outlined,
-                    label: 'Commentaar bij vers ${verse.number}',
+                TourAnchor(
+                  id: TourAnchorIds.sheetCommentary,
+                  child: RuleListTile(
+                    onTap: () => _openCommentary(context, ref),
+                    child: _ActionRow(
+                      icon: Icons.menu_book_outlined,
+                      label: 'Commentaar bij vers ${verse.number}',
+                    ),
                   ),
                 ),
                 RuleListTile(
-                  onTap: () => _openOriginal(context),
+                  onTap: () => _openOriginal(context, ref),
                   child: _ActionRow(
                     icon: Icons.translate,
                     label: 'Grondtekst bij vers ${verse.number}',
@@ -461,11 +507,14 @@ class _VerseActionSheet extends ConsumerWidget {
                       label: 'Herziene Statenvertaling',
                     ),
                   ),
-                RuleListTile(
-                  onTap: () => _addNote(context),
-                  child: const _ActionRow(
-                    icon: Icons.edit_note,
-                    label: 'Notitie toevoegen',
+                TourAnchor(
+                  id: TourAnchorIds.sheetNote,
+                  child: RuleListTile(
+                    onTap: () => _addNote(context),
+                    child: const _ActionRow(
+                      icon: Icons.edit_note,
+                      label: 'Notitie toevoegen',
+                    ),
                   ),
                 ),
                 RuleListTile(
@@ -476,7 +525,7 @@ class _VerseActionSheet extends ConsumerWidget {
                   ),
                 ),
                 RuleListTile(
-                  onTap: () => _openCrossRefs(context),
+                  onTap: () => _openCrossRefs(context, ref),
                   child: _ActionRow(
                     icon: Icons.link,
                     label: 'Kruisverwijzingen',
@@ -509,6 +558,7 @@ class _VerseActionSheet extends ConsumerWidget {
   ) async {
     await HapticFeedback.lightImpact();
     final repo = ref.read(notesRepositoryProvider);
+    final guide = ref.read(tourControllerProvider.notifier);
 
     try {
       if (existing == color) {
@@ -537,9 +587,12 @@ class _VerseActionSheet extends ConsumerWidget {
             updatedAt: DateTime.now(),
           ),
         );
+        guide.signal(GuideSignal.highlightSaved);
       }
       ref.invalidate(highlightsListProvider);
     } on SyncRejectedException catch (e) {
+      // Refused (a limit, a lapsed session): the guide still moves on.
+      if (existing != color) guide.signal(GuideSignal.highlightFailed);
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
@@ -560,6 +613,7 @@ class _VerseActionSheet extends ConsumerWidget {
     ref
         .read(studyPaneProvider.notifier)
         .apply(showMaterials: true, materialsTab: 0);
+    ref.read(tourControllerProvider.notifier).signal(GuideSignal.commentaryOpened);
     Navigator.of(context).pop(_VerseSheetResult.commentary);
   }
 
@@ -570,12 +624,14 @@ class _VerseActionSheet extends ConsumerWidget {
   }
 
   /// Same hand-back as the note: the grondtekst sheet outlives this one.
-  void _openOriginal(BuildContext context) {
+  void _openOriginal(BuildContext context, WidgetRef ref) {
+    ref.read(tourControllerProvider.notifier).signal(GuideSignal.originalOpened);
     Navigator.of(context).pop(_VerseSheetResult.original);
   }
 
   /// Same hand-back as the note: the cross-reference sheet outlives this one.
-  void _openCrossRefs(BuildContext context) {
+  void _openCrossRefs(BuildContext context, WidgetRef ref) {
+    ref.read(tourControllerProvider.notifier).signal(GuideSignal.crossRefsOpened);
     Navigator.of(context).pop(_VerseSheetResult.crossRefs);
   }
 

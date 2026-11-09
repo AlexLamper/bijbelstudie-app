@@ -8,9 +8,11 @@ import '../../premium/present/pro_access_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../bible/present/bible_providers.dart';
+import '../../onboarding/present/tour_controller.dart';
 import '../data/ai_repository.dart';
 import 'ai_conversation_store.dart';
 import 'ai_report_sheet.dart';
+import 'ai_suggested_question.dart';
 
 /// The AI-assistent tab of the study page.
 ///
@@ -85,8 +87,16 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
 
     final key = _contextKey();
     final store = ref.read(aiConversationStoreProvider);
+    // The onboarding guide waits for an answer here. Captured now: the pane
+    // can be gone by the time the answer lands.
+    final guide = ref.read(tourControllerProvider.notifier);
+    if (store.blocked != null) {
+      guide.signal(GuideSignal.aiFailed);
+      return;
+    }
     // A question already in flight for this chapter is not sent twice.
-    if (store.blocked != null || store.conversationFor(key).isSending) return;
+    if (store.conversationFor(key).isSending) return;
+    guide.signal(GuideSignal.aiAsked);
 
     // Dismiss the soft keyboard now that the send is actually going ahead -
     // covers the send button, the field's own submit action, and the
@@ -100,6 +110,9 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     final restore = await ref
         .read(aiConversationStoreProvider.notifier)
         .ask(key: key, message: message);
+    // A question handed back never reached the model: offline, the daily
+    // limit, an error. The guide moves on either way.
+    guide.signal(restore == null ? GuideSignal.aiAnswered : GuideSignal.aiFailed);
     if (!mounted) return;
     // A question that never reached the model goes back into the composer, so
     // retrying is one tap and nothing the reader typed is lost.
@@ -151,6 +164,14 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
     final showLoginCta = blocked != null
         ? store.blockedIsAuth
         : conversation.errorKind == AiErrorKind.auth;
+    // An assistant that cannot answer at all must not hold the onboarding
+    // guide on its question step: it counts as tried.
+    if (blocked != null && ref.watch(tourControllerProvider.select((g) => g.active))) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(tourControllerProvider.notifier).signal(GuideSignal.aiFailed);
+      });
+    }
+    final extraQuestion = ref.watch(aiSuggestedQuestionProvider);
     // A subscriber at their limit is not offered Pro again (3.1.1).
     final showProCta =
         blocked == null &&
@@ -173,7 +194,10 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
           child: turns.isEmpty
               ? _EmptyPrompt(
                   onPick: _send,
-                  suggestions: _suggestions,
+                  suggestions: [
+                    if (extraQuestion != null) extraQuestion,
+                    ..._suggestions,
+                  ],
                   enabled: blocked == null,
                 )
               : ListView.builder(
@@ -256,47 +280,50 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
           ),
         ),
         const RuleLine(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  enabled: blocked == null,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: _send,
-                  decoration: InputDecoration(
-                    hintText: blocked == null
-                        ? 'Stel een vraag over dit hoofdstuk…'
-                        : 'Niet beschikbaar',
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 44,
-                width: 44,
-                child: FilledButton(
-                  onPressed: sending || blocked != null
-                      ? null
-                      : () => _send(_controller.text),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.assistant,
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        TourAnchor(
+          id: TourAnchorIds.aiComposer,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    enabled: blocked == null,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: _send,
+                    decoration: InputDecoration(
+                      hintText: blocked == null
+                          ? 'Stel een vraag over dit hoofdstuk…'
+                          : 'Niet beschikbaar',
+                      isDense: true,
                     ),
                   ),
-                  child: const Icon(Icons.arrow_upward, size: 18),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 44,
+                  width: 44,
+                  child: FilledButton(
+                    onPressed: sending || blocked != null
+                        ? null
+                        : () => _send(_controller.text),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.assistant,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                    ),
+                    child: const Icon(Icons.arrow_upward, size: 18),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -354,24 +381,31 @@ class _EmptyPrompt extends StatelessWidget {
           style: AppTheme.bodyMuted,
         ),
         const SizedBox(height: 20),
-        for (final suggestion in suggestions)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: OutlinedButton(
-              onPressed: enabled ? () => onPick(suggestion) : null,
-              style: OutlinedButton.styleFrom(
-                alignment: Alignment.centerLeft,
-                minimumSize: const Size.fromHeight(44),
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(suggestion, style: AppTheme.bodyMuted),
+        for (final (index, suggestion) in suggestions.indexed)
+          _anchorFirst(
+            index == 0,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton(
+                onPressed: enabled ? () => onPick(suggestion) : null,
+                style: OutlinedButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(44),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(suggestion, style: AppTheme.bodyMuted),
+                ),
               ),
             ),
           ),
       ],
     );
   }
+
+  /// The onboarding guide's hand taps the first suggestion.
+  static Widget _anchorFirst(bool first, Widget chip) =>
+      first ? TourAnchor(id: TourAnchorIds.aiSuggestion, child: chip) : chip;
 }
 
 class _TurnBubble extends StatelessWidget {

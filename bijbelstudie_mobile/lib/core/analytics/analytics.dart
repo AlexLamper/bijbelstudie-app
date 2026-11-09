@@ -60,6 +60,22 @@ class AnalyticsEvents {
 
   /// No props.
   static const treeStudioOpened = 'tree_studio_opened';
+
+  /// The hands-on onboarding guide (`tour_controller.dart`). `step` is a
+  /// [GuideStepId] id (mark/swipe/ask/study).
+  ///
+  /// `replay` ('true'/'false'): started again from Profiel.
+  static const guideStarted = 'guide_started';
+
+  /// `step`, `how` ('done', or 'fallback' when the action failed and the
+  /// guide moved on anyway).
+  static const guideStepCompleted = 'guide_step_completed';
+
+  /// `step`, `how` ('skip' for Overslaan, 'close' for stopping the guide).
+  static const guideStepSkipped = 'guide_step_skipped';
+
+  /// Walked to the end. `done`, `skipped`: step counts.
+  static const guideFinished = 'guide_finished';
 }
 
 /// Fire-and-forget funnel tracking for the mobile app.
