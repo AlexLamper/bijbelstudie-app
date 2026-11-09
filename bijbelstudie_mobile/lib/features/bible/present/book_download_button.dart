@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics.dart';
+import '../../premium/data/reverse_trial_repository.dart';
 import '../../premium/present/paywall_route.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
@@ -163,6 +164,11 @@ class _BookDownloadButtonState extends ConsumerState<BookDownloadButton> {
   }
 
   void _start(List<int> chapters) {
+    // During the reverse trial an offline download counts toward "muziek,
+    // voorlezen en offline". It stays Pro afterwards, personal limit or not.
+    if (ref.read(isTrialProProvider)) {
+      unawaited(ref.read(reverseTrialRepositoryProvider).claim('offline', key: widget.book));
+    }
     runBookDownload(
       ScaffoldMessenger.maybeOf(context),
       ref.read(bookDownloadsProvider.notifier),

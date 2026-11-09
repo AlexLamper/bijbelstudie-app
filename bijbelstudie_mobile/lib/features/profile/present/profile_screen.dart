@@ -448,7 +448,13 @@ class _ProfileHeader extends ConsumerWidget {
                             color: _ChipColor.pro,
                           ),
                           _ChipWord(
-                            profile.isProFromWeb ? 'via web' : 'actief',
+                            profile.isProFromWeb
+                                ? 'via web'
+                                // The reverse trial: Pro for the first three
+                                // active days, nothing bought.
+                                : profile.isProFromTrial
+                                    ? 'proefdagen'
+                                    : 'actief',
                           ),
                         ],
                       )

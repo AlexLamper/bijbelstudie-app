@@ -12,6 +12,7 @@ import '../../../core/analytics/analytics.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/paywall_goal.dart';
 import '../domain/paywall_copy.dart';
+import '../domain/personal_plan.dart';
 import '../domain/price_framing.dart';
 import '../domain/pro_benefits.dart';
 import 'paywall_route.dart';
@@ -72,9 +73,17 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     // Funnel entry, recorded once per visit rather than per rebuild. A
     // subscriber reaching this route sees their status, not prices, so that
     // is not a pricing view.
-    if (!ref.read(hasProProvider)) {
+    if (!ref.read(hasProProvider) || ref.read(isTrialProProvider)) {
+      // A gate refused because of the reader's PERSONAL limit (after the
+      // reverse trial), not the normal free one: counted per feature, and the
+      // paywall view is attributed to it.
+      final limited = ref.read(limitedFeatureProvider);
+      final personalHit = limited != null && widget.gate?.feature == limited;
+      if (personalHit) {
+        ref.read(analyticsProvider).track(AnalyticsEvents.personalLimitHit, {'feature': limited.id});
+      }
       ref.read(analyticsProvider).track(AnalyticsEvents.pricingViewed, {
-        'source': widget.source ?? 'direct',
+        'source': personalHit ? 'app_personal_limit' : (widget.source ?? 'direct'),
         'logged_in': 'yes',
       });
     }
@@ -139,7 +148,15 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     // that has not caught up yet - is shown their status, never prices. Held
     // back while a purchase is still settling with the server, or the store's
     // answer would swap the screen out from under the spinner.
-    final showActive = ref.watch(hasProProvider) && !isLoading && !_celebrating;
+    //
+    // Pro that is only the reverse trial is not a subscription: nothing was
+    // bought, so that reader is shown the prices (with a line about their Pro
+    // days) - never a store subscriber or a web subscriber.
+    final trialPro = ref.watch(isTrialProProvider);
+    final showActive = ref.watch(hasProProvider) && !trialPro && !isLoading && !_celebrating;
+    // After the reverse trial: the reader's top feature and own numbers lead.
+    final pitch = ref.watch(personalPitchProvider);
+    final trial = ref.watch(reverseTrialProvider);
 
     // Resolved by the controller from the current offering, or by a direct
     // product lookup when the offering could not supply them.
@@ -156,9 +173,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     // and tier are always what the customer is shown. Null when either product
     // is missing or the currencies differ - in that case no claim is made, and
     // the badge stays off the card.
-    final discountPercent = (monthlyProduct != null && yearlyProduct != null)
-        ? PriceFraming.annualDiscountPercent(monthlyProduct, yearlyProduct)
+    final deal = (monthlyProduct != null && yearlyProduct != null)
+        ? PriceFraming.annualDeal(monthlyProduct, yearlyProduct)
         : null;
+    final discountPercent = deal?.savePercent;
     final selectedMissing = _selectedPlan == _ProPlan.monthly
         ? monthlyProduct == null
         : yearlyProduct == null;
@@ -168,21 +186,31 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       return ProPaywallView(
         headline: widget.onboarding
             ? PremiumScreen.onboardingHeadline
-            : PaywallCopy.headline(gateId: widget.gate?.id, goal: goal, source: widget.source),
+            : pitch?.headline != null
+                ? '${pitch!.headline}.'
+                : PaywallCopy.headline(gateId: widget.gate?.id, goal: goal, source: widget.source),
         // Onboarding: no X, the free road is a quiet link under the button.
         skipLabel: widget.onboarding ? 'Ga verder met de gratis versie' : null,
         ctaLabelNoTrial: widget.onboarding ? 'Begin direct' : 'Word Pro',
         // Onboarding: three lines, so both plans - and the weekly prices side by
         // side - fit above the button with the two-line headline.
-        benefits: PaywallCopy.benefits(gateBenefit: widget.gate?.benefit, goal: goal)
+        benefits: PaywallCopy.benefits(
+          gateBenefit: pitch != null ? PaywallCopy.featureBenefit(pitch.feature) : widget.gate?.benefit,
+          goal: goal,
+        )
             .take(widget.onboarding ? 3 : PaywallCopy.shown)
             .toList(),
         trial: premiumState.yearlyTrial,
         yearlyPrice: yearlyPrice,
         monthlyPrice: monthlyPrice,
-        yearlyPerWeek: yearlyProduct != null
-            ? '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week'
-            : null,
+        // With both live prices the yearly plan is framed per month, beside
+        // the comparison with paying monthly (`annualDeal`).
+        yearlyPerWeek: deal != null
+            ? '${deal.perMonth} per maand'
+            : yearlyProduct != null
+                ? '${PriceFraming.yearlyPerWeek(yearlyProduct)} per week'
+                : null,
+        annualDeal: deal,
         monthlyPerWeek: monthlyProduct != null
             ? '${PriceFraming.perWeek(monthlyProduct, isAnnual: false)} per week'
             : null,
@@ -209,7 +237,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         onRestore: isLoading
             ? () {}
             : () => ref.read(premiumControllerProvider.notifier).restorePurchases(),
-        gateReason: widget.gate == null ? null : _GateReason(gate: widget.gate!),
+        gateReason: _reasonFor(pitch: pitch, trial: trialPro ? trial : null),
         priceNotice: premiumState.priceStatus == PriceStatus.unavailable
             ? _PriceNotice(
                 message: premiumState.priceError ?? 'Prijzen konden niet worden geladen.',
@@ -250,6 +278,35 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         ],
       ),
     );
+  }
+
+  /// The line under the heading. After the reverse trial it says what the
+  /// reader keeps for free of their top feature; during the trial, how their
+  /// Pro days run; otherwise the gate that sent them here, if any.
+  Widget? _reasonFor({PersonalPitch? pitch, ReverseTrial? trial}) {
+    final gate = widget.gate;
+    if (pitch != null) {
+      final atPersonalLimit = gate?.feature == pitch.feature;
+      return PaywallReasonCard(
+        text: atPersonalLimit
+            ? PersonalPlanCopy.reason(pitch.feature)
+            : (gate?.reason ?? 'Je gebruikte ${pitch.feature.name} het meest.'),
+        detail: atPersonalLimit
+            ? PersonalPlanCopy.proLine(pitch.feature)
+            : 'Gratis houd je daarvan ${pitch.limitLine}. ${PersonalPlanCopy.proLine(pitch.feature)}',
+      );
+    }
+    if (trial != null && trial.active) {
+      final left = trial.daysLeft;
+      return PaywallReasonCard(
+        icon: Icons.workspace_premium_outlined,
+        text: left > 0
+            ? 'Je gebruikt nu je gratis Pro-dagen: nog ${left == 1 ? '1 dag' : '$left dagen'} waarop je BijbelStudie opent.'
+            : 'Vandaag is je laatste gratis Pro-dag.',
+        detail: 'Kies je nu een plan, dan loopt Pro daarna gewoon door.',
+      );
+    }
+    return gate == null ? null : PaywallReasonCard(text: gate.reason);
   }
 
   /// The paywall is a modal: its close button pops back to whatever opened it,
@@ -476,10 +533,16 @@ class _ActiveCard extends StatelessWidget {
 /// know what you were after". It restates the thing they just hit and nothing
 /// more - no second pitch, no price claim, and never a promise that is not
 /// also in [kProBenefits].
-class _GateReason extends StatelessWidget {
-  const _GateReason({required this.gate});
+/// The line under the paywall's heading: why the reader is here, or - after
+/// the reverse trial - what they keep for free of their top feature.
+class PaywallReasonCard extends StatelessWidget {
+  const PaywallReasonCard({super.key, required this.text, this.detail, this.icon = Icons.lock_open_outlined});
 
-  final PaywallGate gate;
+  final String text;
+
+  /// A quieter second line under [text].
+  final String? detail;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -492,13 +555,23 @@ class _GateReason extends StatelessWidget {
         border: Border.all(color: AppTheme.teal.withValues(alpha: 0.22)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.lock_open_outlined, size: 18, color: AppTheme.teal),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 18, color: AppTheme.teal),
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              gate.reason,
-              style: AppTheme.bodyStrong.copyWith(fontSize: 13, color: AppTheme.ink),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: AppTheme.bodyStrong.copyWith(fontSize: 13, color: AppTheme.ink)),
+                if (detail case final more?) ...[
+                  const SizedBox(height: 4),
+                  Text(more, style: AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.inkSoft, height: 1.35)),
+                ],
+              ],
             ),
           ),
         ],

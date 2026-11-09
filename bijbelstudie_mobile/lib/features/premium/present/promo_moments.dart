@@ -15,10 +15,13 @@ import 'pro_access_provider.dart';
 ///
 /// The ids are the server allowlist's `promo_shown.trigger` values
 /// (`lib/analyticsSchema.ts`, website repo) - reuse, never invent.
+///
+/// No moment fires during the reverse trial (the reader has Pro, so
+/// [hasProProvider] keeps every one of them off), and the end-of-onboarding
+/// offer is gone: the three free Pro days replace it. After the trial the
+/// recap ("Je Pro-dagen zitten erop", `ProPromoTrigger`) and the reader's
+/// personal limit (the gate itself, `openPaywall`) lead.
 enum PromoMoment {
-  /// End of onboarding: setup and the tour are done. Once per account.
-  onboarding('onboarding', source: 'app_onboarding'),
-
   /// A streak milestone (3, 7, 30 days).
   streak('streak', source: 'app_streak'),
 
@@ -42,11 +45,9 @@ enum PromoMoment {
   /// `?source=` for the pitch and the paywall behind it.
   final String source;
 
-  /// The onboarding offer ignores the 24h window and the session count - it is
-  /// the one moment the old schedule skipped on purpose and should not have.
-  /// Every other moment still respects the window, so a busy reader is never
-  /// shown two offers in a day.
-  bool get bypassesWindow => this == PromoMoment.onboarding || this == PromoMoment.referralEnd;
+  /// An ending gift ignores the 24h window - it happens once. Every other
+  /// moment respects it, so a busy reader is never shown two offers in a day.
+  bool get bypassesWindow => this == PromoMoment.referralEnd;
 }
 
 final promoMomentProvider = NotifierProvider<PromoMomentController, PromoMoment?>(
@@ -59,8 +60,8 @@ class PromoMomentController extends Notifier<PromoMoment?> {
   @override
   PromoMoment? build() => null;
 
-  /// Asks for the offer at [moment]. Onboarding and an ending gift outrank
-  /// the rest; between the others the first one wins.
+  /// Asks for the offer at [moment]. An ending gift outranks the rest;
+  /// between the others the first one wins.
   void request(PromoMoment moment) {
     final current = state;
     if (current == null || (!current.bypassesWindow && moment.bypassesWindow)) {
@@ -75,23 +76,6 @@ class PromoMomentController extends Notifier<PromoMoment?> {
   }
 }
 
-/// The end-of-onboarding offer, armed by the setup wizard. Separate from
-/// [promoMomentProvider] only so the wizard does not need to know about the
-/// other moments.
-final onboardingPaywallProvider = NotifierProvider<OnboardingPaywallController, bool>(
-  OnboardingPaywallController.new,
-);
-
-class OnboardingPaywallController extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void arm() {
-    state = true;
-    ref.read(promoMomentProvider.notifier).request(PromoMoment.onboarding);
-  }
-}
-
 /// Streak lengths that earn an offer. Celebrating the day matters more than
 /// the pitch, so only a few, and the 24h window still applies.
 const kPromoStreakMilestones = {3, 7, 30};
@@ -99,16 +83,18 @@ const kPromoStreakMilestones = {3, 7, 30};
 /// Notes written before the free limit at which the offer appears ("nog 2").
 const kPromoNotesLeft = 2;
 
-/// The free note limit, mirrored from the website's `FREE_NOTE_LIMIT`.
-const kFreeNoteLimit = 10;
-
 /// After a note is saved: asks for the offer when exactly [kPromoNotesLeft]
-/// free notes remain. Best-effort - an unreadable list just means no offer.
+/// free notes remain. The limit is the server's (`/api/v1/me.limits.notes`),
+/// so an account whose personal limit is notes - no new notes at all - is
+/// never told it has two left. Best-effort - an unreadable list just means
+/// no offer.
 Future<void> requestNoteMomentIfNear(ProviderContainer container) async {
   try {
     if (container.read(hasProProvider)) return;
+    final limit = container.read(accountLimitsProvider).notes;
+    if (limit == null || limit <= kPromoNotesLeft) return;
     final notes = await container.read(notesListProvider.future);
-    if (notes.length == kFreeNoteLimit - kPromoNotesLeft) {
+    if (notes.length == limit - kPromoNotesLeft) {
       container.read(promoMomentProvider.notifier).request(PromoMoment.noteLimitNear);
     }
   } catch (_) {}

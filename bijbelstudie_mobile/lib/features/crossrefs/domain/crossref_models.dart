@@ -243,6 +243,45 @@ class CrossRefChapter {
 
   /// How many of this verse's references are Pro-only in this payload.
   int lockedCountFor(int verse) => verseFor(verse)?.lockedCount ?? 0;
+
+  /// This chapter with at most [perVerse] references shown per verse, the
+  /// rest counted as locked. For an account whose personal limit after the
+  /// reverse trial is study material (`limits.crossRefs` = 1, one below the
+  /// free slice the public URL serves).
+  CrossRefChapter limitedTo(int perVerse) {
+    if (perVerse < 0) return this;
+    var changed = false;
+    final limited = [
+      for (final entry in verses)
+        if (entry.refs.length > perVerse)
+          () {
+            changed = true;
+            return CrossRefVerse(
+              number: entry.number,
+              refs: entry.refs.sublist(0, perVerse),
+              total: entry.total,
+              lockedCount: entry.lockedCount + entry.refs.length - perVerse,
+            );
+          }()
+        else
+          entry,
+    ];
+    if (!changed) return this;
+    return CrossRefChapter(
+      id: id,
+      datasetVersion: datasetVersion,
+      versification: versification,
+      version: version,
+      book: book,
+      osis: osis,
+      chapter: chapter,
+      verses: limited,
+      attribution: attribution,
+      numberingMayDiffer: numberingMayDiffer,
+      updatedAt: updatedAt,
+      fromCache: fromCache,
+    );
+  }
 }
 
 /// The testament pair an analytics event may carry: `ot_ot`, `ot_nt`,

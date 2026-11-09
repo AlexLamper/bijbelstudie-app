@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import '../../../core/analytics/analytics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/lucide_icon.dart';
+import '../../premium/data/reverse_trial_repository.dart';
 import '../../premium/present/paywall_route.dart';
 import '../../premium/present/pro_access_provider.dart';
 import '../data/music_tracks.dart';
@@ -56,24 +59,40 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
         track.subtitle.toLowerCase().contains(query);
   }
 
-  void _pick(int index) {
+  Future<void> _pick(int index) async {
     AppHaptics.light();
     final hasPro = ref.read(hasProProvider);
-    // Captured before the pop: the sheet's context is gone after it.
+    final trialPro = ref.read(isTrialProProvider);
+    final allowance = ref.read(accountLimitsProvider).audioPerDay ?? 0;
+    // Captured before the pop: the sheet's context and its ref are gone after it.
     final router = GoRouter.maybeOf(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final trackId = kMusicTracks[index].id;
     _search.clear();
     Navigator.of(context).pop();
+    final trial = container.read(reverseTrialRepositoryProvider);
     if (!hasPro) {
+      // After the reverse trial, audio as the personal limit keeps one track
+      // a day (website and app together, decided by the server).
+      if (allowance > 0) {
+        final answer = await trial.claim('music', key: trackId);
+        if (answer?.allowed ?? false) {
+          container.read(musicPlayerProvider.notifier).play(index, single: true);
+          return;
+        }
+      }
       // The play press is both the refusal and the way through, so it counts
       // as the hit and the click at once - the reader never sees a separate
       // prompt to click on.
-      final analytics = ref.read(analyticsProvider);
+      final analytics = container.read(analyticsProvider);
       analytics.track(AnalyticsEvents.paywallHit, {'surface': 'music'});
       analytics.track(AnalyticsEvents.paywallCtaClicked, {'surface': 'music'});
       openPaywallWith(router, gate: PaywallGate.music);
       return;
     }
-    ref.read(musicPlayerProvider.notifier).play(index);
+    // During the reverse trial a track counts toward "muziek en voorlezen".
+    if (trialPro) unawaited(trial.claim('music', key: trackId));
+    container.read(musicPlayerProvider.notifier).play(index);
   }
 
   @override
@@ -81,6 +100,8 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
     AppTheme.dependOn(context);
     final last = ref.watch(musicPlayerProvider.select((s) => s.lastTrackIndex));
     final hasPro = ref.watch(hasProProvider);
+    // A personal audio allowance after the reverse trial: one track a day.
+    final allowance = ref.watch(accountLimitsProvider.select((l) => l.audioPerDay ?? 0));
     final visible = _visible;
     final query = _search.text.trim();
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
@@ -138,8 +159,11 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                   Text(
                     hasPro
                         ? 'Piano, lofi en orgel, zonder tekst. Speelt door als je verder leest.'
-                        : 'Piano, lofi en orgel, zonder tekst. Speelt door als je verder leest. '
-                              'Achtergrondmuziek hoort bij Pro.',
+                        : allowance > 0
+                            ? 'Piano, lofi en orgel, zonder tekst. Gratis kies je $allowance '
+                                  '${allowance == 1 ? 'nummer' : 'nummers'} per dag; met Pro speelt alles door.'
+                            : 'Piano, lofi en orgel, zonder tekst. Speelt door als je verder leest. '
+                                  'Achtergrondmuziek hoort bij Pro.',
                     style: TextStyle(
                       fontFamily: AppTheme.sansFontName,
                       fontSize: 13,
@@ -206,7 +230,7 @@ class _MusicPickerSheetState extends ConsumerState<_MusicPickerSheet> {
                           _TrackRow(
                             track: kMusicTracks[i],
                             isLast: last == i,
-                            locked: !hasPro,
+                            locked: !hasPro && allowance == 0,
                             onTap: () => _pick(i),
                           ),
                         ],

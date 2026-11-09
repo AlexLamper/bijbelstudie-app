@@ -1,3 +1,5 @@
+import '../../premium/domain/personal_plan.dart';
+
 /// Reading preferences, mirroring `User.preferences` on the backend.
 ///
 /// Field names and the value scales (`base`, `relaxed`, ...) match
@@ -87,6 +89,13 @@ class ProfileModel {
   final bool isAdmin;
   final ReadingPreferences preferences;
 
+  /// The reverse trial (Pro on the first three active days), or null on an
+  /// account created before it. Additive on `/api/v1/me`.
+  final ReverseTrial? trial;
+
+  /// What this account may do right now; null from a server that predates it.
+  final AccountLimits? limits;
+
   /// The response this was parsed from, kept so the Profiel tab can be cached
   /// to disk and rendered on the first frame of a cold start
   /// (`core/data/payload_cache.dart`). Null for anything built by hand.
@@ -103,7 +112,13 @@ class ProfileModel {
     this.isAdmin = false,
     this.preferences = const ReadingPreferences(),
     this.raw,
+    this.trial,
+    this.limits,
   });
+
+  /// Pro only because of the reverse trial: nothing was bought, so the app may
+  /// offer to buy (unlike [isProFromWeb]).
+  bool get isProFromTrial => isPro && proSource == 'trial';
 
   /// Pro bought outside the App Store. Apple's multiplatform exception lets
   /// these users keep access; the app must not try to sell to them.
@@ -124,6 +139,8 @@ class ProfileModel {
       preferences: ReadingPreferences.fromJson(
         json['preferences'] as Map<String, dynamic>?,
       ),
+      trial: ReverseTrial.fromJson(json['trial']),
+      limits: AccountLimits.fromJson(json['limits']),
     );
   }
 }

@@ -186,7 +186,11 @@ class _AiAssistantPaneState extends ConsumerState<AiAssistantPane> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: AppTheme.assistantTint,
             child: Text(
-              'Nog ${quota.remaining} van ${quota.cap} gratis vragen vandaag',
+              // `cap` is the server's: 1 when the AI is this reader's
+              // personal limit after the reverse trial, else the free 3.
+              quota.cap == 1
+                  ? 'Nog ${quota.remaining} van 1 gratis vraag vandaag'
+                  : 'Nog ${quota.remaining} van ${quota.cap} gratis vragen vandaag',
               style: AppTheme.caption.copyWith(color: AppTheme.assistant),
             ),
           ),

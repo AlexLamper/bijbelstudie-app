@@ -1,4 +1,5 @@
 import '../data/paywall_goal.dart';
+import 'personal_plan.dart';
 
 /// The paywall's headline and benefit lines, chosen for the reader in front of
 /// it.
@@ -51,6 +52,15 @@ class PaywallCopy {
     StudyGoal.dailyHabit => 'Offline lezen',
     StudyGoal.learnAboutJesus => 'Meer AI-vragen',
     StudyGoal.theology => 'Grondtekst',
+  };
+
+  /// The benefit line for a reverse-trial feature, lifted to the top when it
+  /// was the reader's most used one.
+  static String featureBenefit(ProFeature feature) => switch (feature) {
+    ProFeature.ai => 'Meer AI-vragen',
+    ProFeature.notes => 'Onbeperkt notities',
+    ProFeature.study => 'Alle commentaren',
+    ProFeature.audio => 'Achtergrondmuziek',
   };
 
   static String goalHeadline(StudyGoal goal) => switch (goal) {

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../premium/domain/personal_plan.dart';
 import '../../premium/present/paywall_route.dart';
+import '../../premium/present/pro_access_provider.dart';
 import '../data/notes_repository.dart';
 import 'notes_providers.dart';
 
@@ -48,10 +50,16 @@ void listenForSyncRejections(BuildContext context, WidgetRef ref) {
     if (rejection == null) return;
     ref.read(syncRejectionProvider.notifier).clear();
     ref.invalidate(notesListProvider);
+    // `/sync` names no message, only the reason; when notes are this
+    // reader's personal limit (after the reverse trial) the refusal says so
+    // in the website's own words instead of naming the normal free number.
+    final personal = rejection.proRequired && ref.read(limitedFeatureProvider) == ProFeature.notes;
     showSyncRejection(
       ScaffoldMessenger.maybeOf(context),
       GoRouter.maybeOf(context),
-      rejection,
+      personal
+          ? SyncRejectedException(PersonalPlanCopy.reason(ProFeature.notes), proRequired: true)
+          : rejection,
     );
   });
 }

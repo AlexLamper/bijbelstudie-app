@@ -47,6 +47,12 @@ class MusicPlayerController extends Notifier<MusicState> {
   bool _pausedBeforeStop = false;
   bool _fadingOut = false;
 
+  /// Set while a reader whose personal limit after the reverse trial is audio
+  /// plays their one track of the day (TINY_AUDIO_PER_DAY on the server): it
+  /// plays to its end and nothing follows it - no next, no previous, no
+  /// playlist running on.
+  bool _single = false;
+
   static const stoppedMessageDuration = Duration(seconds: 4);
   static const sleepFadeDuration = Duration(seconds: 3);
 
@@ -116,9 +122,10 @@ class MusicPlayerController extends Notifier<MusicState> {
   }
 
   /// Starts [index] from the top, with the pill expanded. The rest of its
-  /// playlist follows.
-  void play(int index) {
+  /// playlist follows - unless [single]: then only this track plays.
+  void play(int index, {bool single = false}) {
     if (index < 0 || index >= kMusicTracks.length) return;
+    _single = single;
     _clearStopped();
     _cancelFade();
     _sleepTimer?.cancel();
@@ -147,6 +154,7 @@ class MusicPlayerController extends Notifier<MusicState> {
   }
 
   void _switch(int index, {required bool fade}) {
+    if (_single) return;
     state = state.copyWith(trackIndex: index, lastTrackIndex: index, paused: false);
     unawaited(MusicPrefs.saveLastTrack(kMusicTracks[index].id).catchError((Object _) {}));
     _run(() async {
@@ -185,6 +193,10 @@ class MusicPlayerController extends Notifier<MusicState> {
   /// faded itself out.
   void _onTrackEnd() {
     if (!state.isPlaying || state.paused || _fadingOut) return;
+    if (_single) {
+      stop();
+      return;
+    }
     _switch(musicStep(state.trackIndex, 1), fade: false);
   }
 

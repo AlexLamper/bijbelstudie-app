@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../domain/paywall_copy.dart';
+import '../domain/price_framing.dart';
 import '../domain/store_copy.dart';
 import '../domain/trial_offer.dart';
 
@@ -45,7 +46,12 @@ class ProPaywallView extends StatelessWidget {
     this.skipLabel,
     this.ctaLabelNoTrial = 'Word Pro',
     this.closeDelay = kPaywallCloseDelay,
+    this.annualDeal,
   });
+
+  /// The yearly plan against twelve monthly payments, from the live store
+  /// prices ([PriceFraming.annualDeal]); null shows no comparison at all.
+  final AnnualDealText? annualDeal;
 
   /// Set on the onboarding paywall: there is no X then, and this quiet link
   /// under the button is the way on to the free version ([onClose]).
@@ -186,6 +192,7 @@ class ProPaywallView extends StatelessWidget {
                             // yes (Alex, 29 Oct), so it is coloured and bold -
                             // still smaller than the billed amount (3.1.2(c)).
                             highlightPerWeek: true,
+                            footnote: annualDeal == null ? null : AnnualDealLine(deal: annualDeal!),
                             onTap: onSelectYearly,
                           ),
                           const SizedBox(height: 10),
@@ -525,7 +532,11 @@ class ProPlanCard extends StatelessWidget {
     this.perWeek,
     this.badge,
     this.highlightPerWeek = false,
+    this.footnote,
   });
+
+  /// A line under the card's own text: the yearly-vs-monthly comparison.
+  final Widget? footnote;
 
   final String title;
   final String price;
@@ -583,6 +594,10 @@ class ProPlanCard extends StatelessWidget {
                             )
                           : AppTheme.caption.copyWith(fontSize: 12.5, color: AppTheme.inkSoft),
                     ),
+                  ],
+                  if (footnote case final note?) ...[
+                    const SizedBox(height: 4),
+                    note,
                   ],
                 ],
               ),
@@ -912,6 +927,36 @@ class _TimelineRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "€ 155,88 bij 12 x maandprijs - bespaar 35%", under the yearly plan whose
+/// card already shows the yearly price and, in its accent line, the price per
+/// month. The struck-through amount is twelve monthly payments at today's
+/// price, labelled as such - never a former price ([PriceFraming.annualDeal]).
+class AnnualDealLine extends StatelessWidget {
+  const AnnualDealLine({super.key, required this.deal});
+
+  final AnnualDealText deal;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = AppTheme.caption.copyWith(fontSize: 12, height: 1.35, color: AppTheme.inkSoft);
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          TextSpan(
+            text: deal.monthlyTimesTwelve,
+            style: base.copyWith(decoration: TextDecoration.lineThrough, decorationColor: AppTheme.inkSoft),
+          ),
+          TextSpan(text: ' bij 12 x maandprijs - bespaar ${deal.savePercent}%'),
+        ],
+      ),
+      semanticsLabel:
+          '${deal.annual} per jaar, tegenover ${deal.monthlyTimesTwelve} bij twaalf keer de maandprijs: '
+          'bespaar ${deal.savePercent} procent, ${deal.perMonth} per maand',
     );
   }
 }

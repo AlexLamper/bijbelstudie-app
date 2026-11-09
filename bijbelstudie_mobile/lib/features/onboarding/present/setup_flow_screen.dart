@@ -21,7 +21,6 @@ import '../../bible/domain/version_catalog.dart';
 import '../../bible/present/bible_providers.dart';
 import '../../bible/present/language_separator.dart';
 import '../../premium/data/paywall_goal.dart';
-import '../../premium/present/pro_access_provider.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../settings/data/notification_prefs.dart';
@@ -198,18 +197,10 @@ class _SetupFlowScreenState extends ConsumerState<SetupFlowScreen> {
     }
 
     if (!mounted) return;
-    // The paywall comes straight after setup, before the tour (Alex, 29 Oct:
-    // "they pay after creating the account immediately"). It used to open
-    // once on Start after the tour, behind three pitch screens; the goal is
-    // known by now, so it goes straight to the price. Leaving it - its quiet
-    // "Ga verder met de gratis versie" link - or buying both continue to the
-    // tour (`PremiumScreen.onboarding`). An account that already has Pro, a
-    // web subscriber signing in here for the first time, goes on to the tour.
-    if (ref.read(hasProProvider)) {
-      context.go('/tour');
-      return;
-    }
-    context.go('/premium?source=app_onboarding&onboarding=1');
+    // Straight on to the tour. There is no paywall here any more (Alex, Nov
+    // 2026): a new account has Pro for its first three active days - the
+    // reverse trial - and is offered Pro when those end, with its own numbers.
+    context.go('/tour');
   }
 
   @override

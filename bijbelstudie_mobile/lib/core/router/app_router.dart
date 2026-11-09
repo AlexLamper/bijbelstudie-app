@@ -36,6 +36,7 @@ import '../../features/progress_tree/present/progress_tree_tab_icon.dart';
 import '../../features/progress_tree/present/studio/progress_tree_studio_screen.dart';
 import '../../features/notes/present/notes_screen.dart';
 import '../../features/premium/present/premium_screen.dart';
+import '../../features/premium/present/trial_recap_screen.dart';
 import '../../features/premium/present/pro_access_provider.dart';
 import '../../features/premium/present/pro_celebration_screen.dart';
 import '../../features/premium/present/pro_promo_trigger.dart';
@@ -499,6 +500,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           gate: PaywallGate.fromId(state.uri.queryParameters['gate']),
           onboarding: state.uri.queryParameters['onboarding'] == '1',
         ),
+      ),
+      // "Je Pro-dagen zitten erop": once, on the first open after the reverse
+      // trial ended. Pushed by `ProPromoTrigger`; the upgrade button replaces
+      // it with `/premium`.
+      GoRoute(
+        path: '/pro-recap',
+        builder: (context, state) => const TrialRecapScreen(),
       ),
       // The post-purchase celebration. Reached only by `pushReplacement` from
       // the paywall, so it takes the paywall's place in the stack.

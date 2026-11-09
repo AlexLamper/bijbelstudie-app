@@ -95,6 +95,33 @@ class PriceFraming {
     return ((saving / yearlyAtMonthlyRate) * 100).round();
   }
 
+  /// The yearly plan as a deal against paying monthly, from the LIVE store
+  /// prices: "€ 155,88 (12 x maandprijs) → € 99,99 per jaar - bespaar 35%,
+  /// € 8,33 per maand".
+  ///
+  /// The struck-through amount is twelve times today's monthly price, never a
+  /// former price, and it is always labelled "12 x maandprijs": under the
+  /// Dutch price-indication rules and the Omnibus directive a crossed-out
+  /// "was" price must be the lowest price of the last 30 days, which is why
+  /// this comparison is the only strikethrough the paywall uses. Null - so
+  /// nothing is shown - when a product is missing, the currencies differ, or
+  /// the yearly plan is not actually cheaper.
+  static AnnualDealText? annualDeal(StoreProduct monthly, StoreProduct annual) {
+    final deal = AnnualDeal.from(
+      monthly: monthly.price,
+      annual: annual.price,
+      monthlyCurrency: monthly.currencyCode,
+      annualCurrency: annual.currencyCode,
+    );
+    if (deal == null) return null;
+    return AnnualDealText(
+      monthlyTimesTwelve: formatLike(monthly, deal.monthlyTimesTwelve),
+      annual: annual.priceString,
+      perMonth: formatLike(annual, deal.perMonth),
+      savePercent: deal.savePercent,
+    );
+  }
+
   /// Whole months of the monthly plan covered by the annual saving.
   ///
   /// Floored, never rounded: a "3 maanden gratis" badge on a saving worth 2,99
@@ -106,4 +133,57 @@ class PriceFraming {
     if (saving <= 0) return null;
     return (saving / monthly.price).floor();
   }
+}
+
+/// The numbers behind [PriceFraming.annualDeal], without a store product, so
+/// they can be tested. Mirrors `annualDeal` in the website's lib/pricing.ts.
+class AnnualDeal {
+  const AnnualDeal({
+    required this.monthlyTimesTwelve,
+    required this.annual,
+    required this.perMonth,
+    required this.savePercent,
+  });
+
+  final double monthlyTimesTwelve;
+  final double annual;
+  final double perMonth;
+
+  /// Whole percent saved against twelve monthly payments, rounded DOWN so the
+  /// badge never claims more than the prices give.
+  final int savePercent;
+
+  static AnnualDeal? from({
+    required double? monthly,
+    required double? annual,
+    String? monthlyCurrency,
+    String? annualCurrency,
+  }) {
+    if (monthly == null || annual == null) return null;
+    if (monthly <= 0 || annual <= 0) return null;
+    if (monthlyCurrency != null && annualCurrency != null && monthlyCurrency != annualCurrency) return null;
+    final twelve = monthly * 12;
+    if (annual >= twelve) return null;
+    return AnnualDeal(
+      monthlyTimesTwelve: twelve,
+      annual: annual,
+      perMonth: (annual / 12 * 100).roundToDouble() / 100,
+      savePercent: (((twelve - annual) / twelve) * 100 + 1e-9).floor(),
+    );
+  }
+}
+
+/// [AnnualDeal] formatted in the store's own currency and number style.
+class AnnualDealText {
+  const AnnualDealText({
+    required this.monthlyTimesTwelve,
+    required this.annual,
+    required this.perMonth,
+    required this.savePercent,
+  });
+
+  final String monthlyTimesTwelve;
+  final String annual;
+  final String perMonth;
+  final int savePercent;
 }

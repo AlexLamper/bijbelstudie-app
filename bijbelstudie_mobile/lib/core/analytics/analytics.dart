@@ -14,6 +14,13 @@ class AnalyticsEvents {
   AnalyticsEvents._();
 
   static const pricingViewed = 'pricing_viewed';
+
+  /// The reverse trial (website `lib/reverseTrial.ts`): a gate refused because
+  /// of the reader's personal limit, and what they chose on the recap. Closed
+  /// sets on the server: `feature` is ai/notes/study/audio, `action`
+  /// upgrade/continue_free. `trial_recap_shown` is recorded by the server.
+  static const personalLimitHit = 'personal_limit_hit';
+  static const trialRecapAction = 'trial_recap_action';
   static const planSelected = 'plan_selected';
   static const checkoutStarted = 'checkout_started';
   static const checkoutCompleted = 'checkout_completed';

@@ -22,6 +22,8 @@ import 'commentary_format.dart';
 import 'commentary_jump.dart';
 import 'commentary_note_target.dart';
 import 'verse_jump_sheet.dart';
+import '../../premium/domain/personal_plan.dart';
+import '../../premium/present/pro_access_provider.dart';
 
 /// The Commentaar tab of the study page, locked to whatever the reader shows.
 ///
@@ -1072,11 +1074,24 @@ class OriginalVerseBlock extends StatelessWidget {
 ///
 /// Mirrors how `CommentaryComponent.tsx` invokes `UpgradePrompt` (around
 /// lines 536-546): same title, body and CTA copy, same `commentary` surface.
-class _CommentaryPaywall extends StatelessWidget {
+class _CommentaryPaywall extends ConsumerWidget {
   const _CommentaryPaywall();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Study material as the personal limit after the reverse trial: today's
+    // chapter was opened elsewhere, so this one shows no preview at all.
+    if (ref.watch(limitedFeatureProvider) == ProFeature.study) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: UpgradePrompt(
+          surface: 'commentary',
+          title: 'Je studiehoofdstuk voor vandaag is gebruikt',
+          body: PersonalPlanCopy.reason(ProFeature.study),
+          cta: 'Verder lezen met Pro',
+        ),
+      );
+    }
     return const Padding(
       padding: EdgeInsets.only(top: 8),
       child: UpgradePrompt(
@@ -1099,11 +1114,22 @@ class _CommentaryPaywall extends StatelessWidget {
 ///
 /// Mirrors `_CommentaryPaywall` above and how `OriginalText.tsx` invokes
 /// `UpgradePrompt`, on the same `original_text` surface.
-class _OriginalTextPaywall extends StatelessWidget {
+class _OriginalTextPaywall extends ConsumerWidget {
   const _OriginalTextPaywall();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(limitedFeatureProvider) == ProFeature.study) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: UpgradePrompt(
+          surface: 'original_text',
+          title: 'Je studiehoofdstuk voor vandaag is gebruikt',
+          body: PersonalPlanCopy.reason(ProFeature.study),
+          cta: 'Verder lezen met Pro',
+        ),
+      );
+    }
     return const Padding(
       padding: EdgeInsets.only(top: 8),
       child: UpgradePrompt(

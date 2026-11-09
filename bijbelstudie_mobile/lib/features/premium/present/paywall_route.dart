@@ -1,5 +1,9 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../domain/personal_plan.dart';
+import 'pro_access_provider.dart';
 
 /// The one place that decides *which* road to the paywall a reader takes.
 ///
@@ -111,6 +115,16 @@ enum PaywallGate {
   /// "Alle commentaren" third in a generic list.
   final String? benefit;
 
+  /// The reverse-trial feature behind this gate: when it is the reader's
+  /// personal limit, the paywall leads with their own numbers for it.
+  ProFeature? get feature => switch (this) {
+    PaywallGate.aiLimit => ProFeature.ai,
+    PaywallGate.notes => ProFeature.notes,
+    PaywallGate.commentary || PaywallGate.originalText || PaywallGate.crossrefs => ProFeature.study,
+    PaywallGate.music || PaywallGate.offline => ProFeature.audio,
+    PaywallGate.groups || PaywallGate.progressTree => null,
+  };
+
   static PaywallGate? fromId(String? id) {
     if (id == null) return null;
     for (final gate in PaywallGate.values) {
@@ -133,7 +147,13 @@ enum PaywallGate {
 void openPaywall(BuildContext context, {PaywallGate? gate, String? source}) {
   final router = GoRouter.of(context);
   if (gate == null) {
-    router.push('/pro-intro?source=${source ?? 'app_funnel'}');
+    // After the reverse trial the reader's own numbers say more than the
+    // three-screen pitch: they already know the app, and the paywall leads
+    // with the feature they used most.
+    final personal = _hasPersonalPitch(context);
+    router.push(personal
+        ? '/premium?source=${source ?? 'app_funnel'}'
+        : '/pro-intro?source=${source ?? 'app_funnel'}');
     return;
   }
   router.push('/premium?source=${source ?? gate.source}&gate=${gate.id}');
@@ -149,4 +169,12 @@ void openPaywallWith(GoRouter? router, {PaywallGate? gate, String? source}) {
     return;
   }
   router.push('/premium?source=${source ?? gate.source}&gate=${gate.id}');
+}
+
+bool _hasPersonalPitch(BuildContext context) {
+  try {
+    return ProviderScope.containerOf(context, listen: false).read(personalPitchProvider) != null;
+  } catch (_) {
+    return false;
+  }
 }

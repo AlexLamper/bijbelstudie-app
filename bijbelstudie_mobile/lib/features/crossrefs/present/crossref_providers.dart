@@ -26,10 +26,15 @@ final crossRefRepositoryProvider = Provider((ref) {
 /// A Pro reader asks for the full list (`full=1`); everyone else reads the
 /// free slice off the CDN. Watching [hasProProvider] refetches the moment a
 /// purchase lands, so the locked row gives way to the full list in place.
+///
+/// After the reverse trial, a reader whose personal limit is study material
+/// sees [AccountLimits.crossRefs] per verse (one) instead of the free slice's
+/// two; the rest shows as locked, like any other Pro reference.
 final crossRefChapterProvider = FutureProvider.autoDispose
-    .family<CrossRefChapter, ChapterRef>((ref, chapterRef) {
+    .family<CrossRefChapter, ChapterRef>((ref, chapterRef) async {
       final full = ref.watch(hasProProvider);
-      return ref
+      final perVerse = ref.watch(accountLimitsProvider.select((limits) => limits.crossRefs));
+      final chapter = await ref
           .watch(crossRefRepositoryProvider)
           .getChapter(
             chapterRef.sourceId,
@@ -37,6 +42,7 @@ final crossRefChapterProvider = FutureProvider.autoDispose
             chapterRef.chapter,
             full: full,
           );
+      return full || perVerse == null ? chapter : chapter.limitedTo(perVerse);
     });
 
 /// The same chapter, but only if it is already on this device.

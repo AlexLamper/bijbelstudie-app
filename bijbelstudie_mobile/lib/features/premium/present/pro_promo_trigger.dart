@@ -9,7 +9,6 @@ import '../../auth/present/auth_controller.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../profile/present/profile_provider.dart';
 import '../../../core/analytics/analytics.dart';
-import '../data/paywall_goal.dart';
 import '../data/pro_promo_schedule.dart';
 import 'paywall_route.dart';
 import 'premium_controller.dart';
@@ -59,6 +58,10 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
   static Future<void>? _sessionRecorded;
   static bool _doneThisProcess = false;
 
+  /// "Je Pro-dagen zitten erop" was put on screen this process. The server
+  /// marks it seen as well, so the next profile load no longer asks for it.
+  static bool _recapShown = false;
+
   Timer? _timer;
 
   @override
@@ -71,6 +74,9 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     ref.listenManual(profileProvider, (previous, next) {
       final profile = next.value;
       if (profile == null) return;
+      // A reverse-trial account gets the recap when its Pro ends, not the
+      // "je Pro-week is voorbij" offer - even when a referral week ran on.
+      if (profile.trial != null) return;
       unawaited(trackGiftEnd(
         ref.read(promoMomentProvider.notifier),
         isPro: profile.isPro,
@@ -97,7 +103,7 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
   void _sync(bool eligible) {
     // A pending moment re-arms the trigger even after this process's session
     // promo: a streak or the end of onboarding is a new reason to ask.
-    final pending = ref.read(promoMomentProvider) != null;
+    final pending = ref.read(promoMomentProvider) != null || _recapDue();
     final touring = ref.read(tourControllerProvider).active;
     final armed = eligible &&
         !touring &&
@@ -111,9 +117,18 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     _timer ??= Timer(ProPromoRules.showDelay, _fire);
   }
 
+  /// The reverse trial ended and its recap has not been shown yet. It leads:
+  /// it outranks every other moment and ignores the 24h window, because it
+  /// happens once per account.
+  bool _recapDue() => !_recapShown && (ref.read(reverseTrialProvider)?.recapPending ?? false);
+
   Future<void> _fire() async {
     _timer = null;
     if (!mounted) return;
+    if (_recapDue()) {
+      _fireRecap();
+      return;
+    }
     if (ref.read(promoMomentProvider) != null) {
       await _fireMoment();
       return;
@@ -153,6 +168,19 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     openPaywall(context, source: ProPromoRules.paywallSource);
   }
 
+  void _fireRecap() {
+    if (_path() != ProPromoRules.triggerRoute) return;
+    if (ref.read(tourControllerProvider).active) return;
+    // Never over a subscription (3.1.1): the recap ends in a purchase button.
+    if (!ref.read(proPromoEligibleProvider)) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    _recapShown = true;
+    _doneThisProcess = true;
+    unawaited(ProPromoSchedule.markShown());
+    ref.read(analyticsProvider).track(AnalyticsEvents.promoShown, {'trigger': 'trial_recap'});
+    GoRouter.of(context).push('/pro-recap');
+  }
+
   /// Opens the pitch for the pending [PromoMoment], if the rules allow it now.
   Future<void> _fireMoment() async {
     final moment = ref.read(promoMomentProvider);
@@ -175,14 +203,6 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     unawaited(ProPromoSchedule.markShown());
     ref.read(analyticsProvider).track(AnalyticsEvents.promoShown, {'trigger': moment.trigger});
 
-    // The end of onboarding opens on the demo: the goal was the wizard's first
-    // question, a minute ago. Without a stored answer the pitch asks it.
-    final goal = await ref.read(storedStudyGoalProvider.future).catchError((_) => null);
-    if (!mounted) return;
-    if (moment == PromoMoment.onboarding && goal != null) {
-      GoRouter.of(context).push('/pro-intro?source=${moment.source}&skipGoal=1');
-      return;
-    }
     openPaywall(context, source: moment.source);
   }
 
@@ -192,6 +212,7 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
     // Both re-arm the timer: a moment being requested, and the tour ending
     // (the onboarding offer waits for it).
     ref.watch(promoMomentProvider);
+    ref.watch(reverseTrialProvider.select((trial) => trial?.recapPending ?? false));
     ref.watch(tourControllerProvider.select((tour) => tour.active));
     // Route and eligibility both arrive through rebuilds (the shell rebuilds
     // on every navigation); the timer is (re)armed or cancelled after layout.
