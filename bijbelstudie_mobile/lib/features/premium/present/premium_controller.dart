@@ -15,6 +15,7 @@ import '../../profile/data/profile_repository.dart';
 import '../../profile/present/profile_provider.dart';
 import '../data/purchase_service.dart';
 import '../domain/store_copy.dart';
+import '../../../core/api/store_pro_signal.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,10 @@ class PremiumController extends Notifier<PremiumState> {
 
   @override
   PremiumState build() {
+    // Mirror the store's answer for the API client (X-Bs-Store-Pro), so the
+    // server never starts the reverse trial on a store subscriber or store
+    // trial it has not heard about yet.
+    listenSelf((_, next) => StoreProSignal.active = next.isPro);
     // Deferred to a microtask on purpose, and this is the whole reason the
     // paywall showed nothing.
     //

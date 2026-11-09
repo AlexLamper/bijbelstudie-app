@@ -130,7 +130,27 @@ class _ProPromoTriggerState extends ConsumerState<ProPromoTrigger> {
 
   /// An older account was just given the reverse trial (website
   /// `isExistingFreeAccount`) and has not been told yet.
-  bool _announceDue() => !_announced && (ref.read(reverseTrialProvider)?.announce ?? false);
+  ///
+  /// Never to a reader who already has Pro of their own: the store says so
+  /// (a subscription or an App Store trial the server may not have synced
+  /// yet), or the server does (a web subscription, admin). Such a reader would
+  /// be told "Je hebt 3 dagen Pro gekregen" about a trial they don't need; the
+  /// server takes that trial back on its next request, and this marks it seen.
+  bool _announceDue() {
+    if (_announced || !(ref.read(reverseTrialProvider)?.announce ?? false)) return false;
+    if (_hasOwnPro()) {
+      _announced = true;
+      unawaited(ref.read(reverseTrialRepositoryProvider).markAnnounceSeen(Analytics.platform));
+      return false;
+    }
+    return true;
+  }
+
+  bool _hasOwnPro() {
+    if (ref.read(premiumControllerProvider).isPro) return true;
+    final source = ref.read(profileProvider).value?.proSource;
+    return source == 'apple' || source == 'google' || source == 'stripe' || source == 'admin';
+  }
 
   Future<void> _fire() async {
     _timer = null;

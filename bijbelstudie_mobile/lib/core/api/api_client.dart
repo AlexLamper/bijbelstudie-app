@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import '../../features/auth/data/auth_local_storage.dart';
 import '../../features/bible/domain/copy_policy.dart';
 import '../config/app_config.dart';
+import 'store_pro_signal.dart';
 
 /// Called when the refresh token is dead and the user has to log in again.
 typedef SessionExpiredCallback = void Function();
@@ -48,6 +49,18 @@ class ApiClient {
 
     dio = Dio(options);
     _refreshDio = Dio(options);
+
+    // Every call, the refresh included (often the first request of a launch):
+    // tells the server the store already gives Pro, so it never hands this
+    // reader the one-time reverse trial. See [StoreProSignal].
+    final storePro = InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (StoreProSignal.active) options.headers[StoreProSignal.header] = '1';
+        handler.next(options);
+      },
+    );
+    dio.interceptors.add(storePro);
+    _refreshDio.interceptors.add(storePro);
 
     dio.interceptors.add(
       InterceptorsWrapper(
