@@ -11,14 +11,12 @@ const int kMaxNotificationsPerDay = 2;
 /// Inhoud). `chapter` and `other` have no switch: a plain reading reminder is
 /// what is left when everything else is off.
 class DailyContentPrefs {
-  const DailyContentPrefs({this.verse = true, this.plan = true, this.study = true});
+  const DailyContentPrefs({this.verse = true, this.study = true});
 
   final bool verse;
-  final bool plan;
   final bool study;
 
   bool allows(ScheduleKind kind) => switch (kind) {
-        ScheduleKind.bibleYear => plan,
         ScheduleKind.study => study,
         ScheduleKind.verse => verse,
         ScheduleKind.chapter || ScheduleKind.other => true,
@@ -27,7 +25,6 @@ class DailyContentPrefs {
   /// `exclude` for `/notifications/schedule`: the kinds switched off, in a
   /// fixed order (it is part of the schedule cache key). Empty when all on.
   String get excludeParam => [
-        if (!plan) 'bibleYear',
         if (!study) 'study',
         if (!verse) 'verse',
       ].join(',');

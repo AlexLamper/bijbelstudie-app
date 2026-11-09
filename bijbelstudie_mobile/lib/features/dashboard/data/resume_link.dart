@@ -5,13 +5,6 @@
 import '../../../core/data/bible_books.dart';
 import '../../studies/data/enrollment_models.dart';
 
-/// The website's `/studies/bijbel-in-een-jaar` opens the app's reading plan
-/// (`/leesplan`, `PlanRoutes.plan`). Set back to false only if that route
-/// goes away: the href then falls back to the Studies tab.
-const bool kBibleYearRouteAvailable = true;
-
-const String bibleYearPath = '/leesplan';
-
 sealed class ResumeTarget {
   const ResumeTarget();
 }
@@ -63,10 +56,7 @@ const ResumeTarget _home = ResumeRoute('/dashboard');
 
 /// Maps [href] to where the app should go. Anything it does not recognise
 /// lands on the Start tab rather than on a broken screen.
-ResumeTarget resumeTargetFor(
-  String href, {
-  bool bibleYearRoute = kBibleYearRouteAvailable,
-}) {
+ResumeTarget resumeTargetFor(String href) {
   final uri = Uri.tryParse(href.trim());
   if (uri == null) return _home;
   if (uri.hasScheme && !(uri.host.endsWith('bijbelstudie.io') || uri.host == 'localhost')) {
@@ -82,9 +72,9 @@ ResumeTarget resumeTargetFor(
       return _studyTarget(segments, query);
     case 'studies':
       if (segments.length == 1) return const ResumeRoute('/studies');
-      if (segments[1] == 'bijbel-in-een-jaar') {
-        return ResumeRoute(bibleYearRoute ? bibleYearPath : '/studies');
-      }
+      // The removed "Bijbel in een jaar" page: an older server may still
+      // send its path, which lands on the Studies tab.
+      if (segments[1] == 'bijbel-in-een-jaar') return const ResumeRoute('/studies');
       if (segments.length == 2) return ResumeRoute('/studies/${Uri.encodeComponent(segments[1])}');
       return const ResumeRoute('/studies');
     case 'lezen':

@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
-import '../../bible_year/present/bible_year_providers.dart';
-import '../../dashboard/data/resume_link.dart';
 import '../../dashboard/data/resume_models.dart';
 import '../../dashboard/present/dashboard_providers.dart';
 import '../../dashboard/present/resume_providers.dart';
@@ -55,9 +53,6 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             ref.invalidate(curatedStudiesProvider);
             ref.invalidate(serverStudyLessonsProvider);
             ref.invalidate(studyEnrollmentsProvider);
-            if (ref.exists(bibleYearProvider)) {
-              await ref.read(bibleYearProvider.notifier).refresh();
-            }
             await ref.read(curatedStudiesProvider.future);
           },
           child: CustomScrollView(
@@ -308,18 +303,9 @@ class _Header extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Text('Studies', style: AppTheme.screenTitle),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const _BibleYearButton(),
-            ],
+          Semantics(
+            header: true,
+            child: Text('Studies', style: AppTheme.screenTitle),
           ),
           const SizedBox(height: 2),
           Text(
@@ -361,37 +347,6 @@ class _Header extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Compact entry to the reading plan, top-right of the header. Replaces the
-/// old row under the catalogue (DAILY_HABIT_PLAN.md §4) - the plan still has
-/// its own row in the menu, this is just a way in from the studies page.
-///
-/// A [SiteOutlineButton] like every other secondary action in the app, sized
-/// down to sit beside the screen title instead of carrying its own teal-tinted
-/// one-off design. Border, radius, label style and press feedback all come
-/// from the shared widget, so this reads as the same control as the outline
-/// buttons on the plan, profile and premium screens.
-class _BibleYearButton extends StatelessWidget {
-  const _BibleYearButton();
-
-  @override
-  Widget build(BuildContext context) {
-    AppTheme.dependOn(context);
-    return Tooltip(
-      message: 'Bijbel in een jaar',
-      child: Semantics(
-        label: 'Bijbel in een jaar',
-        child: SiteOutlineButton(
-          label: 'Jaarplan',
-          icon: Icons.calendar_month_outlined,
-          expand: false,
-          height: 36,
-          onPressed: () => context.push(bibleYearPath),
-        ),
       ),
     );
   }

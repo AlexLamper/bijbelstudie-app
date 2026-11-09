@@ -28,13 +28,11 @@ import '../../notes/present/sync_rejection_notice.dart';
 import '../../notes/present/verse_action_sheet.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../settings/data/reading_settings.dart';
-import '../../bible_year/present/plan_reader_tick.dart';
 import '../../study/domain/chapter_study_models.dart';
 import '../domain/bible_models.dart';
 import '../domain/copy_policy.dart';
 import '../domain/version_catalog.dart';
 import 'bible_providers.dart';
-import 'chapter_end_detector.dart';
 import 'reader_chrome.dart';
 import 'reader_header.dart';
 import 'reader_more_menu.dart';
@@ -463,28 +461,19 @@ class _ReadScreenState extends ConsumerState<ReadScreen> {
                       }
                       final locationKey =
                           '${location.versionId}/${location.book}/${location.chapter}';
-                      // Read to the end: ticks the chapter in a running
-                      // "Bijbel in een jaar" plan (a no-op without one).
-                      return ChapterEndDetector(
+                      // Keyed per chapter so the next chapter starts with
+                      // a fresh subtree.
+                      return ReaderChapterBody(
                         key: ValueKey(locationKey),
-                        onEnd: () => unawaited(
-                          tickPlanChapterAtEnd(
-                            ProviderScope.containerOf(context, listen: false),
-                            location.book,
-                            location.chapter,
-                          ),
-                        ),
-                        child: ReaderChapterBody(
-                          chapter: chapter,
-                          book: location.book,
-                          chapterNumber: location.chapter,
-                          settings: settings,
-                          scrollController: _scrollController,
-                          onVerseLongPress: (verse) =>
-                              _openVerseActions(chapter, verse),
-                          verseKey: (number) => _verseKey(locationKey, number),
-                          pulsingVerse: _pulsingVerse,
-                        ),
+                        chapter: chapter,
+                        book: location.book,
+                        chapterNumber: location.chapter,
+                        settings: settings,
+                        scrollController: _scrollController,
+                        onVerseLongPress: (verse) =>
+                            _openVerseActions(chapter, verse),
+                        verseKey: (number) => _verseKey(locationKey, number),
+                        pulsingVerse: _pulsingVerse,
                       );
                     },
                   ),
@@ -887,7 +876,6 @@ class _ToolSlot extends StatelessWidget {
 }
 
 /// The text of one chapter: verses, then the study link and attribution.
-/// Shared by the reader and the plan reader (`PlanReaderScreen`).
 class ReaderChapterBody extends StatelessWidget {
   const ReaderChapterBody({
     super.key,

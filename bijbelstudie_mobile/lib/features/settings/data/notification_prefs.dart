@@ -31,7 +31,6 @@ class NotificationPrefs {
     this.eveningEnabled = true,
     this.eveningMinutes = kDefaultEveningMinutes,
     this.verseEnabled = true,
-    this.planEnabled = true,
     this.studyEnabled = true,
     this.streakAtRiskEnabled = true,
     this.lessonHalfwayEnabled = true,
@@ -60,9 +59,8 @@ class NotificationPrefs {
   final bool eveningEnabled;
   final int eveningMinutes;
 
-  /// Content switches: "Tekst van de dag", "Leesplan", "Studie".
+  /// Content switches: "Tekst van de dag", "Studie".
   final bool verseEnabled;
-  final bool planEnabled;
   final bool studyEnabled;
 
   final bool streakAtRiskEnabled;
@@ -87,7 +85,7 @@ class NotificationPrefs {
   bool get studyReminderEnabled => masterEnabled;
 
   DailyContentPrefs get content =>
-      DailyContentPrefs(verse: verseEnabled, plan: planEnabled, study: studyEnabled);
+      DailyContentPrefs(verse: verseEnabled, study: studyEnabled);
 
   QuietHours get quietHours =>
       QuietHours(startMinutes: quietStartMinutes, endMinutes: quietEndMinutes);
@@ -123,7 +121,6 @@ class NotificationPrefs {
     bool? eveningEnabled,
     int? eveningMinutes,
     bool? verseEnabled,
-    bool? planEnabled,
     bool? studyEnabled,
     bool? streakAtRiskEnabled,
     bool? lessonHalfwayEnabled,
@@ -143,7 +140,6 @@ class NotificationPrefs {
       eveningEnabled: eveningEnabled ?? this.eveningEnabled,
       eveningMinutes: eveningMinutes ?? this.eveningMinutes,
       verseEnabled: verseEnabled ?? this.verseEnabled,
-      planEnabled: planEnabled ?? this.planEnabled,
       studyEnabled: studyEnabled ?? this.studyEnabled,
       streakAtRiskEnabled: streakAtRiskEnabled ?? this.streakAtRiskEnabled,
       lessonHalfwayEnabled: lessonHalfwayEnabled ?? this.lessonHalfwayEnabled,
@@ -163,7 +159,7 @@ class NotificationPrefs {
 const _p = 'notif.';
 
 /// The content switches under Instellingen > Meldingen.
-enum DailyContentKind { verse, plan, study }
+enum DailyContentKind { verse, study }
 
 final notificationPrefsProvider =
     NotifierProvider<NotificationPrefsController, NotificationPrefs>(
@@ -240,7 +236,6 @@ class NotificationPrefsController extends Notifier<NotificationPrefs> {
         eveningEnabled: prefs.getBool('${_p}eveningEnabled') ?? true,
         eveningMinutes: prefs.getInt('${_p}eveningMinutes') ?? kDefaultEveningMinutes,
         verseEnabled: prefs.getBool('${_p}verseEnabled') ?? true,
-        planEnabled: prefs.getBool('${_p}planEnabled') ?? true,
         studyEnabled: prefs.getBool('${_p}studyEnabled') ?? true,
         streakAtRiskEnabled: prefs.getBool('${_p}streakAtRiskEnabled') ?? true,
         lessonHalfwayEnabled: prefs.getBool('${_p}lessonHalfwayEnabled') ?? true,
@@ -301,18 +296,17 @@ class NotificationPrefsController extends Notifier<NotificationPrefs> {
     }, next);
   }
 
-  /// "Tekst van de dag" / "Leesplan" / "Studie".
+  /// "Tekst van de dag" / "Studie".
   Future<void> setContent(DailyContentKind kind, bool value) {
     final (key, next) = switch (kind) {
       DailyContentKind.verse => ('${_p}verseEnabled', state.copyWith(verseEnabled: value)),
-      DailyContentKind.plan => ('${_p}planEnabled', state.copyWith(planEnabled: value)),
       DailyContentKind.study => ('${_p}studyEnabled', state.copyWith(studyEnabled: value)),
     };
     return _write((p) => p.setBool(key, value), next);
   }
 
   /// Compatibility for callers from before the two daily slots (onboarding,
-  /// the Bijbel-in-een-jaar start flow, the permission sheet): a reminder
+  /// the permission sheet): a reminder
   /// time is the morning time; switching the reminder off is switching the
   /// reminders off. `enabled: true` changes nothing on its own - the master
   /// switch (and [enableIfUnset]) decide that.

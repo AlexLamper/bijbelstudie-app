@@ -32,7 +32,7 @@ Voor beginners én voor wie de Bijbel al jaren leest.
 ## Wat kun je ermee
 
 - **Lezen met uitleg ernaast** - Open een hoofdstuk en lees, met commentaar in een tweede paneel dat meescrollt met de tekst. Eerder gelezen hoofdstukken blijven beschikbaar zonder verbinding.
-- **Begeleide studies en leesplannen** - Stap voor stap door een bijbelboek of thema, in lessen die je in één zitting afmaakt. Een leesplan houdt bij waar je bent.
+- **Begeleide studies** - Stap voor stap door een bijbelboek of thema, in lessen die je in één zitting afmaakt. De app houdt bij waar je bent.
 - **Grondtekst** - Zie het oorspronkelijke Hebreeuws en Grieks bij het vers dat je leest, ook zonder de taal te kennen.
 - **Notities** - Schrijf je gedachten op bij een vers en vind ze later terug, op je telefoon en op de website.
 - **Vragen stellen** - Een AI-assistent die antwoordt vanuit de tekst die je open hebt, voor wanneer je vastloopt.

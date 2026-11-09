@@ -327,7 +327,6 @@ class NotificationPayload {
 final _allowedRoutes = <RegExp>[
   RegExp(r'^/dashboard$'),
   RegExp(r'^/read$'),
-  RegExp(r'^/studies/bijbel-in-een-jaar$'),
   RegExp(r'^/profile/boom$'),
   // The trial reminder: a subscriber sees their status and "Abonnement
   // beheren" here, never prices.

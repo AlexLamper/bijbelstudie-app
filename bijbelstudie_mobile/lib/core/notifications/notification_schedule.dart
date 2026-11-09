@@ -12,13 +12,12 @@ import 'notification_service.dart' show isAllowedNotificationRoute;
 
 /// What a daily notification is about. Mirrors `NotificationKind` in the
 /// website's `lib/notificationScheduleTypes.ts`, in its priority order:
-/// Bijbel in een jaar > study > last chapter read > just the verse. [other]
-/// is any kind a newer server sends that this build does not know; it is
-/// shown as-is (no content toggle filters it).
-enum ScheduleKind { bibleYear, study, chapter, verse, other }
+/// study > last chapter read > just the verse. [other] is any kind a newer
+/// server sends that this build does not know; it is shown as-is (no content
+/// toggle filters it).
+enum ScheduleKind { study, chapter, verse, other }
 
 ScheduleKind scheduleKindFrom(Object? raw) => switch (raw) {
-      'bibleYear' => ScheduleKind.bibleYear,
       'study' => ScheduleKind.study,
       'chapter' => ScheduleKind.chapter,
       'verse' => ScheduleKind.verse,
@@ -214,7 +213,10 @@ class NotificationScheduleRepository {
 
   final Dio? _dio;
 
-  static const cacheKey = 'notif.schedule.v1';
+  /// v2: v1 schedules could still carry "Bijbel in een jaar" tasks, a
+  /// removed feature; a fresh key makes sure none is ever shown again.
+  static const cacheKey = 'notif.schedule.v2';
+  static const _legacyCacheKey = 'notif.schedule.v1';
 
   /// A fetch younger than this is reused for launch/resume/settings runs; a
   /// progress change forces a new one.
@@ -237,6 +239,7 @@ class NotificationScheduleRepository {
     try {
       final p = await SharedPreferences.getInstance();
       await p.remove(cacheKey);
+      await p.remove(_legacyCacheKey);
     } catch (_) {}
   }
 
@@ -260,7 +263,7 @@ class NotificationScheduleRepository {
   /// for the same zone and [exclude]), otherwise the network, otherwise the
   /// cache however old. Never throws; null only when nothing was ever fetched.
   ///
-  /// [exclude] is the switched-off content kinds (`bibleYear,study,verse`);
+  /// [exclude] is the switched-off content kinds (`study,verse`);
   /// the server lets those fall through to the next task and leaves the
   /// verse out, so the words arrive already matching the toggles.
   Future<NotificationSchedule?> load({

@@ -215,7 +215,6 @@ class DashboardData {
     this.lastRead,
     this.dailyVerse,
     this.resume,
-    this.bibleYearActive,
     this.raw,
   });
 
@@ -262,12 +261,6 @@ class DashboardData {
   /// server that predates the field (or a cached payload it wrote); the card
   /// then falls back to what this device knows (`continueStudyProvider`).
   final DashboardResume? resume;
-
-  /// Whether a Bijbel-in-een-jaar plan is running: the response's
-  /// `bibleYear` (`BibleYearToday | null`) is present. Null when the server
-  /// predates the field - then only `GET /bible-year` can tell. Lets the
-  /// Start tab skip that request for the many readers without a plan.
-  final bool? bibleYearActive;
 
   /// The response this was parsed from, kept so the Start tab can be cached to
   /// disk and rendered on the first frame of a cold start
@@ -341,7 +334,6 @@ class DashboardData {
       lastRead: LastRead.fromJson(json['lastRead'] as Map<String, dynamic>?),
       dailyVerse: DailyVerse.fromJson(json['dailyVerse'] as Map<String, dynamic>?),
       resume: DashboardResume.fromJson(json['resume']),
-      bibleYearActive: json.containsKey('bibleYear') ? json['bibleYear'] is Map : null,
     );
   }
 }

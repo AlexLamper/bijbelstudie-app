@@ -30,7 +30,7 @@ import 'friends_providers.dart';
 // reader's own id, and no copy on this screen may let a visitor tell those
 // apart.
 
-/// The meta line when there is no plan day to show. Same as a kring row.
+/// The meta line under a friend's name. Same as a kring row.
 const String kProfileReadsAlong = 'Leest mee';
 const String kProfileBefriend = 'Vrienden worden';
 const String kProfileBefriending = 'Versturen...';
@@ -135,8 +135,8 @@ FriendKringState theirKringState(List<FriendSummary>? friends) {
 /// the reader is allowed to look at. It links on to the tree only when
 /// [FriendSummary.publicProfile] says that page is there.
 ///
-/// What is shown is graded by the server, not here: a non-friend's `streak`,
-/// `planDay` and `friendsSince` come back zeroed, so those lines are left off
+/// What is shown is graded by the server, not here: a non-friend's `streak`
+/// and `friendsSince` come back zeroed, so those lines are left off
 /// rather than printed as zeros, and `friends` is null rather than empty.
 class FriendProfileScreen extends ConsumerStatefulWidget {
   const FriendProfileScreen({super.key, required this.userId});
@@ -396,7 +396,7 @@ class _ProfileBody extends StatelessWidget {
                             children: [
                               Flexible(
                                 child: Text(
-                                  person.planLabel ?? kProfileReadsAlong,
+                                  kProfileReadsAlong,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: AppTheme.caption.copyWith(fontSize: 12.5),

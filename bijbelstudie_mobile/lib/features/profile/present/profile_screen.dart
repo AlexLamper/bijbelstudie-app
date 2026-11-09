@@ -299,7 +299,7 @@ class _HeaderBar extends ConsumerWidget {
   /// invite link is its own card further down ([InviteSection]) and gives away
   /// a week of Pro, which is not what a bare share button should do.
   ///
-  /// The text names what the app does - lezen, uitleg, aantekeningen, leesplan -
+  /// The text names what the app does - lezen, uitleg, aantekeningen, studies -
   /// instead of claiming the sender loves it. A testimonial someone else wrote
   /// is the one thing nobody forwards.
   ///
@@ -312,7 +312,7 @@ class _HeaderBar extends ConsumerWidget {
     try {
       await Share.share(
         'Met BijbelStudie lees je de Bijbel met uitleg erbij, maak je '
-        'aantekeningen en volg je een leesplan. Kijk zelf even: '
+        'aantekeningen en volg je begeleide studies. Kijk zelf even: '
         '${AppConfig.appLinkUrl}',
         sharePositionOrigin: origin,
       );

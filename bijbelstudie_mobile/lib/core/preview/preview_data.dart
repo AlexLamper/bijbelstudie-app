@@ -5,8 +5,6 @@ import '../db/content_cache.dart';
 import '../notifications/notification_schedule.dart';
 import '../../features/bible/domain/bible_models.dart';
 import '../../features/bible/present/bible_providers.dart';
-import '../../features/bible_year/data/bible_year_models.dart';
-import '../../features/bible_year/data/bible_year_repository.dart';
 import '../../features/dashboard/data/dashboard_models.dart';
 import '../../features/dashboard/data/daily_verse_store.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
@@ -297,9 +295,6 @@ class PreviewData {
         // forever - and a skeleton shimmers on a repeating controller, which is
         // what makes `pumpAndSettle` in the widget tests never return.
         treeStateProvider.overrideWith(PreviewTreeNotifier.new),
-        // Bijbel in een jaar: no plan, so the Start tab shows no card and the
-        // Studies tab its two option cards - and nothing reaches the network.
-        bibleYearRepositoryProvider.overrideWithValue(_PreviewBibleYearRepository()),
         // The resume card and the dashboard's study lists read these two. Left
         // real, each started a request that cannot succeed here - and the
         // secure-storage timeout it waits on outlives a widget test.
@@ -398,43 +393,4 @@ class _PreviewEnrollmentRepository implements EnrollmentRepository {
 
   @override
   Future<void> abandon(String studyId) async => throw _refused;
-}
-
-/// Answers `/bible-year` with "no plan" and refuses every write.
-class _PreviewBibleYearRepository extends BibleYearRepository {
-  _PreviewBibleYearRepository() : super(null, timeZone: () async => 'Europe/Amsterdam');
-
-  static const _refused = BibleYearException(
-    BibleYearErrorKind.server,
-    'Niet beschikbaar in de voorbeeldweergave.',
-  );
-
-  @override
-  Future<BibleYearState> fetchState() async => const BibleYearState();
-
-  @override
-  Future<Map<String, dynamic>> start(BibleYearStartBody body) async => throw _refused;
-
-  @override
-  Future<Map<String, dynamic>> restart(BibleYearStartBody body) async => throw _refused;
-
-  @override
-  Future<Map<String, dynamic>> shift() async => throw _refused;
-
-  @override
-  Future<Map<String, dynamic>> stop() async => throw _refused;
-
-  @override
-  Future<Map<String, dynamic>> markRefs(List<BibleYearChapterKey> refs, bool read) async =>
-      throw _refused;
-
-  @override
-  Future<Map<String, dynamic>> markDay(int day, bool read) async => throw _refused;
-
-  @override
-  Future<BibleYearSchedule> schedule(
-    BibleYearPlanKey plan,
-    BibleYearTrackKey track, {
-    int? version,
-  }) async => throw _refused;
 }

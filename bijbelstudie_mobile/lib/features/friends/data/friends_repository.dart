@@ -374,7 +374,7 @@ class FriendsRepository {
   /// gevonden" rather than drawing a blank card.
   ///
   /// Mind the grading on the way out: for a non-friend the server zeroes
-  /// `streak`, `planDay`, `planTotalDays` and `friendsSince`, and
+  /// `streak` and `friendsSince`, and
   /// [FriendProfileView.friends] is null, not `[]`. Check
   /// [FriendProfileView.isFriend] and [FriendProfileView.canSeeFriends].
   Future<FriendProfileView> getProfile(String userId) async {
@@ -649,8 +649,6 @@ class FriendsRepository {
       userId: userId,
       name: 'Marieke',
       streak: 12,
-      planDay: 42,
-      planTotalDays: 365,
       friendsSince: DateTime.now().subtract(const Duration(days: 96)),
       mutualCount: 2,
     ),
@@ -698,9 +696,9 @@ class FriendsRepository {
   FriendsKring _sampleKring() => FriendsKring(
     pendingIncoming: 1,
     friends: const [
-      FriendSummary(userId: 'u1', name: 'Marieke', streak: 12, planDay: 42, planTotalDays: 365),
+      FriendSummary(userId: 'u1', name: 'Marieke', streak: 12),
       FriendSummary(userId: 'u2', name: 'Jonathan', streak: 3),
-      FriendSummary(userId: 'u3', name: 'Hanna', streak: 0, planDay: 7, planTotalDays: 730),
+      FriendSummary(userId: 'u3', name: 'Hanna', streak: 0),
     ],
   );
 
@@ -725,7 +723,7 @@ class FriendsRepository {
           authorName: 'Jonathan',
           kind: FriendPostKind.milestone,
           createdAt: now.subtract(const Duration(hours: 5)),
-          body: 'Dag 30 van Bijbel in een jaar gehaald.',
+          body: '30 dagen op rij gelezen.',
           likeCount: 7,
           likedByMe: true,
           commentCount: 2,

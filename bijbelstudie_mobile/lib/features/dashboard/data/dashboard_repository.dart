@@ -82,8 +82,8 @@ class DashboardRepository {
           'version': version,
           if (commentary != null) 'commentary': commentary,
           if (awardXp != null) 'awardXp': awardXp,
-          // Opening a chapter no longer ticks it in "Bijbel in een jaar": the
-          // reader marks it once it is scrolled to the end (bible-year/mark).
+          // Never tick the chapter in a "Bijbel in een jaar" plan (a removed
+          // feature) - the server still auto-ticks for builds that omit this.
           'planTick': false,
         },
       );

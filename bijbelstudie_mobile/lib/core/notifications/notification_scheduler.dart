@@ -258,9 +258,8 @@ class NotificationRescheduler {
   /// How long a throttled request (a finished step) reuses the last fetch.
   static const throttleWindow = Duration(minutes: 2);
 
-  /// [contentChanged]: progress moved (a lesson finished, a chapter read, a
-  /// Bijbel-in-een-jaar portion marked, a plan started or stopped), so the
-  /// schedule's words are refetched instead of reused from the cache. Pass
+  /// [contentChanged]: progress moved (a lesson finished, a chapter read), so
+  /// the schedule's words are refetched instead of reused from the cache. Pass
   /// false for a settings change or a resume - the cached words are still
   /// right (or are refetched once they are stale anyway).
   ///

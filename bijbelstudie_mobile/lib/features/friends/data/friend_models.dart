@@ -15,7 +15,7 @@ enum FriendPostKind {
   /// A tekst van de dag someone hearted or shared.
   verse,
 
-  /// "Dag 30 van Bijbel in een jaar", a badge, a finished study.
+  /// A badge, a finished study.
   milestone,
 
   /// A note someone chose to share with their vriendenkring.
@@ -188,8 +188,6 @@ class FriendSummary {
     required this.name,
     this.image,
     this.streak = 0,
-    this.planDay,
-    this.planTotalDays,
     this.friendsSince,
     this.mutualCount,
     this.publicProfile,
@@ -206,10 +204,6 @@ class FriendSummary {
 
   /// Days in a row, for the row's flame. 0 when they have none.
   final int streak;
-
-  /// "Dag 42 van 365" is built from these two; both null without a plan.
-  final int? planDay;
-  final int? planTotalDays;
 
   final DateTime? friendsSince;
 
@@ -259,17 +253,11 @@ class FriendSummary {
     name: name,
     image: image,
     streak: streak,
-    planDay: planDay,
-    planTotalDays: planTotalDays,
     friendsSince: friendsSince,
     mutualCount: mutualCount,
     publicProfile: publicProfile,
     inContacts: true,
   );
-
-  /// "Dag 42 van 365", or null for someone who runs no reading plan.
-  String? get planLabel =>
-      planDay == null || planTotalDays == null ? null : 'Dag $planDay van $planTotalDays';
 
   factory FriendSummary.fromJson(Map<String, dynamic> json) {
     final since = json['friendsSince'];
@@ -278,8 +266,6 @@ class FriendSummary {
       name: (json['name'] as String?)?.trim() ?? '',
       image: (json['image'] as String?)?.trim(),
       streak: (json['streak'] as num?)?.toInt() ?? 0,
-      planDay: (json['planDay'] as num?)?.toInt(),
-      planTotalDays: (json['planTotalDays'] as num?)?.toInt(),
       friendsSince: since is String ? DateTime.tryParse(since)?.toLocal() : null,
       // No `?? 0`: an absent field has to stay absent all the way to the UI.
       mutualCount: (json['mutualCount'] as num?)?.toInt(),
@@ -332,7 +318,7 @@ class FriendsKring {
 /// * anyone who is not blocked sees [user], [friendCount], [mutualCount] and
 ///   the [mutuals] themselves - those are the reader's *own* friends, so no
 ///   new name reaches them;
-/// * [FriendSummary.streak], `planDay`, `planTotalDays` and `friendsSince` on
+/// * [FriendSummary.streak] and `friendsSince` on
 ///   [user] come back zeroed/null for a non-friend, so a profile card must not
 ///   read "0 dagen op rij" as a fact about them - check [isFriend] first;
 /// * [friends] is their whole kring **for an actual friend only**.

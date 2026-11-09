@@ -116,7 +116,7 @@ class _FriendRowState extends ConsumerState<FriendRow> {
                           children: [
                             Flexible(
                               child: Text(
-                                friend.planLabel ?? 'Leest mee',
+                                'Leest mee',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTheme.caption.copyWith(fontSize: 12.5),
@@ -344,7 +344,7 @@ class _FriendRequestRowState extends ConsumerState<FriendRequestRow> {
           ),
           const SizedBox(width: 8),
           if (widget.incoming) ...[
-            BibleYearStyleButton(
+            CompactPillButton(
               label: 'Accepteren',
               onPressed: _busy ? null : () => _act('accept'),
             ),
@@ -366,8 +366,8 @@ class _FriendRequestRowState extends ConsumerState<FriendRequestRow> {
 
 /// The small filled pill the request row uses. [SiteButton] is full-width by
 /// default and 48 high; inside a row this has to be the compact one.
-class BibleYearStyleButton extends StatelessWidget {
-  const BibleYearStyleButton({super.key, required this.label, this.onPressed});
+class CompactPillButton extends StatelessWidget {
+  const CompactPillButton({super.key, required this.label, this.onPressed});
 
   final String label;
   final VoidCallback? onPressed;

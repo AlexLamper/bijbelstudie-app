@@ -29,9 +29,8 @@ const discoverableHint =
 
 const autoShareMilestonesLabel = 'Mijlpalen';
 const autoShareMilestonesHint =
-    'Rond je een dag van je leesplan af, maak je een studie af, haal je een badge of lees '
-    'je 7, 30 of 100 dagen op rij? Dan komt dat als bericht in je kring. Dit is het enige '
-    'wat vanzelf geplaatst wordt.';
+    'Maak je een studie af, haal je een badge of lees je 7, 30 of 100 dagen op rij? Dan '
+    'komt dat als bericht in je kring. Dit is het enige wat vanzelf geplaatst wordt.';
 
 const autoShareVersesLabel = 'Tekst van de dag';
 const autoShareVersesHint =

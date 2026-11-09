@@ -31,20 +31,15 @@ enum PermissionMoment {
   /// A first badge, or a finished study.
   firstMilestone,
 
-  /// The reader picked "Elke dag om …" when starting Bijbel in een jaar: an
-  /// explicit request for a reminder, so it is offered even when an earlier
-  /// moment was declined (the OS decides whether its own dialog still shows).
-  planReminder,
-
   /// The vriendenkring moment: the reader just accepted a verzoek or sent one
   /// of their own. The social case has to be asked for separately, because what
   /// it asks for is different - "we laten je weten als er iets gebeurt in je
   /// kring", not "een zetje op je studiedag" - and because it is the one point
   /// where the reader has visibly chosen to have other people in the app.
   ///
-  /// Like [planReminder] it is exempt from the shared one-shot guard (it has
-  /// one of its own, [SocialNotificationStore.askSpent]), and like every other
-  /// moment it is never offered at launch or in onboarding.
+  /// It is exempt from the shared one-shot guard (it has one of its own,
+  /// [SocialNotificationStore.askSpent]), and like every other moment it is
+  /// never offered at launch or in onboarding.
   socialFirstFriend,
 }
 
@@ -61,8 +56,6 @@ extension PermissionMomentCopy on PermissionMoment {
         return 'Twee dagen op rij - mooi.';
       case PermissionMoment.firstMilestone:
         return 'Je hebt iets bereikt.';
-      case PermissionMoment.planReminder:
-        return 'Je leesplan staat klaar.';
       case PermissionMoment.socialFirstFriend:
         return 'Je kring wordt groter.';
     }
@@ -93,7 +86,6 @@ bool permissionMomentEarned(PermissionMoment moment, RetentionState state) {
   switch (moment) {
     case PermissionMoment.firstLesson:
     case PermissionMoment.firstMilestone:
-    case PermissionMoment.planReminder:
     // Only the kring UI knows a verzoek was just sent or accepted, so the
     // caller judges this one too.
     case PermissionMoment.socialFirstFriend:
@@ -131,11 +123,7 @@ Future<bool> maybeAskForNotifications(
   await store.loaded;
   if (!context.mounted) return false;
   final state = ref.read(retentionStoreProvider);
-  if (state.permissionAskedAfterFirstLesson &&
-      moment != PermissionMoment.planReminder &&
-      !social) {
-    return false;
-  }
+  if (state.permissionAskedAfterFirstLesson && !social) return false;
   // The vriendenkring ask has a guard of its own, so being exempt from the one
   // above still only buys it one sheet, ever.
   if (social && await SocialNotificationStore.askSpent()) return false;

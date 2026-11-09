@@ -7,7 +7,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_widgets.dart';
 import '../../../core/ui/skeleton.dart';
 import '../../bible/present/bible_providers.dart';
-import '../../bible_year/present/bible_year_providers.dart';
 import '../../friends/present/friends_providers.dart';
 import '../../onboarding/present/tour_controller.dart';
 import '../../study/present/study_pane_controller.dart';
@@ -73,9 +72,6 @@ class DashboardScreen extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(dashboardProvider);
               await ref.read(friendsFeedProvider.notifier).refresh();
-              if (ref.exists(bibleYearProvider)) {
-                await ref.read(bibleYearProvider.notifier).refresh();
-              }
             },
             child: _DashboardBody(data: data),
           ),
@@ -173,9 +169,8 @@ class _DashboardBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // One main card, never two: the reading plan while a plan runs
-              // and today is unfinished, else "Waar je gebleven was", else
-              // nothing. Together with the verse card it is "je startpunt",
+              // One main card: "Waar je gebleven was", else nothing.
+              // Together with the verse card it is "je startpunt",
               // which is what the tour's first step points at.
               TourAnchor(
                 id: TourAnchorIds.dashboardHero,

@@ -413,15 +413,6 @@ class _NotificationsSection extends ConsumerWidget {
                 },
               ),
               SettingsRow(
-                label: 'Leesplan',
-                subtitle: 'Bijbel in een jaar',
-                switchValue: prefs.planEnabled,
-                onSwitchChanged: (v) async {
-                  await prefsCtl.setContent(DailyContentKind.plan, v);
-                  bump();
-                },
-              ),
-              SettingsRow(
                 label: 'Studie',
                 subtitle: 'De les waar je gebleven was',
                 switchValue: prefs.studyEnabled,

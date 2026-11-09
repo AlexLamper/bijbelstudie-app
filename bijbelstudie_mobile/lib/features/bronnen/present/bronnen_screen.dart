@@ -23,7 +23,7 @@ class BronnenScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       // No top SafeArea: the header paints behind the status bar and pads its
-      // own content down, the same way the leesplan header does.
+      // own content down.
       body: SafeArea(
         top: false,
         bottom: false,
