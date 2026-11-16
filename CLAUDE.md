@@ -55,7 +55,8 @@ sign_in_with_apple (auth).
 - Licensed translations may be read but not harvested: `features/bible/domain/copy_policy.dart`
   holds the id list (mirror of the website's `lib/bibleCopyPolicy.ts`). Reader verses stay plain
   `Text.rich` — never `SelectableText`/`SelectionArea` for scripture. Whole-chapter share and the
-  bulk offline download are refused for a restricted translation; the verse sheet's Kopiëren row
+  bulk offline download are refused for a restricted translation, and its chapters are
+  held in memory only (never written to the sqflite content cache - see `BibleRepository._fetchRestricted`); the verse sheet's Kopiëren row
   (one verse + citation) stays on for every translation. `ApiClient` sends
   `X-Bs-Capabilities: copy-guard`; drop that header and the licensed translations vanish from the
   picker, by server design.
