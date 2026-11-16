@@ -6,6 +6,7 @@ import '../../../core/data/bible_books.dart';
 import '../../../core/db/content_cache.dart';
 import '../../auth/present/auth_controller.dart';
 import '../domain/bible_models.dart';
+import '../domain/copy_policy.dart';
 
 final bibleRepositoryProvider = Provider((ref) {
   return BibleRepository(ref.watch(apiClientProvider), ref.watch(contentCacheProvider));
@@ -24,6 +25,16 @@ class BibleRepository {
   final ContentCache? _cache;
 
   static const _kind = 'bible';
+
+  /// Licensed (copy-restricted) chapters are kept in memory only, never in the
+  /// on-device content cache: the licence lets the app show the text, not
+  /// store a growing copy of the translation on the phone. A small LRU keeps
+  /// paging back and forth in one sitting free of extra requests.
+  static const _restrictedMemoryChapters = 12;
+  final Map<String, _RawChapter> _restrictedMemory = {};
+
+  bool _isRestricted(String kind, String sourceId) =>
+      kind == _kind && isCopyRestricted(sourceId);
 
   Future<List<BibleSource>> getVersions() async {
     final response = await _apiClient.dio.get('/bibles');
@@ -144,6 +155,11 @@ class BibleRepository {
     required String book,
     required List<int> chapters,
   }) async* {
+    // The download button already refuses this (book_download_button.dart);
+    // this is the same rule at the layer that would write to disk.
+    if (isCopyRestricted(versionId)) {
+      throw StateError(copyRestrictedOfflineNotice);
+    }
     var done = 0;
     var failed = 0;
     for (final chapter in chapters) {
@@ -223,6 +239,9 @@ class BibleRepository {
     required int chapter,
     bool pinned = false,
   }) async {
+    if (_isRestricted(kind, sourceId)) {
+      return _fetchRestricted(path: path, sourceId: sourceId, book: book, chapter: chapter);
+    }
     final cached = await _cache?.read(
       kind: kind,
       sourceId: sourceId,
@@ -284,6 +303,40 @@ class BibleRepository {
     } on DioException catch (e) {
       // Offline or server trouble: cached text beats an error screen.
       if (cached != null) return _RawChapter(cached.payload, fromCache: true);
+      throw _mapError(e, sourceId);
+    }
+  }
+
+  /// A licensed chapter: network first, memory second, never disk.
+  Future<_RawChapter> _fetchRestricted({
+    required String path,
+    required String sourceId,
+    required String book,
+    required int chapter,
+  }) async {
+    final key = '$sourceId|$book|$chapter';
+    final remembered = _restrictedMemory.remove(key);
+    if (remembered != null) {
+      _restrictedMemory[key] = remembered; // most recently used last
+      return remembered;
+    }
+    try {
+      final response = await _apiClient.dio.get(path);
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Unexpected chapter payload',
+        );
+      }
+      final raw = _RawChapter(data, fromCache: false);
+      _restrictedMemory[key] = raw;
+      while (_restrictedMemory.length > _restrictedMemoryChapters) {
+        _restrictedMemory.remove(_restrictedMemory.keys.first);
+      }
+      return raw;
+    } on DioException catch (e) {
       throw _mapError(e, sourceId);
     }
   }

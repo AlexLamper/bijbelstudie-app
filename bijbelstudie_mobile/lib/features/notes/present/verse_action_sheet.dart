@@ -11,7 +11,6 @@ import '../../../core/ui/app_widgets.dart';
 import '../../bible/domain/bible_models.dart';
 import '../../bible/domain/copy_policy.dart';
 import '../../bible/present/bible_providers.dart';
-import '../../bible/present/hsv_verse_sheet.dart';
 import '../../commentary/present/commentary_jump.dart';
 import '../../commentary/present/original_verse_sheet.dart';
 import '../../crossrefs/present/crossref_providers.dart';
@@ -25,7 +24,7 @@ import 'sync_rejection_notice.dart';
 
 /// What the sheet was dismissed with. Only the note needs one: everything else
 /// the sheet offers is done before it closes.
-enum _VerseSheetResult { note, commentary, original, hsv, crossRefs }
+enum _VerseSheetResult { note, commentary, original, crossRefs }
 
 /// Long-press on a verse: highlight, commentary, grondtekst, note, bookmark,
 /// cross-references, share, copy.
@@ -99,12 +98,6 @@ Future<void> _runVerseSheet({
   if (result == _VerseSheetResult.original) {
     if (context.mounted) {
       await showOriginalVerseSheet(context: context, chapter: chapter, verse: verse);
-    }
-    return;
-  }
-  if (result == _VerseSheetResult.hsv) {
-    if (context.mounted) {
-      await showHsvVerseSheet(context: context, chapter: chapter, verse: verse);
     }
     return;
   }
@@ -433,15 +426,6 @@ class _VerseActionSheet extends ConsumerWidget {
     // The count is a courtesy, not a gate. It reads the cache only, so a
     // long-press costs no request: the row opens either way and simply says
     // nothing until this chapter's references have been fetched once.
-    // Null while the index is still in flight, which hides the row rather than
-    // offering a verse we may not quote.
-    final hasHsv =
-        ref.watch(hsvIndexProvider).asData?.value.has(
-          chapter.book,
-          chapter.chapter,
-          verse.number,
-        ) ??
-        false;
     final crossRefCount = ref
         .watch(
           cachedCrossRefChapterProvider(
@@ -495,18 +479,6 @@ class _VerseActionSheet extends ConsumerWidget {
                     label: 'Grondtekst bij vers ${verse.number}',
                   ),
                 ),
-                // Only on the fifty verses Stichting HSV lets this product
-                // quote free of charge; on every other verse the row is simply
-                // not there. The index is coordinates, not text, so asking the
-                // question costs nothing - see hsv_repository.dart.
-                if (hasHsv)
-                  RuleListTile(
-                    onTap: () => Navigator.of(context).pop(_VerseSheetResult.hsv),
-                    child: const _ActionRow(
-                      icon: Icons.format_quote_outlined,
-                      label: 'Herziene Statenvertaling',
-                    ),
-                  ),
                 TourAnchor(
                   id: TourAnchorIds.sheetNote,
                   child: RuleListTile(
